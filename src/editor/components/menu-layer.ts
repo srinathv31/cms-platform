@@ -17,14 +17,24 @@ const SCROLL_SETTLE_MS = 450;
 /** The element menus are portalled into. */
 export function menuContainer(editor: Editor): HTMLElement {
   const dom = viewDom(editor);
-  return dom?.closest<HTMLElement>(".ucomp-editor, .ucomp-field") ?? document.body;
+  return (
+    dom?.closest<HTMLElement>(".ucomp-editor, .ucomp-field") ?? document.body
+  );
 }
 
 function scrollParent(el: Element): HTMLElement {
   const doc = el.ownerDocument;
-  for (let node = el.parentElement; node && node !== doc.body; node = node.parentElement) {
+  for (
+    let node = el.parentElement;
+    node && node !== doc.body;
+    node = node.parentElement
+  ) {
     const { overflowY } = getComputedStyle(node);
-    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
+    if (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      node.scrollHeight > node.clientHeight
+    )
+      return node;
   }
   return (doc.scrollingElement as HTMLElement | null) ?? doc.documentElement;
 }
@@ -34,7 +44,13 @@ function scrollParent(el: Element): HTMLElement {
  * once when there already was, after the scroll otherwise, or at once when scrolling can't help).
  * Returns a cancel function.
  */
-export function makeRoomBelow(context: Element, anchor: DOMRect | null, height: number, gap: number, ready: () => void): () => void {
+export function makeRoomBelow(
+  context: Element,
+  anchor: DOMRect | null,
+  height: number,
+  gap: number,
+  ready: () => void,
+): () => void {
   if (!anchor || height <= 0) {
     ready();
     return () => {};
@@ -42,14 +58,20 @@ export function makeRoomBelow(context: Element, anchor: DOMRect | null, height: 
   const doc = context.ownerDocument;
   const win = doc.defaultView;
   const container = scrollParent(context);
-  const isPage = container === doc.scrollingElement || container === doc.documentElement;
+  const isPage =
+    container === doc.scrollingElement || container === doc.documentElement;
   const viewportBottom = win?.innerHeight ?? 0;
-  const box = isPage ? { top: 0, bottom: viewportBottom } : container.getBoundingClientRect();
+  const box = isPage
+    ? { top: 0, bottom: viewportBottom }
+    : container.getBoundingClientRect();
   const visibleTop = Math.max(box.top, 0);
   const visibleBottom = Math.min(box.bottom, viewportBottom);
 
-  const needed = Math.ceil(anchor.bottom + gap + height + VIEWPORT_PADDING - visibleBottom);
-  const canScroll = container.scrollHeight - container.clientHeight - container.scrollTop;
+  const needed = Math.ceil(
+    anchor.bottom + gap + height + VIEWPORT_PADDING - visibleBottom,
+  );
+  const canScroll =
+    container.scrollHeight - container.clientHeight - container.scrollTop;
   // The caret's line must stay in view after the scroll.
   const keepsCaret = anchor.top - needed >= visibleTop + VIEWPORT_PADDING;
   if (needed <= 0 || canScroll < needed || !keepsCaret) {

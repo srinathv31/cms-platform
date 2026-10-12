@@ -34,7 +34,9 @@ function following<T extends object>(target: () => T) {
       if (Object.hasOwn(own, key)) return Reflect.get(own, key);
       const current = target();
       const value = Reflect.get(current, key, current) as unknown;
-      return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(current) : value;
+      return typeof value === "function"
+        ? (value as (...args: unknown[]) => unknown).bind(current)
+        : value;
     },
     has: (_, key) => Reflect.has(own, key) || Reflect.has(target(), key),
   });
@@ -61,7 +63,10 @@ interface DatabaseFiles<D> {
  * `db` and `libsql` follow whichever copy `freshDatabasePerTest()` last switched to, so a test may keep them
  * in a variable; spread them into what the `vi.mock` factory returns.
  */
-export function tempDatabase<S extends Record<string, unknown>>(prefix: string, schema: S) {
+export function tempDatabase<S extends Record<string, unknown>>(
+  prefix: string,
+  schema: S,
+) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   const template = join(dir, "test.db");
   const first = open(template, schema);
@@ -129,9 +134,15 @@ export function freshDatabasePerTest<D>(opts: {
 
   beforeAll(async () => {
     const mocked = (await opts.client()) as { __files?: DatabaseFiles<D> };
-    if (!mocked.__files) throw new Error("freshDatabasePerTest() needs the database module mocked with tempDatabase()");
+    if (!mocked.__files)
+      throw new Error(
+        "freshDatabasePerTest() needs the database module mocked with tempDatabase()",
+      );
     files = mocked.__files;
-    if (opts.migrate !== false) await migrate(files.db as Parameters<typeof migrate>[0], { migrationsFolder: MIGRATIONS });
+    if (opts.migrate !== false)
+      await migrate(files.db as Parameters<typeof migrate>[0], {
+        migrationsFolder: MIGRATIONS,
+      });
     await opts.build?.(files.db);
     await files.freeze();
   }, 60_000);

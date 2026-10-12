@@ -32,7 +32,11 @@ export function AppSidebar({ children }: { children: ReactNode }) {
         <div
           className="contents"
           onClickCapture={(event) => {
-            if (event.target instanceof Element && event.target.closest("a[href]")) setOpenMobile(false);
+            if (
+              event.target instanceof Element &&
+              event.target.closest("a[href]")
+            )
+              setOpenMobile(false);
           }}
         >
           {children}

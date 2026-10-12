@@ -3,8 +3,20 @@
 
 import type { ChannelFields } from "../channel-fields";
 import type { Refused } from "../refusals";
-import { DOCUMENT_THREAD, type LifecycleEffect, type VersionStage } from "../review-types";
-import type { Channel, ContractChange, JSONContent, RevokeRecord, SampleSet, Variable, VersionState } from "../types";
+import {
+  DOCUMENT_THREAD,
+  type LifecycleEffect,
+  type VersionStage,
+} from "../review-types";
+import type {
+  Channel,
+  ContractChange,
+  JSONContent,
+  RevokeRecord,
+  SampleSet,
+  Variable,
+  VersionState,
+} from "../types";
 
 export interface LifecycleResult<C> {
   changes: C;

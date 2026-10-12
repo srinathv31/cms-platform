@@ -18,10 +18,16 @@ export const CHANNEL_HUE: Readonly<Record<Channel, (typeof SERIES)[number]>> = {
   push: SERIES[3],
   sms: SERIES[4],
 };
-export const CHANNEL_SERIES: StackSeries[] = CHANNELS.map((c) => ({ label: CHANNEL_LABELS[c], ...CHANNEL_HUE[c] }));
+export const CHANNEL_SERIES: StackSeries[] = CHANNELS.map((c) => ({
+  label: CHANNEL_LABELS[c],
+  ...CHANNEL_HUE[c],
+}));
 
 /** A push logged before the platform was kept: no phone to name, so no hue. */
-const UNRECORDED = { label: `${CHANNEL_LABELS.push} · not recorded`, bg: "bg-heat-empty" } as const;
+const UNRECORDED = {
+  label: `${CHANNEL_LABELS.push} · not recorded`,
+  bg: "bg-heat-empty",
+} as const;
 
 /**
  * The channel mix of one template's Usage tab: a part for each channel its content type allows, in the
@@ -29,10 +35,15 @@ const UNRECORDED = { label: `${CHANNEL_LABELS.push} · not recorded`, bg: "bg-he
  * step fainter, so they read as one channel and tell apart by their names, which the legend prints with
  * each share (decision 0039). Pushes that predate the platform get a part of their own while there are any.
  */
-export function templateMixParts(d: Pick<TemplateUsageData, "channels" | "byChannel" | "pushByPlatform">): MixPart[] {
+export function templateMixParts(
+  d: Pick<TemplateUsageData, "channels" | "byChannel" | "pushByPlatform">,
+): MixPart[] {
   return d.channels.flatMap((channel): MixPart[] => {
     const bg = CHANNEL_HUE[channel].bg;
-    if (channel !== "push") return [{ label: CHANNEL_LABELS[channel], value: d.byChannel[channel], bg }];
+    if (channel !== "push")
+      return [
+        { label: CHANNEL_LABELS[channel], value: d.byChannel[channel], bg },
+      ];
     return [
       ...PUSH_PLATFORMS.map((platform, i) => ({
         label: `${CHANNEL_LABELS.push} · ${PLATFORM_LABELS[platform]}`,
@@ -40,7 +51,15 @@ export function templateMixParts(d: Pick<TemplateUsageData, "channels" | "byChan
         bg,
         faded: i > 0,
       })),
-      ...(d.pushByPlatform.unrecorded > 0 ? [{ label: UNRECORDED.label, value: d.pushByPlatform.unrecorded, bg: UNRECORDED.bg }] : []),
+      ...(d.pushByPlatform.unrecorded > 0
+        ? [
+            {
+              label: UNRECORDED.label,
+              value: d.pushByPlatform.unrecorded,
+              bg: UNRECORDED.bg,
+            },
+          ]
+        : []),
     ];
   });
 }

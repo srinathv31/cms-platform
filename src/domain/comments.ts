@@ -31,7 +31,13 @@ import {
   type NotificationLink,
 } from "./review-types";
 import { fieldsOfChannels } from "./channel-fields";
-import { asNumbered, compareRounds, reviewLink, versionLabel, type RoundRef } from "./rounds";
+import {
+  asNumbered,
+  compareRounds,
+  reviewLink,
+  versionLabel,
+  type RoundRef,
+} from "./rounds";
 import type { Channel, PermissionResult, VersionState, Viewer } from "./types";
 
 // ── Limits and sentences ──────────────────────────────────────
@@ -44,9 +50,15 @@ export const QUOTE_MAX = 500;
 /** What a refused comment returns (who may comment at all comes from `REASONS`). */
 export const COMMENT_REFUSALS = {
   empty: refusal("comment_empty", "Write a comment first."),
-  tooLong: refusal("comment_too_long", `Keep a comment under ${formatCount(COMMENT_MAX)} characters.`),
+  tooLong: refusal(
+    "comment_too_long",
+    `Keep a comment under ${formatCount(COMMENT_MAX)} characters.`,
+  ),
   noBlock: refusal("block_gone", "That block isn't in this version any more."),
-  closed: refusal("comments_closed", "Only a draft or a version in review takes comments."),
+  closed: refusal(
+    "comments_closed",
+    "Only a draft or a version in review takes comments.",
+  ),
 } as const;
 
 // ── Facts ─────────────────────────────────────────────────────
@@ -77,7 +89,11 @@ export interface CommentTemplate {
   /** The template has an open draft. Its margin shows every thread of the template. */
   hasDraft: boolean;
   /** The version in review, if there is one. Its screen shows the threads that began by its round. */
-  inReview: { number: number; round: number; stageApproverIds: readonly string[] } | null;
+  inReview: {
+    number: number;
+    round: number;
+    stageApproverIds: readonly string[];
+  } | null;
   /** The round the open draft's submit will be (`nextRound`): a thread begun in the draft counts as it. */
   next: RoundRef;
 }
@@ -87,7 +103,10 @@ export interface CommentThread {
   id: string;
   blockId: string;
   status: "open" | "resolved";
-  origin: Pick<CommentVersion, "id" | "number" | "round" | "state" | "createdBy" | "submittedBy">;
+  origin: Pick<
+    CommentVersion,
+    "id" | "number" | "round" | "state" | "createdBy" | "submittedBy"
+  >;
 }
 
 /** A `comment_threads` row to insert. */
@@ -135,7 +154,11 @@ export function takesComments(state: VersionState): boolean {
  * the round the draft will be. (A thread begun in v4's review is not part of v2's record, and one begun
  * in the draft that resubmits v1 is not part of v1 round 1's.)
  */
-export function threadBeganBy(origin: RoundRef | null, through: RoundRef, next: RoundRef): boolean {
+export function threadBeganBy(
+  origin: RoundRef | null,
+  through: RoundRef,
+  next: RoundRef,
+): boolean {
   return compareRounds(origin ?? next, through) <= 0;
 }
 
@@ -145,7 +168,10 @@ export function threadBeganBy(origin: RoundRef | null, through: RoundRef, next: 
  * each block of the body (`blockIds`, top-level and nested). A thread on a field is about its whole text,
  * as one on a block is about the block's.
  */
-export function commentAnchors(blockIds: readonly string[], channels: readonly Channel[]): string[] {
+export function commentAnchors(
+  blockIds: readonly string[],
+  channels: readonly Channel[],
+): string[] {
   return [...fieldsOfChannels(channels).map((field) => field.id), ...blockIds];
 }
 
@@ -158,13 +184,22 @@ export function commentAnchors(blockIds: readonly string[], channels: readonly C
  */
 export function canComment(
   viewer: Viewer,
-  input: { teamId: string; version: Pick<CommentVersion, "state" | "stageApproverIds"> },
+  input: {
+    teamId: string;
+    version: Pick<CommentVersion, "state" | "stageApproverIds">;
+  },
 ): PermissionResult {
   const { version } = input;
-  const named = version.state === "in_review" ? [...version.stageApproverIds] : [];
-  const permitted = can(viewer, "review.comment", { teamId: input.teamId, stageApproverIds: named });
+  const named =
+    version.state === "in_review" ? [...version.stageApproverIds] : [];
+  const permitted = can(viewer, "review.comment", {
+    teamId: input.teamId,
+    stageApproverIds: named,
+  });
   if (!permitted.ok) return permitted;
-  return takesComments(version.state) ? permitted : refuse(COMMENT_REFUSALS.closed);
+  return takesComments(version.state)
+    ? permitted
+    : refuse(COMMENT_REFUSALS.closed);
 }
 
 /**
@@ -179,11 +214,17 @@ export function canActOnThread(
 ): PermissionResult {
   const { template, thread } = input;
   const review = template.inReview;
-  const onReview = review !== null && threadBeganBy(originOf(thread), review, template.next);
+  const onReview =
+    review !== null && threadBeganBy(originOf(thread), review, template.next);
   const named = onReview ? [...review.stageApproverIds] : [];
-  const permitted = can(viewer, "review.comment", { teamId: template.teamId, stageApproverIds: named });
+  const permitted = can(viewer, "review.comment", {
+    teamId: template.teamId,
+    stageApproverIds: named,
+  });
   if (!permitted.ok) return permitted;
-  return template.hasDraft || onReview ? permitted : refuse(COMMENT_REFUSALS.closed);
+  return template.hasDraft || onReview
+    ? permitted
+    : refuse(COMMENT_REFUSALS.closed);
 }
 
 // ── What a comment may say ────────────────────────────────────
@@ -198,7 +239,11 @@ export function commentText(body: string): Outcome<{ body: string }> {
 
 // ── Transitions ───────────────────────────────────────────────
 
-export type AddCommentResult = Outcome<{ thread: NewThread; comment: NewComment; effects: LifecycleEffect[] }>;
+export type AddCommentResult = Outcome<{
+  thread: NewThread;
+  comment: NewComment;
+  effects: LifecycleEffect[];
+}>;
 
 /**
  * Starts a thread on one block of a version or one of its fields (or on the whole version:
@@ -226,7 +271,11 @@ export function addComment(input: {
   if (!allowed.ok) return allowed;
   const text = commentText(input.body);
   if (!text.ok) return text;
-  if (blockId !== DOCUMENT_THREAD && version.state !== "draft" && !input.blockIds.includes(blockId)) {
+  if (
+    blockId !== DOCUMENT_THREAD &&
+    version.state !== "draft" &&
+    !input.blockIds.includes(blockId)
+  ) {
     return refuse(COMMENT_REFUSALS.noBlock);
   }
   const quote = input.quote?.trim().slice(0, QUOTE_MAX) || null;
@@ -235,7 +284,13 @@ export function addComment(input: {
     {
       kind: "audit",
       action: "comment.added",
-      details: { threadId, blockId, number: version.number, round: version.round, ...(quote ? { quote } : {}) },
+      details: {
+        threadId,
+        blockId,
+        number: version.number,
+        round: version.round,
+        ...(quote ? { quote } : {}),
+      },
     },
     ...notifyEach([authorOf(version)], viewer.userId, {
       title: `${viewer.name} commented on ${versionPhrase(template.name, version)}.`,
@@ -257,12 +312,21 @@ export function addComment(input: {
       resolvedAt: null,
       createdAt: now,
     },
-    comment: newComment(input.commentId, threadId, viewer.userId, text.body, now),
+    comment: newComment(
+      input.commentId,
+      threadId,
+      viewer.userId,
+      text.body,
+      now,
+    ),
     effects,
   };
 }
 
-export type ReplyResult = Outcome<{ comment: NewComment; effects: LifecycleEffect[] }>;
+export type ReplyResult = Outcome<{
+  comment: NewComment;
+  effects: LifecycleEffect[];
+}>;
 
 /**
  * Adds a reply to a thread, open or resolved (a reply doesn't reopen it). Everyone who has written in the
@@ -299,18 +363,35 @@ export function reply(input: {
         reply: true,
       },
     },
-    ...notifyEach([authorOf(thread.origin), ...input.participants], viewer.userId, {
-      title: `${viewer.name} replied on ${versionPhrase(template.name, thread.origin)}.`,
-      body: text.body,
-      link: commentLink(template.id, thread.origin),
-    }),
+    ...notifyEach(
+      [authorOf(thread.origin), ...input.participants],
+      viewer.userId,
+      {
+        title: `${viewer.name} replied on ${versionPhrase(template.name, thread.origin)}.`,
+        body: text.body,
+        link: commentLink(template.id, thread.origin),
+      },
+    ),
   ];
 
-  return { ok: true, comment: newComment(input.commentId, thread.id, viewer.userId, text.body, now), effects };
+  return {
+    ok: true,
+    comment: newComment(
+      input.commentId,
+      thread.id,
+      viewer.userId,
+      text.body,
+      now,
+    ),
+    effects,
+  };
 }
 
 /** `changes` is null when the thread already has the asked status: a second click writes nothing, and is still ok. */
-export type ThreadStatusResult = Outcome<{ changes: ThreadStatusChanges | null; effects: LifecycleEffect[] }>;
+export type ThreadStatusResult = Outcome<{
+  changes: ThreadStatusChanges | null;
+  effects: LifecycleEffect[];
+}>;
 
 /** Resolves an open thread: who resolved it and when, and an audit row. */
 export function resolveThread(input: {
@@ -333,7 +414,12 @@ export function reopenThread(input: {
 }
 
 function setStatus(
-  input: { viewer: Viewer; template: CommentTemplate; thread: CommentThread; now: Date },
+  input: {
+    viewer: Viewer;
+    template: CommentTemplate;
+    thread: CommentThread;
+    now: Date;
+  },
   to: "open" | "resolved",
 ): ThreadStatusResult {
   const { viewer, template, thread, now } = input;
@@ -352,7 +438,12 @@ function setStatus(
       {
         kind: "audit",
         action: to === "resolved" ? "thread.resolved" : "thread.reopened",
-        details: { threadId: thread.id, blockId: thread.blockId, number: thread.origin.number, round: thread.origin.round },
+        details: {
+          threadId: thread.id,
+          blockId: thread.blockId,
+          number: thread.origin.number,
+          round: thread.origin.round,
+        },
       },
     ],
   };
@@ -361,7 +452,9 @@ function setStatus(
 // ── Who hears about it ────────────────────────────────────────
 
 /** Who a comment on a version tells: whoever submitted it, else whoever started its draft. */
-function authorOf(version: Pick<CommentVersion, "createdBy" | "submittedBy">): string {
+function authorOf(
+  version: Pick<CommentVersion, "createdBy" | "submittedBy">,
+): string {
   return version.submittedBy ?? version.createdBy;
 }
 
@@ -374,7 +467,12 @@ function notifyEach(
   return [...new Set(userIds)]
     .filter((userId) => userId !== actorId)
     .sort()
-    .map((userId) => ({ kind: "notification", notification: "comment_added", to: { kind: "user", userId }, ...n }));
+    .map((userId) => ({
+      kind: "notification",
+      notification: "comment_added",
+      to: { kind: "user", userId },
+      ...n,
+    }));
 }
 
 /**
@@ -391,7 +489,11 @@ function commentLink(
   const review = reviewLink(templateId, asNumbered(version));
   if (version.state === "in_review") return review;
   const { versionNumber: number, round } = review;
-  return { to: "template", templateId, reviewVersion: round === undefined ? { number } : { number, round } };
+  return {
+    to: "template",
+    templateId,
+    reviewVersion: round === undefined ? { number } : { number, round },
+  };
 }
 
 /** "the draft of Spring Travel", "Spring Travel v2", or "Spring Travel v1, round 2" once v1 was sent back. */
@@ -408,7 +510,12 @@ function originOf(thread: Pick<CommentThread, "origin">): RoundRef | null {
   return thread.origin.number === null ? null : asNumbered(thread.origin);
 }
 
-function newComment(id: string, threadId: string, authorId: string, body: string, now: Date): NewComment {
+function newComment(
+  id: string,
+  threadId: string,
+  authorId: string,
+  body: string,
+  now: Date,
+): NewComment {
   return { id, threadId, authorId, body, kind: "comment", createdAt: now };
 }
-

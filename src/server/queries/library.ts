@@ -4,11 +4,21 @@ import { desc, eq } from "drizzle-orm";
 import { sunsetDay } from "@/domain/business-zone";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
-import { contentTypes, teams, templates, users, versions } from "@/server/db/schema/ucomp";
+import {
+  contentTypes,
+  teams,
+  templates,
+  users,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import { ALL_SPACE } from "@/domain/permissions";
 import { compareRounds, type RoundRow } from "@/domain/rounds";
-import { contentTypeFamily, type ChannelFamily, type VersionState } from "@/domain/types";
+import {
+  contentTypeFamily,
+  type ChannelFamily,
+  type VersionState,
+} from "@/domain/types";
 import { formatAgo } from "@/domain/dates";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 
@@ -43,78 +53,87 @@ export interface LibraryRow {
 export function pickLatest<T extends RoundRow>(list: T[]): T | undefined {
   const draft = list.find((v) => v.state === "draft");
   if (draft) return draft;
-  return list.reduce<T | undefined>((best, v) => (best === undefined || compareRounds(v, best) > 0 ? v : best), undefined);
+  return list.reduce<T | undefined>(
+    (best, v) => (best === undefined || compareRounds(v, best) > 0 ? v : best),
+    undefined,
+  );
 }
 
 /** Templates in a space ("all" = every team), newest edit first. Caller has already passed requireSpace. */
-export const getLibraryRows = cache(async (spaceSlug: string): Promise<LibraryRow[]> => {
-  const nowDate = await demoNow();
-  const zone = await getBusinessZone();
+export const getLibraryRows = cache(
+  async (spaceSlug: string): Promise<LibraryRow[]> => {
+    const nowDate = await demoNow();
+    const zone = await getBusinessZone();
 
-  const templateRows = await db
-    .select({
-      id: templates.id,
-      allowedChannels: contentTypes.allowedChannels,
-      teamSlug: teams.slug,
-      teamName: teams.name,
-      ownerName: users.name,
-      ownerInitials: users.initials,
-      ownerHue: users.avatarHue,
-    })
-    .from(templates)
-    .innerJoin(teams, eq(teams.id, templates.teamId))
-    .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
-    .innerJoin(users, eq(users.id, templates.createdBy))
-    .where(spaceSlug === ALL_SPACE ? undefined : eq(teams.slug, spaceSlug));
+    const templateRows = await db
+      .select({
+        id: templates.id,
+        allowedChannels: contentTypes.allowedChannels,
+        teamSlug: teams.slug,
+        teamName: teams.name,
+        ownerName: users.name,
+        ownerInitials: users.initials,
+        ownerHue: users.avatarHue,
+      })
+      .from(templates)
+      .innerJoin(teams, eq(teams.id, templates.teamId))
+      .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
+      .innerJoin(users, eq(users.id, templates.createdBy))
+      .where(spaceSlug === ALL_SPACE ? undefined : eq(teams.slug, spaceSlug));
 
-  if (templateRows.length === 0) return [];
+    if (templateRows.length === 0) return [];
 
-  // Light columns only: never load `body` for a list.
-  const versionRows = await db
-    .select({
-      templateId: versions.templateId,
-      number: versions.number,
-      round: versions.round,
-      state: versions.state,
-      name: versions.name,
-      sunsetAt: versions.sunsetAt,
-      updatedAt: versions.updatedAt,
-    })
-    .from(versions)
-    .orderBy(desc(versions.updatedAt));
+    // Light columns only: never load `body` for a list.
+    const versionRows = await db
+      .select({
+        templateId: versions.templateId,
+        number: versions.number,
+        round: versions.round,
+        state: versions.state,
+        name: versions.name,
+        sunsetAt: versions.sunsetAt,
+        updatedAt: versions.updatedAt,
+      })
+      .from(versions)
+      .orderBy(desc(versions.updatedAt));
 
-  const byTemplate = new Map<string, typeof versionRows>();
-  for (const v of versionRows) {
-    const list = byTemplate.get(v.templateId);
-    if (list) list.push(v);
-    else byTemplate.set(v.templateId, [v]);
-  }
+    const byTemplate = new Map<string, typeof versionRows>();
+    for (const v of versionRows) {
+      const list = byTemplate.get(v.templateId);
+      if (list) list.push(v);
+      else byTemplate.set(v.templateId, [v]);
+    }
 
-  const rows = templateRows.map((t) => {
-    const list = byTemplate.get(t.id) ?? [];
-    const latest = pickLatest(list);
-    const active = list.find((v) => v.state === "active");
-    const edited = list.reduce<Date | null>(
-      (max, v) => (max === null || v.updatedAt > max ? v.updatedAt : max),
-      null,
-    );
-    return {
-      row: {
-        id: t.id,
-        name: latest?.name ?? t.id,
-        family: contentTypeFamily(t.allowedChannels),
-        teamSlug: t.teamSlug,
-        teamName: t.teamName,
-        status: latest?.state ?? ("draft" as VersionState),
-        sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
-        sunsetPassed: latest ? sunsetPassed(latest, nowDate) : false,
-        activeNumber: active?.number ?? null,
-        lastEdited: edited ? formatAgo(edited, nowDate) : "—",
-        owner: { name: t.ownerName, initials: t.ownerInitials, hue: t.ownerHue },
-      } satisfies LibraryRow,
-      editedAt: edited?.getTime() ?? 0,
-    };
-  });
+    const rows = templateRows.map((t) => {
+      const list = byTemplate.get(t.id) ?? [];
+      const latest = pickLatest(list);
+      const active = list.find((v) => v.state === "active");
+      const edited = list.reduce<Date | null>(
+        (max, v) => (max === null || v.updatedAt > max ? v.updatedAt : max),
+        null,
+      );
+      return {
+        row: {
+          id: t.id,
+          name: latest?.name ?? t.id,
+          family: contentTypeFamily(t.allowedChannels),
+          teamSlug: t.teamSlug,
+          teamName: t.teamName,
+          status: latest?.state ?? ("draft" as VersionState),
+          sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
+          sunsetPassed: latest ? sunsetPassed(latest, nowDate) : false,
+          activeNumber: active?.number ?? null,
+          lastEdited: edited ? formatAgo(edited, nowDate) : "—",
+          owner: {
+            name: t.ownerName,
+            initials: t.ownerInitials,
+            hue: t.ownerHue,
+          },
+        } satisfies LibraryRow,
+        editedAt: edited?.getTime() ?? 0,
+      };
+    });
 
-  return rows.sort((a, b) => b.editedAt - a.editedAt).map((r) => r.row);
-});
+    return rows.sort((a, b) => b.editedAt - a.editedAt).map((r) => r.row);
+  },
+);

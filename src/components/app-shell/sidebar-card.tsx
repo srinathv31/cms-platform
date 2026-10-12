@@ -31,7 +31,6 @@ function readDismissed(key: string): boolean {
   }
 }
 
-
 interface CardContent {
   title: string;
   /** One or two quiet lines. */
@@ -50,13 +49,22 @@ function contentOf(card: SidebarCardModel): CardContent {
             ? `${card.firstName} asked for ${ROLE_LABEL[card.role]} access.`
             : `${card.firstName} and ${plural(card.count - 1, "other")} asked for access.`,
         ],
-        action: { label: "Review", href: `/${card.teamSlug}/settings/access-requests` },
+        action: {
+          label: "Review",
+          href: `/${card.teamSlug}/settings/access-requests`,
+        },
       };
     case "recert_due":
       return {
         title: "Recertification due",
-        lines: [`${card.label} · due ${formatShortDate(card.dueAt)}`, card.progressLabel],
-        action: { label: "Review", href: `/${card.teamSlug}/settings/recertification` },
+        lines: [
+          `${card.label} · due ${formatShortDate(card.dueAt)}`,
+          card.progressLabel,
+        ],
+        action: {
+          label: "Review",
+          href: `/${card.teamSlug}/settings/recertification`,
+        },
       };
     case "my_request":
       return {

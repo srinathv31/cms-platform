@@ -22,14 +22,24 @@ describe("GET /sim/deliveries/[deliveryId]/view", () => {
     expect(read).toHaveBeenCalledWith("dlv_1");
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(await res.json()).toEqual({ ok: true, view: { id: "dlv_1", channel: "web" } });
+    expect(await res.json()).toEqual({
+      ok: true,
+      view: { id: "dlv_1", channel: "web" },
+    });
   });
 
   it("answers 404 with only the sentence when there is no such delivery", async () => {
-    read.mockResolvedValue({ ok: false, reason: "That delivery doesn't exist.", status: 404 });
+    read.mockResolvedValue({
+      ok: false,
+      reason: "That delivery doesn't exist.",
+      status: 404,
+    });
     const res = await get("dlv_nope");
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ ok: false, reason: "That delivery doesn't exist." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      reason: "That delivery doesn't exist.",
+    });
   });
 
   it("answers GET only", async () => {

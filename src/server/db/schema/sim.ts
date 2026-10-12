@@ -2,7 +2,13 @@
 // UCOMP code must never import this file (enforced by ESLint). The simulator reaches
 // UCOMP only through /api/v1, like a real consumer.
 
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 /** The channels Coral sends and stores deliveries for. Its own type: Coral reaches Stencil only over /api/v1. */
 export type SimChannel = "pdf" | "web" | "email" | "push" | "sms";
@@ -24,7 +30,13 @@ export const simOffers = sqliteTable("sim_offers", {
   headline: text("headline").notNull(), // "Spend $1,000 in 3 months, get $200 back"; an alert's: when it's sent
   // annualFee in dollars ("95" when mapped); endsOn is a YYYY-MM-DD day (Phase 5: offer.* mapping fields).
   // Null for an alert.
-  terms: json<{ spend: number; bonus: number; months: number; annualFee?: number; endsOn?: string }>("terms"),
+  terms: json<{
+    spend: number;
+    bonus: number;
+    months: number;
+    annualFee?: number;
+    endsOn?: string;
+  }>("terms"),
 });
 
 export const simCustomers = sqliteTable("sim_customers", {
@@ -42,7 +54,9 @@ export const simCustomers = sqliteTable("sim_customers", {
   cardLast4: text("card_last4").notNull(), // "4821"
   // The card's account, for the alerts' mapping fields. Canonical values; null when the card has none.
   statement: json<{ minimumDue: string; dueDate: string }>("statement"), // "35.00", "2026-10-21"
-  lastPurchase: json<{ amount: string; merchant: string; country: string }>("last_purchase"), // "48.20", "Café Lisboa", "Portugal"
+  lastPurchase: json<{ amount: string; merchant: string; country: string }>(
+    "last_purchase",
+  ), // "48.20", "Café Lisboa", "Portugal"
 });
 
 /** One link per offer. Relinking updates the row (new pinned version, mapping, channels). */
@@ -90,7 +104,10 @@ export const simDeliveries = sqliteTable(
     output: text("output"),
     at: ts("at").notNull(),
   },
-  (t) => [index("sim_deliveries_offer_at").on(t.offerId, t.at), index("sim_deliveries_batch").on(t.batchId)],
+  (t) => [
+    index("sim_deliveries_offer_at").on(t.offerId, t.at),
+    index("sim_deliveries_batch").on(t.batchId),
+  ],
 );
 
 export const simNoticeReads = sqliteTable("sim_notice_reads", {

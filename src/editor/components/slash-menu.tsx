@@ -24,9 +24,18 @@ import { useEffect, useId, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import { Command, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
+import {
+  Command,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "@/components/ui/command";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import type { BlockItem, BlockItemId, ShortcutToken } from "../extensions/block-items";
+import type {
+  BlockItem,
+  BlockItemId,
+  ShortcutToken,
+} from "../extensions/block-items";
 import type { SlashRender } from "../extensions/slash-command";
 import { viewDom } from "../lib/editor-view";
 import { isApple } from "../lib/platform";
@@ -86,7 +95,8 @@ export function createSlashMenuController(): SlashMenuController {
     // After the plugin's update settles; only if the document is exactly as the + left it.
     setTimeout(() => {
       const { editor, doc } = pending;
-      if (!editor.isDestroyed && editor.state.doc === doc) editor.commands.undo();
+      if (!editor.isDestroyed && editor.state.doc === doc)
+        editor.commands.undo();
     }, 0);
   };
 
@@ -102,7 +112,9 @@ export function createSlashMenuController(): SlashMenuController {
     },
     onUpdate: (props) => {
       // While the next query's items resolve, keep showing the previous ones (no flicker).
-      store.setState(props.loading ? { props } : { props, items: props.items, index: 0 });
+      store.setState(
+        props.loading ? { props } : { props, items: props.items, index: 0 },
+      );
     },
     onExit: () => {
       store.setState(CLOSED);
@@ -146,18 +158,45 @@ const KEYCAP =
   "h-5 min-w-5 rounded-md border border-hairline bg-surface-sunken px-1 font-sans text-[11px] font-medium text-text-muted";
 
 // Where the menu waits (invisible) until Suggestion's mount() places it at the caret.
-const PARKED = { position: "fixed", top: 0, left: 0, visibility: "hidden" } as const;
+const PARKED = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  visibility: "hidden",
+} as const;
 
-const HIGHLIGHT_SPRING = { type: "spring", stiffness: 560, damping: 44, mass: 0.9 } as const;
+const HIGHLIGHT_SPRING = {
+  type: "spring",
+  stiffness: 560,
+  damping: 44,
+  mass: 0.9,
+} as const;
 
-export function SlashMenu({ controller, editor }: { controller: SlashMenuController; editor: Editor }) {
-  const open = useStore(controller.store, (s) => s.props !== null && s.items.length > 0);
+export function SlashMenu({
+  controller,
+  editor,
+}: {
+  controller: SlashMenuController;
+  editor: Editor;
+}) {
+  const open = useStore(
+    controller.store,
+    (s) => s.props !== null && s.items.length > 0,
+  );
   const session = useStore(controller.store, (s) => s.session);
   if (!open) return null;
-  return <SlashMenuPanel key={session} controller={controller} editor={editor} />;
+  return (
+    <SlashMenuPanel key={session} controller={controller} editor={editor} />
+  );
 }
 
-function SlashMenuPanel({ controller, editor }: { controller: SlashMenuController; editor: Editor }) {
+function SlashMenuPanel({
+  controller,
+  editor,
+}: {
+  controller: SlashMenuController;
+  editor: Editor;
+}) {
   const { store } = controller;
   const items = useStore(store, (s) => s.items);
   const index = useStore(store, (s) => s.index);
@@ -187,7 +226,9 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
     const dom = viewDom(editor);
     if (!element || !dom) return;
     const list = element.querySelector<HTMLElement>("[cmdk-list]");
-    const option = element.querySelector<HTMLElement>('[cmdk-item][data-selected="true"]');
+    const option = element.querySelector<HTMLElement>(
+      '[cmdk-item][data-selected="true"]',
+    );
     if (list && option) keepInView(list, option);
     if (list?.id) dom.setAttribute("aria-controls", list.id);
     if (option?.id) dom.setAttribute("aria-activedescendant", option.id);
@@ -221,7 +262,8 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
             value={selected ?? ""}
             onValueChange={(value) => {
               const next = items.findIndex((item) => item.id === value);
-              if (next >= 0 && next !== store.getState().index) store.setState({ index: next });
+              if (next >= 0 && next !== store.getState().index)
+                store.setState({ index: next });
             }}
             className="rounded-xl! bg-transparent p-1"
           >
@@ -250,7 +292,10 @@ function SlashMenuPanel({ controller, editor }: { controller: SlashMenuControlle
                     {item.shortcut || item.markdown ? (
                       <CommandShortcut className="tracking-normal">
                         <KbdGroup className="gap-0.5">
-                          {(item.shortcut ? keyLabels(item.shortcut) : [item.markdown!]).map((key, i) => (
+                          {(item.shortcut
+                            ? keyLabels(item.shortcut)
+                            : [item.markdown!]
+                          ).map((key, i) => (
                             <Kbd key={`${key}-${i}`} className={KEYCAP}>
                               {key}
                             </Kbd>

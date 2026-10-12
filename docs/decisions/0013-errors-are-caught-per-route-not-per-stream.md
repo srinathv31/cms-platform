@@ -18,11 +18,11 @@ so the question was where to catch: at each `<Stream>`, so the rest of the page 
 
 Three route-level boundaries, sharing one look ([route-error.tsx](../../src/components/app-shell/route-error.tsx)):
 
-| Boundary | Catches | Keeps |
-| --- | --- | --- |
-| [(product)/error.tsx](../../src/app/(product)/error.tsx) | Any page inside the app frame, the team guard, the settings dialog, the workspace's own layout. | The sidebar and the top bar. |
-| [templates/[templateId]/error.tsx](../../src/app/(product)/[team]/templates/[templateId]/error.tsx) | A workspace tab (Content, Versions, Usage, Activity). | The workspace header and the tab bar, with the frame. |
-| [global-error.tsx](../../src/app/global-error.tsx) | The app frame's streamed parts, the root layout, and the simulator. | Nothing: it renders its own document with the app's styles and fonts, and no providers. |
+| Boundary                                                                                              | Catches                                                                                         | Keeps                                                                                   |
+| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [(product)/error.tsx](<../../src/app/(product)/error.tsx>)                                            | Any page inside the app frame, the team guard, the settings dialog, the workspace's own layout. | The sidebar and the top bar.                                                            |
+| [templates/[templateId]/error.tsx](<../../src/app/(product)/[team]/templates/[templateId]/error.tsx>) | A workspace tab (Content, Versions, Usage, Activity).                                           | The workspace header and the tab bar, with the frame.                                   |
+| [global-error.tsx](../../src/app/global-error.tsx)                                                    | The app frame's streamed parts, the root layout, and the simulator.                             | Nothing: it renders its own document with the app's styles and fonts, and no providers. |
 
 Each says what happened in one plain sentence ("This page didn't load", "This tab didn't load."), offers Try
 again (Next 16's `retry`, which re-fetches the route from the server) and Back to library, and shows the digest

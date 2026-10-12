@@ -6,7 +6,11 @@ import { sunsetDay, sunsetInstant } from "@/domain/business-zone";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
-import { BUSINESS_ZONE_KEY, countPendingSunsets, readBusinessZone } from "./business-zone";
+import {
+  BUSINESS_ZONE_KEY,
+  countPendingSunsets,
+  readBusinessZone,
+} from "./business-zone";
 
 // The business time zone's setting, and the migration that moved every stored sunset from midnight UTC
 // to 00:00 Eastern on the same day (decision 0017), run on a seeded database.
@@ -37,46 +41,65 @@ describe("the business time zone setting", () => {
 
   it("is Eastern with no row, the row's zone once set, and Eastern again for a zone off the list", async () => {
     expect(await readBusinessZone(db)).toBe(NY);
-    await db.insert(settings).values({ key: BUSINESS_ZONE_KEY, value: "America/Chicago" });
+    await db
+      .insert(settings)
+      .values({ key: BUSINESS_ZONE_KEY, value: "America/Chicago" });
     expect(await readBusinessZone(db)).toBe("America/Chicago");
-    await db.update(settings).set({ value: "Mars/Olympus_Mons" }).where(eq(settings.key, BUSINESS_ZONE_KEY));
+    await db
+      .update(settings)
+      .set({ value: "Mars/Olympus_Mons" })
+      .where(eq(settings.key, BUSINESS_ZONE_KEY));
     expect(await readBusinessZone(db)).toBe(NY);
   });
 
   it("counts the Superseded versions whose sunset is still to come", async () => {
     // The seed's one sunset: Balance Transfer v1, 21 days after the base.
     expect(await countPendingSunsets(db, BASE)).toBe(1);
-    expect(await countPendingSunsets(db, new Date(BASE.getTime() + 30 * DAY))).toBe(0);
+    expect(
+      await countPendingSunsets(db, new Date(BASE.getTime() + 30 * DAY)),
+    ).toBe(0);
   });
 });
 
 describe("the migration to 00:00 Eastern", () => {
   const folder = "./src/server/db/migrations";
-  const file = readdirSync(folder).find((name) => name.endsWith("_sunset_business_zone.sql"))!;
+  const file = readdirSync(folder).find((name) =>
+    name.endsWith("_sunset_business_zone.sql"),
+  )!;
   const sql = readFileSync(`${folder}/${file}`, "utf8");
   const sunsets = async () =>
     Object.fromEntries(
-      (await db.select({ id: versions.id, sunsetAt: versions.sunsetAt }).from(versions).where(isNotNull(versions.sunsetAt))).map((v) => [
-        v.id,
-        v.sunsetAt!.toISOString(),
-      ]),
+      (
+        await db
+          .select({ id: versions.id, sunsetAt: versions.sunsetAt })
+          .from(versions)
+          .where(isNotNull(versions.sunsetAt))
+      ).map((v) => [v.id, v.sunsetAt!.toISOString()]),
     );
   /** Sets the demo clock so that "now" is `at`, as the migration reads it (real time plus the offset). */
   const clockAt = (at: Date) =>
-    db.update(settings).set({ value: (at.getTime() - Date.now()) / DAY }).where(eq(settings.key, "clock_offset_days"));
+    db
+      .update(settings)
+      .set({ value: (at.getTime() - Date.now()) / DAY })
+      .where(eq(settings.key, "clock_offset_days"));
 
   let seeded: Record<string, string>;
   beforeAll(async () => {
     seeded = await sunsets();
   });
   afterEach(async () => {
-    await db.update(settings).set({ value: 0 }).where(eq(settings.key, "clock_offset_days"));
+    await db
+      .update(settings)
+      .set({ value: 0 })
+      .where(eq(settings.key, "clock_offset_days"));
   });
 
   it("leaves the seed's sunsets alone: they are already 00:00 Eastern", async () => {
     expect(Object.values(seeded)).toHaveLength(1);
     const [at] = Object.values(seeded);
-    expect(sunsetInstant(sunsetDay(new Date(at!), NY), NY).toISOString()).toBe(at);
+    expect(sunsetInstant(sunsetDay(new Date(at!), NY), NY).toISOString()).toBe(
+      at,
+    );
     await libsql.execute(sql);
     expect(await sunsets()).toEqual(seeded);
   });
@@ -95,17 +118,25 @@ describe("the migration to 00:00 Eastern", () => {
     ];
     try {
       for (const [day, expected] of cases) {
-        await db.update(versions).set({ sunsetAt: new Date(`${day}T00:00:00.000Z`) }).where(eq(versions.id, id!));
+        await db
+          .update(versions)
+          .set({ sunsetAt: new Date(`${day}T00:00:00.000Z`) })
+          .where(eq(versions.id, id!));
         await libsql.execute(sql);
         const moved = (await sunsets())[id!];
         expect(moved, day).toBe(expected);
-        expect(moved, `${day}, the rule's instant`).toBe(sunsetInstant(day, NY).toISOString());
+        expect(moved, `${day}, the rule's instant`).toBe(
+          sunsetInstant(day, NY).toISOString(),
+        );
         // A second run changes nothing.
         await libsql.execute(sql);
         expect((await sunsets())[id!], `${day}, run twice`).toBe(expected);
       }
     } finally {
-      await db.update(versions).set({ sunsetAt: new Date(seeded[id!]!) }).where(eq(versions.id, id!));
+      await db
+        .update(versions)
+        .set({ sunsetAt: new Date(seeded[id!]!) })
+        .where(eq(versions.id, id!));
     }
   });
 
@@ -113,7 +144,10 @@ describe("the migration to 00:00 Eastern", () => {
     const [id] = Object.keys(seeded);
     const legacy = new Date("2027-03-01T00:00:00.000Z"); // 7 PM Eastern on February 28
     try {
-      await db.update(versions).set({ sunsetAt: legacy }).where(eq(versions.id, id!));
+      await db
+        .update(versions)
+        .set({ sunsetAt: legacy })
+        .where(eq(versions.id, id!));
       // Two hours after it passed; 00:00 Eastern would still be three hours away.
       await clockAt(new Date(legacy.getTime() + 2 * 3_600_000));
       await libsql.execute(sql);
@@ -124,7 +158,10 @@ describe("the migration to 00:00 Eastern", () => {
       await libsql.execute(sql);
       expect((await sunsets())[id!]).toBe("2027-03-01T05:00:00.000Z");
     } finally {
-      await db.update(versions).set({ sunsetAt: new Date(seeded[id!]!) }).where(eq(versions.id, id!));
+      await db
+        .update(versions)
+        .set({ sunsetAt: new Date(seeded[id!]!) })
+        .where(eq(versions.id, id!));
     }
   });
 });

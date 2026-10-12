@@ -6,7 +6,12 @@ import { sunsetDay } from "@/domain/business-zone";
 import { typeLabel } from "@/domain/contract";
 import { contractDiff } from "@/domain/golive/contract-diff";
 import { contractJsonSchema, exampleOf } from "@/domain/golive/json-schema";
-import { CONSUMER_ERRORS, integrationSamples, renderPathOf, RESPONSE_FORMATS } from "@/domain/golive/samples";
+import {
+  CONSUMER_ERRORS,
+  integrationSamples,
+  renderPathOf,
+  RESPONSE_FORMATS,
+} from "@/domain/golive/samples";
 import type { IntegrationPanelData } from "@/domain/golive-types";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { can } from "@/domain/permissions";
@@ -16,7 +21,14 @@ import { refusal, type ReadResult } from "@/server/api/reads";
 import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
-import { consumers, contentTypes, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  consumers,
+  contentTypes,
+  renderLog,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 
 // The integration panel (the sheet behind the template's "Share" ring): what a consumer needs to
 // call the render API for the Active version. `loadIntegrationPanel` serves
@@ -29,11 +41,21 @@ async function sampleConsumer(templateId: string): Promise<string> {
     .select({ id: renderLog.consumerId })
     .from(renderLog)
     .innerJoin(consumers, eq(consumers.id, renderLog.consumerId))
-    .where(and(eq(renderLog.templateId, templateId), eq(renderLog.isPreview, false), isNotNull(renderLog.consumerId)))
+    .where(
+      and(
+        eq(renderLog.templateId, templateId),
+        eq(renderLog.isPreview, false),
+        isNotNull(renderLog.consumerId),
+      ),
+    )
     .orderBy(desc(renderLog.at))
     .limit(1);
   if (recent?.id) return recent.id;
-  const [first] = await db.select({ id: consumers.id }).from(consumers).orderBy(asc(consumers.id)).limit(1);
+  const [first] = await db
+    .select({ id: consumers.id })
+    .from(consumers)
+    .orderBy(asc(consumers.id))
+    .limit(1);
   return first?.id ?? "coral";
 }
 
@@ -41,7 +63,10 @@ async function sampleConsumer(templateId: string): Promise<string> {
  * The panel's data, or null when the template doesn't exist or has no Active version. Everything in it
  * is what consumers get from `/api/v1`, the name included: the Active version's, not an open draft's.
  */
-export async function getIntegrationPanel(templateId: string, origin: string): Promise<IntegrationPanelData | null> {
+export async function getIntegrationPanel(
+  templateId: string,
+  origin: string,
+): Promise<IntegrationPanelData | null> {
   const [row] = await db
     .select({
       id: templates.id,
@@ -57,7 +82,10 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
   if (!row) return null;
   const { allowedChannels, ...found } = row;
 
-  const all = await db.select().from(versions).where(eq(versions.templateId, found.id));
+  const all = await db
+    .select()
+    .from(versions)
+    .where(eq(versions.templateId, found.id));
   const active = all.find((v) => v.state === "active" && v.number !== null);
   if (!active) return null;
   const activeNumber = active.number!;
@@ -65,7 +93,9 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
 
   // What the render route accepts: turned on for the version and still allowed by the content type
   // (Channel rules can turn a channel off after the version went Active).
-  const channels = CHANNELS.filter((c) => active.channels.includes(c) && allowedChannels.includes(c));
+  const channels = CHANNELS.filter(
+    (c) => active.channels.includes(c) && allowedChannels.includes(c),
+  );
   const consumerId = await sampleConsumer(template.id);
   const path = renderPathOf(template.id);
   const base = origin.replace(/\/+$/, "");
@@ -79,12 +109,21 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
   const zone = await getBusinessZone();
   const at = await now();
   const older = all
-    .filter((v) => (v.state === "superseded" || v.state === "revoked") && v.number !== null && v.number < activeNumber)
+    .filter(
+      (v) =>
+        (v.state === "superseded" || v.state === "revoked") &&
+        v.number !== null &&
+        v.number < activeNumber,
+    )
     .sort((a, b) => b.number! - a.number!);
 
   return {
     template,
-    active: { number: activeNumber, activatedAt: (active.activatedAt ?? active.createdAt).toISOString(), channels },
+    active: {
+      number: activeNumber,
+      activatedAt: (active.activatedAt ?? active.createdAt).toISOString(),
+      channels,
+    },
     contract: active.variables.map((v) => ({
       key: v.key,
       label: v.label,
@@ -110,7 +149,10 @@ export async function getIntegrationPanel(templateId: string, origin: string): P
     responses: [...RESPONSE_FORMATS],
     errors: [...CONSUMER_ERRORS],
     since: older.map((v) => {
-      const diff = contractDiff({ number: v.number!, variables: v.variables }, { number: activeNumber, variables: active.variables });
+      const diff = contractDiff(
+        { number: v.number!, variables: v.variables },
+        { number: activeNumber, variables: active.variables },
+      );
       return {
         number: v.number!,
         state: v.state,
@@ -127,14 +169,22 @@ const Input = z.object({ templateId: z.string().trim().min(1).max(64) });
 /** "https://ucomp.example": the origin the page was requested on (behind a proxy, its forwarded host). */
 async function requestOrigin(): Promise<string> {
   const h = await headers();
-  const host = h.get("x-forwarded-host")?.split(",")[0]?.trim() || h.get("host") || "localhost:3000";
+  const host =
+    h.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    h.get("host") ||
+    "localhost:3000";
   const forwarded = h.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const proto = forwarded || (/^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host) ? "http" : "https");
+  const proto =
+    forwarded ||
+    (/^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host) ? "http" : "https");
   return `${proto}://${host}`;
 }
 
 /** The panel for someone who may see the integration details; read-only, so nothing is refreshed or audited. */
-export async function loadIntegrationPanel(viewer: Viewer, input: { templateId: string }): Promise<ReadResult<{ panel: IntegrationPanelData }>> {
+export async function loadIntegrationPanel(
+  viewer: Viewer,
+  input: { templateId: string },
+): Promise<ReadResult<{ panel: IntegrationPanelData }>> {
   const parsed = Input.safeParse(input);
   if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateGone);
   const { templateId } = parsed.data;
@@ -146,9 +196,13 @@ export async function loadIntegrationPanel(viewer: Viewer, input: { templateId: 
     .limit(1);
   if (!template) return refusal(404, REQUEST_REFUSALS.templateGone);
 
-  const permitted = can(viewer, "integration.view", { teamId: template.teamId });
+  const permitted = can(viewer, "integration.view", {
+    teamId: template.teamId,
+  });
   if (!permitted.ok) return refusal(403, permitted);
 
   const panel = await getIntegrationPanel(templateId, await requestOrigin());
-  return panel ? { ok: true, panel } : refusal(409, REQUEST_REFUSALS.noActiveVersion);
+  return panel
+    ? { ok: true, panel }
+    : refusal(409, REQUEST_REFUSALS.noActiveVersion);
 }

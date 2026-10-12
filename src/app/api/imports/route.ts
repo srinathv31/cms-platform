@@ -1,10 +1,22 @@
 import type { NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/domain/arrival-cookies";
-import { IMPORT_LIMITS, IMPORT_REFUSALS, JUST_IMPORTED_COOKIE, type ImportResponse } from "@/domain/import-types";
+import {
+  JUST_CREATED_COOKIE,
+  JUST_CREATED_MAX_AGE,
+} from "@/domain/arrival-cookies";
+import {
+  IMPORT_LIMITS,
+  IMPORT_REFUSALS,
+  JUST_IMPORTED_COOKIE,
+  type ImportResponse,
+} from "@/domain/import-types";
 import { refuse } from "@/domain/refusals";
-import { importPermission, importStatus, importTemplate } from "@/server/import/create";
+import {
+  importPermission,
+  importStatus,
+  importTemplate,
+} from "@/server/import/create";
 import { readBodyCapped } from "@/server/api/read-body";
 import { getViewer } from "@/server/viewer";
 
@@ -23,7 +35,10 @@ import { getViewer } from "@/server/viewer";
 const MULTIPART_SLACK = 64 * 1024;
 
 function respond(body: ImportResponse): Response {
-  return Response.json(body, { status: importStatus(body), headers: { "Cache-Control": "no-store" } });
+  return Response.json(body, {
+    status: importStatus(body),
+    headers: { "Cache-Control": "no-store" },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -37,13 +52,16 @@ export async function POST(request: NextRequest) {
   // Too large: refused from the declared length when there is one, else as soon as the count passes it.
   const cap = IMPORT_LIMITS.maxBytes + MULTIPART_SLACK;
   const tooLarge = refuse(IMPORT_REFUSALS.size);
-  if (Number(request.headers.get("content-length")) > cap) return respond(tooLarge);
+  if (Number(request.headers.get("content-length")) > cap)
+    return respond(tooLarge);
   const body = await readBodyCapped(request.body, cap);
   if (!body.ok) return respond(tooLarge);
 
   let form: FormData;
   try {
-    form = await new Response(body.bytes, { headers: { "content-type": request.headers.get("content-type") ?? "" } }).formData();
+    form = await new Response(body.bytes, {
+      headers: { "content-type": request.headers.get("content-type") ?? "" },
+    }).formData();
   } catch {
     return respond(refuse(IMPORT_REFUSALS.unreadable));
   }
@@ -51,12 +69,19 @@ export async function POST(request: NextRequest) {
 
   const result = await importTemplate(viewer, {
     teamSlug,
-    file: file instanceof File ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null,
+    file:
+      file instanceof File
+        ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }
+        : null,
   });
 
   if (result.ok) {
     const jar = await cookies();
-    const cookie = { path: "/", sameSite: "lax" as const, maxAge: JUST_CREATED_MAX_AGE };
+    const cookie = {
+      path: "/",
+      sameSite: "lax" as const,
+      maxAge: JUST_CREATED_MAX_AGE,
+    };
     jar.set(JUST_CREATED_COOKIE, result.templateId, cookie);
     jar.set(JUST_IMPORTED_COOKIE, result.templateId, cookie);
     revalidatePath("/[team]/library", "page");

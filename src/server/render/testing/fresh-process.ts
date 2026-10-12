@@ -11,7 +11,11 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { assertNever } from "@/domain/assert-never";
-import type { RenderDoc, RenderError, RenderTarget } from "@/domain/render/types";
+import type {
+  RenderDoc,
+  RenderError,
+  RenderTarget,
+} from "@/domain/render/types";
 import type { Channel } from "@/domain/types";
 import { renderPdf } from "@/server/render/channels/pdf";
 import { runEngine, type RenderBody } from "@/server/render/engine";
@@ -55,26 +59,40 @@ await server.close();
 `;
 
 /** Runs `jobs`, in order, in a new Node process; resolves with one result per job. */
-export function renderInFreshProcess(jobs: readonly FreshJob[]): Promise<FreshResult[]> {
+export function renderInFreshProcess(
+  jobs: readonly FreshJob[],
+): Promise<FreshResult[]> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["--input-type=module", "-e", CHILD], {
-      cwd: ROOT,
-      env: {
-        ...process.env,
-        FRESH_CONFIG: path.join(ROOT, "vitest.config.mts"),
-        FRESH_ENTRY: "/src/server/render/testing/fresh-process.ts",
+    const child = spawn(
+      process.execPath,
+      ["--input-type=module", "-e", CHILD],
+      {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          FRESH_CONFIG: path.join(ROOT, "vitest.config.mts"),
+          FRESH_ENTRY: "/src/server/render/testing/fresh-process.ts",
+        },
+        stdio: ["pipe", "pipe", "pipe"],
       },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    );
     let out = "";
     let err = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk: string) => (out += chunk));
-    child.stderr.setEncoding("utf8").on("data", (chunk: string) => (err += chunk));
+    child.stdout
+      .setEncoding("utf8")
+      .on("data", (chunk: string) => (out += chunk));
+    child.stderr
+      .setEncoding("utf8")
+      .on("data", (chunk: string) => (err += chunk));
     child.on("error", reject);
     child.on("close", (code) => {
       const at = out.lastIndexOf(MARKER);
       if (code !== 0 || at < 0) {
-        reject(new Error(`The fresh render process failed (exit ${code}).\n${err.slice(-4000)}`));
+        reject(
+          new Error(
+            `The fresh render process failed (exit ${code}).\n${err.slice(-4000)}`,
+          ),
+        );
         return;
       }
       resolve(JSON.parse(out.slice(at + MARKER.length)) as FreshResult[]);
@@ -84,18 +102,36 @@ export function renderInFreshProcess(jobs: readonly FreshJob[]): Promise<FreshRe
 }
 
 /** The child's side: runs each job in order. Exported for the child process only. */
-export async function runJobs(jobs: readonly FreshJob[]): Promise<FreshResult[]> {
+export async function runJobs(
+  jobs: readonly FreshJob[],
+): Promise<FreshResult[]> {
   const results: FreshResult[] = [];
   for (const job of jobs) {
     if ("pdfDoc" in job) {
-      const bytes = await renderPdf(job.pdfDoc, { createdAt: new Date(job.at) });
-      results.push({ name: job.name, ok: true, body: Buffer.from(bytes).toString("base64"), error: null });
+      const bytes = await renderPdf(job.pdfDoc, {
+        createdAt: new Date(job.at),
+      });
+      results.push({
+        name: job.name,
+        ok: true,
+        body: Buffer.from(bytes).toString("base64"),
+        error: null,
+      });
       continue;
     }
-    const result = await runEngine(engineInput(job.input), job.target, new Date(job.input.at));
+    const result = await runEngine(
+      engineInput(job.input),
+      job.target,
+      new Date(job.input.at),
+    );
     results.push(
       result.ok
-        ? { name: job.name, ok: true, body: bodyText(job.target.channel, result.body), error: null }
+        ? {
+            name: job.name,
+            ok: true,
+            body: bodyText(job.target.channel, result.body),
+            error: null,
+          }
         : { name: job.name, ok: false, body: null, error: result.error },
     );
   }
@@ -119,6 +155,9 @@ function bodyText(channel: Channel, body: RenderBody): string {
 
 /** A PDF result's bytes. */
 export function pdfBytes(result: FreshResult): Uint8Array {
-  if (!result.ok || result.body === null) throw new Error(`${result.name} did not render: ${result.error?.message ?? "no body"}`);
+  if (!result.ok || result.body === null)
+    throw new Error(
+      `${result.name} did not render: ${result.error?.message ?? "no body"}`,
+    );
   return new Uint8Array(Buffer.from(result.body, "base64"));
 }

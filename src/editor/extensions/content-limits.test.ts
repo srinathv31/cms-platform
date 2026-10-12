@@ -6,18 +6,34 @@
 import type { Editor, JSONContent } from "@tiptap/core";
 import { Slice } from "@tiptap/pm/model";
 import { afterEach, describe, expect, it } from "vitest";
-import { documentProblem, normalizeAndCheckBody } from "../model/document-check";
+import {
+  documentProblem,
+  normalizeAndCheckBody,
+} from "../model/document-check";
 import { CELL_CONTENT } from "../schema";
-import { destroyEditors, doc, mountEditor, p, press, type } from "../testing/editor";
+import {
+  destroyEditors,
+  doc,
+  mountEditor,
+  p,
+  press,
+  type,
+} from "../testing/editor";
 import { BLOCK_ITEMS } from "./block-items";
 import { canAddColumn, normalizeSlice, tableColumnsAt } from "./content-limits";
 
 afterEach(destroyEditors);
 
-const td = (...content: JSONContent[]): JSONContent => ({ type: "tableCell", content: content.length ? content : [p()] });
+const td = (...content: JSONContent[]): JSONContent => ({
+  type: "tableCell",
+  content: content.length ? content : [p()],
+});
 const table = (columns: number, rows = 2): JSONContent => ({
   type: "table",
-  content: Array.from({ length: rows }, () => ({ type: "tableRow", content: Array.from({ length: columns }, () => td()) })),
+  content: Array.from({ length: rows }, () => ({
+    type: "tableRow",
+    content: Array.from({ length: columns }, () => td()),
+  })),
 });
 
 /** The caret in the first empty paragraph of the first table cell. */
@@ -30,7 +46,8 @@ function caretInCell(editor: Editor) {
   editor.commands.setTextSelection(at);
 }
 
-const types = (editor: Editor) => (editor.getJSON().content ?? []).map((block) => block.type);
+const types = (editor: Editor) =>
+  (editor.getJSON().content ?? []).map((block) => block.type);
 
 describe("table cells hold paragraphs and lists", () => {
   it("is the schema's content expression", () => {
@@ -43,7 +60,9 @@ describe("table cells hold paragraphs and lists", () => {
   it("the block menu offers text and lists in a cell, no headings, tables, callouts or dividers", () => {
     const editor = mountEditor(doc(p("Before"), table(2)));
     caretInCell(editor);
-    const offered = BLOCK_ITEMS.filter((item) => item.isAvailable(editor)).map((item) => item.id);
+    const offered = BLOCK_ITEMS.filter((item) => item.isAvailable(editor)).map(
+      (item) => item.id,
+    );
     expect(offered).toEqual(["text", "bulletList", "orderedList"]);
   });
 
@@ -52,7 +71,9 @@ describe("table cells hold paragraphs and lists", () => {
     caretInCell(editor);
     for (const char of "---") type(editor, char);
     expect(types(editor)).toEqual(["paragraph", "table", "paragraph"]);
-    expect(editor.state.doc.child(1).firstChild?.firstChild?.textContent).toBe("---");
+    expect(editor.state.doc.child(1).firstChild?.firstChild?.textContent).toBe(
+      "---",
+    );
   });
 
   it("`---` on a line of its own outside a table is still a divider", () => {
@@ -66,10 +87,21 @@ describe("table cells hold paragraphs and lists", () => {
     /** A table whose first cell holds a bulleted item of two paragraphs; the caret at the end of the second, "second". */
     function inCellList(second = ""): Editor {
       const item = { type: "listItem", content: [p("first"), p(second)] };
-      const editor = mountEditor(doc(p("Before"), { type: "table", content: [{ type: "tableRow", content: [td({ type: "bulletList", content: [item] }), td()] }] }));
+      const editor = mountEditor(
+        doc(p("Before"), {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [td({ type: "bulletList", content: [item] }), td()],
+            },
+          ],
+        }),
+      );
       let at = -1;
       editor.state.doc.descendants((node, pos) => {
-        if (at < 0 && node.type.name === "listItem") at = pos + 1 + node.child(0).nodeSize + 1 + second.length;
+        if (at < 0 && node.type.name === "listItem")
+          at = pos + 1 + node.child(0).nodeSize + 1 + second.length;
         return at < 0;
       });
       editor.commands.setTextSelection(at);
@@ -78,7 +110,10 @@ describe("table cells hold paragraphs and lists", () => {
     const itemBlocks = (editor: Editor) => {
       const out: string[] = [];
       editor.state.doc.descendants((node) => {
-        if (node.type.name === "listItem") node.forEach((child) => void out.push(`${child.type.name}:${child.textContent}`));
+        if (node.type.name === "listItem")
+          node.forEach(
+            (child) => void out.push(`${child.type.name}:${child.textContent}`),
+          );
       });
       return out;
     };
@@ -86,14 +121,21 @@ describe("table cells hold paragraphs and lists", () => {
     it("the block menu offers text and lists only", () => {
       const editor = inCellList();
       expect(editor.can().setHeading({ level: 2 })).toBe(true); // the schema would let a list item take one
-      expect(BLOCK_ITEMS.filter((item) => item.isAvailable(editor)).map((item) => item.id)).toEqual(["text", "orderedList"]);
+      expect(
+        BLOCK_ITEMS.filter((item) => item.isAvailable(editor)).map(
+          (item) => item.id,
+        ),
+      ).toEqual(["text", "orderedList"]);
     });
 
     it("`---` and `#`–`###` typed at the start of a line stay text", () => {
       for (const shortcut of ["---", "# ", "## ", "### "]) {
         const editor = inCellList();
         for (const char of shortcut) type(editor, char);
-        expect(itemBlocks(editor), shortcut).toEqual(["paragraph:first", `paragraph:${shortcut}`]);
+        expect(itemBlocks(editor), shortcut).toEqual([
+          "paragraph:first",
+          `paragraph:${shortcut}`,
+        ]);
       }
     });
 
@@ -105,19 +147,49 @@ describe("table cells hold paragraphs and lists", () => {
       expect(press(editor, "2", mod)).toBe(true);
       expect(editor.getJSON()).toEqual(before);
 
-      const outside = mountEditor(doc({ type: "bulletList", content: [{ type: "listItem", content: [p("first"), p("x")] }] }));
-      outside.commands.setTextSelection(outside.state.doc.firstChild!.firstChild!.child(0).nodeSize + 3);
+      const outside = mountEditor(
+        doc({
+          type: "bulletList",
+          content: [{ type: "listItem", content: [p("first"), p("x")] }],
+        }),
+      );
+      outside.commands.setTextSelection(
+        outside.state.doc.firstChild!.firstChild!.child(0).nodeSize + 3,
+      );
       press(outside, "2", mod);
-      expect(outside.state.doc.firstChild!.firstChild!.child(1).type.name).toBe("heading");
+      expect(outside.state.doc.firstChild!.firstChild!.child(1).type.name).toBe(
+        "heading",
+      );
     });
 
     it("a pasted heading, rule or callout lands as paragraphs", () => {
       const editor = inCellList();
       const pasted = editor.schema.nodeFromJSON(
-        doc(p("a"), { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "b" }] }, { type: "horizontalRule" }, { type: "callout", content: [p("c")] }, p("d")),
+        doc(
+          p("a"),
+          {
+            type: "heading",
+            attrs: { level: 2 },
+            content: [{ type: "text", text: "b" }],
+          },
+          { type: "horizontalRule" },
+          { type: "callout", content: [p("c")] },
+          p("d"),
+        ),
       );
-      const slice = normalizeSlice(new Slice(pasted.content, 0, 0), editor.schema, false, true);
-      expect(slice.content.toJSON().map((b: JSONContent) => b.type)).toEqual(["paragraph", "paragraph", "paragraph", "paragraph", "paragraph"]);
+      const slice = normalizeSlice(
+        new Slice(pasted.content, 0, 0),
+        editor.schema,
+        false,
+        true,
+      );
+      expect(slice.content.toJSON().map((b: JSONContent) => b.type)).toEqual([
+        "paragraph",
+        "paragraph",
+        "paragraph",
+        "paragraph",
+        "paragraph",
+      ]);
       editor.view.dispatch(editor.state.tr.replaceSelection(slice));
       expect(documentProblem(editor.getJSON())).toBeNull();
     });
@@ -126,15 +198,23 @@ describe("table cells hold paragraphs and lists", () => {
     function drop(editor: Editor, ...nodes: JSONContent[]) {
       let at = -1;
       editor.state.doc.descendants((node, pos) => {
-        if (at < 0 && node.type.name === "listItem") at = pos + 1 + node.child(0).nodeSize;
+        if (at < 0 && node.type.name === "listItem")
+          at = pos + 1 + node.child(0).nodeSize;
         return at < 0;
       });
       const content = nodes.map((node) => editor.schema.nodeFromJSON(node));
-      editor.view.dispatch(editor.state.tr.insert(at, content).setMeta("uiEvent", "drop"));
+      editor.view.dispatch(
+        editor.state.tr.insert(at, content).setMeta("uiEvent", "drop"),
+      );
     }
     /** A document's node types and text, nothing else. */
-    const outline = (node: JSONContent): unknown => node.text ?? [node.type, ...(node.content ?? []).map(outline)];
-    const heading = (value: string): JSONContent => ({ type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: value }] });
+    const outline = (node: JSONContent): unknown =>
+      node.text ?? [node.type, ...(node.content ?? []).map(outline)];
+    const heading = (value: string): JSONContent => ({
+      type: "heading",
+      attrs: { level: 2 },
+      content: [{ type: "text", text: value }],
+    });
 
     it("a dropped heading, rule, callout or table is converted at once, as the save stores it", () => {
       const editor = inCellList("second");
@@ -143,7 +223,10 @@ describe("table cells hold paragraphs and lists", () => {
         heading("dropped heading"),
         { type: "horizontalRule" },
         { type: "callout", content: [p("callout one"), p("callout two")] },
-        { type: "table", content: [{ type: "tableRow", content: [td(p("t1")), td(p("t2"))] }] },
+        {
+          type: "table",
+          content: [{ type: "tableRow", content: [td(p("t1")), td(p("t2"))] }],
+        },
       );
       expect(itemBlocks(editor)).toEqual([
         "paragraph:first",
@@ -163,8 +246,21 @@ describe("table cells hold paragraphs and lists", () => {
 
     it("converts what a dropped list carries in its own items, at any depth", () => {
       const editor = inCellList("second");
-      const nested = { type: "bulletList", content: [{ type: "listItem", content: [p("inner"), heading("inner heading")] }] };
-      drop(editor, { type: "orderedList", content: [{ type: "listItem", content: [p("outer"), heading("outer heading"), nested] }] });
+      const nested = {
+        type: "bulletList",
+        content: [
+          { type: "listItem", content: [p("inner"), heading("inner heading")] },
+        ],
+      };
+      drop(editor, {
+        type: "orderedList",
+        content: [
+          {
+            type: "listItem",
+            content: [p("outer"), heading("outer heading"), nested],
+          },
+        ],
+      });
       expect(itemBlocks(editor)).not.toContain("heading:outer heading");
       expect(itemBlocks(editor)).toContain("paragraph:outer heading");
       expect(itemBlocks(editor)).toContain("paragraph:inner heading");
@@ -174,15 +270,30 @@ describe("table cells hold paragraphs and lists", () => {
     it("the conversion is part of the drop's undo step", () => {
       const editor = inCellList("second");
       drop(editor, heading("dropped"));
-      expect(itemBlocks(editor)).toEqual(["paragraph:first", "paragraph:dropped", "paragraph:second"]);
+      expect(itemBlocks(editor)).toEqual([
+        "paragraph:first",
+        "paragraph:dropped",
+        "paragraph:second",
+      ]);
       editor.commands.undo();
-      expect(itemBlocks(editor)).toEqual(["paragraph:first", "paragraph:second"]);
+      expect(itemBlocks(editor)).toEqual([
+        "paragraph:first",
+        "paragraph:second",
+      ]);
     });
 
     it("leaves a heading in a list outside a table as it is", () => {
-      const editor = mountEditor(doc({ type: "bulletList", content: [{ type: "listItem", content: [p("first")] }] }));
+      const editor = mountEditor(
+        doc({
+          type: "bulletList",
+          content: [{ type: "listItem", content: [p("first")] }],
+        }),
+      );
       drop(editor, heading("stays a heading"));
-      expect(itemBlocks(editor)).toEqual(["paragraph:first", "heading:stays a heading"]);
+      expect(itemBlocks(editor)).toEqual([
+        "paragraph:first",
+        "heading:stays a heading",
+      ]);
     });
   });
 
@@ -190,7 +301,9 @@ describe("table cells hold paragraphs and lists", () => {
     const editor = mountEditor(doc(p("Before"), table(2)));
     caretInCell(editor);
     for (const char of "- ") type(editor, char);
-    expect(editor.state.doc.child(1).firstChild?.firstChild?.firstChild?.type.name).toBe("bulletList");
+    expect(
+      editor.state.doc.child(1).firstChild?.firstChild?.firstChild?.type.name,
+    ).toBe("bulletList");
   });
 });
 
@@ -217,8 +330,18 @@ describe("table columns", () => {
 describe("Tab in a list", () => {
   /** Lists `levels` deep, one item each but the deepest (two); the caret in the deepest second item. */
   function nested(levels: number): Editor {
-    let list: JSONContent = { type: "bulletList", content: [0, 1].map((i) => ({ type: "listItem", content: [p(`deepest ${i}`)] })) };
-    for (let level = levels - 1; level >= 1; level--) list = { type: "bulletList", content: [{ type: "listItem", content: [p(`level ${level}`), list] }] };
+    let list: JSONContent = {
+      type: "bulletList",
+      content: [0, 1].map((i) => ({
+        type: "listItem",
+        content: [p(`deepest ${i}`)],
+      })),
+    };
+    for (let level = levels - 1; level >= 1; level--)
+      list = {
+        type: "bulletList",
+        content: [{ type: "listItem", content: [p(`level ${level}`), list] }],
+      };
     const editor = mountEditor(doc(list));
     let caret = 0;
     editor.state.doc.descendants((node, pos) => {
@@ -229,8 +352,14 @@ describe("Tab in a list", () => {
   }
 
   const depth = (node: JSONContent, level = 0): number => {
-    const here = node.type === "bulletList" || node.type === "orderedList" ? level + 1 : level;
-    return Math.max(here, ...(node.content ?? []).map((child) => depth(child, here)));
+    const here =
+      node.type === "bulletList" || node.type === "orderedList"
+        ? level + 1
+        : level;
+    return Math.max(
+      here,
+      ...(node.content ?? []).map((child) => depth(child, here)),
+    );
   };
 
   it("nests an item down to the ninth level", () => {
@@ -258,7 +387,9 @@ describe("Tab in a list", () => {
 describe("normalizeSlice", () => {
   it("normalizes a slice and keeps its open depths", () => {
     const editor = mountEditor(doc(p()));
-    const pasted = editor.schema.nodeFromJSON(doc({ type: "paragraph", content: [{ type: "text", text: "a\tb" }] }));
+    const pasted = editor.schema.nodeFromJSON(
+      doc({ type: "paragraph", content: [{ type: "text", text: "a\tb" }] }),
+    );
     const slice = new Slice(pasted.content, 1, 1);
     const out = normalizeSlice(slice, editor.schema);
     expect(out.openStart).toBe(1);
@@ -268,7 +399,12 @@ describe("normalizeSlice", () => {
 
   it("a paragraph left with no text stays, empty", () => {
     const editor = mountEditor(doc(p()));
-    const pasted = editor.schema.nodeFromJSON(doc({ type: "paragraph", content: [{ type: "text", text: "\u0001" }] }));
-    expect(normalizeSlice(new Slice(pasted.content, 0, 0), editor.schema).content.firstChild?.childCount).toBe(0);
+    const pasted = editor.schema.nodeFromJSON(
+      doc({ type: "paragraph", content: [{ type: "text", text: "\u0001" }] }),
+    );
+    expect(
+      normalizeSlice(new Slice(pasted.content, 0, 0), editor.schema).content
+        .firstChild?.childCount,
+    ).toBe(0);
   });
 });

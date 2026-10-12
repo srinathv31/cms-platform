@@ -2,8 +2,20 @@ import type { ReactNode, Ref } from "react";
 import { ScaledBox } from "@/components/primitives/scaled-viewport";
 import { cn } from "@/lib/utils";
 import { deviceFontVariables } from "./fonts";
-import { BEZEL, SCREEN_SIZES, bezelWidth, frameSize, phoneScale, pt } from "./geometry";
-import type { DeviceAppearance, DevicePlatform, DeviceWidth, PhoneFit } from "./types";
+import {
+  BEZEL,
+  SCREEN_SIZES,
+  bezelWidth,
+  frameSize,
+  phoneScale,
+  pt,
+} from "./geometry";
+import type {
+  DeviceAppearance,
+  DevicePlatform,
+  DeviceWidth,
+  PhoneFit,
+} from "./types";
 
 // One generic frame for every platform: a slab with a metal rim, a black glass edge and a camera cutout.
 // No maker's bezel, buttons or logo. The preview is a <figure> named by its caption; the frame itself is
@@ -16,7 +28,10 @@ import type { DeviceAppearance, DevicePlatform, DeviceWidth, PhoneFit } from "./
 // holds that scale and the phone runs past its bottom, for a scroller round it to scroll.
 
 /** The camera cutout per platform: iOS's Dynamic Island, Android's punch hole. Width and height in points. */
-const CUTOUT: Record<DevicePlatform, { width: number; height: number; top: number }> = {
+const CUTOUT: Record<
+  DevicePlatform,
+  { width: number; height: number; top: number }
+> = {
   ios: { width: 126, height: 37, top: 11 },
   android: { width: 22, height: 22, top: 12 },
 };
@@ -58,9 +73,15 @@ export function PhoneFrame({
       data-appearance={appearance}
       data-width={width}
       aria-hidden={caption === null || undefined}
-      className={cn(deviceFontVariables, "m-0 h-full w-full min-w-0", className)}
+      className={cn(
+        deviceFontVariables,
+        "m-0 h-full w-full min-w-0",
+        className,
+      )}
     >
-      {caption === null ? null : <figcaption className="sr-only">{caption}</figcaption>}
+      {caption === null ? null : (
+        <figcaption className="sr-only">{caption}</figcaption>
+      )}
       <ScaledBox
         width={frame.width}
         height={frame.height}
@@ -80,7 +101,10 @@ export function PhoneFrame({
           className="bg-(--device-rim)"
         >
           <div
-            style={{ padding: pt(bezel.glass), borderRadius: pt(size.radius + bezel.glass) }}
+            style={{
+              padding: pt(bezel.glass),
+              borderRadius: pt(size.radius + bezel.glass),
+            }}
             className="h-full bg-(--device-bezel)"
           >
             {/* Clipped with clip-path, not just overflow: Chrome lets a composited backdrop-filter (the expanded
@@ -99,7 +123,11 @@ export function PhoneFrame({
               <span
                 aria-hidden
                 data-slot="device-cutout"
-                style={{ width: pt(cutout.width), height: pt(cutout.height), top: pt(cutout.top) }}
+                style={{
+                  width: pt(cutout.width),
+                  height: pt(cutout.height),
+                  top: pt(cutout.top),
+                }}
                 className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2 rounded-full bg-(--device-island)"
               />
             </div>

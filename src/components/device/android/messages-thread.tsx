@@ -2,7 +2,16 @@
 
 import { useRef } from "react";
 import { m } from "motion/react";
-import { ArrowLeft, EllipsisVertical, ImagePlus, Mic, Phone, Plus, Smile, Video } from "lucide-react";
+import {
+  ArrowLeft,
+  EllipsisVertical,
+  ImagePlus,
+  Mic,
+  Phone,
+  Plus,
+  Smile,
+  Video,
+} from "lucide-react";
 import { fadeRise } from "@/components/motion/presets";
 import { cn } from "@/lib/utils";
 import { pt } from "../geometry";
@@ -41,33 +50,59 @@ export function AndroidMessagesThread({
   return (
     <div className="absolute inset-0 flex flex-col bg-(--device-m3-surface-container) text-(--device-m3-on-surface)">
       <StatusBar platform="android" time={clock.time} ink="app" />
-      <header className="flex shrink-0 items-center" style={{ marginTop: pt(STATUS_BAR_HEIGHT.android), height: pt(64), paddingInline: pt(4) }}>
-        <span aria-hidden className="grid place-items-center" style={{ width: pt(48), height: pt(48) }}>
+      <header
+        className="flex shrink-0 items-center"
+        style={{
+          marginTop: pt(STATUS_BAR_HEIGHT.android),
+          height: pt(64),
+          paddingInline: pt(4),
+        }}
+      >
+        <span
+          aria-hidden
+          className="grid place-items-center"
+          style={{ width: pt(48), height: pt(48) }}
+        >
           <ArrowLeft strokeWidth={2} style={icon} />
         </span>
         <span
           aria-hidden
           className="shrink-0 overflow-hidden rounded-full bg-(--device-m3-primary-container) text-(--device-m3-on-primary-container)"
-          style={{ width: pt(40), height: pt(40), padding: pt(5), paddingBottom: 0 }}
+          style={{
+            width: pt(40),
+            height: pt(40),
+            padding: pt(5),
+            paddingBottom: 0,
+          }}
         >
           <Silhouette />
         </span>
         <span
           data-slot="sms-sender"
           data-placeholder={sender === null ? "" : undefined}
-          className={cn("min-w-0 flex-1 truncate tabular-nums", sender === null && "text-(--device-m3-on-surface-variant)")}
+          className={cn(
+            "min-w-0 flex-1 truncate tabular-nums",
+            sender === null && "text-(--device-m3-on-surface-variant)",
+          )}
           style={{ fontSize: pt(20), lineHeight: pt(28), marginLeft: pt(12) }}
         >
           {sender ?? NO_SENDER}
         </span>
-        <span aria-hidden className="flex shrink-0 items-center text-(--device-m3-on-surface-variant)" style={{ gap: pt(20), paddingRight: pt(12) }}>
+        <span
+          aria-hidden
+          className="flex shrink-0 items-center text-(--device-m3-on-surface-variant)"
+          style={{ gap: pt(20), paddingRight: pt(12) }}
+        >
           <Phone strokeWidth={2} style={icon} />
           <Video strokeWidth={2} style={icon} />
           <EllipsisVertical strokeWidth={2} style={icon} />
         </span>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col bg-(--device-m3-surface)" style={{ borderRadius: `${pt(28)} ${pt(28)} 0 0` }}>
+      <div
+        className="flex min-h-0 flex-1 flex-col bg-(--device-m3-surface)"
+        style={{ borderRadius: `${pt(28)} ${pt(28)} 0 0` }}
+      >
         <m.div
           {...fadeRise}
           ref={scroller}
@@ -77,10 +112,22 @@ export function AndroidMessagesThread({
           style={{ padding: `${pt(18)} ${pt(16)} ${pt(12)}` }}
         >
           {messages.map((sms, i) => (
-            <div key={i} ref={i === messages.length - 1 ? newest : undefined} data-slot="sms-message" style={{ marginTop: i === 0 ? 0 : pt(showsStamp(messages, i) ? 18 : 4) }}>
+            <div
+              key={i}
+              ref={i === messages.length - 1 ? newest : undefined}
+              data-slot="sms-message"
+              style={{
+                marginTop: i === 0 ? 0 : pt(showsStamp(messages, i) ? 18 : 4),
+              }}
+            >
               {showsStamp(messages, i) ? (
-                <p className="text-center text-(--device-m3-on-surface-variant)" style={{ ...label, marginBottom: pt(14) }}>
-                  {i === 0 ? <span className="block font-medium">Text message</span> : null}
+                <p
+                  className="text-center text-(--device-m3-on-surface-variant)"
+                  style={{ ...label, marginBottom: pt(14) }}
+                >
+                  {i === 0 ? (
+                    <span className="block font-medium">Text message</span>
+                  ) : null}
                   <span className="block tabular-nums">
                     {sms.day ?? "Today"} • {sms.time}
                   </span>
@@ -89,11 +136,18 @@ export function AndroidMessagesThread({
               <div
                 data-slot="sms-bubble"
                 className="w-fit max-w-[80%] bg-(--device-m3-bubble-in) whitespace-pre-wrap [overflow-wrap:anywhere]"
-                style={{ ...message, borderRadius: `${pt(18)} ${pt(18)} ${pt(18)} ${pt(4)}`, padding: `${pt(10)} ${pt(14)}` }}
+                style={{
+                  ...message,
+                  borderRadius: `${pt(18)} ${pt(18)} ${pt(18)} ${pt(4)}`,
+                  padding: `${pt(10)} ${pt(14)}`,
+                }}
               >
                 {linkRuns(sms.text).map((run, j) =>
                   run.link ? (
-                    <span key={j} className="underline decoration-from-font underline-offset-2">
+                    <span
+                      key={j}
+                      className="underline decoration-from-font underline-offset-2"
+                    >
                       {run.text}
                     </span>
                   ) : (
@@ -105,7 +159,11 @@ export function AndroidMessagesThread({
           ))}
         </m.div>
 
-        <div aria-hidden className="flex shrink-0 items-center" style={{ gap: pt(8), padding: `${pt(8)} ${pt(12)} ${pt(30)}` }}>
+        <div
+          aria-hidden
+          className="flex shrink-0 items-center"
+          style={{ gap: pt(8), padding: `${pt(8)} ${pt(12)} ${pt(30)}` }}
+        >
           <span
             className="grid shrink-0 place-items-center rounded-full bg-(--device-m3-surface-container-high) text-(--device-m3-primary)"
             style={{ width: pt(40), height: pt(40) }}
@@ -114,12 +172,26 @@ export function AndroidMessagesThread({
           </span>
           <span
             className="flex min-w-0 flex-1 items-center justify-between rounded-full bg-(--device-m3-surface-container-high) text-(--device-m3-on-surface-variant)"
-            style={{ ...androidText("body", settings.textSize), height: pt(48), padding: `0 ${pt(14)} 0 ${pt(18)}`, gap: pt(12) }}
+            style={{
+              ...androidText("body", settings.textSize),
+              height: pt(48),
+              padding: `0 ${pt(14)} 0 ${pt(18)}`,
+              gap: pt(12),
+            }}
           >
             <span className="truncate">Text message</span>
-            <span className="flex shrink-0 items-center" style={{ gap: pt(14) }}>
-              <Smile strokeWidth={2} style={{ width: pt(22), height: pt(22) }} />
-              <ImagePlus strokeWidth={2} style={{ width: pt(22), height: pt(22) }} />
+            <span
+              className="flex shrink-0 items-center"
+              style={{ gap: pt(14) }}
+            >
+              <Smile
+                strokeWidth={2}
+                style={{ width: pt(22), height: pt(22) }}
+              />
+              <ImagePlus
+                strokeWidth={2}
+                style={{ width: pt(22), height: pt(22) }}
+              />
             </span>
           </span>
           <span

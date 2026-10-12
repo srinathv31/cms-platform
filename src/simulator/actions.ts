@@ -4,7 +4,13 @@ import { eq, inArray } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { ApiChannel } from "@/contracts/api-v1";
-import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
+import {
+  simCustomers,
+  simDeliveries,
+  simLinks,
+  simNoticeReads,
+  simOffers,
+} from "@/server/db/schema/sim";
 import { simDb, withBusyRetry } from "./db";
 import { isSimFieldPath } from "./fields";
 import { blockedSentence, missingRequired, valuesFor } from "./mapping";
@@ -20,7 +26,13 @@ import { ucompApi } from "./ucomp-api";
 // Values never reach a log: nothing below prints customer data.
 
 const fail = (reason: string) => ({ ok: false as const, reason });
-const CHANNEL_LABEL: Record<ApiChannel, string> = { pdf: "PDF", web: "Web", email: "Email", push: "Push", sms: "SMS" };
+const CHANNEL_LABEL: Record<ApiChannel, string> = {
+  pdf: "PDF",
+  web: "Web",
+  email: "Email",
+  push: "Push",
+  sms: "SMS",
+};
 /** At most this many renders in flight per send. */
 const RENDER_CONCURRENCY = 3;
 const MAX_CUSTOMERS = 50;
@@ -28,12 +40,16 @@ const MAX_CUSTOMERS = 50;
 const Channel = z.enum(["pdf", "web", "email", "push", "sms"]);
 const Mapping = z.record(z.string().min(1).max(100), z.string().nullable());
 
-const randomPart = (length: number) => crypto.randomUUID().replace(/-/g, "").slice(0, length);
+const randomPart = (length: number) =>
+  crypto.randomUUID().replace(/-/g, "").slice(0, length);
 
 /** The stored mapping: known field paths only. */
-function cleanMapping(mapping: Readonly<Record<string, string | null>>): Record<string, SimFieldPath> {
+function cleanMapping(
+  mapping: Readonly<Record<string, string | null>>,
+): Record<string, SimFieldPath> {
   const out: Record<string, SimFieldPath> = {};
-  for (const [key, path] of Object.entries(mapping)) if (isSimFieldPath(path)) out[key] = path;
+  for (const [key, path] of Object.entries(mapping))
+    if (isSimFieldPath(path)) out[key] = path;
   return out;
 }
 
@@ -59,24 +75,44 @@ export async function linkTemplate(input: {
   mapping: Record<string, SimFieldPath | null>;
 }): Promise<SimResult> {
   const parsed = LinkInput.safeParse(input);
-  if (!parsed.success) return fail(parsed.error.issues[0]?.path[0] === "channels" ? "Choose at least one channel." : "That link isn't complete.");
+  if (!parsed.success)
+    return fail(
+      parsed.error.issues[0]?.path[0] === "channels"
+        ? "Choose at least one channel."
+        : "That link isn't complete.",
+    );
   const { offerId, templateId, version, channels, mapping } = parsed.data;
 
-  const [offer] = await simDb.select({ id: simOffers.id, kind: simOffers.kind }).from(simOffers).where(eq(simOffers.id, offerId));
+  const [offer] = await simDb
+    .select({ id: simOffers.id, kind: simOffers.kind })
+    .from(simOffers)
+    .where(eq(simOffers.id, offerId));
   if (!offer) return fail("That offer doesn't exist.");
   const sends = KIND_CHANNELS[offer.kind];
-  if (channels.some((c) => !sends.channels.includes(c))) return fail(sends.refusal);
+  if (channels.some((c) => !sends.channels.includes(c)))
+    return fail(sends.refusal);
 
   const detail = await (await ucompApi()).getTemplate(templateId);
   if (!detail.ok) return fail(detail.error.message);
   const { activeVersion, contract, name } = detail.data;
-  if (activeVersion === null || contract === null) return fail("This template has no Active version to link.");
-  if (version !== activeVersion) return fail(`v${version} isn't the Active version. Link v${activeVersion}.`);
+  if (activeVersion === null || contract === null)
+    return fail("This template has no Active version to link.");
+  if (version !== activeVersion)
+    return fail(
+      `v${version} isn't the Active version. Link v${activeVersion}.`,
+    );
   const outside = channels.filter((c) => !contract.channels.includes(c));
-  if (outside.length > 0) return fail(`v${activeVersion} doesn't render ${CHANNEL_LABEL[outside[0]]}.`);
+  if (outside.length > 0)
+    return fail(
+      `v${activeVersion} doesn't render ${CHANNEL_LABEL[outside[0]]}.`,
+    );
 
   const keys = new Set(contract.variables.map((v) => v.key));
-  const kept = cleanMapping(Object.fromEntries(Object.entries(mapping).filter(([key]) => keys.has(key))));
+  const kept = cleanMapping(
+    Object.fromEntries(
+      Object.entries(mapping).filter(([key]) => keys.has(key)),
+    ),
+  );
   const row = {
     templateId: detail.data.id,
     templateName: name,
@@ -97,24 +133,40 @@ export async function linkTemplate(input: {
 }
 
 /** Changes the mapping of an existing link (the offer page's rows). Null clears a key. */
-export async function saveMapping(input: { offerId: string; mapping: Record<string, SimFieldPath | null> }): Promise<SimResult> {
-  const parsed = z.object({ offerId: z.string().min(1), mapping: Mapping }).safeParse(input);
+export async function saveMapping(input: {
+  offerId: string;
+  mapping: Record<string, SimFieldPath | null>;
+}): Promise<SimResult> {
+  const parsed = z
+    .object({ offerId: z.string().min(1), mapping: Mapping })
+    .safeParse(input);
   if (!parsed.success) return fail("That mapping isn't complete.");
   const { offerId, mapping } = parsed.data;
-  const [link] = await simDb.select().from(simLinks).where(eq(simLinks.offerId, offerId));
+  const [link] = await simDb
+    .select()
+    .from(simLinks)
+    .where(eq(simLinks.offerId, offerId));
   if (!link) return fail("Link a template first.");
 
-  const detail = await (await ucompApi()).getTemplate(link.templateId, { version: link.pinnedVersion });
+  const detail = await (
+    await ucompApi()
+  ).getTemplate(link.templateId, { version: link.pinnedVersion });
   if (!detail.ok) return fail(detail.error.message);
   const keys = new Set(detail.data.contract?.variables.map((v) => v.key) ?? []);
   const unknown = Object.keys(mapping).find((key) => !keys.has(key));
-  if (unknown) return fail(`v${link.pinnedVersion} has no variable ${unknown}.`);
-  const bad = Object.entries(mapping).find(([, path]) => path !== null && !isSimFieldPath(path));
+  if (unknown)
+    return fail(`v${link.pinnedVersion} has no variable ${unknown}.`);
+  const bad = Object.entries(mapping).find(
+    ([, path]) => path !== null && !isSimFieldPath(path),
+  );
   if (bad) return fail(`${bad[1]} isn't one of Coral's fields.`);
 
   const next: Record<string, string | null> = { ...link.mapping, ...mapping };
   await withBusyRetry(() =>
-    simDb.update(simLinks).set({ mapping: cleanMapping(next) }).where(eq(simLinks.id, link.id)),
+    simDb
+      .update(simLinks)
+      .set({ mapping: cleanMapping(next) })
+      .where(eq(simLinks.id, link.id)),
   );
   refresh();
   return { ok: true };
@@ -123,7 +175,11 @@ export async function saveMapping(input: { offerId: string; mapping: Record<stri
 // ── Send ─────────────────────────────────────────────────────────────────────
 
 /** Runs `work` over `items` with at most `limit` in flight; results keep the items' order. */
-async function pool<T, R>(items: readonly T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
+async function pool<T, R>(
+  items: readonly T[],
+  limit: number,
+  work: (item: T) => Promise<R>,
+): Promise<R[]> {
   const out = new Array<R>(items.length);
   let next = 0;
   const runner = async () => {
@@ -132,7 +188,9 @@ async function pool<T, R>(items: readonly T[], limit: number, work: (item: T) =>
       out[i] = await work(items[i]);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runner));
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, runner),
+  );
   return out;
 }
 
@@ -140,9 +198,15 @@ async function pool<T, R>(items: readonly T[], limit: number, work: (item: T) =>
  * Renders every linked channel for each chosen customer on the pinned version, as Coral. Failed renders
  * are results (the API's error kept verbatim); the action fails only when nothing could be sent.
  */
-export async function sendToCustomers(input: { offerId: string; customerIds: string[] }): Promise<SimResult<{ batch: SimBatch }>> {
+export async function sendToCustomers(input: {
+  offerId: string;
+  customerIds: string[];
+}): Promise<SimResult<{ batch: SimBatch }>> {
   const parsed = z
-    .object({ offerId: z.string().min(1), customerIds: z.array(z.string().min(1)).min(1).max(MAX_CUSTOMERS) })
+    .object({
+      offerId: z.string().min(1),
+      customerIds: z.array(z.string().min(1)).min(1).max(MAX_CUSTOMERS),
+    })
     .safeParse(input);
   if (!parsed.success) return fail("Choose customers to send to.");
   const { offerId } = parsed.data;
@@ -151,41 +215,73 @@ export async function sendToCustomers(input: { offerId: string; customerIds: str
   const [[offer], [link], customerRows] = await Promise.all([
     simDb.select().from(simOffers).where(eq(simOffers.id, offerId)),
     simDb.select().from(simLinks).where(eq(simLinks.offerId, offerId)),
-    simDb.select().from(simCustomers).where(inArray(simCustomers.id, customerIds)),
+    simDb
+      .select()
+      .from(simCustomers)
+      .where(inArray(simCustomers.id, customerIds)),
   ]);
   if (!offer) return fail("That offer doesn't exist.");
   if (!link) return fail("Link a template to send.");
-  const customers = customerIds.flatMap((id) => customerRows.filter((c) => c.id === id));
+  const customers = customerIds.flatMap((id) =>
+    customerRows.filter((c) => c.id === id),
+  );
   if (customers.length === 0) return fail("Choose customers to send to.");
 
   const api = await ucompApi();
   // Coral checks its own mapping against the pinned contract before sending anything.
-  const detail = await api.getTemplate(link.templateId, { version: link.pinnedVersion });
-  if (!detail.ok && detail.error.status === 0) return fail(detail.error.message);
+  const detail = await api.getTemplate(link.templateId, {
+    version: link.pinnedVersion,
+  });
+  if (!detail.ok && detail.error.status === 0)
+    return fail(detail.error.message);
   if (detail.ok && detail.data.contract) {
-    const missing = missingRequired(detail.data.contract.variables, link.mapping);
+    const missing = missingRequired(
+      detail.data.contract.variables,
+      link.mapping,
+    );
     if (missing.length > 0) return fail(blockedSentence(missing));
   }
 
   const mapping = cleanMapping(link.mapping);
   const offerRec = offerRecord(offer);
-  const jobs = customers.flatMap((customer) => link.channels.map((channel) => ({ customer, channel })));
-  const results = await pool(jobs, RENDER_CONCURRENCY, async ({ customer, channel }) => {
-    const correlationId = `coral_${randomPart(16)}`;
-    const values = valuesFor(mapping, customerRecord(customer), offerRec);
-    // A push is rendered for the phone it goes to: the customer's platform.
-    const platform = channel === "push" ? customer.platform : null;
-    const rendered = await api.render(
-      link.templateId,
-      { version: link.pinnedVersion, channel, values, ...(platform ? { platform } : {}) },
-      correlationId,
-    );
-    // Stamped with UCOMP's answer time (its HTTP Date header: the demo's clock), real time without one.
-    return { customer, channel, platform, correlationId, rendered, at: rendered.at };
-  });
+  const jobs = customers.flatMap((customer) =>
+    link.channels.map((channel) => ({ customer, channel })),
+  );
+  const results = await pool(
+    jobs,
+    RENDER_CONCURRENCY,
+    async ({ customer, channel }) => {
+      const correlationId = `coral_${randomPart(16)}`;
+      const values = valuesFor(mapping, customerRecord(customer), offerRec);
+      // A push is rendered for the phone it goes to: the customer's platform.
+      const platform = channel === "push" ? customer.platform : null;
+      const rendered = await api.render(
+        link.templateId,
+        {
+          version: link.pinnedVersion,
+          channel,
+          values,
+          ...(platform ? { platform } : {}),
+        },
+        correlationId,
+      );
+      // Stamped with UCOMP's answer time (its HTTP Date header: the demo's clock), real time without one.
+      return {
+        customer,
+        channel,
+        platform,
+        correlationId,
+        rendered,
+        at: rendered.at,
+      };
+    },
+  );
 
-  const unreachable = results.every((r) => !r.rendered.ok && r.rendered.error.status === 0);
-  if (unreachable) return fail((results[0].rendered as { error: SimApiError }).error.message);
+  const unreachable = results.every(
+    (r) => !r.rendered.ok && r.rendered.error.status === 0,
+  );
+  if (unreachable)
+    return fail((results[0].rendered as { error: SimApiError }).error.message);
 
   const batchKey = randomPart(12);
   const batchId = `bat_${batchKey}`;
@@ -215,12 +311,21 @@ export async function sendToCustomers(input: { offerId: string; customerIds: str
 
 // ── Notices ──────────────────────────────────────────────────────────────────
 
-export async function markNoticesRead(input: { noticeIds: string[] }): Promise<SimResult> {
-  const parsed = z.object({ noticeIds: z.array(z.string().min(1).max(64)).min(1).max(500) }).safeParse(input);
+export async function markNoticesRead(input: {
+  noticeIds: string[];
+}): Promise<SimResult> {
+  const parsed = z
+    .object({ noticeIds: z.array(z.string().min(1).max(64)).min(1).max(500) })
+    .safeParse(input);
   if (!parsed.success) return fail("Choose notices to mark read.");
   const readAt = new Date();
-  const rows = [...new Set(parsed.data.noticeIds)].map((noticeId) => ({ noticeId, readAt }));
-  await withBusyRetry(() => simDb.insert(simNoticeReads).values(rows).onConflictDoNothing());
+  const rows = [...new Set(parsed.data.noticeIds)].map((noticeId) => ({
+    noticeId,
+    readAt,
+  }));
+  await withBusyRetry(() =>
+    simDb.insert(simNoticeReads).values(rows).onConflictDoNothing(),
+  );
   refresh();
   return { ok: true };
 }

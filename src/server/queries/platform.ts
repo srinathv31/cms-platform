@@ -14,14 +14,22 @@ import type {
 import { versionsNeeding } from "@/domain/approval-chain";
 import { BUSINESS_ZONES, zoneLabel } from "@/domain/business-zone";
 import { can } from "@/domain/permissions";
-import { approverProblem, ruleLabel } from "@/domain/platform-config/approval-chains";
+import {
+  approverProblem,
+  ruleLabel,
+} from "@/domain/platform-config/approval-chains";
 import { cannotBeFirstTeamAdmin } from "@/domain/platform-config/teams";
 import { channelRuleRefusal } from "@/domain/platform-config/channels";
 import { sectionsRefusal } from "@/domain/platform-config/sections";
 import { TEAM_ICONS } from "@/domain/platform-config/limits";
 import { zoneChangeConsequences } from "@/domain/platform-config/time-zone";
 import { refuse, type Refusal } from "@/domain/refusals";
-import { CHANNELS, contentTypeFamily, type Channel, type PermissionResult } from "@/domain/types";
+import {
+  CHANNELS,
+  contentTypeFamily,
+  type Channel,
+  type PermissionResult,
+} from "@/domain/types";
 import { db } from "@/server/db/client";
 import {
   approvalStages,
@@ -64,33 +72,55 @@ async function requireManage() {
 /** Active members per team and each team's active Team Admins. */
 async function activeMembers() {
   return db
-    .select({ teamId: memberships.teamId, userId: memberships.userId, role: membershipRoles.role })
+    .select({
+      teamId: memberships.teamId,
+      userId: memberships.userId,
+      role: membershipRoles.role,
+    })
     .from(memberships)
-    .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
+    .innerJoin(
+      membershipRoles,
+      eq(membershipRoles.membershipId, memberships.id),
+    )
     .where(eq(memberships.status, "active"));
 }
 
-const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
+const byName = <T extends { name: string }>(a: T, b: T) =>
+  a.name.localeCompare(b.name);
 
 /** A rule's refusal as the UI gets it decided: refused with its sentence, or allowed. */
-const decided = (refusal: Refusal | null): PermissionResult => (refusal ? refuse(refusal) : { ok: true });
+const decided = (refusal: Refusal | null): PermissionResult =>
+  refusal ? refuse(refusal) : { ok: true };
 
 // ── Teams ─────────────────────────────────────────────────────
 
 export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
   await requireManage();
-  const [teamRows, members, templateRows, userRows, people] = await Promise.all([
-    db.select().from(teams).orderBy(asc(teams.name)),
-    activeMembers(),
-    db.select({ teamId: templates.teamId }).from(templates),
-    db.select({ id: users.id, name: users.name, title: users.title, platformRole: users.platformRole }).from(users),
-    getPeople(),
-  ]);
+  const [teamRows, members, templateRows, userRows, people] = await Promise.all(
+    [
+      db.select().from(teams).orderBy(asc(teams.name)),
+      activeMembers(),
+      db.select({ teamId: templates.teamId }).from(templates),
+      db
+        .select({
+          id: users.id,
+          name: users.name,
+          title: users.title,
+          platformRole: users.platformRole,
+        })
+        .from(users),
+      getPeople(),
+    ],
+  );
 
   return {
     teams: teamRows.map((t) => {
       const here = members.filter((m) => m.teamId === t.id);
-      const admins = [...new Set(here.filter((m) => m.role === "team_admin").map((m) => m.userId))]
+      const admins = [
+        ...new Set(
+          here.filter((m) => m.role === "team_admin").map((m) => m.userId),
+        ),
+      ]
         .map((id) => personOf(people, id))
         .sort(byName);
       return {
@@ -118,138 +148,191 @@ export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
 
 // ── Content types ─────────────────────────────────────────────
 
-export const getContentTypesSection = cache(async (): Promise<ContentTypesSection> => {
-  await requireManage();
-  const [types, templateRows] = await Promise.all([
-    db.select().from(contentTypes).orderBy(asc(contentTypes.name)),
-    db.select({ contentTypeId: templates.contentTypeId }).from(templates),
-  ]);
-  return {
-    types: types.map((t) => ({
-      id: t.id,
-      key: t.key,
-      name: t.name,
-      family: contentTypeFamily(t.allowedChannels),
-      requiredSections: t.requiredSections,
-      allowedChannels: CHANNELS.filter((c) => t.allowedChannels.includes(c)),
-      smsFooter: t.smsFooter,
-      smsMaxParts: t.smsMaxParts,
-      templates: templateRows.filter((r) => r.contentTypeId === t.id).length,
-      can: { editSections: decided(sectionsRefusal(t)) },
-    })),
-  };
-});
+export const getContentTypesSection = cache(
+  async (): Promise<ContentTypesSection> => {
+    await requireManage();
+    const [types, templateRows] = await Promise.all([
+      db.select().from(contentTypes).orderBy(asc(contentTypes.name)),
+      db.select({ contentTypeId: templates.contentTypeId }).from(templates),
+    ]);
+    return {
+      types: types.map((t) => ({
+        id: t.id,
+        key: t.key,
+        name: t.name,
+        family: contentTypeFamily(t.allowedChannels),
+        requiredSections: t.requiredSections,
+        allowedChannels: CHANNELS.filter((c) => t.allowedChannels.includes(c)),
+        smsFooter: t.smsFooter,
+        smsMaxParts: t.smsMaxParts,
+        templates: templateRows.filter((r) => r.contentTypeId === t.id).length,
+        can: { editSections: decided(sectionsRefusal(t)) },
+      })),
+    };
+  },
+);
 
 // ── Channel rules ─────────────────────────────────────────────
 
-export const getChannelRulesSection = cache(async (): Promise<ChannelRulesSection> => {
-  await requireManage();
-  const [types, active] = await Promise.all([
-    db.select().from(contentTypes).orderBy(asc(contentTypes.name)),
-    db
-      .select({ contentTypeId: templates.contentTypeId, channels: versions.channels })
-      .from(versions)
-      .innerJoin(templates, eq(templates.id, versions.templateId))
-      .where(eq(versions.state, "active")),
-  ]);
-  const perChannel = <T>(fn: (channel: Channel) => T) =>
-    Object.fromEntries(CHANNELS.map((c) => [c, fn(c)])) as Record<Channel, T>;
+export const getChannelRulesSection = cache(
+  async (): Promise<ChannelRulesSection> => {
+    await requireManage();
+    const [types, active] = await Promise.all([
+      db.select().from(contentTypes).orderBy(asc(contentTypes.name)),
+      db
+        .select({
+          contentTypeId: templates.contentTypeId,
+          channels: versions.channels,
+        })
+        .from(versions)
+        .innerJoin(templates, eq(templates.id, versions.templateId))
+        .where(eq(versions.state, "active")),
+    ]);
+    const perChannel = <T>(fn: (channel: Channel) => T) =>
+      Object.fromEntries(CHANNELS.map((c) => [c, fn(c)])) as Record<Channel, T>;
 
-  return {
-    channels: CHANNELS,
-    rows: types.map((t) => {
-      const mine = active.filter((v) => v.contentTypeId === t.id);
-      return {
-        contentTypeId: t.id,
-        name: t.name,
-        allowed: perChannel((c) => t.allowedChannels.includes(c)),
-        activeUsing: perChannel((c) => mine.filter((v) => v.channels.includes(c)).length),
-        can: {
-          // The last channel on can't go off, and a channel of the other family can't go on.
-          toggle: perChannel((c) => decided(channelRuleRefusal(t, c, !t.allowedChannels.includes(c), types))),
-        },
-      };
-    }),
-  };
-});
+    return {
+      channels: CHANNELS,
+      rows: types.map((t) => {
+        const mine = active.filter((v) => v.contentTypeId === t.id);
+        return {
+          contentTypeId: t.id,
+          name: t.name,
+          allowed: perChannel((c) => t.allowedChannels.includes(c)),
+          activeUsing: perChannel(
+            (c) => mine.filter((v) => v.channels.includes(c)).length,
+          ),
+          can: {
+            // The last channel on can't go off, and a channel of the other family can't go on.
+            toggle: perChannel((c) =>
+              decided(
+                channelRuleRefusal(t, c, !t.allowedChannels.includes(c), types),
+              ),
+            ),
+          },
+        };
+      }),
+    };
+  },
+);
 
 // ── Approval chains ───────────────────────────────────────────
 
-export const getApprovalChainsSection = cache(async (): Promise<ApprovalChainsSection> => {
-  const viewer = await requireManage();
-  const [types, stageRows, inReview, members, userRows, people] = await Promise.all([
-    db.select({ id: contentTypes.id, name: contentTypes.name }).from(contentTypes).orderBy(asc(contentTypes.name)),
-    db.select().from(approvalStages).orderBy(asc(approvalStages.position)),
-    db
-      .select({ contentTypeId: templates.contentTypeId, stages: versions.stages, currentStage: versions.currentStage })
-      .from(versions)
-      .innerJoin(templates, eq(templates.id, versions.templateId))
-      .where(eq(versions.state, "in_review")),
-    db
-      .select({ userId: memberships.userId, teamName: teams.name })
-      .from(memberships)
-      .innerJoin(teams, eq(teams.id, memberships.teamId))
-      .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
-      .where(eq(memberships.status, "active")),
-    db.select({ id: users.id, name: users.name, title: users.title, platformRole: users.platformRole }).from(users),
-    getPeople(),
-  ]);
-  const named = userRows.map((u) => ({ id: u.id, name: u.name }));
+export const getApprovalChainsSection = cache(
+  async (): Promise<ApprovalChainsSection> => {
+    const viewer = await requireManage();
+    const [types, stageRows, inReview, members, userRows, people] =
+      await Promise.all([
+        db
+          .select({ id: contentTypes.id, name: contentTypes.name })
+          .from(contentTypes)
+          .orderBy(asc(contentTypes.name)),
+        db.select().from(approvalStages).orderBy(asc(approvalStages.position)),
+        db
+          .select({
+            contentTypeId: templates.contentTypeId,
+            stages: versions.stages,
+            currentStage: versions.currentStage,
+          })
+          .from(versions)
+          .innerJoin(templates, eq(templates.id, versions.templateId))
+          .where(eq(versions.state, "in_review")),
+        db
+          .select({ userId: memberships.userId, teamName: teams.name })
+          .from(memberships)
+          .innerJoin(teams, eq(teams.id, memberships.teamId))
+          .innerJoin(
+            membershipRoles,
+            eq(membershipRoles.membershipId, memberships.id),
+          )
+          .where(eq(memberships.status, "active")),
+        db
+          .select({
+            id: users.id,
+            name: users.name,
+            title: users.title,
+            platformRole: users.platformRole,
+          })
+          .from(users),
+        getPeople(),
+      ]);
+    const named = userRows.map((u) => ({ id: u.id, name: u.name }));
 
-  const chains: ApprovalChainView[] = types.map((type) => {
-    const stages = stageRows.filter((s) => s.contentTypeId === type.id);
-    const chain = stages.map((s, index) => ({ id: s.id, position: index, name: s.name, rule: s.approverRule }));
-    // Per stage, the versions in review that still need it, in the stages they recorded at submit.
-    const needing = versionsNeeding(
-      inReview.filter((v) => v.contentTypeId === type.id),
-      chain,
-    );
+    const chains: ApprovalChainView[] = types.map((type) => {
+      const stages = stageRows.filter((s) => s.contentTypeId === type.id);
+      const chain = stages.map((s, index) => ({
+        id: s.id,
+        position: index,
+        name: s.name,
+        rule: s.approverRule,
+      }));
+      // Per stage, the versions in review that still need it, in the stages they recorded at submit.
+      const needing = versionsNeeding(
+        inReview.filter((v) => v.contentTypeId === type.id),
+        chain,
+      );
+      return {
+        contentTypeId: type.id,
+        name: type.name,
+        stages: chain.map((s) => ({
+          ...s,
+          ruleLabel: ruleLabel(s.rule, named),
+          waiting: needing[s.id] ?? 0,
+        })),
+      };
+    });
+
+    // What validateChain checks about each person; `members` holds only active memberships with a role.
+    const facts: ApproverFacts[] = userRows.map((u) => ({
+      id: u.id,
+      name: u.name,
+      platformRole: u.platformRole,
+      activeTeamRole: members.some((m) => m.userId === u.id),
+    }));
+    // Someone a stage may name: whoever the domain's approverProblem allows (an active team role, not an
+    // Auditor, not the admin choosing). Beside the name: the teams whose templates they see today.
+    const choices = userRows.flatMap((u, index) => {
+      if (approverProblem(facts[index]!, viewer.userId)) return [];
+      const teamNames = [
+        ...new Set(
+          members.filter((m) => m.userId === u.id).map((m) => m.teamName),
+        ),
+      ].sort();
+      const seen = u.platformRole ? ["All teams"] : teamNames;
+      return [{ ...personOf(people, u.id), title: u.title, teams: seen }];
+    });
+    // The editor validates every stage, so it needs the facts for the people stages name now as well.
+    const relevant = new Set([
+      ...choices.map((c) => c.id),
+      ...stageRows.flatMap((s) =>
+        s.approverRule.kind === "user" ? [s.approverRule.userId] : [],
+      ),
+    ]);
+
     return {
-      contentTypeId: type.id,
-      name: type.name,
-      stages: chain.map((s) => ({ ...s, ruleLabel: ruleLabel(s.rule, named), waiting: needing[s.id] ?? 0 })),
+      chains,
+      people: choices.sort(byName),
+      approvers: facts.filter((f) => relevant.has(f.id)),
+      viewerId: viewer.userId,
     };
-  });
-
-  // What validateChain checks about each person; `members` holds only active memberships with a role.
-  const facts: ApproverFacts[] = userRows.map((u) => ({
-    id: u.id,
-    name: u.name,
-    platformRole: u.platformRole,
-    activeTeamRole: members.some((m) => m.userId === u.id),
-  }));
-  // Someone a stage may name: whoever the domain's approverProblem allows (an active team role, not an
-  // Auditor, not the admin choosing). Beside the name: the teams whose templates they see today.
-  const choices = userRows.flatMap((u, index) => {
-    if (approverProblem(facts[index]!, viewer.userId)) return [];
-    const teamNames = [...new Set(members.filter((m) => m.userId === u.id).map((m) => m.teamName))].sort();
-    const seen = u.platformRole ? ["All teams"] : teamNames;
-    return [{ ...personOf(people, u.id), title: u.title, teams: seen }];
-  });
-  // The editor validates every stage, so it needs the facts for the people stages name now as well.
-  const relevant = new Set([
-    ...choices.map((c) => c.id),
-    ...stageRows.flatMap((s) => (s.approverRule.kind === "user" ? [s.approverRule.userId] : [])),
-  ]);
-
-  return {
-    chains,
-    people: choices.sort(byName),
-    approvers: facts.filter((f) => relevant.has(f.id)),
-    viewerId: viewer.userId,
-  };
-});
+  },
+);
 
 // ── Business time zone ────────────────────────────────────────
 
-export const getBusinessZoneSection = cache(async (): Promise<BusinessZoneSection> => {
-  const viewer = await requireManage();
-  const nowDate = await demoNow();
-  const [zone, pendingSunsets] = await Promise.all([getBusinessZone(), countPendingSunsets(db, nowDate)]);
-  return {
-    zone,
-    zones: BUSINESS_ZONES.map((z) => ({ id: z.id, label: zoneLabel(z.id) })),
-    can: { change: can(viewer, "platform.manage", { teamId: null }) },
-    consequences: zoneChangeConsequences(pendingSunsets),
-  };
-});
+export const getBusinessZoneSection = cache(
+  async (): Promise<BusinessZoneSection> => {
+    const viewer = await requireManage();
+    const nowDate = await demoNow();
+    const [zone, pendingSunsets] = await Promise.all([
+      getBusinessZone(),
+      countPendingSunsets(db, nowDate),
+    ]);
+    return {
+      zone,
+      zones: BUSINESS_ZONES.map((z) => ({ id: z.id, label: zoneLabel(z.id) })),
+      can: { change: can(viewer, "platform.manage", { teamId: null }) },
+      consequences: zoneChangeConsequences(pendingSunsets),
+    };
+  },
+);

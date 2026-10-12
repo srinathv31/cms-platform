@@ -12,11 +12,17 @@ import { filterVariables } from "../model/variables";
 import type { VariableStore } from "../state/variable-store";
 import { MENU_FLOATING_UI, showOnTyping } from "./menu-placement";
 
-export type PickerItem = { kind: "variable"; variable: Variable } | { kind: "create"; label: string };
+export type PickerItem =
+  { kind: "variable"; variable: Variable } | { kind: "create"; label: string };
 
-export type VariablePickerRender = NonNullable<SuggestionOptions<PickerItem, PickerItem>["render"]>;
+export type VariablePickerRender = NonNullable<
+  SuggestionOptions<PickerItem, PickerItem>["render"]
+>;
 
-export type VariableSuggestion = Omit<SuggestionOptions<PickerItem, PickerItem>, "editor">;
+export type VariableSuggestion = Omit<
+  SuggestionOptions<PickerItem, PickerItem>,
+  "editor"
+>;
 
 export const variablePickerPluginKey = new PluginKey("variablePicker");
 
@@ -24,7 +30,12 @@ const MAX_QUERY = 64;
 
 /** Whether text typed after `{{` still reads as a picker query. */
 export function isPickerQuery(query: string): boolean {
-  return query.length <= MAX_QUERY && !/^\s/.test(query) && !query.includes("}}") && !query.includes("{{");
+  return (
+    query.length <= MAX_QUERY &&
+    !/^\s/.test(query) &&
+    !query.includes("}}") &&
+    !query.includes("{{")
+  );
 }
 
 /**
@@ -32,21 +43,44 @@ export function isPickerQuery(query: string): boolean {
  * already names a variable exactly (its label, any case, or its key): that one is the answer, and
  * creating it again would only make a duplicate.
  */
-export function pickerItems(variables: readonly Variable[], query: string): PickerItem[] {
+export function pickerItems(
+  variables: readonly Variable[],
+  query: string,
+): PickerItem[] {
   const label = query.trim().replace(/\s+/g, " ");
-  const matches = filterVariables(variables, query).map<PickerItem>((variable) => ({ kind: "variable", variable }));
+  const matches = filterVariables(variables, query).map<PickerItem>(
+    (variable) => ({ kind: "variable", variable }),
+  );
   const lower = label.toLowerCase();
-  const exact = lower !== "" && variables.some((v) => v.label.trim().toLowerCase() === lower || v.key === lower);
+  const exact =
+    lower !== "" &&
+    variables.some(
+      (v) => v.label.trim().toLowerCase() === lower || v.key === lower,
+    );
   return exact ? matches : [...matches, { kind: "create", label }];
 }
 
 /** Inserts the chosen variable's chip over the `{{query` text and returns focus to the field. */
-export function insertPicked(editor: Editor, range: { from: number; to: number }, item: PickerItem) {
+export function insertPicked(
+  editor: Editor,
+  range: { from: number; to: number },
+  item: PickerItem,
+) {
   if (item.kind !== "variable") return;
-  editor.chain().insertVariable(item.variable.key, range).focus(undefined, { scrollIntoView: true }).run();
+  editor
+    .chain()
+    .insertVariable(item.variable.key, range)
+    .focus(undefined, { scrollIntoView: true })
+    .run();
 }
 
-export function variableSuggestion({ store, render }: { store: VariableStore; render: VariablePickerRender }): VariableSuggestion {
+export function variableSuggestion({
+  store,
+  render,
+}: {
+  store: VariableStore;
+  render: VariablePickerRender;
+}): VariableSuggestion {
   return {
     char: "{{",
     pluginKey: variablePickerPluginKey,
@@ -63,8 +97,13 @@ export function variableSuggestion({ store, render }: { store: VariableStore; re
     allow: ({ state, range, editor }) => {
       if (!editor.isEditable) return false;
       const type = state.schema.nodes[NODE.variable];
-      if (!state.doc.resolve(range.from).parent.type.contentMatch.matchType(type)) return false;
-      return isPickerQuery(state.doc.textBetween(range.from, range.to).slice(2));
+      if (
+        !state.doc.resolve(range.from).parent.type.contentMatch.matchType(type)
+      )
+        return false;
+      return isPickerQuery(
+        state.doc.textBetween(range.from, range.to).slice(2),
+      );
     },
     render,
   };

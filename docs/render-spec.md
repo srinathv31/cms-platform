@@ -12,18 +12,18 @@ Visual styling (fonts, sizes, spacing, colors) may differ per channel. Content a
 
 Where this document and the code disagree, one of them has a bug. The example tables in the test files named below are part of this specification; a Java port runs the same rows.
 
-| Topic | Normative examples (TypeScript reference) |
-| --- | --- |
-| List markers | `src/editor/model/list-markers.test.ts` (`list-markers.ts`) |
-| Links | `src/editor/model/links.test.ts` (`links.ts`) |
-| Values | `src/editor/model/variables.test.ts` (`variables.ts`) |
-| JSON numbers in requests | `src/domain/render/json-number-text.test.ts` |
-| Value checks, the length limit among them | `src/domain/render/validate.test.ts` (`validate.ts`) |
-| Push and SMS output | `src/domain/render/message.test.ts` (`message.ts`) |
-| SMS encoding, characters and parts | `src/domain/messages/gsm7.test.ts` (`gsm7.ts`) |
-| Push payload size | `src/domain/messages/push.test.ts` (`push.ts`) |
-| Byte-level channel output | the golden files, `src/server/render/golden/` |
-| RenderDoc shape | `src/domain/render/types.ts` |
+| Topic                                     | Normative examples (TypeScript reference)                   |
+| ----------------------------------------- | ----------------------------------------------------------- |
+| List markers                              | `src/editor/model/list-markers.test.ts` (`list-markers.ts`) |
+| Links                                     | `src/editor/model/links.test.ts` (`links.ts`)               |
+| Values                                    | `src/editor/model/variables.test.ts` (`variables.ts`)       |
+| JSON numbers in requests                  | `src/domain/render/json-number-text.test.ts`                |
+| Value checks, the length limit among them | `src/domain/render/validate.test.ts` (`validate.ts`)        |
+| Push and SMS output                       | `src/domain/render/message.test.ts` (`message.ts`)          |
+| SMS encoding, characters and parts        | `src/domain/messages/gsm7.test.ts` (`gsm7.ts`)              |
+| Push payload size                         | `src/domain/messages/push.test.ts` (`push.ts`)              |
+| Byte-level channel output                 | the golden files, `src/server/render/golden/`               |
+| RenderDoc shape                           | `src/domain/render/types.ts`                                |
 
 Contents:
 
@@ -48,18 +48,18 @@ Contents:
 
 `POST /api/v1/templates/{templateId}/render` (consumers) and Stencil's own preview, `POST /api/templates/{templateId}/preview` (the signed-in person), run these stages in order. The first stage that fails ends the request with the error shown (section 11).
 
-| # | Stage | Fails with |
-| --- | --- | --- |
-| 1 | Find the template (and its content type) | 404 `template_not_found` |
-| 2 | Find the version by number, or the open draft (preview only). A number is its released row; with none, its latest round, which stage 4 refuses a consumer. A preview may name a `round` of the number | 404 `version_not_found` |
-| 3 | Preview: the viewer may see the template. Consumer: the consumer is registered | 403 `preview_forbidden` / `unknown_consumer` |
-| 4 | Version rules (consumers only): released, not sunset, not revoked | 409 / 410 |
-| 5 | The channel is allowed by the content type and enabled on the version | 422 `channel_not_allowed` / `channel_not_enabled` |
-| 6 | **Validate values** against the version's variable list (section 5) | 422 `missing_variables` / `invalid_values` |
-| 7 | **Check the document**: a document channel's body passes the document check (section 3); a message channel never reads the body. Then the rendered channel's own fields (for email, the subject and then the preheader; for push, the title, subtitle and body; for SMS, the message), each that has a value, pass the check for its shape (section 2, "Field shapes"), then the schema parse | 500 `render_failed` |
-| 8 | **Resolve**: a document's TipTap JSON and the canonical values into a RenderDoc (section 8), and the channel's fields into text | 500 `render_failed` |
-| 9 | **Channel adapter**: RenderDoc → web HTML, email, or PDF; or the message's text → a push for its platform, or an SMS, measured against its limit (section 10) | 500 `render_failed`; a message over its limit: 422 `push_payload_too_large` / `sms_too_long` |
-| 10 | Write one `render_log` row for every request that reached stage 3, whatever the outcome (never values; a push's row names its platform) | — |
+| #   | Stage                                                                                                                                                                                                                                                                                                                                                                                         | Fails with                                                                                   |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 1   | Find the template (and its content type)                                                                                                                                                                                                                                                                                                                                                      | 404 `template_not_found`                                                                     |
+| 2   | Find the version by number, or the open draft (preview only). A number is its released row; with none, its latest round, which stage 4 refuses a consumer. A preview may name a `round` of the number                                                                                                                                                                                         | 404 `version_not_found`                                                                      |
+| 3   | Preview: the viewer may see the template. Consumer: the consumer is registered                                                                                                                                                                                                                                                                                                                | 403 `preview_forbidden` / `unknown_consumer`                                                 |
+| 4   | Version rules (consumers only): released, not sunset, not revoked                                                                                                                                                                                                                                                                                                                             | 409 / 410                                                                                    |
+| 5   | The channel is allowed by the content type and enabled on the version                                                                                                                                                                                                                                                                                                                         | 422 `channel_not_allowed` / `channel_not_enabled`                                            |
+| 6   | **Validate values** against the version's variable list (section 5)                                                                                                                                                                                                                                                                                                                           | 422 `missing_variables` / `invalid_values`                                                   |
+| 7   | **Check the document**: a document channel's body passes the document check (section 3); a message channel never reads the body. Then the rendered channel's own fields (for email, the subject and then the preheader; for push, the title, subtitle and body; for SMS, the message), each that has a value, pass the check for its shape (section 2, "Field shapes"), then the schema parse | 500 `render_failed`                                                                          |
+| 8   | **Resolve**: a document's TipTap JSON and the canonical values into a RenderDoc (section 8), and the channel's fields into text                                                                                                                                                                                                                                                               | 500 `render_failed`                                                                          |
+| 9   | **Channel adapter**: RenderDoc → web HTML, email, or PDF; or the message's text → a push for its platform, or an SMS, measured against its limit (section 10)                                                                                                                                                                                                                                 | 500 `render_failed`; a message over its limit: 422 `push_payload_too_large` / `sms_too_long` |
+| 10  | Write one `render_log` row for every request that reached stage 3, whatever the outcome (never values; a push's row names its platform)                                                                                                                                                                                                                                                       | —                                                                                            |
 
 Before stage 1 the route checks the request itself: the body's size (at most 1,000,000 bytes, else 413 `body_too_large`), then its shape, `version: "draft"` only on the preview route, `round` only on the preview route (a whole number from 1; the consumer route ignores it, whatever it holds, since consumers never see rounds, and ignores a `preview` field too), a `platform` (`ios` or `android`) with channel `push` and with no other channel, no `encoding` with push or SMS, and, on the consumer route only, an `X-Consumer-Id` header (400 `bad_request` / `consumer_required`). The size is refused from a declared `Content-Length` before anything is read, and otherwise as soon as the bytes read pass the limit: a chunked body has no length, so the count is what holds. Nothing past the limit is buffered. Those refusals, and refusals at stages 1–2, are not logged. Something that fails outside the engine (the database, the log write) answers 500 `render_failed` with "… Try again.".
 
@@ -75,39 +75,39 @@ A template body is TipTap (ProseMirror) JSON: `{ "type": "doc", "content": [ …
 
 ### Nodes
 
-| Node | Allowed inside | Content | Attributes |
-| --- | --- | --- | --- |
-| `doc` | — (the root) | one or more blocks | — |
-| `paragraph` | `doc`, `listItem`, `tableCell`, `tableHeader`, `callout` | inline nodes, zero or more | `id` |
-| `heading` | `doc`, `listItem` (not inside a cell) | inline nodes, zero or more | `id`, `level`, `requiredKey` |
-| `bulletList` | `doc`, `listItem`, `tableCell`, `tableHeader` | `listItem`, one or more | `id` |
-| `orderedList` | `doc`, `listItem`, `tableCell`, `tableHeader` | `listItem`, one or more | `id`, `start`, `markerFormat`, `markerDelimiter`, `type` (ignored) |
-| `listItem` | `bulletList`, `orderedList` | a `paragraph`, then zero or more blocks (inside a cell: paragraphs and lists only) | `id` |
-| `table` | `doc`, `listItem` (not inside a cell) | `tableRow`, one or more | `id` |
-| `tableRow` | `table` | `tableCell` / `tableHeader`, zero or more (an empty row passes only when rowspans from above cover every column) | — |
-| `tableCell`, `tableHeader` | `tableRow` | `paragraph`, `bulletList` or `orderedList`, one or more | `colspan`, `rowspan`, `colwidth` (removed at save), `align` (removed at save) |
-| `callout` | `doc`, `listItem` (not inside a cell) | `paragraph`, one or more | `id` |
-| `horizontalRule` | `doc`, `listItem` (not inside a cell) | — | `id` |
-| `text` | inline | — | marks: `bold`, `italic`, `underline`, `link` |
-| `hardBreak` | inline | — | — |
-| `variable` | inline (an atom) | — | `key`; marks: `bold`, `italic`, `underline`, `link` |
+| Node                       | Allowed inside                                           | Content                                                                                                          | Attributes                                                                    |
+| -------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `doc`                      | — (the root)                                             | one or more blocks                                                                                               | —                                                                             |
+| `paragraph`                | `doc`, `listItem`, `tableCell`, `tableHeader`, `callout` | inline nodes, zero or more                                                                                       | `id`                                                                          |
+| `heading`                  | `doc`, `listItem` (not inside a cell)                    | inline nodes, zero or more                                                                                       | `id`, `level`, `requiredKey`                                                  |
+| `bulletList`               | `doc`, `listItem`, `tableCell`, `tableHeader`            | `listItem`, one or more                                                                                          | `id`                                                                          |
+| `orderedList`              | `doc`, `listItem`, `tableCell`, `tableHeader`            | `listItem`, one or more                                                                                          | `id`, `start`, `markerFormat`, `markerDelimiter`, `type` (ignored)            |
+| `listItem`                 | `bulletList`, `orderedList`                              | a `paragraph`, then zero or more blocks (inside a cell: paragraphs and lists only)                               | `id`                                                                          |
+| `table`                    | `doc`, `listItem` (not inside a cell)                    | `tableRow`, one or more                                                                                          | `id`                                                                          |
+| `tableRow`                 | `table`                                                  | `tableCell` / `tableHeader`, zero or more (an empty row passes only when rowspans from above cover every column) | —                                                                             |
+| `tableCell`, `tableHeader` | `tableRow`                                               | `paragraph`, `bulletList` or `orderedList`, one or more                                                          | `colspan`, `rowspan`, `colwidth` (removed at save), `align` (removed at save) |
+| `callout`                  | `doc`, `listItem` (not inside a cell)                    | `paragraph`, one or more                                                                                         | `id`                                                                          |
+| `horizontalRule`           | `doc`, `listItem` (not inside a cell)                    | —                                                                                                                | `id`                                                                          |
+| `text`                     | inline                                                   | —                                                                                                                | marks: `bold`, `italic`, `underline`, `link`                                  |
+| `hardBreak`                | inline                                                   | —                                                                                                                | —                                                                             |
+| `variable`                 | inline (an atom)                                         | —                                                                                                                | `key`; marks: `bold`, `italic`, `underline`, `link`                           |
 
 "Blocks" are `paragraph`, `heading`, `bulletList`, `orderedList`, `table`, `callout` and `horizontalRule`. Inside a table cell, at any depth, there are only paragraphs and lists: a cell's children, and the children of every list item inside a cell (in nested lists too), are paragraphs and lists. No tables, headings, rules or callouts anywhere inside a cell. Outside a table, a list item may hold any block after its first paragraph.
 
 ### Attributes and their allowed values
 
-| Attribute | On | Allowed values | Absent / null means |
-| --- | --- | --- | --- |
-| `id` | blocks and list items | a non-empty string (stable block id); any other value is not refused and reads as no id | no id (`null` on RenderDoc blocks; a list item's id is not carried) |
-| `level` | `heading` | `1`, `2`, `3` | `1` (the schema's default); `null` or any other value is refused |
-| `requiredKey` | `heading` | a required section's key, e.g. `"legal_notices"`; anything but a non-empty string means an ordinary heading | an ordinary heading |
-| `start` | `orderedList` | an integer from `0` to `9999` | `1` |
-| `markerFormat` | `orderedList` | `"decimal"`, `"lower-alpha"`, `"upper-alpha"`, `"lower-roman"`, `"upper-roman"` | the default for the list's depth (section 7) |
-| `markerDelimiter` | `orderedList` | `"period"`, `"paren-right"`, `"parens"` | `"period"` |
-| `type` | `orderedList` | TipTap's own attribute, any value; ignored by the engine | — |
-| `colspan`, `rowspan` | cells | an integer ≥ 1 that stays inside the table (section 3) | `1` |
-| `key` | `variable` | a variable key (`[a-z][a-z0-9]*(_[a-z0-9]+)*`, at most 64 characters); not checked: one that isn't a string in the version's variable list renders nothing (section 8) | renders nothing |
-| `href` | `link` mark | a link that passes the link check (section 6); not refused otherwise: a failing one loses its mark at save, and the resolver drops it | no link |
+| Attribute            | On                    | Allowed values                                                                                                                                                         | Absent / null means                                                 |
+| -------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `id`                 | blocks and list items | a non-empty string (stable block id); any other value is not refused and reads as no id                                                                                | no id (`null` on RenderDoc blocks; a list item's id is not carried) |
+| `level`              | `heading`             | `1`, `2`, `3`                                                                                                                                                          | `1` (the schema's default); `null` or any other value is refused    |
+| `requiredKey`        | `heading`             | a required section's key, e.g. `"legal_notices"`; anything but a non-empty string means an ordinary heading                                                            | an ordinary heading                                                 |
+| `start`              | `orderedList`         | an integer from `0` to `9999`                                                                                                                                          | `1`                                                                 |
+| `markerFormat`       | `orderedList`         | `"decimal"`, `"lower-alpha"`, `"upper-alpha"`, `"lower-roman"`, `"upper-roman"`                                                                                        | the default for the list's depth (section 7)                        |
+| `markerDelimiter`    | `orderedList`         | `"period"`, `"paren-right"`, `"parens"`                                                                                                                                | `"period"`                                                          |
+| `type`               | `orderedList`         | TipTap's own attribute, any value; ignored by the engine                                                                                                               | —                                                                   |
+| `colspan`, `rowspan` | cells                 | an integer ≥ 1 that stays inside the table (section 3)                                                                                                                 | `1`                                                                 |
+| `key`                | `variable`            | a variable key (`[a-z][a-z0-9]*(_[a-z0-9]+)*`, at most 64 characters); not checked: one that isn't a string in the version's variable list renders nothing (section 8) | renders nothing                                                     |
+| `href`               | `link` mark           | a link that passes the link check (section 6); not refused otherwise: a failing one loses its mark at save, and the resolver drops it                                  | no link                                                             |
 
 JSON numbers are compared by value (`3.0` is 3). Strings and fractions are refused where an integer is required. `align`, `colwidth` and TipTap's `type` may appear in stored documents with any value (documents stored before save normalization removed them) and are ignored.
 
@@ -119,14 +119,14 @@ In the editor's HTML (clipboard, static render) the numbering attributes appear 
 
 A channel can have short fields of its own, printed by that channel only. They are declared once, in a registry (in the Node code, `src/domain/channel-fields.ts`), each with a key, a label, a shape and whether submit requires it:
 
-| Channel | Field | Shape | Required at submit | Notes |
-| --- | --- | --- | --- | --- |
-| Email | `subject` | `line` | yes | |
-| Email | `preheader` | `line` | no | |
-| Push | `title` | `line` | yes | |
-| Push | `subtitle` | `line` | no | iPhone only: Android's push never carries it |
-| Push | `body` | `paragraph` | yes | no public link shortener (submit) |
-| SMS | `text` | `lines` | yes | GSM-7 as typed, no public link shortener (submit) |
+| Channel | Field       | Shape       | Required at submit | Notes                                             |
+| ------- | ----------- | ----------- | ------------------ | ------------------------------------------------- |
+| Email   | `subject`   | `line`      | yes                |                                                   |
+| Email   | `preheader` | `line`      | no                 |                                                   |
+| Push    | `title`     | `line`      | yes                |                                                   |
+| Push    | `subtitle`  | `line`      | no                 | iPhone only: Android's push never carries it      |
+| Push    | `body`      | `paragraph` | yes                | no public link shortener (submit)                 |
+| SMS     | `text`      | `lines`     | yes                | GSM-7 as typed, no public link shortener (submit) |
 
 PDF and Web have none. A version stores them as one JSON object, `channelFields` (the `versions.channel_fields` column), keyed by channel and then by field key: `{ "email": { "subject": { "type": "doc", … }, "preheader": { "type": "doc", … } } }`, `{ "push": { "title": …, "body": … }, "sms": { "text": … } }`. A field with no value is absent, and so is a channel with none, so a version without any holds `{}`. A field keeps its value while its channel is off; only its own channel's render reads it.
 
@@ -134,23 +134,23 @@ PDF and Web have none. A version stores them as one JSON object, `channelFields`
 
 Every channel field is a separate document, `{ "type": "doc", "content": [ one paragraph ] }`, whose paragraph holds only `text` and `variable` nodes, and `hardBreak` nodes in a `lines` field. Neither those nodes nor the paragraph carry marks: no bold, no links. The paragraph may be empty.
 
-| Shape | Holds | Line breaks | Used by |
-| --- | --- | --- | --- |
-| `line` | one line of text and variables | none: a typed or pasted line break is saved as one space | the email subject and preheader, a push title and subtitle |
-| `paragraph` | one paragraph of text and variables, shown wrapping | none, as `line` | a push body |
-| `lines` | text and variables over several lines | each is a `hardBreak`; several pasted paragraphs join with one each, so a blank line stays | an SMS message |
+| Shape       | Holds                                               | Line breaks                                                                                | Used by                                                    |
+| ----------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `line`      | one line of text and variables                      | none: a typed or pasted line break is saved as one space                                   | the email subject and preheader, a push title and subtitle |
+| `paragraph` | one paragraph of text and variables, shown wrapping | none, as `line`                                                                            | a push body                                                |
+| `lines`     | text and variables over several lines               | each is a `hardBreak`; several pasted paragraphs join with one each, so a blank line stays | an SMS message                                             |
 
 The field check refuses anything else in the channel's own words (section 3).
 
 ### Limits
 
-| Limit | Value |
-| --- | --- |
-| Heading levels | 1–3 |
-| Ordered list `start` | 0–9999 |
-| List nesting | at most 9 levels (a list may have at most 8 list ancestors, bullet or ordered) |
-| Table columns | at most 12 |
-| Table cell content | paragraphs and lists only, at every depth (in the cell's lists' items too) |
+| Limit                | Value                                                                          |
+| -------------------- | ------------------------------------------------------------------------------ |
+| Heading levels       | 1–3                                                                            |
+| Ordered list `start` | 0–9999                                                                         |
+| List nesting         | at most 9 levels (a list may have at most 8 list ancestors, bullet or ordered) |
+| Table columns        | at most 12                                                                     |
+| Table cell content   | paragraphs and lists only, at every depth (in the cell's lists' items too)     |
 
 ---
 
@@ -162,27 +162,27 @@ Every write of a body (an autosave, an import) stores it as: normalize → check
 
 ### Normalization (the CMS, at save; the resolver repeats the text rules defensively)
 
-| What arrives | Saved as |
-| --- | --- |
-| A heading whose `level` is a number above 3 and at most 6 (3.5 and 5.5 included) | level 3; any other bad level (0, 7, `"2"`, `null`) is left for the check |
-| A table cell with `align` or `colwidth` | those attributes removed |
-| An `orderedList` with TipTap's `type` attribute | `type` removed (numbering is `markerFormat` / `markerDelimiter`) |
-| Paste into the editor only: an `orderedList` whose `start` is a number outside 0–9999 or not whole | below 0 → 0, above 9999 → 9999, a fraction cut to its whole part, NaN (the clipboard's `start="x"`) → 1; so the editor shows the number every channel prints. At save and import an out-of-range `start` is left for the check, which refuses it |
-| A tab (U+0009) in text | one space (U+0020) (also on paste and import) |
-| A line break character inside a text node (CR LF once, CR, LF, U+2028, U+2029), after tabs and control characters | a `hardBreak` node; the pieces keep the node's marks |
-| A text node that is empty, or left empty | removed |
-| Other control characters in text (U+0000–U+0008, U+000B, U+000C, U+000E–U+001F, U+007F–U+009F) | removed |
-| An invisible character in text (section 4: soft hyphen, zero-width and bidirectional marks, variation selectors, …) | removed (also on paste and import); in a push's or an SMS's field, kept (section 4) |
-| A paragraph or heading whose text was all removed | no `content` (its hard breaks, if any, stay: every hard break is kept) |
-| A link mark whose `href` passes the link check | `href` replaced by its normalized form |
-| A link mark whose `href` fails the link check | the mark removed, the text kept |
-| A heading in a table cell (directly, or in a list item anywhere inside the cell) | a paragraph with the same content, keeping only `id` |
-| A callout in a table cell (as above) | its children, converted by these same rules |
-| A rule in a table cell (as above) | an empty paragraph keeping the rule's `id` |
-| A table in a table cell (as above) | first normalized as a table (padded, split), then each of its cells' content, row by row and cell by cell, converted by these rules; its `id` is dropped |
-| A table cell, or a list item inside one, left with nothing | one empty paragraph |
-| A ragged table (its spans otherwise valid) | per row, one cell per uncovered slot, appended at the row end, holding one empty paragraph; a header cell if the row's first cell is one, else a data cell (what the editor's table plugin does on load) |
-| A table wider than 12 columns (and at most 1,000) that lines up once padded | consecutive tables for columns 1–12, 13–24, …; every row appears in each, so header rows repeat (below) |
+| What arrives                                                                                                        | Saved as                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A heading whose `level` is a number above 3 and at most 6 (3.5 and 5.5 included)                                    | level 3; any other bad level (0, 7, `"2"`, `null`) is left for the check                                                                                                                                                                         |
+| A table cell with `align` or `colwidth`                                                                             | those attributes removed                                                                                                                                                                                                                         |
+| An `orderedList` with TipTap's `type` attribute                                                                     | `type` removed (numbering is `markerFormat` / `markerDelimiter`)                                                                                                                                                                                 |
+| Paste into the editor only: an `orderedList` whose `start` is a number outside 0–9999 or not whole                  | below 0 → 0, above 9999 → 9999, a fraction cut to its whole part, NaN (the clipboard's `start="x"`) → 1; so the editor shows the number every channel prints. At save and import an out-of-range `start` is left for the check, which refuses it |
+| A tab (U+0009) in text                                                                                              | one space (U+0020) (also on paste and import)                                                                                                                                                                                                    |
+| A line break character inside a text node (CR LF once, CR, LF, U+2028, U+2029), after tabs and control characters   | a `hardBreak` node; the pieces keep the node's marks                                                                                                                                                                                             |
+| A text node that is empty, or left empty                                                                            | removed                                                                                                                                                                                                                                          |
+| Other control characters in text (U+0000–U+0008, U+000B, U+000C, U+000E–U+001F, U+007F–U+009F)                      | removed                                                                                                                                                                                                                                          |
+| An invisible character in text (section 4: soft hyphen, zero-width and bidirectional marks, variation selectors, …) | removed (also on paste and import); in a push's or an SMS's field, kept (section 4)                                                                                                                                                              |
+| A paragraph or heading whose text was all removed                                                                   | no `content` (its hard breaks, if any, stay: every hard break is kept)                                                                                                                                                                           |
+| A link mark whose `href` passes the link check                                                                      | `href` replaced by its normalized form                                                                                                                                                                                                           |
+| A link mark whose `href` fails the link check                                                                       | the mark removed, the text kept                                                                                                                                                                                                                  |
+| A heading in a table cell (directly, or in a list item anywhere inside the cell)                                    | a paragraph with the same content, keeping only `id`                                                                                                                                                                                             |
+| A callout in a table cell (as above)                                                                                | its children, converted by these same rules                                                                                                                                                                                                      |
+| A rule in a table cell (as above)                                                                                   | an empty paragraph keeping the rule's `id`                                                                                                                                                                                                       |
+| A table in a table cell (as above)                                                                                  | first normalized as a table (padded, split), then each of its cells' content, row by row and cell by cell, converted by these rules; its `id` is dropped                                                                                         |
+| A table cell, or a list item inside one, left with nothing                                                          | one empty paragraph                                                                                                                                                                                                                              |
+| A ragged table (its spans otherwise valid)                                                                          | per row, one cell per uncovered slot, appended at the row end, holding one empty paragraph; a header cell if the row's first cell is one, else a data cell (what the editor's table plugin does on load)                                         |
+| A table wider than 12 columns (and at most 1,000) that lines up once padded                                         | consecutive tables for columns 1–12, 13–24, …; every row appears in each, so header rows repeat (below)                                                                                                                                          |
 
 How a wide table is split: each piece's rows hold the cells that start in that row and overlap the piece's columns. A cell crossing a boundary keeps its content in the piece where it starts, its colspan cut to fit; the next piece gets a cell of the same type with all its other attributes and one empty paragraph, spanning the rest. The first piece keeps the table's attributes; later pieces lose `id`. Tables with bad spans, overlapping cells, overlong rowspans, no columns or more than 1,000 columns (a colspan of a billion would pad or split into a billion empty cells) are left unchanged for the check.
 
@@ -196,23 +196,23 @@ A message's field (a push's title, subtitle and body, an SMS's message) takes th
 
 The check walks the document depth-first, a node before its children, applying these rules at each node in this order; the first broken rule wins:
 
-| Rule | Exact sentence |
-| --- | --- |
-| `heading.level` is absent, 1, 2 or 3 | "Headings can only be levels 1 to 3." |
-| `orderedList.start` is absent, null or an integer from 0 to 9999 | "A numbered list can start at 0 to 9999." |
-| `markerFormat` / `markerDelimiter` are absent, null, or one of the allowed values | "This list's numbering style isn't one Stencil knows." |
+| Rule                                                                                                                                                                                                  | Exact sentence                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `heading.level` is absent, 1, 2 or 3                                                                                                                                                                  | "Headings can only be levels 1 to 3."                     |
+| `orderedList.start` is absent, null or an integer from 0 to 9999                                                                                                                                      | "A numbered list can start at 0 to 9999."                 |
+| `markerFormat` / `markerDelimiter` are absent, null, or one of the allowed values                                                                                                                     | "This list's numbering style isn't one Stencil knows."    |
 | A table: width ≥ 1; spans absent, null or an integer ≥ 1; each cell takes the next column a rowspan from above doesn't hold; no slot taken twice; nothing past the last column or row; every row full | "This table's cells don't line up into rows and columns." |
-| A table is at most 12 columns wide | "Tables can have at most 12 columns." |
-| A list has at most 8 list ancestors (bullet or ordered, counted through anything, cells included) | "Lists can nest at most 9 levels deep." |
-| Every child of a cell, and of every list item inside a cell (at any depth), is a paragraph or a list (an unknown node or `text` there too) | "Table cells can hold only paragraphs and lists." |
+| A table is at most 12 columns wide                                                                                                                                                                    | "Tables can have at most 12 columns."                     |
+| A list has at most 8 list ancestors (bullet or ordered, counted through anything, cells included)                                                                                                     | "Lists can nest at most 9 levels deep."                   |
+| Every child of a cell, and of every list item inside a cell (at any depth), is a paragraph or a list (an unknown node or `text` there too)                                                            | "Table cells can hold only paragraphs and lists."         |
 
 Only then the document is parsed against the editor schema (section 2). The parse refuses an unknown node or mark, a misplaced node, an empty `doc` or a root that isn't `doc`, an empty text node, a node that isn't an object, duplicate marks and marks on a block, all with "This document has content Stencil doesn't support." A channel field takes the field check for its shape instead of these rules (section 2, "Field shapes"), then the same parse. The field check's sentence is its channel's:
 
-| Channel | Sentence |
-| --- | --- |
-| Email | "The email subject and preheader can hold only one line of text and variables." |
-| Push | "The push title, subtitle and body can hold only text and variables, with no line breaks." |
-| SMS | "The SMS message can hold only text, line breaks and variables." |
+| Channel | Sentence                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------ |
+| Email   | "The email subject and preheader can hold only one line of text and variables."            |
+| Push    | "The push title, subtitle and body can hold only text and variables, with no line breaks." |
+| SMS     | "The SMS message can hold only text, line breaks and variables."                           |
 
 Link hrefs are normalized at save rather than refused, so the check does not refuse a document for a link (the resolver drops a link that fails the link check, keeping its text).
 
@@ -236,22 +236,22 @@ The engine runs the same check before resolving (pipeline stage 7). A stored doc
 
 Spaces are content. Leading spaces, trailing spaces and runs of spaces render exactly as typed in every channel:
 
-| Channel | How |
-| --- | --- |
-| Web | paragraphs and headings (`p`, `h1`–`h3`) use `white-space: pre-wrap`; list items, cells and callouts hold their text in `<p>` |
-| Email HTML | the no-break space technique below |
-| Plain text (email) | the characters as typed |
-| PDF | every U+0020 stays U+0020 in the text layer; nothing becomes a no-break space. Spaces of every kind (U+0020, U+00A0, U+1680, U+2000–U+200A, U+202F, U+205F, U+3000) that begin a line the author started (paragraph or heading start, or after a hard break) are set as a run of their own and print where they were typed, each at its own width; if those spaces and the first word don't fit on the line, the spaces stay alone on that line and the word starts the next. Runs inside a line keep their width. Lines wrap only at U+0020: at an automatic wrap the run of U+0020 there is absorbed (the first becomes the break, the rest are dropped), as a browser does with `pre-wrap`, never carried to the start of the next line; the other spaces hold their neighbours together, as a no-break space does. Spaces ending a line (before a hard break or the paragraph's end) are kept as far as they fit; the rest are absorbed. So a paragraph of only spaces is one blank line. A space is never a character the PDF can't draw (section 10) |
+| Channel            | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web                | paragraphs and headings (`p`, `h1`–`h3`) use `white-space: pre-wrap`; list items, cells and callouts hold their text in `<p>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Email HTML         | the no-break space technique below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Plain text (email) | the characters as typed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| PDF                | every U+0020 stays U+0020 in the text layer; nothing becomes a no-break space. Spaces of every kind (U+0020, U+00A0, U+1680, U+2000–U+200A, U+202F, U+205F, U+3000) that begin a line the author started (paragraph or heading start, or after a hard break) are set as a run of their own and print where they were typed, each at its own width; if those spaces and the first word don't fit on the line, the spaces stay alone on that line and the word starts the next. Runs inside a line keep their width. Lines wrap only at U+0020: at an automatic wrap the run of U+0020 there is absorbed (the first becomes the break, the rest are dropped), as a browser does with `pre-wrap`, never carried to the start of the next line; the other spaces hold their neighbours together, as a no-break space does. Spaces ending a line (before a hard break or the paragraph's end) are kept as far as they fit; the rest are absorbed. So a paragraph of only spaces is one blank line. A space is never a character the PDF can't draw (section 10) |
 
 **Email no-break space technique.** Mail clients collapse whitespace and ignore `white-space`. For each line of a paragraph, heading or the preheader (the line's text across all its runs, split at hard breaks), walk the characters in order and replace a U+0020 with U+00A0 when it is the first character of the line, or the last character of the line, or the character written just before it is a U+0020. Every U+00A0 (the author's and the inserted ones) is written as `&nbsp;`. It applies to every paragraph and heading wherever it sits (top level, list items, cells, callouts) and to the preheader; not to `<title>`, markers or plain text.
 
-| Line (· is a space) | Written |
-| --- | --- |
-| `a·b` | `a b` |
-| `a···b` | `a &nbsp; b` (space, nbsp, space) |
-| `··Lead` | `&nbsp; Lead` |
-| `End··` | `End &nbsp;` |
-| `···` | `&nbsp; &nbsp;` |
+| Line (· is a space) | Written                           |
+| ------------------- | --------------------------------- |
+| `a·b`               | `a b`                             |
+| `a···b`             | `a &nbsp; b` (space, nbsp, space) |
+| `··Lead`            | `&nbsp; Lead`                     |
+| `End··`             | `End &nbsp;`                      |
+| `···`               | `&nbsp; &nbsp;`                   |
 
 ### Hard breaks
 
@@ -265,20 +265,20 @@ A hard break ends the current line and starts a new one. A paragraph's lines are
 
 "Blank characters" for rule 2: U+0020, U+00A0, U+1680, U+2000–U+200A, U+202F, U+205F, U+3000, the invisible characters above, tabs and line break characters. Control characters are not blank: `{{promo_note}}` beside a U+0007 keeps the paragraph, which resolves empty. "Empty" for rule 3: no inline content at all after resolution (a paragraph of hard breaks isn't empty: the author made those lines).
 
-| Document (top level) | Every channel shows |
-| --- | --- |
-| `A`, empty paragraph, `B` | A, a blank line, B |
-| `A`, paragraph `···`, `B` | A, a blank line (holding three spaces), B |
-| `A`, paragraph `[br]`, `B` | A, two blank lines, B (the paragraph's two empty lines) |
-| paragraph `[br]x` | an empty line, then x |
-| paragraph `x[br]` | x, then an empty line |
-| paragraph `x[br][br]` | x, then two empty lines |
-| `Rate: {{promo_rate}}` with no value | `Rate: ` (the text stays; only all-variable paragraphs go) |
-| `{{promo_note}}` with no value | nothing (the paragraph is removed) |
-| `· {{promo_note}} ·[br]` with no value | nothing (only blanks and breaks besides the variable) |
-| `A`, paragraph `[br]` (end of document) | A, two blank lines (breaks are content, not "empty") |
-| `A`, `B`, empty, empty (end of document) | A, B |
-| `A`, paragraph `··` (end of document) | A, a blank line (spaces are content, not "empty") |
+| Document (top level)                     | Every channel shows                                        |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| `A`, empty paragraph, `B`                | A, a blank line, B                                         |
+| `A`, paragraph `···`, `B`                | A, a blank line (holding three spaces), B                  |
+| `A`, paragraph `[br]`, `B`               | A, two blank lines, B (the paragraph's two empty lines)    |
+| paragraph `[br]x`                        | an empty line, then x                                      |
+| paragraph `x[br]`                        | x, then an empty line                                      |
+| paragraph `x[br][br]`                    | x, then two empty lines                                    |
+| `Rate: {{promo_rate}}` with no value     | `Rate: ` (the text stays; only all-variable paragraphs go) |
+| `{{promo_note}}` with no value           | nothing (the paragraph is removed)                         |
+| `· {{promo_note}} ·[br]` with no value   | nothing (only blanks and breaks besides the variable)      |
+| `A`, paragraph `[br]` (end of document)  | A, two blank lines (breaks are content, not "empty")       |
+| `A`, `B`, empty, empty (end of document) | A, B                                                       |
+| `A`, paragraph `··` (end of document)    | A, a blank line (spaces are content, not "empty")          |
 
 ---
 
@@ -316,24 +316,24 @@ Display: currency `-$1,234.5` (the sign goes before the `$`), percent `21.90%`, 
 
 **JSON numbers.** A JSON number in a request's `values` is read from its exact source text (Node: the `JSON.parse` reviver's `context.source`; Java: the parser's raw token text) and then follows the same grammar as a string: `{"apr": 21.90}` is `"21.90"` and displays `21.90%`; `1e3` is refused; `1000000000000000000000` keeps every digit. This applies to the direct members of `values`. A number becomes a string, so a text variable gets its source text (`7` is `"7"`), and a date or us_state variable refuses it. `true`, `false`, objects and arrays are invalid for every type (`first_name must be text.`). When a key repeats, the last one counts. An engine that can't read a number's source text refuses the number; it never guesses digits.
 
-| Type | Input | Canonical | Display |
-| --- | --- | --- | --- |
-| currency | `95` | `95` | `$95` |
-| currency | `1000.5` | `1000.5` | `$1,000.5` |
-| currency | `-$1,234.5` | `-1234.5` | `-$1,234.5` |
-| currency | `$1,000,000.00` | `1000000.00` | `$1,000,000.00` |
-| currency | `1000000000000000000000` | same | `$1,000,000,000,000,000,000,000` |
-| percent | `6.875` | `6.875` | `6.875%` |
-| percent | `21.90` | `21.90` | `21.90%` |
-| percent | `21.99 %` | `21.99` | `21.99%` |
-| number | `1.999999` | `1.999999` | `1.999999` |
-| number | `1,234,567.891` | `1234567.891` | `1,234,567.891` |
-| date | `3/4/2027` | `2027-03-04` | `March 4, 2027` |
-| date | `Sept 30, 2027` | `2027-09-30` | `September 30, 2027` |
-| us_state | `new  jersey` | `NJ` | `New Jersey` |
-| text | `Maya\nChen` | `Maya\nChen` | `Maya Chen` |
-| currency | `1,00` / `.5` / `5.` / `+5` / `007` / `-0` / `1e3` / `$-5` | refused | — |
-| date | `2027-02-29` / `1/1/27` / `4 March 2027` | refused | — |
+| Type     | Input                                                      | Canonical     | Display                          |
+| -------- | ---------------------------------------------------------- | ------------- | -------------------------------- |
+| currency | `95`                                                       | `95`          | `$95`                            |
+| currency | `1000.5`                                                   | `1000.5`      | `$1,000.5`                       |
+| currency | `-$1,234.5`                                                | `-1234.5`     | `-$1,234.5`                      |
+| currency | `$1,000,000.00`                                            | `1000000.00`  | `$1,000,000.00`                  |
+| currency | `1000000000000000000000`                                   | same          | `$1,000,000,000,000,000,000,000` |
+| percent  | `6.875`                                                    | `6.875`       | `6.875%`                         |
+| percent  | `21.90`                                                    | `21.90`       | `21.90%`                         |
+| percent  | `21.99 %`                                                  | `21.99`       | `21.99%`                         |
+| number   | `1.999999`                                                 | `1.999999`    | `1.999999`                       |
+| number   | `1,234,567.891`                                            | `1234567.891` | `1,234,567.891`                  |
+| date     | `3/4/2027`                                                 | `2027-03-04`  | `March 4, 2027`                  |
+| date     | `Sept 30, 2027`                                            | `2027-09-30`  | `September 30, 2027`             |
+| us_state | `new  jersey`                                              | `NJ`          | `New Jersey`                     |
+| text     | `Maya\nChen`                                               | `Maya\nChen`  | `Maya Chen`                      |
+| currency | `1,00` / `.5` / `5.` / `+5` / `007` / `-0` / `1e3` / `$-5` | refused       | —                                |
+| date     | `2027-02-29` / `1/1/27` / `4 March 2027`                   | refused       | —                                |
 
 A variable whose display text is empty after the text rules (for example a text value made only of invisible or control characters) renders nothing and counts as having no value. It still satisfies a required variable: no `missing_variables`.
 
@@ -356,35 +356,35 @@ Everything else is kept exactly as written: the host's case, existing `%XX` esca
 
 **Refusals, checked in this order (the first that applies is the reason):**
 
-| # | Reason | When | Message |
-| --- | --- | --- | --- |
-| 1 | `empty` | nothing left after trimming | "Enter a link." |
-| 2 | `invisible` | a lone surrogate | "Links can't contain invisible or control characters." |
-| 3 | `space` | any whitespace from the list in step 1 (except the zero-width ones) inside | "Links can't contain spaces or line breaks." |
-| 4 | `invisible` | a control, format or invisible character inside: U+0000–U+001F, U+007F–U+009F, U+00AD, U+034F, U+061C, U+115F, U+1160, U+17B4, U+17B5, U+180B–U+180F, U+200B–U+200F, U+202A–U+202E, U+2060–U+206F, U+3164, U+FE00–U+FE0F, U+FEFF, U+FFA0, U+FFF0–U+FFFB, U+1BCA0–U+1BCA3, U+1D173–U+1D17A, U+E0000–U+E0FFF | "Links can't contain invisible or control characters." |
-| 5 | `scheme` | after NFC: no scheme (`[A-Za-z][A-Za-z0-9+.-]*:`), or not `https`, `http`, `mailto`, `tel` (any case) | "Links must start with https://, http://, mailto: or tel:." |
-| 6 | `backslash` | a `\` anywhere | "Links can't contain a backslash." |
-| 7 | `web-address` | http(s): the scheme isn't followed by `//` | "Enter a full web address, like https://www.example.com." |
-| 8 | `web-userinfo` | http(s): an `@` in the authority (`https://bank.example@evil.example`) | "Web links can't have a name or password before the site's address." |
-| 9 | `web-address` | http(s): an empty host | (as 7) |
-| 10 | `web-host` | http(s): a host with characters above U+007F | "Write an international site name in its xn-- form." |
-| 11 | `web-address` | http(s): a host that isn't dot-separated labels of `[A-Za-z0-9_-]` (not starting or ending with `-`, an optional final dot) or `[`, one or more of `0-9 A-F a-f : .`, `]` (not otherwise validated); or a port that isn't 1–5 digits up to 65535 | (as 7) |
-| 12 | `email` | mailto: the part before the first `?` is not one or more comma-separated `local@domain` addresses (exactly one `@`, both sides non-empty) | "Enter an email address after mailto:, like mailto:help@example.com." |
-| 13 | `phone` | tel: not an optional `+`, then digits and `-` `.` `(` `)` with at least one digit, then optionally `;ext=` and one or more digits | "Enter a phone number after tel:, like tel:+18005550100." |
+| #   | Reason         | When                                                                                                                                                                                                                                                                                                       | Message                                                               |
+| --- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 1   | `empty`        | nothing left after trimming                                                                                                                                                                                                                                                                                | "Enter a link."                                                       |
+| 2   | `invisible`    | a lone surrogate                                                                                                                                                                                                                                                                                           | "Links can't contain invisible or control characters."                |
+| 3   | `space`        | any whitespace from the list in step 1 (except the zero-width ones) inside                                                                                                                                                                                                                                 | "Links can't contain spaces or line breaks."                          |
+| 4   | `invisible`    | a control, format or invisible character inside: U+0000–U+001F, U+007F–U+009F, U+00AD, U+034F, U+061C, U+115F, U+1160, U+17B4, U+17B5, U+180B–U+180F, U+200B–U+200F, U+202A–U+202E, U+2060–U+206F, U+3164, U+FE00–U+FE0F, U+FEFF, U+FFA0, U+FFF0–U+FFFB, U+1BCA0–U+1BCA3, U+1D173–U+1D17A, U+E0000–U+E0FFF | "Links can't contain invisible or control characters."                |
+| 5   | `scheme`       | after NFC: no scheme (`[A-Za-z][A-Za-z0-9+.-]*:`), or not `https`, `http`, `mailto`, `tel` (any case)                                                                                                                                                                                                      | "Links must start with https://, http://, mailto: or tel:."           |
+| 6   | `backslash`    | a `\` anywhere                                                                                                                                                                                                                                                                                             | "Links can't contain a backslash."                                    |
+| 7   | `web-address`  | http(s): the scheme isn't followed by `//`                                                                                                                                                                                                                                                                 | "Enter a full web address, like https://www.example.com."             |
+| 8   | `web-userinfo` | http(s): an `@` in the authority (`https://bank.example@evil.example`)                                                                                                                                                                                                                                     | "Web links can't have a name or password before the site's address."  |
+| 9   | `web-address`  | http(s): an empty host                                                                                                                                                                                                                                                                                     | (as 7)                                                                |
+| 10  | `web-host`     | http(s): a host with characters above U+007F                                                                                                                                                                                                                                                               | "Write an international site name in its xn-- form."                  |
+| 11  | `web-address`  | http(s): a host that isn't dot-separated labels of `[A-Za-z0-9_-]` (not starting or ending with `-`, an optional final dot) or `[`, one or more of `0-9 A-F a-f : .`, `]` (not otherwise validated); or a port that isn't 1–5 digits up to 65535                                                           | (as 7)                                                                |
+| 12  | `email`        | mailto: the part before the first `?` is not one or more comma-separated `local@domain` addresses (exactly one `@`, both sides non-empty)                                                                                                                                                                  | "Enter an email address after mailto:, like mailto:help@example.com." |
+| 13  | `phone`        | tel: not an optional `+`, then digits and `-` `.` `(` `)` with at least one digit, then optionally `;ext=` and one or more digits                                                                                                                                                                          | "Enter a phone number after tel:, like tel:+18005550100."             |
 
 The authority is what follows `//` up to the first `/`, `?` or `#`; the port is what follows its last `:` (unless the authority ends with `]`).
 
-| Input | Result |
-| --- | --- |
-| `·https://coral.example·` | `https://coral.example` |
-| `HTTPS://Coral.Example/Terms` | `https://Coral.Example/Terms` |
-| `https://coral.example/café` | `https://coral.example/caf%C3%A9` |
-| `mailto:help@coral.example?subject=Card%20terms` | unchanged |
-| `tel:+18005550100` | unchanged |
-| `javascript:alert(1)`, `data:…`, `ftp://…`, `coral.example`, `/terms` | refused: `scheme` |
-| `https://coral.example/card terms` | refused: `space` |
-| `https://bank.example@evil.example/` | refused: `web-userinfo` |
-| `https://café.example/` | refused: `web-host` |
+| Input                                                                 | Result                            |
+| --------------------------------------------------------------------- | --------------------------------- |
+| `·https://coral.example·`                                             | `https://coral.example`           |
+| `HTTPS://Coral.Example/Terms`                                         | `https://Coral.Example/Terms`     |
+| `https://coral.example/café`                                          | `https://coral.example/caf%C3%A9` |
+| `mailto:help@coral.example?subject=Card%20terms`                      | unchanged                         |
+| `tel:+18005550100`                                                    | unchanged                         |
+| `javascript:alert(1)`, `data:…`, `ftp://…`, `coral.example`, `/terms` | refused: `scheme`                 |
+| `https://coral.example/card terms`                                    | refused: `space`                  |
+| `https://bank.example@evil.example/`                                  | refused: `web-userinfo`           |
+| `https://café.example/`                                               | refused: `web-host`               |
 
 **In the channels:** web HTML, email HTML and plain text group links the same way. Consecutive text runs with the same href are one link, whatever their other marks (variable runs included). A hard break belongs to the link only when the nearest text runs before and after it both carry that href (`<a>a<br>b</a>`); otherwise it stands outside any link (`<a>a</a><br>b`). HTML writes each group as one `<a href="…">` with the normalized href (HTML-escaped). Plain text writes each group as `text (address)` (section 10), with a break inside it as `\n` and the address after the link's last line. The PDF writes a link annotation with the normalized href for every linked run.
 
@@ -398,19 +398,19 @@ The authority is what follows `//` up to the first `/`, `?` or `#`; the port is 
 
 An ordered list's style is a **format** and a **delimiter**:
 
-| Format | Writes 1, 2, 3, 4 as | Range | Outside the range |
-| --- | --- | --- | --- |
-| `decimal` | 1 2 3 4 | every integer ≥ 0 | — |
-| `lower-alpha` | a b c d … z aa ab … | ≥ 1 | 0 is written `0` |
-| `upper-alpha` | A B C D … Z AA AB … | ≥ 1 | 0 is written `0` |
-| `lower-roman` | i ii iii iv | 1–3999 | 0 and ≥ 4000 are written in decimal digits |
-| `upper-roman` | I II III IV | 1–3999 | 0 and ≥ 4000 are written in decimal digits |
+| Format        | Writes 1, 2, 3, 4 as | Range             | Outside the range                          |
+| ------------- | -------------------- | ----------------- | ------------------------------------------ |
+| `decimal`     | 1 2 3 4              | every integer ≥ 0 | —                                          |
+| `lower-alpha` | a b c d … z aa ab …  | ≥ 1               | 0 is written `0`                           |
+| `upper-alpha` | A B C D … Z AA AB …  | ≥ 1               | 0 is written `0`                           |
+| `lower-roman` | i ii iii iv          | 1–3999            | 0 and ≥ 4000 are written in decimal digits |
+| `upper-roman` | I II III IV          | 1–3999            | 0 and ≥ 4000 are written in decimal digits |
 
-| Delimiter | Marker for 4 in lower-roman |
-| --- | --- |
-| `period` | `iv.` |
-| `paren-right` | `iv)` |
-| `parens` | `(iv)` |
+| Delimiter     | Marker for 4 in lower-roman |
+| ------------- | --------------------------- |
+| `period`      | `iv.`                       |
+| `paren-right` | `iv)`                       |
+| `parens`      | `(iv)`                      |
 
 - Decimal: ASCII digits, no grouping, no padding (`10003`).
 - Alpha is bijective base 26 (spreadsheet columns): 26 → `z`, 27 → `aa`, 52 → `az`, 53 → `ba`, 702 → `zz`, 703 → `aaa`.
@@ -427,24 +427,24 @@ A list's **ordered depth** is the number of `orderedList` nodes among its ancest
 - An ordered list whose `markerFormat` is absent or null takes the format for its ordered depth: 0 → `decimal`, 1 → `lower-alpha`, 2 → `lower-roman`, 3 → `decimal`, and so on (depth mod 3). Its delimiter, when absent or null, is `period`. The two fall back independently. A styled parent does not change a child's default.
 - A bullet list's glyph cycles by bullet depth: 0 → disc `•` (U+2022), 1 → circle `◦` (U+25E6), 2 → square `▪` (U+25AA), 3 → disc, and so on.
 
-| Structure | Markers |
-| --- | --- |
-| ordered › ordered › ordered › ordered | `1.` › `a.` › `i.` › `1.` |
-| ordered › bullet › ordered | `1.` › `•` › `a.` (the bullet list doesn't count) |
-| bullet › ordered › bullet › bullet | `•` › `1.` › `◦` › `▪` (the ordered list doesn't count) |
-| ordered styled `(a)` › unstyled ordered | `(a)` › `a.` (depth 1 default) |
+| Structure                               | Markers                                                 |
+| --------------------------------------- | ------------------------------------------------------- |
+| ordered › ordered › ordered › ordered   | `1.` › `a.` › `i.` › `1.`                               |
+| ordered › bullet › ordered              | `1.` › `•` › `a.` (the bullet list doesn't count)       |
+| bullet › ordered › bullet › bullet      | `•` › `1.` › `◦` › `▪` (the ordered list doesn't count) |
+| ordered styled `(a)` › unstyled ordered | `(a)` › `a.` (depth 1 default)                          |
 
 ### Numbering
 
-Item *i* (counting from 0) of an ordered list is number `start + i`. `start` is honoured everywhere, including 0. Numbering is assigned after the resolver removes items (section 8), so the list renumbers like deleting a numbered paragraph in Word.
+Item _i_ (counting from 0) of an ordered list is number `start + i`. `start` is honoured everywhere, including 0. Numbering is assigned after the resolver removes items (section 8), so the list renumbers like deleting a numbered paragraph in Word.
 
-| start, style, items | Markers |
-| --- | --- |
-| 1, `1.`, 3 | `1.` `2.` `3.` |
-| 0, `1.`, 2 | `0.` `1.` |
-| 25, `(a)`, 3 | `(y)` `(z)` `(aa)` |
-| 3998, `I.`, 3 | `MMMCMXCVIII.` `MMMCMXCIX.` `4000.` |
-| 9999, `1)`, 2 | `9999)` `10000)` |
+| start, style, items | Markers                             |
+| ------------------- | ----------------------------------- |
+| 1, `1.`, 3          | `1.` `2.` `3.`                      |
+| 0, `1.`, 2          | `0.` `1.`                           |
+| 25, `(a)`, 3        | `(y)` `(z)` `(aa)`                  |
+| 3998, `I.`, 3       | `MMMCMXCVIII.` `MMMCMXCIX.` `4000.` |
+| 9999, `1)`, 2       | `9999)` `10000)`                    |
 
 ### Every channel prints the RenderDoc's markers
 
@@ -462,33 +462,33 @@ CSS can't be trusted for this: the built-in counter styles match `formatMarker` 
 
 The resolver is a pure walk over the JSON (no editor runtime). Inputs: the checked document, the variable list and the canonical values. It handles exactly the node and mark names of section 2. Anything else throws a ResolveError carrying one of the document check's sentences, and the render fails with `reason: "document"` (section 11). The walk is depth-first in document order, and the first problem found is reported. Removal never skips a check.
 
-| Situation | Message |
-| --- | --- |
-| Body not a `doc`; an unknown node or mark; a known node in a wrong place (outside a cell); a list, list item or callout with no content; a field line that isn't a paragraph or heading | "This document has content Stencil doesn't support." |
-| Any schema node other than `paragraph`, `bulletList` or `orderedList` in a cell, or in a list item anywhere inside a cell | "Table cells can hold only paragraphs and lists." |
-| `level` present and not 1, 2 or 3 | "Headings can only be levels 1 to 3." |
-| `start` not absent or null, and not an integer 0–9999 | "A numbered list can start at 0 to 9999." |
-| `markerFormat` / `markerDelimiter` not absent or null, and not an allowed value (exact case) | "This list's numbering style isn't one Stencil knows." |
-| A list with 9 or more list ancestors (bullet and ordered counted together, through tables) | "Lists can nest at most 9 levels deep." |
-| A table wider than 12 columns | "Tables can have at most 12 columns." |
-| A bad `colspan` / `rowspan`, no rows, any other grid failure | "This table's cells don't line up into rows and columns." |
+| Situation                                                                                                                                                                               | Message                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Body not a `doc`; an unknown node or mark; a known node in a wrong place (outside a cell); a list, list item or callout with no content; a field line that isn't a paragraph or heading | "This document has content Stencil doesn't support."      |
+| Any schema node other than `paragraph`, `bulletList` or `orderedList` in a cell, or in a list item anywhere inside a cell                                                               | "Table cells can hold only paragraphs and lists."         |
+| `level` present and not 1, 2 or 3                                                                                                                                                       | "Headings can only be levels 1 to 3."                     |
+| `start` not absent or null, and not an integer 0–9999                                                                                                                                   | "A numbered list can start at 0 to 9999."                 |
+| `markerFormat` / `markerDelimiter` not absent or null, and not an allowed value (exact case)                                                                                            | "This list's numbering style isn't one Stencil knows."    |
+| A list with 9 or more list ancestors (bullet and ordered counted together, through tables)                                                                                              | "Lists can nest at most 9 levels deep."                   |
+| A table wider than 12 columns                                                                                                                                                           | "Tables can have at most 12 columns."                     |
+| A bad `colspan` / `rowspan`, no rows, any other grid failure                                                                                                                            | "This table's cells don't line up into rows and columns." |
 
 A heading checks `level` before its content. An ordered list checks depth, then `start`, `markerFormat`, `markerDelimiter`, then its items. A table resolves every cell (content, then `colspan`, `rowspan`) before the grid checks.
 
 ### Blocks
 
-| JSON | RenderDoc |
-| --- | --- |
-| `paragraph` | `paragraph` with resolved inline content |
-| `heading` | `heading` with `level` (absent → 1), `section` = `requiredKey` when it is a non-empty string, otherwise null |
-| `bulletList` | `list`, `ordered: false`, `bullet` from the bullet depth; each item's `marker` is the glyph |
-| `orderedList` | `list`, `ordered: true`, `start` (absent → 1), `format` and `delimiter` resolved (section 7); item *i*'s `marker` is `formatMarker(start + i, format, delimiter)` |
-| `listItem` | `{ marker, content }` |
-| `table` | `table` with `columns` (the table's width) and `rows` |
-| `tableRow` | `{ cells }`, the cells that start in this row |
-| `tableCell` / `tableHeader` | `{ header: false / true, colspan, rowspan, content }` |
-| `callout` | `callout` with its paragraphs |
-| `horizontalRule` | `rule` |
+| JSON                        | RenderDoc                                                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `paragraph`                 | `paragraph` with resolved inline content                                                                                                                          |
+| `heading`                   | `heading` with `level` (absent → 1), `section` = `requiredKey` when it is a non-empty string, otherwise null                                                      |
+| `bulletList`                | `list`, `ordered: false`, `bullet` from the bullet depth; each item's `marker` is the glyph                                                                       |
+| `orderedList`               | `list`, `ordered: true`, `start` (absent → 1), `format` and `delimiter` resolved (section 7); item _i_'s `marker` is `formatMarker(start + i, format, delimiter)` |
+| `listItem`                  | `{ marker, content }`                                                                                                                                             |
+| `table`                     | `table` with `columns` (the table's width) and `rows`                                                                                                             |
+| `tableRow`                  | `{ cells }`, the cells that start in this row                                                                                                                     |
+| `tableCell` / `tableHeader` | `{ header: false / true, colspan, rowspan, content }`                                                                                                             |
+| `callout`                   | `callout` with its paragraphs                                                                                                                                     |
+| `horizontalRule`            | `rule`                                                                                                                                                            |
 
 `id` is `attrs.id` when it is a non-empty string, otherwise null.
 
@@ -637,7 +637,7 @@ The adapter returns `{ subject, preheader, html, text }`.
 - Paragraph: its lines (a hard break is `\n`, so a final break leaves an empty last line). An empty paragraph is an empty line. A paragraph of spaces is a line of those spaces.
 - Heading: its lines. Level 1 is followed by a line of `=`, level 2 by a line of `-`, each as long as the heading's longest line in code points (at least 3); level 3 has none. A heading whose lines are all blank (only whitespace, section 5's set) has no underline and keeps its lines as typed.
 - List: items follow each other with no empty line between. An item's lines are its blocks' lines, with no empty line between blocks. The first line is the `marker`, a space and that line, or the marker alone (no trailing space) when that line is empty. Each further line is indented by the marker's length in code points plus one. An empty line stays empty (no indent). A nested list is one of the item's blocks, so it takes that indent (`10. ten` / `    ◦ in` / `      a. deep`).
-- Table: each row is written as lines. A cell's lines are its blocks' lines (joined with `\n`); an empty cell is one empty line. A row has as many lines as its tallest cell. Row line *j*: each cell contributes its line *j*, or an empty string when it has fewer lines; every cell but the last is padded with spaces to its longest line (in code points); the pieces are joined with ` | `, except that an empty last piece is joined with ` |` (no trailing space). A row whose cells are all single lines is therefore `a | b | c`, as before. After a row made only of header cells, unless it is the table's last row, comes a line of `-` as long as that row's longest line (at least 3). Cells are written in reading order; spans don't add or remove separators.
+- Table: each row is written as lines. A cell's lines are its blocks' lines (joined with `\n`); an empty cell is one empty line. A row has as many lines as its tallest cell. Row line _j_: each cell contributes its line _j_, or an empty string when it has fewer lines; every cell but the last is padded with spaces to its longest line (in code points); the pieces are joined with `|`, except that an empty last piece is joined with ` |` (no trailing space). A row whose cells are all single lines is therefore `a | b | c`, as before. After a row made only of header cells, unless it is the table's last row, comes a line of `-` as long as that row's longest line (at least 3). Cells are written in reading order; spans don't add or remove separators.
 - Callout: a line `+` followed by 39 `-`, then each line of its content prefixed `| ` (an empty line is `|`), then the same frame line. Its paragraphs are separated by an empty line.
 - Rule: 40 `-`.
 - Links: `text (address)` once per link (grouped as in section 6). The text is the link's runs, breaks as `\n`. The address is the href without a leading `mailto:` or `tel:`. When the text is blank (only whitespace, section 5's set), just the address; the blank text isn't printed. Just the text when, after trimming the text (section 5's set), `normalizeLink(text)` is the href or the text is the address; both comparisons lowercase each side (Java: `toLowerCase(Locale.ROOT)`) and remove at most one trailing `/` from each. The text is printed untrimmed.
@@ -693,18 +693,18 @@ The reference is `src/domain/messages/gsm7.ts`; its README explains the sources 
 
 Every error is JSON `{ "error": { "code", "message", "details"? } }`. The codes and statuses are in `src/domain/render/types.ts`. Messages are exact sentences; they never echo a submitted value, with one exception below.
 
-| Situation | Code (status) | Message |
-| --- | --- | --- |
-| Required values missing | `missing_variables` (422) | "Missing required variables: first_name, purchase_apr." (keys joined by ", "), then each invalid sentence, separated by one space |
-| A value doesn't fit its type | `invalid_values` (422) | one sentence per key, separated by one space: "{key} must be text." / "… an amount, like 1000 or 1000.50." / "… a percentage, like 21.99." / "… a date, like 2027-03-04." / "… a number, like 20000." / "… a US state, like NJ." |
-| A value is longer than 1,000 characters | `invalid_values` (422) | "{key} must be at most 1,000 characters." in the same list, in the version's variable order |
-| The body is larger than 1,000,000 bytes | `body_too_large` (413) | "The body must be at most 1,000,000 bytes." Before stage 1, not logged |
-| A push without a platform or with one that isn't `ios` or `android`; a platform on another channel; an encoding on push or SMS | `bad_request` (400) | "platform must be ios or android." / "platform is only for channel push." / "encoding is only for channels pdf, web and email." Before stage 1, not logged |
-| A push over 4,096 bytes on its platform, with these values | `push_payload_too_large` (422) | "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes." (the platform as "iPhone" or "Android") `details: { "platform", "payloadBytes", "maxBytes": 4096 }` |
-| An SMS over 10 parts, with these values | `sms_too_long` (422) | "The SMS is 11 parts in UCS-2. It can be at most 10 parts." `details: { "parts", "maxParts": 10, "encoding", "characters" }` |
-| The stored document fails the document check, or the resolver refuses it | `render_failed` (500) | "The PDF couldn't be rendered. {sentence}" e.g. "The PDF couldn't be rendered. Tables can have at most 12 columns." The sentence is one of section 3's (the limits, or "This document has content Stencil doesn't support." from the schema parse), or, for a channel field, its channel's field sentence (section 3). `details: { "reason": "document" }` |
-| The PDF font can't draw some characters | `render_failed` (500) | "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ), U+20B9 (₹)." `details: { "reason": "glyphs", "characters": ["U+1EA1", "U+20B9"] }` |
-| Anything else that fails in stages 7–9, or outside the engine (the database, the log write) | `render_failed` (500) | "The PDF couldn't be rendered. Try again." (as today), no `details` |
+| Situation                                                                                                                      | Code (status)                  | Message                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Required values missing                                                                                                        | `missing_variables` (422)      | "Missing required variables: first_name, purchase_apr." (keys joined by ", "), then each invalid sentence, separated by one space                                                                                                                                                                                                                          |
+| A value doesn't fit its type                                                                                                   | `invalid_values` (422)         | one sentence per key, separated by one space: "{key} must be text." / "… an amount, like 1000 or 1000.50." / "… a percentage, like 21.99." / "… a date, like 2027-03-04." / "… a number, like 20000." / "… a US state, like NJ."                                                                                                                           |
+| A value is longer than 1,000 characters                                                                                        | `invalid_values` (422)         | "{key} must be at most 1,000 characters." in the same list, in the version's variable order                                                                                                                                                                                                                                                                |
+| The body is larger than 1,000,000 bytes                                                                                        | `body_too_large` (413)         | "The body must be at most 1,000,000 bytes." Before stage 1, not logged                                                                                                                                                                                                                                                                                     |
+| A push without a platform or with one that isn't `ios` or `android`; a platform on another channel; an encoding on push or SMS | `bad_request` (400)            | "platform must be ios or android." / "platform is only for channel push." / "encoding is only for channels pdf, web and email." Before stage 1, not logged                                                                                                                                                                                                 |
+| A push over 4,096 bytes on its platform, with these values                                                                     | `push_payload_too_large` (422) | "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes." (the platform as "iPhone" or "Android") `details: { "platform", "payloadBytes", "maxBytes": 4096 }`                                                                                                                                                                                    |
+| An SMS over 10 parts, with these values                                                                                        | `sms_too_long` (422)           | "The SMS is 11 parts in UCS-2. It can be at most 10 parts." `details: { "parts", "maxParts": 10, "encoding", "characters" }`                                                                                                                                                                                                                               |
+| The stored document fails the document check, or the resolver refuses it                                                       | `render_failed` (500)          | "The PDF couldn't be rendered. {sentence}" e.g. "The PDF couldn't be rendered. Tables can have at most 12 columns." The sentence is one of section 3's (the limits, or "This document has content Stencil doesn't support." from the schema parse), or, for a channel field, its channel's field sentence (section 3). `details: { "reason": "document" }` |
+| The PDF font can't draw some characters                                                                                        | `render_failed` (500)          | "The PDF couldn't be rendered. Its font can't show these characters: U+1EA1 (ạ), U+20B9 (₹)." `details: { "reason": "glyphs", "characters": ["U+1EA1", "U+20B9"] }`                                                                                                                                                                                        |
+| Anything else that fails in stages 7–9, or outside the engine (the database, the log write)                                    | `render_failed` (500)          | "The PDF couldn't be rendered. Try again." (as today), no `details`                                                                                                                                                                                                                                                                                        |
 
 "The PDF" is the channel's subject: "The PDF", "The web page", "The email", "The push", "The SMS".
 
@@ -794,7 +794,7 @@ A case runs the engine (stages 6 to 9) on its input once per channel it lists, i
 - A push's title and body are the same on both platforms, Android's has no subtitle, and each `payloadBytes` is its platform's JSON measured again. An SMS's `encoding`, `parts` and `characters` are its `text` measured again, and the text ends with the footer on its own line when the case has one.
 - The RenderDoc invariants of section 9 hold.
 - The web and email HTML match `content.txt` line for line (markers and blank lines included).
-- The email text is the plain text section 10 dictates, line for line. Every line is exact (characters, typed spaces, markers, each hard break's line, every empty line, the ` | ` between cells, link addresses), except the layout the format adds, compared loosely: the indent of an item's further lines, the padding after a cell's line and an underline's length.
+- The email text is the plain text section 10 dictates, line for line. Every line is exact (characters, typed spaces, markers, each hard break's line, every empty line, the `|` between cells, link addresses), except the layout the format adds, compared loosely: the indent of an item's further lines, the padding after a cell's line and an underline's length.
 - The PDF matches a reduced view of `content.txt` (`content.ts` explains why): `∅` only for a top-level blank paragraph between two paragraphs; an item's later paragraphs join the line above them (the item's, a paragraph's or a nested list's; not a heading's or a table cell's); a table is one line per cell that holds text, in reading order, the cell's lines joined. The Node extractor finds each cell from the rules it draws (`extract-pdf.ts`), so a cell's text, its row and column and its order are compared, but not a blank paragraph inside a cell. Typed spaces and single hard breaks are not compared in the PDF (a line ends at a break and at an automatic wrap alike, and leading spaces are an offset, not text); `pdf.test.ts` checks them directly.
 - The links match in the web HTML, the email HTML and the PDF (the email text shows each address in its line).
 - Every paragraph and heading with text, at any depth (top level, list items, cells, callouts), keeps its typed spaces and every hard break in the web HTML and the email HTML, in document order.
@@ -814,35 +814,35 @@ A case runs the engine (stages 6 to 9) on its input once per channel it lists, i
 
 **Changed by this specification:**
 
-| Area | Before | Now |
-| --- | --- | --- |
-| Numbering styles | none (depth only) | ten styles per ordered list, plus start; stored as `markerFormat` / `markerDelimiter` |
-| Default third ordered level | `a.` in the editor, `i.` in the PDF, browser default on the web | `i.` everywhere |
-| Bullets | by total list depth (PDF), CSS nesting (web) | by bullet depth only, • ◦ ▪ cycling, everywhere |
-| Markers in web/email | the client's numbering | text from the RenderDoc |
-| Markers in plain text | `1.` / `-` only | the RenderDoc's markers, including • ◦ ▪ |
-| Blank paragraphs | dropped by web, email and text | rendered as blank lines everywhere |
-| Paragraphs of empty optional variables | left as blank paragraphs (then dropped) | removed; list items removed and renumbered |
-| Leading and repeated spaces | collapsed by email HTML and PDF, trimmed by text | as typed everywhere |
-| Breaks at paragraph start | trimmed by text | kept everywhere |
-| Trailing break | an extra line in some channels | kept: the empty line after it shows in every channel and in the static editor render, as in the live editor |
-| PDF word cutting | inserted a hyphen | bare |
-| Unicode | as stored | NFC; invisible characters (soft hyphen, zero-width and bidirectional marks, variation selectors, …) removed at save and by the resolver |
-| Unicode spaces in the PDF | refused (no glyph), or a no-break space hung into the margin, depending on what the process rendered before | drawn at their own width; leading ones keep their indent |
-| Values | rounded by `Intl`, `Number` | exact digits (section 5) |
-| Currency `invalid_values` sentence | "… an amount, like 1000.00." | "… an amount, like 1000 or 1000.50." |
-| Value forms | loose (`.5`, `5.`, `007`, `1,00`, `-0`, `$-5`, several spaces before `%` accepted) | the section 5 grammar; those are refused |
-| JSON numbers in `values` | binary (21.90 read as 21.9) | exact source text |
-| Value length | unlimited | at most 1,000 characters each; longer is `invalid_values`, and the schema says `maxLength: 1000` |
-| Body size | 400 `bad_request` "The body is too large.", from `Content-Length` and the text read (a chunked body was buffered whole first) | 413 `body_too_large`, counted as the body is read |
-| Dates | years 0100–9999 | 0001–9999 |
-| Published values schema | any `-?digits(.digits)` | the canonical grammar; dates from 0001 |
-| Links | three different checks | one check, with normalization |
-| Subject and preheader | whitespace runs collapsed | runs kept, ends trimmed |
-| Tables and cells | any width, any blocks in cells | ≤ 12 columns, paragraphs and lists in cells at every depth, rectangular |
-| Heading levels 4–6, cell `align` / `colwidth` | stored as pasted | normalized at save |
-| Unrenderable characters in the PDF | tofu or silently dropped | `render_failed` naming them |
-| A stored document outside the content model | rendered approximately, or a crash | refused at save (autosave, and import with the new `content` refusal), and `render_failed` with `reason: "document"` and the check's sentence at render |
-| A pasted list `start` outside 0–9999 | shown as pasted, refused at save | brought into 0–9999 on paste |
-| PDF dates | the wall clock | the render time `at` |
-| Channels | PDF, Web and Email | also Push and SMS, for message templates (an Alert): a push for `platform` `ios` or `android`, an SMS with its footer, measured and refused past their limits (section 10) |
+| Area                                          | Before                                                                                                                        | Now                                                                                                                                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Numbering styles                              | none (depth only)                                                                                                             | ten styles per ordered list, plus start; stored as `markerFormat` / `markerDelimiter`                                                                                      |
+| Default third ordered level                   | `a.` in the editor, `i.` in the PDF, browser default on the web                                                               | `i.` everywhere                                                                                                                                                            |
+| Bullets                                       | by total list depth (PDF), CSS nesting (web)                                                                                  | by bullet depth only, • ◦ ▪ cycling, everywhere                                                                                                                            |
+| Markers in web/email                          | the client's numbering                                                                                                        | text from the RenderDoc                                                                                                                                                    |
+| Markers in plain text                         | `1.` / `-` only                                                                                                               | the RenderDoc's markers, including • ◦ ▪                                                                                                                                   |
+| Blank paragraphs                              | dropped by web, email and text                                                                                                | rendered as blank lines everywhere                                                                                                                                         |
+| Paragraphs of empty optional variables        | left as blank paragraphs (then dropped)                                                                                       | removed; list items removed and renumbered                                                                                                                                 |
+| Leading and repeated spaces                   | collapsed by email HTML and PDF, trimmed by text                                                                              | as typed everywhere                                                                                                                                                        |
+| Breaks at paragraph start                     | trimmed by text                                                                                                               | kept everywhere                                                                                                                                                            |
+| Trailing break                                | an extra line in some channels                                                                                                | kept: the empty line after it shows in every channel and in the static editor render, as in the live editor                                                                |
+| PDF word cutting                              | inserted a hyphen                                                                                                             | bare                                                                                                                                                                       |
+| Unicode                                       | as stored                                                                                                                     | NFC; invisible characters (soft hyphen, zero-width and bidirectional marks, variation selectors, …) removed at save and by the resolver                                    |
+| Unicode spaces in the PDF                     | refused (no glyph), or a no-break space hung into the margin, depending on what the process rendered before                   | drawn at their own width; leading ones keep their indent                                                                                                                   |
+| Values                                        | rounded by `Intl`, `Number`                                                                                                   | exact digits (section 5)                                                                                                                                                   |
+| Currency `invalid_values` sentence            | "… an amount, like 1000.00."                                                                                                  | "… an amount, like 1000 or 1000.50."                                                                                                                                       |
+| Value forms                                   | loose (`.5`, `5.`, `007`, `1,00`, `-0`, `$-5`, several spaces before `%` accepted)                                            | the section 5 grammar; those are refused                                                                                                                                   |
+| JSON numbers in `values`                      | binary (21.90 read as 21.9)                                                                                                   | exact source text                                                                                                                                                          |
+| Value length                                  | unlimited                                                                                                                     | at most 1,000 characters each; longer is `invalid_values`, and the schema says `maxLength: 1000`                                                                           |
+| Body size                                     | 400 `bad_request` "The body is too large.", from `Content-Length` and the text read (a chunked body was buffered whole first) | 413 `body_too_large`, counted as the body is read                                                                                                                          |
+| Dates                                         | years 0100–9999                                                                                                               | 0001–9999                                                                                                                                                                  |
+| Published values schema                       | any `-?digits(.digits)`                                                                                                       | the canonical grammar; dates from 0001                                                                                                                                     |
+| Links                                         | three different checks                                                                                                        | one check, with normalization                                                                                                                                              |
+| Subject and preheader                         | whitespace runs collapsed                                                                                                     | runs kept, ends trimmed                                                                                                                                                    |
+| Tables and cells                              | any width, any blocks in cells                                                                                                | ≤ 12 columns, paragraphs and lists in cells at every depth, rectangular                                                                                                    |
+| Heading levels 4–6, cell `align` / `colwidth` | stored as pasted                                                                                                              | normalized at save                                                                                                                                                         |
+| Unrenderable characters in the PDF            | tofu or silently dropped                                                                                                      | `render_failed` naming them                                                                                                                                                |
+| A stored document outside the content model   | rendered approximately, or a crash                                                                                            | refused at save (autosave, and import with the new `content` refusal), and `render_failed` with `reason: "document"` and the check's sentence at render                    |
+| A pasted list `start` outside 0–9999          | shown as pasted, refused at save                                                                                              | brought into 0–9999 on paste                                                                                                                                               |
+| PDF dates                                     | the wall clock                                                                                                                | the render time `at`                                                                                                                                                       |
+| Channels                                      | PDF, Web and Email                                                                                                            | also Push and SMS, for message templates (an Alert): a push for `platform` `ios` or `android`, an SMS with its footer, measured and refused past their limits (section 10) |

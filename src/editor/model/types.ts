@@ -60,15 +60,45 @@ export interface SampleSet {
  */
 export type ContractChange =
   /** A variable the baseline doesn't have. Breaking when it is required. */
-  | { kind: "added"; key: string; breaking: boolean; type: VariableType; required: boolean }
+  | {
+      kind: "added";
+      key: string;
+      breaking: boolean;
+      type: VariableType;
+      required: boolean;
+    }
   /** A baseline variable the list no longer has; `key` is its key there. */
-  | { kind: "removed"; key: string; breaking: true; type: VariableType; required: boolean }
+  | {
+      kind: "removed";
+      key: string;
+      breaking: true;
+      type: VariableType;
+      required: boolean;
+    }
   /** The same variable under a new key: `key` and `to` are the new key, `from` the baseline's. */
-  | { kind: "key_renamed"; key: string; breaking: true; from: string; to: string }
-  | { kind: "type_changed"; key: string; breaking: true; from: VariableType; to: VariableType }
+  | {
+      kind: "key_renamed";
+      key: string;
+      breaking: true;
+      from: string;
+      to: string;
+    }
+  | {
+      kind: "type_changed";
+      key: string;
+      breaking: true;
+      from: VariableType;
+      to: VariableType;
+    }
   | { kind: "made_required"; key: string; breaking: true }
   | { kind: "made_optional"; key: string; breaking: false }
-  | { kind: "label_changed"; key: string; breaking: false; from: string; to: string };
+  | {
+      kind: "label_changed";
+      key: string;
+      breaking: false;
+      from: string;
+      to: string;
+    };
 
 export type ContractChangeKind = ContractChange["kind"];
 
@@ -84,4 +114,3 @@ export const NODE = {
   heading: "heading",
   callout: "callout",
 } as const;
-

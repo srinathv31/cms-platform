@@ -21,16 +21,25 @@ export const LineBoundaryKeys = Extension.create({
             if (event.key !== "Home" && event.key !== "End") return false;
             if (event.metaKey || event.ctrlKey || event.altKey) return false;
             const selection = view.dom.ownerDocument.getSelection();
-            if (!selection || typeof selection.modify !== "function") return false;
+            if (!selection || typeof selection.modify !== "function")
+              return false;
 
             const extend = event.shiftKey;
-            selection.modify(extend ? "extend" : "move", event.key === "Home" ? "backward" : "forward", "lineboundary");
+            selection.modify(
+              extend ? "extend" : "move",
+              event.key === "Home" ? "backward" : "forward",
+              "lineboundary",
+            );
             const { focusNode, focusOffset } = selection;
             if (focusNode && view.dom.contains(focusNode)) {
               try {
                 const head = view.posAtDOM(focusNode, focusOffset);
                 const anchor = extend ? view.state.selection.anchor : head;
-                view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, anchor, head)));
+                view.dispatch(
+                  view.state.tr.setSelection(
+                    TextSelection.create(view.state.doc, anchor, head),
+                  ),
+                );
               } catch {
                 // ProseMirror will read the DOM selection on selectionchange instead.
               }

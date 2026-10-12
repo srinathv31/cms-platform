@@ -2,7 +2,17 @@ import { randomUUID } from "node:crypto";
 import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
-import { SPRING_NAME, TEAM, click, createSpringTravel, json, reactReady, removeTemplate, rows, type SpringFixture } from "./helpers/golive";
+import {
+  SPRING_NAME,
+  TEAM,
+  click,
+  createSpringTravel,
+  json,
+  reactReady,
+  removeTemplate,
+  rows,
+  type SpringFixture,
+} from "./helpers/golive";
 import {
   asPersona,
   caret,
@@ -36,7 +46,8 @@ const RENAMED = "Spring Travel Rewards — Card Terms";
 const ELSEWHERE = "Spring Travel Rewards — Renamed in another tab";
 const TYPED = "Typed in this tab.";
 const TOO_LATE = "Typed after the other tab saved.";
-const CONFLICT = "Your latest changes can't be saved — this draft changed elsewhere.";
+const CONFLICT =
+  "Your latest changes can't be saved — this draft changed elsewhere.";
 
 let db: Client;
 let fixture: SpringFixture | null = null;
@@ -55,18 +66,27 @@ test.afterAll(() => {
   db?.close();
 });
 
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
-const stopped = (page: Page) => page.locator('[data-slot="save-stopped"]').filter({ visible: true });
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
+const stopped = (page: Page) =>
+  page.locator('[data-slot="save-stopped"]').filter({ visible: true });
 const stoppedReason = (page: Page) => stopped(page).getByRole("alert");
-const reloadButton = (page: Page) => stopped(page).getByRole("button", { name: "Reload", exact: true });
-const submitButton = (page: Page) => page.getByRole("button", { name: "Submit for review" });
-const channels = (page: Page) => page.locator('[aria-label="Channels"] button').filter({ visible: true });
+const reloadButton = (page: Page) =>
+  stopped(page).getByRole("button", { name: "Reload", exact: true });
+const submitButton = (page: Page) =>
+  page.getByRole("button", { name: "Submit for review" });
+const channels = (page: Page) =>
+  page.locator('[aria-label="Channels"] button').filter({ visible: true });
 
 /** Maya opens Spring Travel and presses Edit: the page shows its draft, editable. Returns the draft's id. */
 async function openDraft(page: Page): Promise<string> {
   await asPersona(page, "maya");
   await page.goto(`/${TEAM}/templates/${fixture!.templateId}`);
-  await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: SPRING_NAME }),
+  ).toBeVisible();
   await hydrated(page);
   const edit = page.getByRole("button", { name: "Edit", exact: true });
   await reactReady(edit);
@@ -77,7 +97,11 @@ async function openDraft(page: Page): Promise<string> {
 }
 
 const theDraft = async () => {
-  const [draft] = await rows(db, "SELECT id, rev, name, body FROM versions WHERE template_id = ? AND state = 'draft'", [fixture!.templateId]);
+  const [draft] = await rows(
+    db,
+    "SELECT id, rev, name, body FROM versions WHERE template_id = ? AND state = 'draft'",
+    [fixture!.templateId],
+  );
   return draft!;
 };
 
@@ -89,19 +113,31 @@ async function typeAtEndOfFirstParagraph(page: Page, text: string) {
   await untilUncovered(paragraph, end);
   await paragraph.click({ position: end, delay: 90 });
   await page.keyboard.press("End");
-  await expect.poll(async () => (await caret(page)).focused, { message: "the document takes focus" }).toBe(true);
+  await expect
+    .poll(async () => (await caret(page)).focused, {
+      message: "the document takes focus",
+    })
+    .toBe(true);
   await typeSlowly(page, ` ${text}`);
   await expect(documentEditor(page)).toContainText(text);
 }
 
-test("a rename on the Versions tab, opened by its address, saves", async ({ page }) => {
+test("a rename on the Versions tab, opened by its address, saves", async ({
+  page,
+}) => {
   await openDraft(page);
 
   await test.step("Maya opens the Versions tab by its address and renames the draft: Saving…, then Saved", async () => {
     await page.goto(`/${TEAM}/templates/${fixture!.templateId}/versions`);
     await hydrated(page);
-    await expect(page.locator('[data-slot="tab-bar"]').getByRole("link", { name: "Versions" })).toHaveAttribute("aria-current", "page");
-    await expect(documentEditor(page), "no Content tab on screen").toHaveCount(0);
+    await expect(
+      page
+        .locator('[data-slot="tab-bar"]')
+        .getByRole("link", { name: "Versions" }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(documentEditor(page), "no Content tab on screen").toHaveCount(
+      0,
+    );
     const field = nameField(page);
     await expect(field).toHaveValue(SPRING_NAME);
     await field.fill(RENAMED);
@@ -117,7 +153,10 @@ test("a rename on the Versions tab, opened by its address, saves", async ({ page
   });
 });
 
-test("after another session saves first, the page turns read-only and offers Reload", async ({ page, problems }) => {
+test("after another session saves first, the page turns read-only and offers Reload", async ({
+  page,
+  problems,
+}) => {
   const draftId = await openDraft(page);
 
   await test.step("Maya types a sentence: it saves", async () => {
@@ -127,23 +166,36 @@ test("after another session saves first, the page turns read-only and offers Rel
 
   await test.step("Another session renames the draft: it saves first, through the same API", async () => {
     const { rev } = await theDraft();
-    const res = await page.request.put(`/api/drafts/${draftId}`, { data: { rev: Number(rev), sessionKey: randomUUID(), name: ELSEWHERE } });
+    const res = await page.request.put(`/api/drafts/${draftId}`, {
+      data: { rev: Number(rev), sessionKey: randomUUID(), name: ELSEWHERE },
+    });
     expect(res.status()).toBe(200);
 
     // A save from the rev it just left is refused in the shape every refusal has, carrying the current rev.
-    const stale = await page.request.put(`/api/drafts/${draftId}`, { data: { rev: Number(rev), sessionKey: randomUUID(), name: "Too late" } });
+    const stale = await page.request.put(`/api/drafts/${draftId}`, {
+      data: { rev: Number(rev), sessionKey: randomUUID(), name: "Too late" },
+    });
     expect(stale.status()).toBe(409);
-    expect(await stale.json()).toEqual({ ok: false, code: "draft_changed", reason: "This draft changed. Try again.", rev: Number(rev) + 1 });
+    expect(await stale.json()).toEqual({
+      ok: false,
+      code: "draft_changed",
+      reason: "This draft changed. Try again.",
+      rev: Number(rev) + 1,
+    });
   });
 
   await test.step("Her next save is refused: the page is read-only, the status says so, and Reload shows", async () => {
     await typeSlowly(page, ` ${TOO_LATE}`);
     await expect(stoppedReason(page)).toHaveText(CONFLICT, { timeout: 15_000 });
     await expect(saveIndicator(page)).toHaveText("Not saved.");
-    await expect(documentEditor(page)).toHaveAttribute("contenteditable", "false");
+    await expect(documentEditor(page)).toHaveAttribute(
+      "contenteditable",
+      "false",
+    );
     await expect(nameField(page)).toHaveJSProperty("readOnly", true);
     await expect(channels(page)).toHaveCount(3);
-    for (const toggle of await channels(page).all()) await expect(toggle).toHaveAttribute("data-disabled");
+    for (const toggle of await channels(page).all())
+      await expect(toggle).toHaveAttribute("data-disabled");
     await expect(reloadButton(page)).toBeVisible();
     // Submit shows greyed out with the reason at the control (N8), instead of looking available and explaining after the click.
     await expect(submitButton(page)).toHaveAttribute("aria-disabled", "true");
@@ -164,21 +216,31 @@ test("after another session saves first, the page turns read-only and offers Rel
     await expect(nameField(page)).toHaveValue(ELSEWHERE, { timeout: 20_000 });
     await hydrated(page);
     await liveEditor(page);
-    await expect(documentEditor(page)).toHaveAttribute("contenteditable", "true");
+    await expect(documentEditor(page)).toHaveAttribute(
+      "contenteditable",
+      "true",
+    );
     await expect(documentEditor(page)).toContainText(TYPED);
     await expect(documentEditor(page)).not.toContainText(TOO_LATE);
     await expect(saveIndicator(page)).toHaveText("Saved");
     await expect(stopped(page)).toHaveCount(0);
-    await expect(submitButton(page)).not.toHaveAttribute("aria-disabled", "true");
+    await expect(submitButton(page)).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   // The refused save is a 409, which Chrome logs. It is the one console error this test expects.
-  const refused = problems.filter((p) => /status of 409/.test(p) && p.includes(`/api/drafts/${draftId}`));
+  const refused = problems.filter(
+    (p) => /status of 409/.test(p) && p.includes(`/api/drafts/${draftId}`),
+  );
   expect(refused).toHaveLength(1);
   problems.splice(problems.indexOf(refused[0]!), 1);
 });
 
-test("leaving while a save is out asks first, and leaving once saved doesn't", async ({ page }) => {
+test("leaving while a save is out asks first, and leaving once saved doesn't", async ({
+  page,
+}) => {
   await openDraft(page);
   const dialogs: string[] = [];
   // Stay on the page when asked, so what happens next can be checked.
@@ -210,9 +272,14 @@ test("leaving while a save is out asks first, and leaving once saved doesn't", a
     // The page reloads itself, as the browser's Reload would. (Playwright's own reload waits for a load
     // that never comes once the question is answered "stay".)
     await page.evaluate(() => void setTimeout(() => location.reload()));
-    await expect.poll(() => dialogs, { message: "the browser asks before leaving" }).toEqual(["beforeunload"]);
+    await expect
+      .poll(() => dialogs, { message: "the browser asks before leaving" })
+      .toEqual(["beforeunload"]);
     await expect(documentEditor(page)).toContainText(TOO_LATE);
-    await expect(saveIndicator(page), "still the same page, still saving").toHaveText("Saving…");
+    await expect(
+      saveIndicator(page),
+      "still the same page, still saving",
+    ).toHaveText("Saving…");
 
     release();
     await expect(saveIndicator(page)).toHaveText("Saved", { timeout: 15_000 });

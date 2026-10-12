@@ -8,7 +8,10 @@ import type { StoreApi } from "zustand/vanilla";
  * counts on the server already, and hydrates to the same markup. The selector must return a
  * primitive or a stable reference.
  */
-export function useLiveStore<S, T>(store: StoreApi<S>, selector: (state: S) => T): T {
+export function useLiveStore<S, T>(
+  store: StoreApi<S>,
+  selector: (state: S) => T,
+): T {
   const read = () => selector(store.getState());
   return useSyncExternalStore(store.subscribe, read, read);
 }

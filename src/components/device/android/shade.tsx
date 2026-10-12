@@ -17,7 +17,13 @@ import { androidFixed } from "./type";
 // lock screen needs the phone unlocked, so previews hidden doesn't change it. Clicking the shade collapses
 // the card, like a tap outside it; the card's own button does the same from the keyboard.
 
-function QuickTile({ on = false, children }: { on?: boolean; children: ReactNode }) {
+function QuickTile({
+  on = false,
+  children,
+}: {
+  on?: boolean;
+  children: ReactNode;
+}) {
   return (
     <m.span
       {...fadeRise}
@@ -56,10 +62,21 @@ export function Shade({
         aria-hidden
         onClick={onToggle}
         className="absolute inset-0"
-        style={{ backdropFilter: blur, WebkitBackdropFilter: blur, background: "var(--device-m3-shade)" }}
+        style={{
+          backdropFilter: blur,
+          WebkitBackdropFilter: blur,
+          background: "var(--device-m3-shade)",
+        }}
       />
       <StatusBar platform="android" time={clock.time} ink="app" />
-      <div className="absolute inset-x-0 flex flex-col" style={{ top: pt(STATUS_BAR_HEIGHT.android + 6), paddingInline: pt(16), gap: pt(14) }}>
+      <div
+        className="absolute inset-x-0 flex flex-col"
+        style={{
+          top: pt(STATUS_BAR_HEIGHT.android + 6),
+          paddingInline: pt(16),
+          gap: pt(14),
+        }}
+      >
         <div aria-hidden className="flex justify-between">
           <QuickTile on>
             <Wifi strokeWidth={2.2} style={glyph} />
@@ -80,7 +97,10 @@ export function Shade({
           className="relative overflow-hidden rounded-full bg-(--device-m3-surface-container-highest)"
           style={{ height: pt(44) }}
         >
-          <span className="absolute inset-y-0 left-0 flex items-center rounded-full bg-(--device-m3-primary) text-(--device-m3-on-primary)" style={{ width: "62%", paddingLeft: pt(14) }}>
+          <span
+            className="absolute inset-y-0 left-0 flex items-center rounded-full bg-(--device-m3-primary) text-(--device-m3-on-primary)"
+            style={{ width: "62%", paddingLeft: pt(14) }}
+          >
             <Sun strokeWidth={2.2} style={{ width: pt(20), height: pt(20) }} />
           </span>
         </m.div>
@@ -96,8 +116,14 @@ export function Shade({
             background="var(--device-m3-shade-card)"
             corners={[28, 28, 6, 6]}
           />
-          <QuietCard corners={[6, 6, 6, 6]} background="var(--device-m3-shade-card)" />
-          <QuietCard corners={[6, 6, 28, 28]} background="var(--device-m3-shade-card)" />
+          <QuietCard
+            corners={[6, 6, 6, 6]}
+            background="var(--device-m3-shade-card)"
+          />
+          <QuietCard
+            corners={[6, 6, 28, 28]}
+            background="var(--device-m3-shade-card)"
+          />
         </div>
         <m.span
           {...fadeRise}

@@ -9,8 +9,11 @@ import { JUST_IMPORTED_COOKIE } from "@/domain/import-types";
 export function peekJustImported(): string | null {
   if (typeof document === "undefined") return null;
   const prefix = `${JUST_IMPORTED_COOKIE}=`;
-  const entry = document.cookie.split("; ").find((part) => part.startsWith(prefix));
-  const id = entry === undefined ? "" : decodeURIComponent(entry.slice(prefix.length));
+  const entry = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(prefix));
+  const id =
+    entry === undefined ? "" : decodeURIComponent(entry.slice(prefix.length));
   return id === "" ? null : id;
 }
 

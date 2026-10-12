@@ -12,7 +12,15 @@
 //
 // The email <title> is the subject, as mail tools expect. The template name never appears.
 
-import type { EmailFields, EmailRender, RenderBlock, RenderDoc, RenderInline, RenderListItem, RenderTable } from "@/domain/render/types";
+import type {
+  EmailFields,
+  EmailRender,
+  RenderBlock,
+  RenderDoc,
+  RenderInline,
+  RenderListItem,
+  RenderTable,
+} from "@/domain/render/types";
 import { normalizeLink } from "@/editor/model/links";
 import {
   FONT_STACK,
@@ -122,8 +130,9 @@ const CALLOUT_CELL = [
 
 const EMAIL: HtmlFlavor = {
   attrs: (role, place) =>
-    (role === "table" ? ' cellpadding="0" cellspacing="0" border="0" width="100%"' : "") +
-    ` style="${styleFor(role, place)}"`,
+    (role === "table"
+      ? ' cellpadding="0" cellspacing="0" border="0" width="100%"'
+      : "") + ` style="${styleFor(role, place)}"`,
   spaces: "nbsp",
   emptyLine: "&nbsp;",
   bareParagraph: true,
@@ -193,7 +202,8 @@ const width = (line: string) => [...line].length;
 const isBlank = (text: string) => text.trim() === "";
 
 /** Ignoring case and one trailing "/". */
-const sameAddress = (a: string, b: string) => a.replace(/\/$/, "").toLowerCase() === b.replace(/\/$/, "").toLowerCase();
+const sameAddress = (a: string, b: string) =>
+  a.replace(/\/$/, "").toLowerCase() === b.replace(/\/$/, "").toLowerCase();
 
 /**
  * "text (address)", where the address is the href without a leading mailto: or tel:. Just the text
@@ -205,7 +215,11 @@ function linkText(text: string, href: string): string {
   if (isBlank(text)) return address;
   const shown = text.trim();
   const asLink = normalizeLink(shown);
-  if ((asLink !== null && sameAddress(asLink, href)) || sameAddress(shown, address)) return text;
+  if (
+    (asLink !== null && sameAddress(asLink, href)) ||
+    sameAddress(shown, address)
+  )
+    return text;
   return `${text} (${address})`;
 }
 
@@ -213,7 +227,9 @@ function linkText(text: string, href: string): string {
 export function inlineText(content: readonly RenderInline[]): string {
   return groupByLink(content)
     .map(({ href, items }) => {
-      const text = items.map((item) => (item.type === "break" ? "\n" : item.text)).join("");
+      const text = items
+        .map((item) => (item.type === "break" ? "\n" : item.text))
+        .join("");
       return href === null ? text : linkText(text, href);
     })
     .join("");
@@ -246,7 +262,13 @@ function blockLines(block: RenderBlock): string[] {
     case "table":
       return tableLines(block);
     case "callout":
-      return [FRAME, ...blocksLines(block.content, true).map((line) => (line === "" ? "|" : `| ${line}`)), FRAME];
+      return [
+        FRAME,
+        ...blocksLines(block.content, true).map((line) =>
+          line === "" ? "|" : `| ${line}`,
+        ),
+        FRAME,
+      ];
     case "rule":
       return [RULE];
   }
@@ -275,7 +297,9 @@ function itemLines(item: RenderListItem): string[] {
 function tableLines(table: RenderTable): string[] {
   const out: string[] = [];
   table.rows.forEach((row, r) => {
-    const cells = row.cells.map((cell) => (cell.content.length === 0 ? [""] : blocksLines(cell.content, false)));
+    const cells = row.cells.map((cell) =>
+      cell.content.length === 0 ? [""] : blocksLines(cell.content, false),
+    );
     const widths = cells.map((lines) => Math.max(...lines.map(width)));
     const height = Math.max(0, ...cells.map((lines) => lines.length));
     const rowLines: string[] = [];
@@ -293,7 +317,8 @@ function tableLines(table: RenderTable): string[] {
       rowLines.push(line);
     }
     out.push(...rowLines);
-    if (isHeaderRow(row) && r < table.rows.length - 1) out.push("-".repeat(Math.max(3, ...rowLines.map(width))));
+    if (isHeaderRow(row) && r < table.rows.length - 1)
+      out.push("-".repeat(Math.max(3, ...rowLines.map(width))));
   });
   return out;
 }
@@ -310,10 +335,16 @@ function emailText(doc: RenderDoc): string {
  * kept. They are returned as they are; a line break, which a resolved field never holds, would
  * become a space, so no caller can ever start a new mail header.
  */
-const oneLine = (value: string) => value.replace(/\r\n|[\n\r\u2028\u2029]/g, " ").trim();
+const oneLine = (value: string) =>
+  value.replace(/\r\n|[\n\r\u2028\u2029]/g, " ").trim();
 
 export function renderEmail(doc: RenderDoc, fields: EmailFields): EmailRender {
   const subject = oneLine(fields.subject);
   const preheader = oneLine(fields.preheader);
-  return { subject, preheader, html: emailHtml(doc, subject, preheader), text: emailText(doc) };
+  return {
+    subject,
+    preheader,
+    html: emailHtml(doc, subject, preheader),
+    text: emailText(doc),
+  };
 }

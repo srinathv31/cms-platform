@@ -2,7 +2,12 @@
 // the same rows.
 
 import { describe, expect, it } from "vitest";
-import { LINK_MESSAGES, checkLink, normalizeLink, type LinkRefusal } from "./links";
+import {
+  LINK_MESSAGES,
+  checkLink,
+  normalizeLink,
+  type LinkRefusal,
+} from "./links";
 
 describe("checkLink: accepted, with the normalized href", () => {
   it.each([
@@ -10,8 +15,14 @@ describe("checkLink: accepted, with the normalized href", () => {
     ["https://coral.example", "https://coral.example"],
     ["https://coral.example/", "https://coral.example/"],
     ["http://coral.example/terms", "http://coral.example/terms"],
-    ["https://Coral.Example/Terms?Q=1#Top", "https://Coral.Example/Terms?Q=1#Top"],
-    ["https://coral.example/a?q=1&r=two#top", "https://coral.example/a?q=1&r=two#top"],
+    [
+      "https://Coral.Example/Terms?Q=1#Top",
+      "https://Coral.Example/Terms?Q=1#Top",
+    ],
+    [
+      "https://coral.example/a?q=1&r=two#top",
+      "https://coral.example/a?q=1&r=two#top",
+    ],
     ["https://coral.example?q=1", "https://coral.example?q=1"],
     ["https://coral.example#fees", "https://coral.example#fees"],
     ["https://coral.example:8443/x", "https://coral.example:8443/x"],
@@ -21,13 +32,25 @@ describe("checkLink: accepted, with the normalized href", () => {
     ["https://[2001:db8::1]:8080/x", "https://[2001:db8::1]:8080/x"],
     ["https://xn--caf-dma.example/", "https://xn--caf-dma.example/"],
     ["https://my_host.example/", "https://my_host.example/"],
-    ["https://coral.example/card%20terms", "https://coral.example/card%20terms"],
+    [
+      "https://coral.example/card%20terms",
+      "https://coral.example/card%20terms",
+    ],
     ["https://coral.example/50%off", "https://coral.example/50%off"],
     ["https://coral.example/a|b{c}^", "https://coral.example/a|b{c}^"],
-    ["https://coral.example/\"quoted\"<tag>", "https://coral.example/\"quoted\"<tag>"],
+    [
+      'https://coral.example/"quoted"<tag>',
+      'https://coral.example/"quoted"<tag>',
+    ],
     ["mailto:help@coral.example", "mailto:help@coral.example"],
-    ["mailto:help@coral.example?subject=Card%20terms", "mailto:help@coral.example?subject=Card%20terms"],
-    ["mailto:a@coral.example,b@coral.example", "mailto:a@coral.example,b@coral.example"],
+    [
+      "mailto:help@coral.example?subject=Card%20terms",
+      "mailto:help@coral.example?subject=Card%20terms",
+    ],
+    [
+      "mailto:a@coral.example,b@coral.example",
+      "mailto:a@coral.example,b@coral.example",
+    ],
     ["tel:+18005550100", "tel:+18005550100"],
     ["tel:1-800-555-0100", "tel:1-800-555-0100"],
     ["tel:(800)555.0100", "tel:(800)555.0100"],
@@ -43,7 +66,10 @@ describe("checkLink: accepted, with the normalized href", () => {
     // Non-ASCII after the host, and in mailto:, percent-encoded as UTF-8 (after NFC).
     ["https://coral.example/café", "https://coral.example/caf%C3%A9"],
     ["https://coral.example/café", "https://coral.example/caf%C3%A9"],
-    ["https://coral.example/a?q=é#ü", "https://coral.example/a?q=%C3%A9#%C3%BC"],
+    [
+      "https://coral.example/a?q=é#ü",
+      "https://coral.example/a?q=%C3%A9#%C3%BC",
+    ],
     ["https://coral.example/€", "https://coral.example/%E2%82%AC"],
     ["https://coral.example/😀", "https://coral.example/%F0%9F%98%80"],
     ["mailto:josé@coral.example", "mailto:jos%C3%A9@coral.example"],
@@ -124,14 +150,19 @@ describe("checkLink: refused, with the reason", () => {
     ["tel:++18005550100", "phone"],
     ["tel:+18005550100;ext=", "phone"],
   ] as [string, LinkRefusal][])("%j → %s", (input, reason) => {
-    expect(checkLink(input)).toEqual({ ok: false, reason, message: LINK_MESSAGES[reason] });
+    expect(checkLink(input)).toEqual({
+      ok: false,
+      reason,
+      message: LINK_MESSAGES[reason],
+    });
     expect(normalizeLink(input)).toBeNull();
   });
 });
 
 describe("normalizeLink", () => {
   it("is null for anything but a string", () => {
-    for (const value of [null, undefined, 42, {}, ["https://coral.example"]]) expect(normalizeLink(value)).toBeNull();
+    for (const value of [null, undefined, 42, {}, ["https://coral.example"]])
+      expect(normalizeLink(value)).toBeNull();
   });
 
   it("is idempotent", () => {

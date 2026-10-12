@@ -8,15 +8,19 @@ import type { Cx } from "./context";
 type Mark = NonNullable<JSONContent["marks"]>[number];
 export type RedlineOp = RedlineMark["attrs"]["op"];
 
-export const isNode = (x: unknown): x is JSONContent => typeof x === "object" && x !== null;
+export const isNode = (x: unknown): x is JSONContent =>
+  typeof x === "object" && x !== null;
 
-export const isTextblock = (node: JSONContent) => node.type === "paragraph" || node.type === "heading";
+export const isTextblock = (node: JSONContent) =>
+  node.type === "paragraph" || node.type === "heading";
 
-const isEmptyParagraph = (node: JSONContent) => node.type === "paragraph" && !node.content?.length;
+const isEmptyParagraph = (node: JSONContent) =>
+  node.type === "paragraph" && !node.content?.length;
 
 /** The document's top-level blocks, without the trailing empty paragraphs. */
 export function topLevel(doc: JSONContent | null | undefined): JSONContent[] {
-  const content = doc && Array.isArray(doc.content) ? doc.content.filter(isNode) : [];
+  const content =
+    doc && Array.isArray(doc.content) ? doc.content.filter(isNode) : [];
   let end = content.length;
   while (end > 0 && isEmptyParagraph(content[end - 1])) end--;
   return content.slice(0, end);
@@ -58,7 +62,11 @@ export function family(node: JSONContent): string {
 }
 
 /** Attribute values equal to these are the same as no value. */
-const DEFAULT_ATTRS: Readonly<Record<string, unknown>> = { colspan: 1, rowspan: 1, start: 1 };
+const DEFAULT_ATTRS: Readonly<Record<string, unknown>> = {
+  colspan: 1,
+  rowspan: 1,
+  start: 1,
+};
 
 /** Attributes that mean something: not `id`, not null, not a default. Sorted, so key order is noise. */
 function attrsKey(attrs: JSONContent["attrs"]): string {
@@ -66,7 +74,13 @@ function attrsKey(attrs: JSONContent["attrs"]): string {
   const parts: string[] = [];
   for (const name of Object.keys(attrs).sort()) {
     const value: unknown = attrs[name];
-    if (name === "id" || value === null || value === undefined || DEFAULT_ATTRS[name] === value) continue;
+    if (
+      name === "id" ||
+      value === null ||
+      value === undefined ||
+      DEFAULT_ATTRS[name] === value
+    )
+      continue;
     parts.push(`${name}=${JSON.stringify(value)}`);
   }
   return parts.length > 0 ? `{${parts.join(";")}}` : "";
@@ -74,7 +88,9 @@ function attrsKey(attrs: JSONContent["attrs"]): string {
 
 /** A link is its href (target and rel are editor defaults); other marks are their type and attributes. */
 function markKey(mark: Mark): string {
-  return mark.type === "link" ? `link(${String(mark.attrs?.href ?? "")})` : mark.type + attrsKey(mark.attrs);
+  return mark.type === "link"
+    ? `link(${String(mark.attrs?.href ?? "")})`
+    : mark.type + attrsKey(mark.attrs);
 }
 
 export function marksKey(marks: JSONContent["marks"]): string {
@@ -92,7 +108,8 @@ export function nodeKey(cx: Cx, node: JSONContent): string {
   if (hit !== undefined) return hit;
   let key = kindKey(node) + marksKey(node.marks);
   if (typeof node.text === "string") key += JSON.stringify(node.text);
-  if (node.content?.length) key += `[${node.content.map((child) => nodeKey(cx, child)).join(",")}]`;
+  if (node.content?.length)
+    key += `[${node.content.map((child) => nodeKey(cx, child)).join(",")}]`;
   cx.keys.set(node, key);
   return key;
 }
@@ -101,7 +118,10 @@ export function contentKey(cx: Cx, node: JSONContent): string {
   return (node.content ?? []).map((child) => nodeKey(cx, child)).join(",");
 }
 
-export function withContent(node: JSONContent, content: JSONContent[]): JSONContent {
+export function withContent(
+  node: JSONContent,
+  content: JSONContent[],
+): JSONContent {
   const copy: JSONContent = { ...node, content };
   if (content.length === 0) delete copy.content;
   return copy;
@@ -118,6 +138,10 @@ export function withMark(inline: JSONContent, op: RedlineOp): JSONContent {
 /** The whole block marked: every inline node inside it gets the mark. */
 export function markAll(node: JSONContent, op: RedlineOp): JSONContent {
   if (!node.content?.length) return node;
-  if (isTextblock(node)) return { ...node, content: node.content.map((child) => withMark(child, op)) };
+  if (isTextblock(node))
+    return {
+      ...node,
+      content: node.content.map((child) => withMark(child, op)),
+    };
   return { ...node, content: node.content.map((child) => markAll(child, op)) };
 }

@@ -11,9 +11,21 @@ import { useCopy } from "./copy";
  */
 
 /** Copy glyph that crossfades into a check. Fixed size so nothing shifts. */
-function CopyGlyph({ copied, className }: { copied: boolean; className?: string }) {
+function CopyGlyph({
+  copied,
+  className,
+}: {
+  copied: boolean;
+  className?: string;
+}) {
   return (
-    <span aria-hidden className={cn("relative inline-grid size-3.5 shrink-0 place-items-center", className)}>
+    <span
+      aria-hidden
+      className={cn(
+        "relative inline-grid size-3.5 shrink-0 place-items-center",
+        className,
+      )}
+    >
       <Copy
         strokeWidth={1.75}
         className={cn(

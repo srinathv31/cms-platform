@@ -9,7 +9,11 @@ import {
   type AuditPageData,
   type AuditRow,
 } from "@/domain/access-types";
-import { SYSTEM_ACTOR, SYSTEM_INITIALS, eventVersionLabel } from "@/domain/activity";
+import {
+  SYSTEM_ACTOR,
+  SYSTEM_INITIALS,
+  eventVersionLabel,
+} from "@/domain/activity";
 import {
   AUDIT_CATEGORIES,
   CATEGORY_LABEL,
@@ -36,7 +40,12 @@ import type { NumberedRound } from "@/domain/rounds";
 import type { VersionState, Viewer } from "@/domain/types";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
-import { auditEvents, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  auditEvents,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { refusal, type ReadRefusal } from "@/server/api/reads";
 import { formatAgo, formatDateTime, utcDay } from "@/domain/dates";
 import { getPeople, iso, personOf, type People } from "./review-shared";
@@ -60,43 +69,76 @@ interface AuditScope {
   name: string;
 }
 
-const SYSTEM_PERSON_VIEW: Person = { id: SYSTEM_PERSON, name: SYSTEM_ACTOR, initials: SYSTEM_INITIALS, hue: 0 };
+const SYSTEM_PERSON_VIEW: Person = {
+  id: SYSTEM_PERSON,
+  name: SYSTEM_ACTOR,
+  initials: SYSTEM_INITIALS,
+  hue: 0,
+};
 
-const FILTER_KEYS = ["team", "person", "action", "template", "from", "to"] as const satisfies readonly (keyof AuditFilters)[];
+const FILTER_KEYS = [
+  "team",
+  "person",
+  "action",
+  "template",
+  "from",
+  "to",
+] as const satisfies readonly (keyof AuditFilters)[];
 
 /**
  * The Audit page's read model. 404 without `audit.view` in the space (a hidden page, not a refusal).
  * Read once per request: the header's Export count and the table each pass their own filters object,
  * and React's `cache` keys an object by identity, so the read is cached on a string key instead.
  */
-export function getAuditPage(spaceSlug: string, filters: AuditFilters): Promise<AuditPageData> {
-  return auditPageFor(spaceSlug, JSON.stringify(FILTER_KEYS.map((key) => filters[key] ?? null)));
+export function getAuditPage(
+  spaceSlug: string,
+  filters: AuditFilters,
+): Promise<AuditPageData> {
+  return auditPageFor(
+    spaceSlug,
+    JSON.stringify(FILTER_KEYS.map((key) => filters[key] ?? null)),
+  );
 }
 
-const auditPageFor = cache(async (spaceSlug: string, filtersKey: string): Promise<AuditPageData> => {
-  const values = JSON.parse(filtersKey) as (string | null)[];
-  const filters: AuditFilters = {};
-  FILTER_KEYS.forEach((key, i) => {
-    if (values[i] !== null) filters[key] = values[i]!;
-  });
-  const space = await requireSpace(spaceSlug);
-  if (!can(space.viewer, "audit.view", { teamId: space.teamId ?? ALL_SPACE }).ok) notFound();
-  const { data } = await readAudit(
-    { slug: space.slug, isAll: space.isAll, teamId: space.teamId, name: space.name },
-    filters,
-    await now(),
-  );
-  return data;
-});
+const auditPageFor = cache(
+  async (spaceSlug: string, filtersKey: string): Promise<AuditPageData> => {
+    const values = JSON.parse(filtersKey) as (string | null)[];
+    const filters: AuditFilters = {};
+    FILTER_KEYS.forEach((key, i) => {
+      if (values[i] !== null) filters[key] = values[i]!;
+    });
+    const space = await requireSpace(spaceSlug);
+    if (
+      !can(space.viewer, "audit.view", { teamId: space.teamId ?? ALL_SPACE }).ok
+    )
+      notFound();
+    const { data } = await readAudit(
+      {
+        slug: space.slug,
+        isAll: space.isAll,
+        teamId: space.teamId,
+        name: space.name,
+      },
+      filters,
+      await now(),
+    );
+    return data;
+  },
+);
 
-export type AuditExport = { ok: true; filename: string; csv: string; count: number } | ReadRefusal;
+export type AuditExport =
+  { ok: true; filename: string; csv: string; count: number } | ReadRefusal;
 
 /**
  * The CSV of every event the filters match (no page limit), for the export route. A route answers
  * with a refusal and its status instead of redirecting: unknown team → 404 `space_unavailable`; no
  * `audit.view` there → 403 `generic`.
  */
-export async function getAuditExport(viewer: Viewer, spaceSlug: string, filters: AuditFilters): Promise<AuditExport> {
+export async function getAuditExport(
+  viewer: Viewer,
+  spaceSlug: string,
+  filters: AuditFilters,
+): Promise<AuditExport> {
   const scope = await auditScope(viewer, spaceSlug);
   if (!scope.ok) return scope;
   const nowDate = await now();
@@ -110,16 +152,31 @@ export async function getAuditExport(viewer: Viewer, spaceSlug: string, filters:
 }
 
 /** Who may read which space's audit, answered as a refusal with its status (for the export route). */
-export async function auditScope(viewer: Viewer, spaceSlug: string): Promise<{ ok: true; scope: AuditScope } | ReadRefusal> {
+export async function auditScope(
+  viewer: Viewer,
+  spaceSlug: string,
+): Promise<{ ok: true; scope: AuditScope } | ReadRefusal> {
   const refused = refusal(403, REASONS.generic);
   if (spaceSlug === ALL_SPACE) {
-    if (!isCrossTeam(viewer) || !can(viewer, "audit.view", { teamId: ALL_SPACE }).ok) return refused;
-    return { ok: true, scope: { slug: ALL_SPACE, isAll: true, teamId: null, name: "All teams" } };
+    if (
+      !isCrossTeam(viewer) ||
+      !can(viewer, "audit.view", { teamId: ALL_SPACE }).ok
+    )
+      return refused;
+    return {
+      ok: true,
+      scope: { slug: ALL_SPACE, isAll: true, teamId: null, name: "All teams" },
+    };
   }
-  const team = await db.query.teams.findFirst({ where: eq(teams.slug, spaceSlug) });
+  const team = await db.query.teams.findFirst({
+    where: eq(teams.slug, spaceSlug),
+  });
   if (!team) return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
   if (!can(viewer, "audit.view", { teamId: team.id }).ok) return refused;
-  return { ok: true, scope: { slug: team.slug, isAll: false, teamId: team.id, name: team.name } };
+  return {
+    ok: true,
+    scope: { slug: team.slug, isAll: false, teamId: team.id, name: team.name },
+  };
 }
 
 // ── The read ─────────────────────────────────────────────────
@@ -145,16 +202,27 @@ async function readAudit(
   const today = utcDay(nowDate);
 
   const knownPeople = new Map<string, Person>();
-  const knownTemplates = new Map<string, { id: string; name: string; teamSlug: string }>();
+  const knownTemplates = new Map<
+    string,
+    { id: string; name: string; teamSlug: string }
+  >();
   const knownActions = new Set<string>();
   for (const [i, row] of universe.entries()) {
     for (const key of personKeysOf(row)) {
-      if (!knownPeople.has(key)) knownPeople.set(key, key === SYSTEM_PERSON ? SYSTEM_PERSON_VIEW : personOf(people, key));
+      if (!knownPeople.has(key))
+        knownPeople.set(
+          key,
+          key === SYSTEM_PERSON ? SYSTEM_PERSON_VIEW : personOf(people, key),
+        );
     }
     if (row.template && !knownTemplates.has(row.template.id)) {
       // A row names its own version; the filter names the template once, as it is now.
       const name = events[i]!.currentTemplateName ?? row.template.name;
-      knownTemplates.set(row.template.id, { id: row.template.id, name, teamSlug: row.team?.slug ?? "" });
+      knownTemplates.set(row.template.id, {
+        id: row.template.id,
+        name,
+        teamSlug: row.team?.slug ?? "",
+      });
     }
     knownActions.add(actionKeyOf(row));
   }
@@ -167,15 +235,27 @@ async function readAudit(
     options: {
       teams: space.isAll
         ? teamRows
-            .map((t) => ({ slug: t.slug, name: t.name, count: counts.team[t.slug] ?? 0 }))
+            .map((t) => ({
+              slug: t.slug,
+              name: t.name,
+              count: counts.team[t.slug] ?? 0,
+            }))
             .sort((a, b) => a.name.localeCompare(b.name))
         : [],
       people: [...knownPeople.values()]
         .map((p) => ({ ...p, count: counts.person[p.id] ?? 0 }))
         .sort((a, b) => systemLast(a.id, b.id) || a.name.localeCompare(b.name)),
-      categories: AUDIT_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABEL[c], count: counts.action[c] ?? 0 })),
+      categories: AUDIT_CATEGORIES.map((c) => ({
+        value: c,
+        label: CATEGORY_LABEL[c],
+        count: counts.action[c] ?? 0,
+      })),
       actions: actionOptions()
-        .filter((o) => knownActions.has(o.value) || filterValues(filters, "action").includes(o.value))
+        .filter(
+          (o) =>
+            knownActions.has(o.value) ||
+            filterValues(filters, "action").includes(o.value),
+        )
         .map((o) => ({ ...o, count: counts.action[o.value] ?? 0 })),
       templates: [...knownTemplates.values()]
         .map((t) => ({ ...t, count: counts.template[t.id] ?? 0 }))
@@ -220,7 +300,9 @@ async function loadEvents(teamId: string | null): Promise<EventRow[]> {
       actorId: auditEvents.actorId,
       teamId: auditEvents.teamId,
       templateId: auditEvents.templateId,
-      templateName: sql<string | null>`coalesce(${versions.name}, ${currentName(templates.id)})`,
+      templateName: sql<
+        string | null
+      >`coalesce(${versions.name}, ${currentName(templates.id)})`,
       currentTemplateName: currentName(templates.id),
       action: auditEvents.action,
       details: auditEvents.details,
@@ -243,10 +325,18 @@ function toRow(
 ): AuditRow {
   const actor = e.actorId ? personOf(people, e.actorId) : null;
   const subjectId = subjectIdOf(e.action, e.details);
-  const team = e.teamId ? (teamsById.get(e.teamId) ?? { slug: e.teamId, name: e.teamId }) : null;
+  const team = e.teamId
+    ? (teamsById.get(e.teamId) ?? { slug: e.teamId, name: e.teamId })
+    : null;
   const version: NumberedRound | null =
-    e.versionNumber !== null && e.versionRound !== null && e.versionState !== null
-      ? { number: e.versionNumber, round: e.versionRound, state: e.versionState }
+    e.versionNumber !== null &&
+    e.versionRound !== null &&
+    e.versionState !== null
+      ? {
+          number: e.versionNumber,
+          round: e.versionRound,
+          state: e.versionState,
+        }
       : null;
   const category: AuditCategory = categoryOf(e.action);
   return {
@@ -254,13 +344,18 @@ function toRow(
     at: iso(e.at),
     actor,
     team: team ? { slug: team.slug, name: team.name } : null,
-    template: e.templateId ? { id: e.templateId, name: e.templateName ?? e.templateId } : null,
+    template: e.templateId
+      ? { id: e.templateId, name: e.templateName ?? e.templateId }
+      : null,
     // The cell names the version as the event does: the round for a review event (`eventVersionLabel`).
     versionLabel: eventVersionLabel(e.action, version),
     action: e.action,
     category,
     actionLabel: actionLabel(e.action, actor !== null),
-    summary: describeAuditEvent({ action: e.action, details: e.details, version }, actor),
+    summary: describeAuditEvent(
+      { action: e.action, details: e.details, version },
+      actor,
+    ),
     subject: subjectId ? personOf(people, subjectId) : null,
     when: formatDateTime(e.at, nowDate),
     ago: formatAgo(e.at, nowDate, { capitalize: true }),
@@ -276,14 +371,28 @@ function sanitize(
   let f: AuditFilters = { ...requested };
   if (space.isAll) {
     const slugs = new Set(teamRows.map((t) => t.slug));
-    f = withFilterValues(f, "team", filterValues(f, "team").filter((s) => slugs.has(s)));
+    f = withFilterValues(
+      f,
+      "team",
+      filterValues(f, "team").filter((s) => slugs.has(s)),
+    );
   } else {
     delete f.team;
   }
   const people = new Set(universe.flatMap(personKeysOf));
-  const templateIds = new Set(universe.flatMap((r) => (r.template ? [r.template.id] : [])));
-  f = withFilterValues(f, "person", filterValues(f, "person").filter((p) => people.has(p)));
-  f = withFilterValues(f, "template", filterValues(f, "template").filter((t) => templateIds.has(t)));
+  const templateIds = new Set(
+    universe.flatMap((r) => (r.template ? [r.template.id] : [])),
+  );
+  f = withFilterValues(
+    f,
+    "person",
+    filterValues(f, "person").filter((p) => people.has(p)),
+  );
+  f = withFilterValues(
+    f,
+    "template",
+    filterValues(f, "template").filter((t) => templateIds.has(t)),
+  );
   return f;
 }
 

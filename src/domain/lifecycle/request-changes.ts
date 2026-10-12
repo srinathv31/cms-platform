@@ -6,11 +6,21 @@
 import { currentStageOf } from "../approval-chain";
 import { makerCheckerRefusal } from "../permissions";
 import { refuse } from "../refusals";
-import { DOCUMENT_THREAD, type ApprovalStage, type LifecycleEffect } from "../review-types";
+import {
+  DOCUMENT_THREAD,
+  type ApprovalStage,
+  type LifecycleEffect,
+} from "../review-types";
 import { copyToDraft } from "./drafts";
 import { roundOf, sentence, trimmed, notify } from "./helpers";
 import { REFUSALS } from "./refusals";
-import type { DraftFields, Outcome, ReviewVersion, ApprovalRecord, ReasonComment } from "./types";
+import type {
+  DraftFields,
+  Outcome,
+  ReviewVersion,
+  ApprovalRecord,
+  ReasonComment,
+} from "./types";
 
 export type RequestChangesResult = Outcome<{
   changes: { state: "changes_requested" };
@@ -84,8 +94,17 @@ export function requestChanges(input: {
       decidedAt: now,
     },
     // The draft is the author's to fix, so it is theirs, not the approver's. Its writers are the version's.
-    newDraft: copyToDraft(version, version.submittedBy ?? actorId, now, version.writers),
-    reasonComment: { blockId: DOCUMENT_THREAD, body: reason, kind: "change_request" },
+    newDraft: copyToDraft(
+      version,
+      version.submittedBy ?? actorId,
+      now,
+      version.writers,
+    ),
+    reasonComment: {
+      blockId: DOCUMENT_THREAD,
+      body: reason,
+      kind: "change_request",
+    },
     effects,
   };
 }

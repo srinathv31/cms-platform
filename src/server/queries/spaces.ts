@@ -26,7 +26,10 @@ export interface SettingsAccess {
   platform: boolean;
 }
 
-export function settingsAccessFor(viewer: Viewer, teamSlug: string): SettingsAccess {
+export function settingsAccessFor(
+  viewer: Viewer,
+  teamSlug: string,
+): SettingsAccess {
   const teamId = teamSlug === ALL_SPACE ? null : teamSlug;
   return {
     team: teamId ? can(viewer, "team.manageMembers", { teamId }).ok : false,
@@ -67,13 +70,22 @@ export interface ShellData {
 export const getShell = cache(async (): Promise<ShellData> => {
   const viewer = await getViewer();
   const teamRows = await db
-    .select({ id: teams.id, slug: teams.slug, name: teams.name, icon: teams.icon })
+    .select({
+      id: teams.id,
+      slug: teams.slug,
+      name: teams.name,
+      icon: teams.icon,
+    })
     .from(teams)
     .orderBy(teams.name);
   // Platform Admin and Auditor get "All teams" first, then every team to step into.
   const spaces = spacesFor(viewer, teamRows);
   if (spaces.length === 0) {
-    return { viewer: { userId: viewer.userId, name: viewer.name }, spaces: [], homeCard: await getHomeCard() };
+    return {
+      viewer: { userId: viewer.userId, name: viewer.name },
+      spaces: [],
+      homeCard: await getHomeCard(),
+    };
   }
 
   const iconBySlug = new Map(teamRows.map((t) => [t.slug, t.icon]));
@@ -90,7 +102,11 @@ export const getShell = cache(async (): Promise<ShellData> => {
     if (!can(viewer, "team.manageMembers", { teamId: r.teamId }).ok) continue;
     const existing = recertByTeam.get(r.teamId);
     if (existing) continue;
-    recertByTeam.set(r.teamId, { id: r.id, label: r.label, dueLabel: formatShortDate(r.dueAt, nowDate) });
+    recertByTeam.set(r.teamId, {
+      id: r.id,
+      label: r.label,
+      dueLabel: formatShortDate(r.dueAt, nowDate),
+    });
   }
 
   const cards = await getSidebarCards();
@@ -130,26 +146,29 @@ export interface SpaceContext {
  * Resolves the `[team]` segment for the current viewer.
  * Unknown slug → 404. A real team the viewer can't see → their default space (or request-access).
  */
-export const requireSpace = cache(async (slug: string): Promise<SpaceContext> => {
-  const viewer = await getViewer();
-  const isAll = slug === ALL_SPACE;
-  const team = isAll
-    ? null
-    : ((await db.query.teams.findFirst({ where: eq(teams.slug, slug) })) ?? null);
-  if (!isAll && !team) notFound();
+export const requireSpace = cache(
+  async (slug: string): Promise<SpaceContext> => {
+    const viewer = await getViewer();
+    const isAll = slug === ALL_SPACE;
+    const team = isAll
+      ? null
+      : ((await db.query.teams.findFirst({ where: eq(teams.slug, slug) })) ??
+        null);
+    if (!isAll && !team) notFound();
 
-  if (!canSeeSpace(viewer, slug)) {
-    const fallback = defaultSpace(viewer);
-    redirect(fallback ? `/${fallback}/library` : "/request-access");
-  }
-  return {
-    viewer,
-    slug,
-    isAll,
-    teamId: team ? team.id : null,
-    name: isAll ? "All teams" : team!.name,
-  };
-});
+    if (!canSeeSpace(viewer, slug)) {
+      const fallback = defaultSpace(viewer);
+      redirect(fallback ? `/${fallback}/library` : "/request-access");
+    }
+    return {
+      viewer,
+      slug,
+      isAll,
+      teamId: team ? team.id : null,
+      name: isAll ? "All teams" : team!.name,
+    };
+  },
+);
 
 /** Resolve a params promise to a space (for streamed server components). */
 export async function requireSpaceFromParams(

@@ -27,16 +27,27 @@ function absoluteFileUrl(url: string): string {
 export const E2E_GATE_PORT = Number(process.env.E2E_GATE_PORT ?? 3100);
 
 /** A server started outside Playwright (`E2E_PORT`, e.g. a dev server on 3000), or undefined when Playwright starts them. */
-export const E2E_EXTERNAL_PORT = process.env.E2E_PORT && Number(process.env.E2E_PORT) !== E2E_GATE_PORT ? Number(process.env.E2E_PORT) : undefined;
+export const E2E_EXTERNAL_PORT =
+  process.env.E2E_PORT && Number(process.env.E2E_PORT) !== E2E_GATE_PORT
+    ? Number(process.env.E2E_PORT)
+    : undefined;
 
 /** True when the run has one database or one server that Playwright does not own: it cannot be split across workers. */
-export const E2E_SHARED_STORAGE = E2E_EXTERNAL_PORT !== undefined || Boolean(fromEnv("E2E_DATABASE_URL") || fromEnv("E2E_UPLOADS_DIR"));
+export const E2E_SHARED_STORAGE =
+  E2E_EXTERNAL_PORT !== undefined ||
+  Boolean(fromEnv("E2E_DATABASE_URL") || fromEnv("E2E_UPLOADS_DIR"));
 
-export const e2ePort = (slot: number) => E2E_EXTERNAL_PORT ?? E2E_GATE_PORT + slot;
+export const e2ePort = (slot: number) =>
+  E2E_EXTERNAL_PORT ?? E2E_GATE_PORT + slot;
 
-export const e2eDatabaseUrl = (slot: number) => absoluteFileUrl(fromEnv("E2E_DATABASE_URL") ?? `file:./data/e2e-${slot}.db`);
+export const e2eDatabaseUrl = (slot: number) =>
+  absoluteFileUrl(fromEnv("E2E_DATABASE_URL") ?? `file:./data/e2e-${slot}.db`);
 
-export const e2eUploadsDir = (slot: number) => path.resolve(process.cwd(), fromEnv("E2E_UPLOADS_DIR") ?? `./data/e2e-uploads-${slot}`);
+export const e2eUploadsDir = (slot: number) =>
+  path.resolve(
+    process.cwd(),
+    fromEnv("E2E_UPLOADS_DIR") ?? `./data/e2e-uploads-${slot}`,
+  );
 
 /** This worker's slot: 0 to workers - 1. */
 export const E2E_SLOT = Number(process.env.TEST_PARALLEL_INDEX ?? 0);

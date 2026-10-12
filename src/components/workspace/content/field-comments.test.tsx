@@ -10,12 +10,24 @@ import { FieldCommentControls, type FieldComments } from "./field-comments";
 // The comments on a document's email subject and preheader in the author's rail: a marker for the open
 // threads on a field, and a button that starts one.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-const JORDAN: Person = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 212 };
+const JORDAN: Person = {
+  id: "jordan",
+  name: "Jordan Ellis",
+  initials: "JE",
+  hue: 212,
+};
 const [SUBJECT, PREHEADER] = channelFieldsOf("email");
 
-function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}, comments = 1): ThreadView {
+function thread(
+  id: string,
+  blockId: string,
+  patch: Partial<ThreadView> = {},
+  comments = 1,
+): ThreadView {
   return {
     id,
     blockId,
@@ -48,18 +60,34 @@ afterEach(() => {
   container.remove();
 });
 
-function render(threads: ThreadView[], over: Partial<FieldComments> = {}, field = SUBJECT) {
-  const comments: FieldComments = { threads, activeThreadId: null, onActivate: vi.fn(), onRequestComment: vi.fn(), ...over };
-  act(() => root.render(<FieldCommentControls field={field} comments={comments} />));
+function render(
+  threads: ThreadView[],
+  over: Partial<FieldComments> = {},
+  field = SUBJECT,
+) {
+  const comments: FieldComments = {
+    threads,
+    activeThreadId: null,
+    onActivate: vi.fn(),
+    onRequestComment: vi.fn(),
+    ...over,
+  };
+  act(() =>
+    root.render(<FieldCommentControls field={field} comments={comments} />),
+  );
   return comments;
 }
-const marker = () => container.querySelector<HTMLButtonElement>("[data-field-marker]");
-const add = () => container.querySelector<HTMLButtonElement>('[data-slot="field-comment"]');
+const marker = () =>
+  container.querySelector<HTMLButtonElement>("[data-field-marker]");
+const add = () =>
+  container.querySelector<HTMLButtonElement>('[data-slot="field-comment"]');
 
 describe("FieldCommentControls", () => {
   it("offers a button that starts a comment on the field, named for it", () => {
     const { onRequestComment } = render([]);
-    expect(add()?.getAttribute("aria-label")).toBe("Comment on the email subject");
+    expect(add()?.getAttribute("aria-label")).toBe(
+      "Comment on the email subject",
+    );
     act(() => add()!.click());
     expect(onRequestComment).toHaveBeenCalledWith("email.subject");
     expect(marker(), "no thread, no marker").toBeNull();
@@ -67,23 +95,37 @@ describe("FieldCommentControls", () => {
 
   it("names the preheader's button for the preheader", () => {
     render([], {}, PREHEADER);
-    expect(add()?.getAttribute("aria-label")).toBe("Comment on the email preheader");
+    expect(add()?.getAttribute("aria-label")).toBe(
+      "Comment on the email preheader",
+    );
   });
 
   it("marks the field's open threads with the number of comments on it, and none from another field", () => {
-    render([thread("t1", "email.subject", {}, 2), thread("t2", "email.subject"), thread("t3", "email.preheader", {}, 4)]);
-    expect(marker()?.getAttribute("aria-label")).toBe("3 comments on the email subject");
+    render([
+      thread("t1", "email.subject", {}, 2),
+      thread("t2", "email.subject"),
+      thread("t3", "email.preheader", {}, 4),
+    ]);
+    expect(marker()?.getAttribute("aria-label")).toBe(
+      "3 comments on the email subject",
+    );
     expect(marker()?.textContent).toBe("3");
   });
 
   it("leaves out resolved threads and threads on removed content", () => {
-    render([thread("done", "email.subject", { status: "resolved" }), thread("gone", "email.subject", { orphaned: true })]);
+    render([
+      thread("done", "email.subject", { status: "resolved" }),
+      thread("gone", "email.subject", { orphaned: true }),
+    ]);
     expect(marker()).toBeNull();
   });
 
   it("opens the thread when the marker is chosen, and the next one on each further press", () => {
     const onActivate = vi.fn();
-    const threads = [thread("t1", "email.subject"), thread("t2", "email.subject")];
+    const threads = [
+      thread("t1", "email.subject"),
+      thread("t2", "email.subject"),
+    ];
     render(threads, { onActivate });
     act(() => marker()!.click());
     expect(onActivate).toHaveBeenLastCalledWith("t1");

@@ -1,7 +1,15 @@
 // @vitest-environment happy-dom
 import { act, createRef, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from "vitest";
 import type { ChannelFields } from "@/domain/channel-fields";
 import { diffChannelFields } from "@/domain/redline/channel-fields";
 import type { Person } from "@/domain/review-types";
@@ -14,14 +22,36 @@ import { FieldsView } from "./fields-view";
 // marker in the gutter for a thread on one, a button that starts one, and a handle the screen's focus and
 // comment calls go through (the body keeps its own).
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-const JORDAN: Person = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 212 };
-const line = (text: string): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
-const channelFields: ChannelFields = { email: { subject: line("Your terms are ready"), preheader: line("What to know before you spend.") } };
-const FIELDS = diffChannelFields(null, { channels: ["email"], channelFields }).fields;
+const JORDAN: Person = {
+  id: "jordan",
+  name: "Jordan Ellis",
+  initials: "JE",
+  hue: 212,
+};
+const line = (text: string): JSONContent => ({
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+const channelFields: ChannelFields = {
+  email: {
+    subject: line("Your terms are ready"),
+    preheader: line("What to know before you spend."),
+  },
+};
+const FIELDS = diffChannelFields(null, {
+  channels: ["email"],
+  channelFields,
+}).fields;
 
-function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}): ThreadView {
+function thread(
+  id: string,
+  blockId: string,
+  patch: Partial<ThreadView> = {},
+): ThreadView {
   return {
     id,
     blockId,
@@ -30,26 +60,51 @@ function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}): T
     originVersionNumber: 1,
     originRound: 1,
     originLabel: "v1",
-    comments: [{ id: `${id}-c`, author: JORDAN, body: "Text", kind: "comment", createdAt: "2027-02-18T10:00:00Z" }],
+    comments: [
+      {
+        id: `${id}-c`,
+        author: JORDAN,
+        body: "Text",
+        kind: "comment",
+        createdAt: "2027-02-18T10:00:00Z",
+      },
+    ],
     orphaned: false,
     ...patch,
   };
 }
 
-const rect = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 0, width: 0 }) as DOMRect;
+const rect = (top: number, height: number) =>
+  ({
+    top,
+    height,
+    bottom: top + height,
+    left: 0,
+    right: 0,
+    width: 0,
+  }) as DOMRect;
 /** Where each field's frame is on screen (happy-dom lays nothing out): the subject first, 60px apart. */
-const TOP: Record<string, number> = { "email.subject": 100, "email.preheader": 160 };
+const TOP: Record<string, number> = {
+  "email.subject": 100,
+  "email.preheader": 160,
+};
 
 let root: Root;
 let container: HTMLElement;
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-    const top = TOP[this.getAttribute("data-block-id") ?? ""];
-    return top === undefined ? rect(0, 0) : rect(top, 50);
-  });
-  vi.spyOn(Element.prototype, "getClientRects").mockImplementation(function (this: Element) {
-    return (this.hasAttribute("data-block-id") ? [this.getBoundingClientRect()] : []) as unknown as DOMRectList;
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: Element) {
+      const top = TOP[this.getAttribute("data-block-id") ?? ""];
+      return top === undefined ? rect(0, 0) : rect(top, 50);
+    },
+  );
+  vi.spyOn(Element.prototype, "getClientRects").mockImplementation(function (
+    this: Element,
+  ) {
+    return (this.hasAttribute("data-block-id")
+      ? [this.getBoundingClientRect()]
+      : []) as unknown as DOMRectList;
   });
   container = document.createElement("div");
   document.body.append(container);
@@ -69,9 +124,17 @@ interface Handlers {
 }
 
 /** Mounts the details with the gutter's first measure done (the markers find the handle a frame after mount). */
-async function mount(threads: ThreadView[], over: { activeBlockId?: string | null; commenting?: boolean } = {}) {
-  const handleRef = createRef<DocumentEditorHandle | null>() as RefObject<DocumentEditorHandle | null>;
-  const handlers: Handlers = { onActivate: vi.fn(), onRequestComment: vi.fn(), onRequestBlockComment: vi.fn() };
+async function mount(
+  threads: ThreadView[],
+  over: { activeBlockId?: string | null; commenting?: boolean } = {},
+) {
+  const handleRef =
+    createRef<DocumentEditorHandle | null>() as RefObject<DocumentEditorHandle | null>;
+  const handlers: Handlers = {
+    onActivate: vi.fn(),
+    onRequestComment: vi.fn(),
+    onRequestBlockComment: vi.fn(),
+  };
   const commenting = over.commenting ?? true;
   act(() =>
     root.render(
@@ -88,7 +151,9 @@ async function mount(threads: ThreadView[], over: { activeBlockId?: string | nul
         activeBlockId={over.activeBlockId ?? null}
         onActivate={handlers.onActivate}
         onRequestComment={commenting ? handlers.onRequestComment : undefined}
-        onRequestBlockComment={commenting ? handlers.onRequestBlockComment : undefined}
+        onRequestBlockComment={
+          commenting ? handlers.onRequestBlockComment : undefined
+        }
       />,
     ),
   );
@@ -98,8 +163,14 @@ async function mount(threads: ThreadView[], over: { activeBlockId?: string | nul
   return { handleRef, ...handlers };
 }
 
-const markers = () => Array.from(container.querySelectorAll<HTMLButtonElement>('[data-slot="gutter-markers"] [data-marker]'));
-const frame = (id: string) => container.querySelector<HTMLElement>(`.ucomp-doc > [data-block-id="${id}"]`)!;
+const markers = () =>
+  Array.from(
+    container.querySelectorAll<HTMLButtonElement>(
+      '[data-slot="gutter-markers"] [data-marker]',
+    ),
+  );
+const frame = (id: string) =>
+  container.querySelector<HTMLElement>(`.ucomp-doc > [data-block-id="${id}"]`)!;
 const hover = (el: Element) =>
   act(() => {
     el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
@@ -108,18 +179,25 @@ const hover = (el: Element) =>
 describe("FieldsView, as a document's email details", () => {
   it("draws the subject and the preheader as the details block above the body, framed by their ids", async () => {
     await mount([]);
-    expect(container.querySelector('[data-fields-document="details"]')).not.toBeNull();
-    expect([...container.querySelectorAll(".ucomp-doc > [data-block-id]")].map((el) => el.getAttribute("data-block-id"))).toEqual([
-      "email.subject",
-      "email.preheader",
-    ]);
+    expect(
+      container.querySelector('[data-fields-document="details"]'),
+    ).not.toBeNull();
+    expect(
+      [...container.querySelectorAll(".ucomp-doc > [data-block-id]")].map(
+        (el) => el.getAttribute("data-block-id"),
+      ),
+    ).toEqual(["email.subject", "email.preheader"]);
   });
 
   it("marks a thread on the subject in the gutter, counting its comments, in a group of its own", async () => {
     await mount([thread("t1", "email.subject"), thread("t2", "email.subject")]);
     expect(markers().map((m) => m.dataset.marker)).toEqual(["email.subject"]);
-    expect(markers()[0].getAttribute("aria-label")).toBe("2 comments on this field");
-    expect(container.querySelector('[role="toolbar"]')?.getAttribute("aria-label")).toBe("Comments on the email details");
+    expect(markers()[0].getAttribute("aria-label")).toBe(
+      "2 comments on this field",
+    );
+    expect(
+      container.querySelector('[role="toolbar"]')?.getAttribute("aria-label"),
+    ).toBe("Comments on the email details");
   });
 
   it("marks the preheader too, below the subject's, and leaves out resolved threads and threads on blocks of the body", async () => {
@@ -141,7 +219,9 @@ describe("FieldsView, as a document's email details", () => {
     const { onRequestBlockComment } = await mount([]);
     expect(container.querySelector('[data-slot="block-comment"]')).toBeNull();
     hover(frame("email.subject"));
-    const add = container.querySelector<HTMLButtonElement>('[data-slot="block-comment"] button')!;
+    const add = container.querySelector<HTMLButtonElement>(
+      '[data-slot="block-comment"] button',
+    )!;
     expect(add.getAttribute("aria-label")).toBe("Comment on this field");
     act(() => add.click());
     expect(onRequestBlockComment).toHaveBeenCalledWith("email.subject");
@@ -155,11 +235,16 @@ describe("FieldsView, as a document's email details", () => {
   });
 
   it("answers the screen's handle for a field: where it is, and a comment on it", async () => {
-    const { handleRef, onRequestComment } = await mount([thread("t1", "email.preheader")]);
+    const { handleRef, onRequestComment } = await mount([
+      thread("t1", "email.preheader"),
+    ]);
     const handle = handleRef.current!;
     expect(handle.getBlockRect("email.preheader")?.top).toBe(160);
     expect(handle.getThreadRect("t1")?.top).toBe(160);
-    expect(handle.getBlockRect("b_intro"), "a block of the body isn't here").toBeNull();
+    expect(
+      handle.getBlockRect("b_intro"),
+      "a block of the body isn't here",
+    ).toBeNull();
     handle.requestComment("email.subject");
     expect(onRequestComment).toHaveBeenCalledWith({ blockId: "email.subject" });
   });

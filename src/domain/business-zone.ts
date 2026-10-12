@@ -43,7 +43,9 @@ export const BUSINESS_ZONES = [
 export type BusinessZone = (typeof BUSINESS_ZONES)[number]["id"];
 
 export function isBusinessZone(value: unknown): value is BusinessZone {
-  return typeof value === "string" && BUSINESS_ZONES.some((z) => z.id === value);
+  return (
+    typeof value === "string" && BUSINESS_ZONES.some((z) => z.id === value)
+  );
 }
 
 /** "Eastern (America/New_York)", "UTC". A zone off the list is named by its id. */
@@ -90,10 +92,21 @@ function wallAt(ms: number, zone: string): Wall {
   for (const part of wallFormat(zone).formatToParts(new Date(ms))) {
     if (part.type !== "literal") parts[part.type] = Number(part.value);
   }
-  const { year = 0, month = 1, day = 1, hour = 0, minute = 0, second = 0 } = parts;
+  const {
+    year = 0,
+    month = 1,
+    day = 1,
+    hour = 0,
+    minute = 0,
+    second = 0,
+  } = parts;
   const midnight = Date.UTC(year, month - 1, day);
   const sinceMidnight = ((hour * 60 + minute) * 60 + second) * 1000;
-  return { day: new Date(midnight).toISOString().slice(0, 10), sinceMidnight, asUtc: midnight + sinceMidnight };
+  return {
+    day: new Date(midnight).toISOString().slice(0, 10),
+    sinceMidnight,
+    asUtc: midnight + sinceMidnight,
+  };
 }
 
 /** The zone's offset from UTC at `ms`, in ms (-5 h in New York in winter). */
@@ -153,7 +166,11 @@ function firstInstantOf(day: string, zone: string, midnight: number): number {
  * Whole days from today to the day a sunset falls on, both in the zone: 1 the day before (renders stop at
  * midnight tonight), 0 or less once that day has come.
  */
-export function daysUntilSunset(sunsetAt: Date, now: Date, zone: string): number {
+export function daysUntilSunset(
+  sunsetAt: Date,
+  now: Date,
+  zone: string,
+): number {
   return daysBetween(todayIn(now, zone), sunsetDay(sunsetAt, zone));
 }
 
@@ -162,8 +179,12 @@ export function daysUntilSunset(sunsetAt: Date, now: Date, zone: string): number
  * in a record written before the business zone, the UTC date of its `sunsetAt`, which is what a sunset
  * date meant then. Null when it names neither.
  */
-export function recordedSunsetDay(record: { sunsetDay?: unknown; sunsetAt?: unknown }): string | null {
-  if (typeof record.sunsetDay === "string" && isCalendarDay(record.sunsetDay)) return record.sunsetDay;
+export function recordedSunsetDay(record: {
+  sunsetDay?: unknown;
+  sunsetAt?: unknown;
+}): string | null {
+  if (typeof record.sunsetDay === "string" && isCalendarDay(record.sunsetDay))
+    return record.sunsetDay;
   if (typeof record.sunsetAt !== "string") return null;
   const at = new Date(record.sunsetAt);
   return Number.isNaN(at.getTime()) ? null : at.toISOString().slice(0, 10);

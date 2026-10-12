@@ -13,7 +13,8 @@ const ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 export function blockId(scope: string, key: string): string {
   const rng = mulberry32(fnv1a(`${scope}:${key}`));
   let id = "b_";
-  for (let i = 0; i < 6; i++) id += ID_ALPHABET[Math.floor(rng() * ID_ALPHABET.length)];
+  for (let i = 0; i < 6; i++)
+    id += ID_ALPHABET[Math.floor(rng() * ID_ALPHABET.length)];
   return id;
 }
 
@@ -33,15 +34,25 @@ export function rich(source: string): JSONContent[] {
     const at = m.index ?? 0;
     if (at > last) out.push({ type: "text", text: source.slice(last, at) });
     if (m[1]) out.push({ type: "variable", attrs: { key: m[1] } });
-    else if (m[2]) out.push({ type: "text", text: m[2], marks: [{ type: "bold" }] });
-    else out.push({ type: "text", text: m[3], marks: [{ type: "link", attrs: { href: m[4] } }] });
+    else if (m[2])
+      out.push({ type: "text", text: m[2], marks: [{ type: "bold" }] });
+    else
+      out.push({
+        type: "text",
+        text: m[3],
+        marks: [{ type: "link", attrs: { href: m[4] } }],
+      });
     last = at + m[0].length;
   }
-  if (last < source.length) out.push({ type: "text", text: source.slice(last) });
+  if (last < source.length)
+    out.push({ type: "text", text: source.slice(last) });
   return out;
 }
 
-const paragraph = (source: string): JSONContent => ({ type: "paragraph", content: rich(source) });
+const paragraph = (source: string): JSONContent => ({
+  type: "paragraph",
+  content: rich(source),
+});
 
 /** A one-paragraph document: a one-line channel field (the email subject and preheader, a push title or body). */
 export function inlineDoc(source: string): JSONContent {
@@ -50,13 +61,19 @@ export function inlineDoc(source: string): JSONContent {
 
 /** A `lines` channel field (an SMS message): one paragraph, each line after the first behind a hard break. */
 export function linesDoc(...lines: string[]): JSONContent {
-  const content = lines.flatMap((line, i) => [...(i > 0 ? [{ type: "hardBreak" }] : []), ...rich(line)]);
+  const content = lines.flatMap((line, i) => [
+    ...(i > 0 ? [{ type: "hardBreak" }] : []),
+    ...rich(line),
+  ]);
   return { type: "doc", content: [{ type: "paragraph", content }] };
 }
 
 // ── Blocks ────────────────────────────────────────────────────
 
-export const p = (key: string, source: string): Block => ({ key, node: paragraph(source) });
+export const p = (key: string, source: string): Block => ({
+  key,
+  node: paragraph(source),
+});
 
 export const h3 = (key: string, title: string): Block => ({
   key,
@@ -67,7 +84,10 @@ export const ul = (key: string, items: string[]): Block => ({
   key,
   node: {
     type: "bulletList",
-    content: items.map((item) => ({ type: "listItem", content: [paragraph(item)] })),
+    content: items.map((item) => ({
+      type: "listItem",
+      content: [paragraph(item)],
+    })),
   },
 });
 
@@ -75,13 +95,20 @@ export const ol = (key: string, items: string[]): Block => ({
   key,
   node: {
     type: "orderedList",
-    content: items.map((item) => ({ type: "listItem", content: [paragraph(item)] })),
+    content: items.map((item) => ({
+      type: "listItem",
+      content: [paragraph(item)],
+    })),
   },
 });
 
 const cellAttrs = { colspan: 1, rowspan: 1, colwidth: null };
 
-export const table = (key: string, header: string[], rows: string[][]): Block => ({
+export const table = (
+  key: string,
+  header: string[],
+  rows: string[][],
+): Block => ({
   key,
   node: {
     type: "table",
@@ -111,7 +138,10 @@ export const callout = (key: string, ...paragraphs: string[]): Block => ({
   node: { type: "callout", content: paragraphs.map(paragraph) },
 });
 
-export const hr = (key: string): Block => ({ key, node: { type: "horizontalRule" } });
+export const hr = (key: string): Block => ({
+  key,
+  node: { type: "horizontalRule" },
+});
 
 // ── Required sections ─────────────────────────────────────────
 
@@ -143,7 +173,9 @@ export function buildDoc(scope: string, blocks: Block[]): JSONContent {
     const id = blockId(scope, key);
     const clash = seen.get(id);
     if (clash !== undefined) {
-      throw new Error(`Seed: block id clash in "${scope}": "${key}" and "${clash}" both hash to ${id}`);
+      throw new Error(
+        `Seed: block id clash in "${scope}": "${key}" and "${clash}" both hash to ${id}`,
+      );
     }
     seen.set(id, key);
     return { ...node, attrs: { id, ...node.attrs } };
@@ -176,9 +208,13 @@ export function disclosure(
 
 // ── Inspection (used by the seed's own sanity checks) ─────────
 
-export function variableKeys(node: JSONContent | null | undefined, out = new Set<string>()): Set<string> {
+export function variableKeys(
+  node: JSONContent | null | undefined,
+  out = new Set<string>(),
+): Set<string> {
   if (!node) return out;
-  if (node.type === "variable" && typeof node.attrs?.key === "string") out.add(node.attrs.key);
+  if (node.type === "variable" && typeof node.attrs?.key === "string")
+    out.add(node.attrs.key);
   node.content?.forEach((child) => variableKeys(child, out));
   return out;
 }
@@ -191,5 +227,7 @@ export function topLevelIds(doc: JSONContent): string[] {
 export function blockText(node: JSONContent | undefined): string {
   if (!node) return "";
   if (node.type === "text") return node.text ?? "";
-  return (node.content ?? []).map(blockText).join(node.type === "paragraph" ? "" : " ");
+  return (node.content ?? [])
+    .map(blockText)
+    .join(node.type === "paragraph" ? "" : " ");
 }

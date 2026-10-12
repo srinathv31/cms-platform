@@ -11,25 +11,54 @@ import type { Variable } from "../model/types";
 import { editorExtensions } from "../schema";
 import { createChipPopoverStore } from "../state/chip-popover";
 import { createEditorRootRuntime } from "../state/editor-root";
-import { blockPos, destroyEditors, doc, mountEditor, press, text } from "../testing/editor";
+import {
+  blockPos,
+  destroyEditors,
+  doc,
+  mountEditor,
+  press,
+  text,
+} from "../testing/editor";
 import { VARIABLE_DRAG_TYPE } from "./field-binding";
 
-const VARIABLES: Variable[] = [{ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }];
-const chipNode = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
+const VARIABLES: Variable[] = [
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+];
+const chipNode = (key: string): JSONContent => ({
+  type: "variable",
+  attrs: { key },
+});
 
 afterEach(destroyEditors);
 
-function setup(content: JSONContent = doc({ type: "paragraph", content: [text("Hi "), chipNode("first_name"), text(" there")] })) {
+function setup(
+  content: JSONContent = doc({
+    type: "paragraph",
+    content: [text("Hi "), chipNode("first_name"), text(" there")],
+  }),
+) {
   const root = createEditorRootRuntime({ variables: VARIABLES });
   root.registerField({ id: "body", label: "Document", kind: "body" });
   const chip = createChipPopoverStore();
   const editor = mountEditor(content, {
-    extensions: editorExtensions({ store: root.variables, binding: { fieldId: "body", kind: "body", root, chip } }),
+    extensions: editorExtensions({
+      store: root.variables,
+      binding: { fieldId: "body", kind: "body", root, chip },
+    }),
   });
   return { root, chip, editor: editor as Editor };
 }
 
-const selectChip = (editor: Editor) => editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 4)));
+const selectChip = (editor: Editor) =>
+  editor.view.dispatch(
+    editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 4)),
+  );
 
 describe("chip popover", () => {
   it("Enter or Space on a selected chip toggles it; Esc closes it", () => {
@@ -57,9 +86,20 @@ describe("chip popover", () => {
 
   it("a click on a chip opens it; moving the selection off the chip closes it", () => {
     const { editor, chip } = setup();
-    editor.view.someProp("handleClickOn", (f) => f(editor.view, 5, editor.state.doc.nodeAt(4)!, 4, new MouseEvent("click"), true));
+    editor.view.someProp("handleClickOn", (f) =>
+      f(
+        editor.view,
+        5,
+        editor.state.doc.nodeAt(4)!,
+        4,
+        new MouseEvent("click"),
+        true,
+      ),
+    );
     expect(chip.getState().pos).toBe(4);
-    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 2)));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 2)),
+    );
     expect(chip.getState().pos).toBeNull();
   });
 });
@@ -76,7 +116,9 @@ describe("focus and paste", () => {
   it("pasted HTML goes through the normalizer", () => {
     const { editor } = setup();
     editor.commands.setTextSelection(editor.state.doc.content.size - 1);
-    editor.view.pasteHTML('<p style="color:red"><span style="font-weight:700">Bold</span><o:p></o:p></p>');
+    editor.view.pasteHTML(
+      '<p style="color:red"><span style="font-weight:700">Bold</span><o:p></o:p></p>',
+    );
     const json = JSON.stringify(editor.getJSON());
     expect(json).toContain('"marks":[{"type":"bold"}]');
     expect(json).not.toContain("color");
@@ -86,22 +128,46 @@ describe("focus and paste", () => {
 // ── A panel drop, or a drop with nothing to parse, then a block move (handoff review I4, N6) ──────────────────────────────────────────
 
 /** A paragraph with a block id, as stored documents have them. */
-const block = (id: string, value: string): JSONContent => ({ type: "paragraph", attrs: { id }, content: [text(value)] });
+const block = (id: string, value: string): JSONContent => ({
+  type: "paragraph",
+  attrs: { id },
+  content: [text(value)],
+});
 
 /** A drop event as the browser sends it: the drag's data and how it may land. The test aims it with `aimAt`. */
-function dropEvent(data: Record<string, string>, effectAllowed: DataTransfer["effectAllowed"], files: File[] = []): DragEvent {
-  const event = new Event("drop", { bubbles: true, cancelable: true }) as DragEvent;
-  const types = files.length ? [...Object.keys(data), "Files"] : Object.keys(data);
-  const dataTransfer = { getData: (type: string) => data[type] ?? "", types, effectAllowed, files };
-  Object.defineProperties(event, { dataTransfer: { value: dataTransfer }, clientX: { value: 0 }, clientY: { value: 0 } });
+function dropEvent(
+  data: Record<string, string>,
+  effectAllowed: DataTransfer["effectAllowed"],
+  files: File[] = [],
+): DragEvent {
+  const event = new Event("drop", {
+    bubbles: true,
+    cancelable: true,
+  }) as DragEvent;
+  const types = files.length
+    ? [...Object.keys(data), "Files"]
+    : Object.keys(data);
+  const dataTransfer = {
+    getData: (type: string) => data[type] ?? "",
+    types,
+    effectAllowed,
+    files,
+  };
+  Object.defineProperties(event, {
+    dataTransfer: { value: dataTransfer },
+    clientX: { value: 0 },
+    clientY: { value: 0 },
+  });
   return event;
 }
 
 /** The drop lands at `pos` (happy-dom has no layout to aim with). */
-const aimAt = (editor: Editor, pos: number) => (editor.view.posAtCoords = () => ({ pos, inside: -1 }));
+const aimAt = (editor: Editor, pos: number) =>
+  (editor.view.posAtCoords = () => ({ pos, inside: -1 }));
 
 /** A drag begins on `element`. UniqueID and the paste rules watch `dragstart` on the window. */
-const startDrag = (element: Element) => element.dispatchEvent(new Event("dragstart", { bubbles: true }));
+const startDrag = (element: Element) =>
+  element.dispatchEvent(new Event("dragstart", { bubbles: true }));
 
 /** A panel row dragged from outside the editor and dropped at `pos`, with the data variables-panel.tsx gives it. */
 function dropFromPanel(editor: Editor, key: string, pos: number): DragEvent {
@@ -121,7 +187,9 @@ function dropFile(editor: Editor, pos: number): DragEvent {
   document.body.appendChild(row);
   startDrag(row);
   aimAt(editor, pos);
-  const event = dropEvent({}, "all", [new File(["%PDF"], "terms.pdf", { type: "application/pdf" })]);
+  const event = dropEvent({}, "all", [
+    new File(["%PDF"], "terms.pdf", { type: "application/pdf" }),
+  ]);
   editor.view.dom.dispatchEvent(event);
   row.remove();
   return event;
@@ -137,9 +205,16 @@ function moveBlockByGrip(editor: Editor, index: number, pos: number) {
   const handle = document.createElement("div");
   view.dom.parentElement!.appendChild(handle);
   startDrag(handle);
-  const selection = NodeSelection.create(view.state.doc, blockPos(editor, index));
+  const selection = NodeSelection.create(
+    view.state.doc,
+    blockPos(editor, index),
+  );
   view.dispatch(view.state.tr.setSelection(selection));
-  view.dragging = { slice: selection.content(), move: true, node: selection } as typeof view.dragging;
+  view.dragging = {
+    slice: selection.content(),
+    move: true,
+    node: selection,
+  } as typeof view.dragging;
   aimAt(editor, pos);
   view.dom.dispatchEvent(dropEvent({}, "uninitialized"));
   handle.remove();
@@ -161,7 +236,11 @@ function idsAndText(editor: Editor): [string, string][] {
 }
 
 describe("a panel drop, then a block move", () => {
-  const DOC = doc(block("b_one", "One"), block("b_two", "Two"), block("b_three", "Three"));
+  const DOC = doc(
+    block("b_one", "One"),
+    block("b_two", "Two"),
+    block("b_three", "Three"),
+  );
 
   it("the moved block keeps its id, so its comment threads stay on it", () => {
     const { editor } = setup(DOC);
@@ -209,7 +288,9 @@ describe("a panel drop, then a block move", () => {
     document.body.appendChild(row);
     startDrag(row);
     aimAt(editor, 4);
-    editor.view.dom.dispatchEvent(dropEvent({ "text/plain": " and more" }, "copy"));
+    editor.view.dom.dispatchEvent(
+      dropEvent({ "text/plain": " and more" }, "copy"),
+    );
     row.remove();
     expect(idsAndText(editor)[0]).toEqual(["b_one", "One and more"]);
   });

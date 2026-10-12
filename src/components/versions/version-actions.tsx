@@ -37,7 +37,10 @@ export interface VersionContext {
   nowIso: string;
 }
 
-type Item = Pick<VersionTimelineItem, "id" | "number" | "state" | "sunsetDay" | "sunsetPassed" | "revoke" | "can">;
+type Item = Pick<
+  VersionTimelineItem,
+  "id" | "number" | "state" | "sunsetDay" | "sunsetPassed" | "revoke" | "can"
+>;
 
 function pendingRevoke(item: Item): boolean {
   return !!item.revoke && !item.revoke.confirmedAt;
@@ -54,14 +57,21 @@ function focusWhenPresent(id: string, fallback: string, timeout = 1500) {
   const tick = () => {
     const target = byId(id);
     if (target) return target.focus();
-    if (performance.now() - start < timeout) return void requestAnimationFrame(tick);
+    if (performance.now() - start < timeout)
+      return void requestAnimationFrame(tick);
     byId(fallback)?.focus();
   };
   requestAnimationFrame(tick);
 }
 
 /** Set sunset (Superseded) and Revoke (Active or Superseded), at the head of the entry. */
-export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item }) {
+export function EntryActions({
+  ctx,
+  item,
+}: {
+  ctx: VersionContext;
+  item: Item;
+}) {
   const [sunsetOpen, setSunsetOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const sunsetButton = useRef<HTMLButtonElement>(null);
@@ -76,8 +86,14 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
   // A sunset is for a version that stays; while its revoke waits for a second approver, its fate is that.
   // Once the sunset has passed it stays where it is, disabled, saying why.
   const sunset = item.can.setSunset;
-  const showSunset = item.state === "superseded" && !revoking && (sunset.ok || item.sunsetPassed);
-  const canRevoke = (item.state === "active" || item.state === "superseded") && !revoking && item.can.startRevoke.ok;
+  const showSunset =
+    item.state === "superseded" &&
+    !revoking &&
+    (sunset.ok || item.sunsetPassed);
+  const canRevoke =
+    (item.state === "active" || item.state === "superseded") &&
+    !revoking &&
+    item.can.startRevoke.ok;
   if (!showSunset && !canRevoke) return null;
 
   const sunsetLabel = item.sunsetDay ? "Change sunset" : "Set sunset";
@@ -85,7 +101,11 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
       {showSunset && !sunset.ok ? (
-        <BlockedButton aria-label={`${sunsetLabel} for v${number}`} reason={sunset.reason} className="gap-1.5 bg-surface">
+        <BlockedButton
+          aria-label={`${sunsetLabel} for v${number}`}
+          reason={sunset.reason}
+          className="gap-1.5 bg-surface"
+        >
           <CalendarClock aria-hidden strokeWidth={1.75} />
           {sunsetLabel}
         </BlockedButton>
@@ -143,7 +163,9 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
               started.current = true;
               focusWhenPresent(headingId, headingId);
             }}
-            finalFocus={() => (started.current ? byId(headingId) : revokeButton.current)}
+            finalFocus={() =>
+              started.current ? byId(headingId) : revokeButton.current
+            }
           />
         </>
       ) : null}
@@ -152,7 +174,13 @@ export function EntryActions({ ctx, item }: { ctx: VersionContext; item: Item })
 }
 
 /** Confirm revoke and Withdraw revoke, inside a pending revoke's block. */
-export function RevokeBlockActions({ ctx, item }: { ctx: VersionContext; item: Item }) {
+export function RevokeBlockActions({
+  ctx,
+  item,
+}: {
+  ctx: VersionContext;
+  item: Item;
+}) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const { pending, error, run } = useActionRun();
   const confirmButton = useRef<HTMLButtonElement>(null);
@@ -172,10 +200,17 @@ export function RevokeBlockActions({ ctx, item }: { ctx: VersionContext; item: I
   const blocked = !confirm.ok ? confirm.reason : null;
 
   function withdraw() {
-    run(() => cancelRevoke({ templateId: ctx.templateId, versionNumber: number as number }), {
-      // The block is gone and the entry's Revoke button is back (once the refresh lands): focus goes to it.
-      onOk: () => focusWhenPresent(entryRevokeId(item.id), headingId),
-    });
+    run(
+      () =>
+        cancelRevoke({
+          templateId: ctx.templateId,
+          versionNumber: number as number,
+        }),
+      {
+        // The block is gone and the entry's Revoke button is back (once the refresh lands): focus goes to it.
+        onOk: () => focusWhenPresent(entryRevokeId(item.id), headingId),
+      },
+    );
   }
 
   return (
@@ -207,7 +242,13 @@ export function RevokeBlockActions({ ctx, item }: { ctx: VersionContext; item: I
             onClick={withdraw}
           >
             <span className={cn(pending && "invisible")}>Withdraw revoke</span>
-            {pending ? <Spinner aria-hidden role="presentation" className="absolute size-3.5" /> : null}
+            {pending ? (
+              <Spinner
+                aria-hidden
+                role="presentation"
+                className="absolute size-3.5"
+              />
+            ) : null}
           </Button>
         ) : null}
       </div>
@@ -236,7 +277,9 @@ export function RevokeBlockActions({ ctx, item }: { ctx: VersionContext; item: I
             confirmed.current = true;
             focusWhenPresent(headingId, headingId);
           }}
-          finalFocus={() => (confirmed.current ? byId(headingId) : confirmButton.current)}
+          finalFocus={() =>
+            confirmed.current ? byId(headingId) : confirmButton.current
+          }
         />
       ) : null}
     </div>

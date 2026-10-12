@@ -1,7 +1,13 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Panel } from "./panel";
-import { MIX_BOX_SKELETON, MIX_CARD, TEMPLATE_BARS_HEIGHT, USAGE_CELL, USAGE_COLUMNS } from "./template-usage";
+import {
+  MIX_BOX_SKELETON,
+  MIX_CARD,
+  TEMPLATE_BARS_HEIGHT,
+  USAGE_CELL,
+  USAGE_COLUMNS,
+} from "./template-usage";
 
 /** The Usage tab while it streams: the chart card, the two number cards, the channel card and the table's card. */
 export function TemplateUsageSkeleton() {
@@ -14,7 +20,10 @@ export function TemplateUsageSkeleton() {
             <Skeleton className="h-3 w-24" />
           </div>
           <div className="mt-2 h-5" />
-          <Skeleton className="mt-4 w-full" style={{ height: TEMPLATE_BARS_HEIGHT }} />
+          <Skeleton
+            className="mt-4 w-full"
+            style={{ height: TEMPLATE_BARS_HEIGHT }}
+          />
         </Panel>
         <div className="grid grid-rows-[auto_1fr] gap-6">
           <Panel>

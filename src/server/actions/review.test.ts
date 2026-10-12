@@ -3,7 +3,15 @@ import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { sunsetInstant } from "@/domain/business-zone";
 import { describeChanges, diffVariables } from "@/domain/contract";
 import { noticeView } from "@/domain/golive/notices";
@@ -20,10 +28,18 @@ import * as schema from "@/server/db/schema/ucomp";
 import { parseDraftPatchText } from "@/server/drafts/parse-patch";
 import { saveDraft } from "@/server/drafts/save-draft";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
-import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
+import {
+  getWorkspaceDocument,
+  getWorkspaceHeader,
+} from "@/server/queries/workspace";
 import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { findRound } from "@/server/queries/find-round";
-import { createTemplateWithDraft, draftRev, loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  createTemplateWithDraft,
+  draftRev,
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getReviewScreen } from "@/server/queries/review";
 import { addComment } from "./comments";
@@ -80,7 +96,8 @@ const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
-  for (const id of ["maya", "jordan", "alex", "priya", "sam", "morgan"]) people[id] = await loadPersona(db, id);
+  for (const id of ["maya", "jordan", "alex", "priya", "sam", "morgan"])
+    people[id] = await loadPersona(db, id);
 });
 
 // Every step happens a minute after the last, so rows are easy to tell apart. Every test starts from the
@@ -98,13 +115,25 @@ beforeEach(() => {
 });
 
 /** A version by number: the round given, or the number's head (its released row, else its latest round). */
-const version = (templateId: string, number: number, round?: number) => findRound(db, templateId, number, round);
+const version = (templateId: string, number: number, round?: number) =>
+  findRound(db, templateId, number, round);
 const draftOf = (templateId: string) =>
-  db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.state, "draft")) });
-const auditAt = (at: Date) => db.select().from(auditEvents).where(eq(auditEvents.at, at));
+  db.query.versions.findFirst({
+    where: and(
+      eq(versions.templateId, templateId),
+      eq(versions.state, "draft"),
+    ),
+  });
+const auditAt = (at: Date) =>
+  db.select().from(auditEvents).where(eq(auditEvents.at, at));
 const notificationsAt = (at: Date) =>
-  db.select().from(notifications).where(eq(notifications.createdAt, at)).orderBy(notifications.userId);
-const noticesAt = (at: Date) => db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, at));
+  db
+    .select()
+    .from(notifications)
+    .where(eq(notifications.createdAt, at))
+    .orderBy(notifications.userId);
+const noticesAt = (at: Date) =>
+  db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, at));
 
 const blockIds = (doc: { content?: { attrs?: Record<string, unknown> }[] }) =>
   (doc.content ?? []).map((b) => b.attrs?.id);
@@ -117,7 +146,13 @@ const submitNow = async (templateId: string, note?: string) =>
 async function edit(userId: string, templateId: string, text: string) {
   const at = as(userId);
   const draft = (await draftOf(templateId))!;
-  const body = { ...draft.body, content: [...(draft.body.content ?? []), { type: "paragraph", content: [{ type: "text", text }] }] };
+  const body = {
+    ...draft.body,
+    content: [
+      ...(draft.body.content ?? []),
+      { type: "paragraph", content: [{ type: "text", text }] },
+    ],
+  };
   const saved = await applyDraftPatch(db, {
     viewer: people[userId]!,
     versionId: draft.id,
@@ -146,7 +181,11 @@ describe("the review loop (scenario 3)", () => {
   /** Maya has submitted v1 with a note. */
   async function submitted() {
     as("maya");
-    expect(await submitNow(templateId, "  Ready for a look.  ")).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId, "  Ready for a look.  ")).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     settle();
   }
   /** Jordan has sent v1 back. */
@@ -154,7 +193,12 @@ describe("the review loop (scenario 3)", () => {
     await submitted();
     as("jordan");
     expect(
-      await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "The intro APR period doesn't match the product sheet." }),
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "The intro APR period doesn't match the product sheet.",
+      }),
     ).toEqual({ ok: true });
     settle();
   }
@@ -162,14 +206,24 @@ describe("the review loop (scenario 3)", () => {
   async function resubmitted() {
     await sentBack();
     as("maya");
-    expect(await submitDraft({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 1, round: 2 });
+    expect(
+      await submitDraft({ templateId, rev: await draftRev(db, templateId) }),
+    ).toEqual({ ok: true, number: 1, round: 2 });
     settle();
   }
   /** Jordan has approved round 2: v1 is Active. */
   async function approved() {
     await resubmitted();
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: ["typical"],
+      }),
+    ).toEqual({
       ok: true,
       wentLive: true,
       number: 1,
@@ -192,7 +246,9 @@ describe("the review loop (scenario 3)", () => {
       currentStage: 0,
       contractChanges: null,
     });
-    expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.submitted"]);
+    expect((await auditAt(at)).map((r) => r.action)).toEqual([
+      "version.submitted",
+    ]);
     const sent = await notificationsAt(at);
     expect(sent.map((n) => n.userId)).toEqual(["alex", "jordan"]);
     expect(sent[0]).toMatchObject({
@@ -206,7 +262,11 @@ describe("the review loop (scenario 3)", () => {
   it("a second submit is refused and writes nothing", async () => {
     await submitted();
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: false, code: "already_in_review", reason: "This version is already in review." });
+    expect(await submitNow(templateId)).toEqual({
+      ok: false,
+      code: "already_in_review",
+      reason: "This version is already in review.",
+    });
     expect(await auditAt(at)).toEqual([]);
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -214,11 +274,26 @@ describe("the review loop (scenario 3)", () => {
   it("Maya can't approve or request changes on her own version", async () => {
     await submitted();
     as("maya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: false,
       ...REASONS.ownVersion,
     });
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "x" })).toEqual({
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "x",
+      }),
+    ).toEqual({
       ok: false,
       ...REASONS.ownVersion,
     });
@@ -227,7 +302,14 @@ describe("the review loop (scenario 3)", () => {
   it("a change request needs a reason", async () => {
     await submitted();
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "   " })).toEqual({
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "   ",
+      }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.giveReason,
     });
@@ -238,13 +320,17 @@ describe("the review loop (scenario 3)", () => {
     await submitted();
     const at = as("jordan");
     const reason = "The intro APR period doesn't match the product sheet.";
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason })).toEqual({ ok: true });
+    expect(
+      await requestChanges({ templateId, versionNumber: 1, round: 1, reason }),
+    ).toEqual({ ok: true });
     expect(refresh).toHaveBeenCalledTimes(1);
 
     const v1 = (await version(templateId, 1))!;
     expect(v1.state).toBe("changes_requested");
 
-    expect(await db.select().from(approvals).where(eq(approvals.versionId, v1.id))).toEqual([
+    expect(
+      await db.select().from(approvals).where(eq(approvals.versionId, v1.id)),
+    ).toEqual([
       expect.objectContaining({
         stagePosition: 0,
         stageName: "Team approver",
@@ -256,21 +342,44 @@ describe("the review loop (scenario 3)", () => {
     ]);
 
     const draft = (await draftOf(templateId))!;
-    expect(draft).toMatchObject({ number: null, round: null, basedOnVersionId: v1.id, createdBy: "maya", rev: 0 });
+    expect(draft).toMatchObject({
+      number: null,
+      round: null,
+      basedOnVersionId: v1.id,
+      createdBy: "maya",
+      rev: 0,
+    });
     expect(blockIds(draft.body)).toEqual(blockIds(v1.body));
 
-    const [thread] = await db.select().from(commentThreads).where(eq(commentThreads.originVersionId, v1.id));
-    expect(thread).toMatchObject({ blockId: DOCUMENT_THREAD, quote: null, status: "open", templateId });
-    expect(await db.select().from(comments).where(eq(comments.threadId, thread!.id))).toEqual([
-      expect.objectContaining({ authorId: "jordan", body: reason, kind: "change_request" }),
+    const [thread] = await db
+      .select()
+      .from(commentThreads)
+      .where(eq(commentThreads.originVersionId, v1.id));
+    expect(thread).toMatchObject({
+      blockId: DOCUMENT_THREAD,
+      quote: null,
+      status: "open",
+      templateId,
+    });
+    expect(
+      await db.select().from(comments).where(eq(comments.threadId, thread!.id)),
+    ).toEqual([
+      expect.objectContaining({
+        authorId: "jordan",
+        body: reason,
+        kind: "change_request",
+      }),
     ]);
 
-    expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.changes_requested"]);
+    expect((await auditAt(at)).map((r) => r.action)).toEqual([
+      "version.changes_requested",
+    ]);
     expect(await notificationsAt(at)).toEqual([
       expect.objectContaining({
         userId: "maya",
         kind: "changes_requested",
-        title: "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 1.",
+        title:
+          "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 1.",
         href: `/coral-offers/templates/${templateId}`,
       }),
     ]);
@@ -279,28 +388,43 @@ describe("the review loop (scenario 3)", () => {
   it("a second change request (a double click) is refused and writes nothing", async () => {
     await sentBack();
     const at = as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Again" })).toEqual({
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "Again",
+      }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
     expect(await auditAt(at)).toEqual([]);
     const v1 = (await version(templateId, 1))!;
-    expect(await db.select().from(approvals).where(eq(approvals.versionId, v1.id))).toHaveLength(1);
+    expect(
+      await db.select().from(approvals).where(eq(approvals.versionId, v1.id)),
+    ).toHaveLength(1);
   });
 
   it("Maya resubmits as v1, round 2 (through the Phase 3 name, submitDraft): a send-back uses up no number", async () => {
     await sentBack();
     const at = as("maya");
-    expect(await submitDraft({ templateId, rev: await draftRev(db, templateId) })).toEqual({ ok: true, number: 1, round: 2 });
+    expect(
+      await submitDraft({ templateId, rev: await draftRev(db, templateId) }),
+    ).toEqual({ ok: true, number: 1, round: 2 });
     expect((await version(templateId, 1, 2))?.state).toBe("in_review");
-    expect((await version(templateId, 1, 1))?.state, "round 1 stays the record it was").toBe("changes_requested");
+    expect(
+      (await version(templateId, 1, 1))?.state,
+      "round 1 stays the record it was",
+    ).toBe("changes_requested");
     expect(await version(templateId, 2)).toBeUndefined();
     // The approvers' link names the round: the bare URL is the number's head, which round 2 now is anyway.
     const sent = await notificationsAt(at);
     expect(sent.map((n) => n.userId)).toEqual(["alex", "jordan"]);
     expect(sent[0]).toMatchObject({
       kind: "review_requested",
-      title: "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review.",
+      title:
+        "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review.",
       href: `/coral-offers/review/${templateId}/1?round=2`,
     });
   });
@@ -308,11 +432,26 @@ describe("the review loop (scenario 3)", () => {
   it("approving round 1 after round 2 exists is refused: it isn't in review", async () => {
     await resubmitted();
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Again" })).toEqual({
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "Again",
+      }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
@@ -323,7 +462,15 @@ describe("the review loop (scenario 3)", () => {
   it("a round that doesn't exist is refused like a forbidden one", async () => {
     await resubmitted();
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 3, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 3,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: false,
       ...REASONS.generic,
     });
@@ -334,22 +481,49 @@ describe("the review loop (scenario 3)", () => {
     await resubmitted();
     const at = as("jordan");
     const before = (await version(templateId, 1, 2))!;
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["pdf"], sampleSetsSeen: ["typical"] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: ["pdf"],
+        sampleSetsSeen: ["typical"],
+      }),
+    ).toEqual({
       ok: false,
       code: "output_not_viewed",
       reason: "Preview Web first.",
     });
     // An output of another channel doesn't stand in for one of this round's.
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["email", "sms"], sampleSetsSeen: [] })).toMatchObject({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: ["email", "sms"],
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({
       ok: false,
       code: "output_not_viewed",
     });
     // A key that isn't an output doesn't parse.
     expect(
-      await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["push"] as unknown as typeof OUTPUT_KEYS, sampleSetsSeen: [] }),
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: ["push"] as unknown as typeof OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
     ).toMatchObject({ ok: false, code: "invalid_input" });
     expect(await version(templateId, 1, 2)).toEqual(before);
-    expect(await db.select().from(approvals).where(eq(approvals.versionId, before.id))).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(approvals)
+        .where(eq(approvals.versionId, before.id)),
+    ).toEqual([]);
     expect(await auditAt(at)).toEqual([]);
     expect(await notificationsAt(at)).toEqual([]);
     expect(refresh).not.toHaveBeenCalled();
@@ -358,20 +532,50 @@ describe("the review loop (scenario 3)", () => {
   it("Jordan approves v1, round 2: it goes live as v1 and Maya hears about it", async () => {
     await resubmitted();
     const at = as("jordan");
-    const result = await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: ["web", "pdf", "web"], sampleSetsSeen: ["typical", "long", "typical"] });
+    const result = await approveVersion({
+      templateId,
+      versionNumber: 1,
+      round: 2,
+      outputsViewed: ["web", "pdf", "web"],
+      sampleSetsSeen: ["typical", "long", "typical"],
+    });
     expect(result).toEqual({ ok: true, wentLive: true, number: 1, round: 2 });
     expect(refresh).toHaveBeenCalledTimes(1);
 
     const v1 = (await version(templateId, 1))!;
-    expect(v1).toMatchObject({ round: 2, state: "active", activatedAt: at, currentStage: 0 });
-    expect(await db.select().from(approvals).where(eq(approvals.versionId, v1.id))).toEqual([
-      expect.objectContaining({ decision: "approved", actorId: "jordan", sampleSetsSeen: ["typical", "long"] }),
+    expect(v1).toMatchObject({
+      round: 2,
+      state: "active",
+      activatedAt: at,
+      currentStage: 0,
+    });
+    expect(
+      await db.select().from(approvals).where(eq(approvals.versionId, v1.id)),
+    ).toEqual([
+      expect.objectContaining({
+        decision: "approved",
+        actorId: "jordan",
+        sampleSetsSeen: ["typical", "long"],
+      }),
     ]);
     expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
-      ["version.activated", { number: 1, round: 2, supersedes: null, stage: "Team approver", outputsViewed: ["pdf", "web"] }],
+      [
+        "version.activated",
+        {
+          number: 1,
+          round: 2,
+          supersedes: null,
+          stage: "Team approver",
+          outputsViewed: ["pdf", "web"],
+        },
+      ],
     ]);
     expect(await notificationsAt(at)).toEqual([
-      expect.objectContaining({ userId: "maya", kind: "version_live", title: "Spring Travel Rewards — Terms v1 is now Active." }),
+      expect.objectContaining({
+        userId: "maya",
+        kind: "version_live",
+        title: "Spring Travel Rewards — Terms v1 is now Active.",
+      }),
     ]);
     // Nobody renders a brand-new template yet: no consumer notices.
     expect(await noticesAt(at)).toEqual([]);
@@ -380,7 +584,15 @@ describe("the review loop (scenario 3)", () => {
   it("a second approve is refused", async () => {
     await approved();
     as("alex");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.notInReview,
     });
@@ -389,9 +601,22 @@ describe("the review loop (scenario 3)", () => {
   it("the database holds one released row per number: a second fails the index", async () => {
     await approved();
     const v1 = (await version(templateId, 1))!;
-    await expect(db.insert(versions).values({ ...v1, id: `v_dup_${templateId}`, round: 3, state: "superseded" })).rejects.toThrow();
+    await expect(
+      db.insert(versions).values({
+        ...v1,
+        id: `v_dup_${templateId}`,
+        round: 3,
+        state: "superseded",
+      }),
+    ).rejects.toThrow();
     // And one row per round.
-    await expect(db.insert(versions).values({ ...v1, id: `v_dup2_${templateId}`, state: "changes_requested" })).rejects.toThrow();
+    await expect(
+      db.insert(versions).values({
+        ...v1,
+        id: `v_dup2_${templateId}`,
+        state: "changes_requested",
+      }),
+    ).rejects.toThrow();
   });
 });
 
@@ -403,9 +628,14 @@ describe("resubmitting answers the change request", () => {
   let blockThreadId: string;
   let firstRequestId: string;
 
-  const threadsOf = (id: string) => db.select().from(commentThreads).where(eq(commentThreads.templateId, id));
-  const threadRow = (id: string) => db.query.commentThreads.findFirst({ where: eq(commentThreads.id, id) });
-  const resolvedAudit = (at: Date) => auditAt(at).then((rows) => rows.filter((r) => r.action === "thread.resolved"));
+  const threadsOf = (id: string) =>
+    db.select().from(commentThreads).where(eq(commentThreads.templateId, id));
+  const threadRow = (id: string) =>
+    db.query.commentThreads.findFirst({ where: eq(commentThreads.id, id) });
+  const resolvedAudit = (at: Date) =>
+    auditAt(at).then((rows) =>
+      rows.filter((r) => r.action === "thread.resolved"),
+    );
 
   // Maya submitted; Jordan left a block comment and then asked for changes on the whole version.
   beforeEach(async () => {
@@ -429,16 +659,33 @@ describe("resubmitting answers the change request", () => {
     });
     if (!block.ok) throw new Error(block.reason);
     blockThreadId = block.threadId;
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "The intro APR doesn't match." })).toEqual({ ok: true });
-    const request = (await threadsOf(templateId)).find((t) => t.blockId === DOCUMENT_THREAD)!;
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "The intro APR doesn't match.",
+      }),
+    ).toEqual({ ok: true });
+    const request = (await threadsOf(templateId)).find(
+      (t) => t.blockId === DOCUMENT_THREAD,
+    )!;
     firstRequestId = request.id;
-    expect(request).toMatchObject({ status: "open", resolvedBy: null, resolvedAt: null });
+    expect(request).toMatchObject({
+      status: "open",
+      resolvedBy: null,
+      resolvedAt: null,
+    });
   });
 
   /** Maya resubmits as round 2; returns the submit time. */
   async function resubmit() {
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 2,
+    });
     return at;
   }
 
@@ -463,11 +710,20 @@ describe("resubmitting answers the change request", () => {
         templateId,
         versionId: v1Id,
         action: "thread.resolved",
-        details: { threadId: firstRequestId, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: 1, resolvedWithRound: 2 },
+        details: {
+          threadId: firstRequestId,
+          blockId: DOCUMENT_THREAD,
+          auto: true,
+          resolvedWith: 1,
+          resolvedWithRound: 2,
+        },
       }),
     ]);
     // The submit's own audit row is still there beside it.
-    expect((await auditAt(resolvedAt)).map((r) => r.action).sort()).toEqual(["thread.resolved", "version.submitted"]);
+    expect((await auditAt(resolvedAt)).map((r) => r.action).sort()).toEqual([
+      "thread.resolved",
+      "version.submitted",
+    ]);
   });
 
   it("leaves the block comment open", async () => {
@@ -483,26 +739,62 @@ describe("resubmitting answers the change request", () => {
   it("a second cycle resolves only the new change request", async () => {
     const resolvedAt = await resubmit();
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "One more fix, please." })).toEqual({ ok: true });
-    const second = (await threadsOf(templateId)).find((t) => t.blockId === DOCUMENT_THREAD && t.status === "open")!;
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        reason: "One more fix, please.",
+      }),
+    ).toEqual({ ok: true });
+    const second = (await threadsOf(templateId)).find(
+      (t) => t.blockId === DOCUMENT_THREAD && t.status === "open",
+    )!;
     expect(second.id).not.toBe(firstRequestId);
 
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 3 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 3,
+    });
 
-    expect(await threadRow(second.id)).toMatchObject({ status: "resolved", resolvedBy: "maya", resolvedAt: at });
+    expect(await threadRow(second.id)).toMatchObject({
+      status: "resolved",
+      resolvedBy: "maya",
+      resolvedAt: at,
+    });
     // The first request keeps the moment it was answered; the block comment is still open.
-    expect(await threadRow(firstRequestId)).toMatchObject({ status: "resolved", resolvedBy: "maya", resolvedAt });
+    expect(await threadRow(firstRequestId)).toMatchObject({
+      status: "resolved",
+      resolvedBy: "maya",
+      resolvedAt,
+    });
     expect(await threadRow(blockThreadId)).toMatchObject({ status: "open" });
 
-    expect((await resolvedAudit(at)).map((r) => [r.versionId, r.details])).toEqual([
-      [second.originVersionId, { threadId: second.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: 1, resolvedWithRound: 3 }],
+    expect(
+      (await resolvedAudit(at)).map((r) => [r.versionId, r.details]),
+    ).toEqual([
+      [
+        second.originVersionId,
+        {
+          threadId: second.id,
+          blockId: DOCUMENT_THREAD,
+          auto: true,
+          resolvedWith: 1,
+          resolvedWithRound: 3,
+        },
+      ],
     ]);
     expect(await resolvedAudit(resolvedAt)).toHaveLength(1);
   });
 
   it("a submit with no open change request writes no thread.resolved row", async () => {
-    const { templateId: fresh } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId: fresh } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     const at = as("maya");
     expect(await submitNow(fresh)).toEqual({ ok: true, number: 1, round: 1 });
     expect(await resolvedAudit(at)).toEqual([]);
@@ -518,11 +810,24 @@ describe("approveVersion over an Active version", () => {
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
 
     // The seed's v3 is in review on round 2, after round 1 was sent back.
-    const result = await approveVersion({ templateId, versionNumber: 3, round: 2, sunsetPrevious: sunset, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] });
+    const result = await approveVersion({
+      templateId,
+      versionNumber: 3,
+      round: 2,
+      sunsetPrevious: sunset,
+      outputsViewed: OUTPUT_KEYS,
+      sampleSetsSeen: ["typical"],
+    });
     expect(result).toEqual({ ok: true, wentLive: true, number: 3, round: 2 });
 
-    expect(await version(templateId, 3)).toMatchObject({ round: 2, state: "active", activatedAt: at });
-    expect(await version(templateId, 3, 1)).toMatchObject({ state: "changes_requested" });
+    expect(await version(templateId, 3)).toMatchObject({
+      round: 2,
+      state: "active",
+      activatedAt: at,
+    });
+    expect(await version(templateId, 3, 1)).toMatchObject({
+      state: "changes_requested",
+    });
     expect(await version(templateId, 2)).toMatchObject({
       state: "superseded",
       supersededAt: at,
@@ -548,18 +853,40 @@ describe("approveVersion over an Active version", () => {
   });
 
   it("refuses a sunset date that isn't after today, and one that isn't a date", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     as("maya");
     await submitNow(templateId);
     const at = as("jordan");
     const today = at.toISOString().slice(0, 10);
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: "2026-02-30", outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        sunsetPrevious: "2026-02-30",
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: false,
       code: "invalid_date",
       reason: "Pick a valid date.",
     });
     // No Active version to sunset here, but the date is still checked.
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, sunsetPrevious: today, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        sunsetPrevious: today,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.sunsetAfterToday,
     });
@@ -581,33 +908,73 @@ describe("a two-stage chain", () => {
   });
 
   it("moves through the stages in order; only the named approver acts on Legal", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
 
     const first = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: ["typical"],
+      }),
+    ).toEqual({
       ok: true,
       wentLive: false,
       number: 1,
       round: 1,
     });
-    expect(await version(templateId, 1)).toMatchObject({ state: "in_review", currentStage: 1, activatedAt: null });
-    expect((await auditAt(first)).map((r) => r.action)).toEqual(["version.stage_approved"]);
-    expect((await notificationsAt(first)).map((n) => [n.userId, n.kind])).toEqual([
+    expect(await version(templateId, 1)).toMatchObject({
+      state: "in_review",
+      currentStage: 1,
+      activatedAt: null,
+    });
+    expect((await auditAt(first)).map((r) => r.action)).toEqual([
+      "version.stage_approved",
+    ]);
+    expect(
+      (await notificationsAt(first)).map((n) => [n.userId, n.kind]),
+    ).toEqual([
       ["alex", "review_requested"],
       ["maya", "stage_approved"],
     ]);
 
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: false,
       code: "waiting_on_stage",
       reason: "Waiting on Legal.",
     });
 
     as("alex");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: true,
       wentLive: true,
       number: 1,
@@ -616,7 +983,9 @@ describe("a two-stage chain", () => {
     const v1 = (await version(templateId, 1))!;
     expect(v1.state).toBe("active");
     expect(
-      (await db.select().from(approvals).where(eq(approvals.versionId, v1.id))).map((a) => [a.stageName, a.actorId]),
+      (
+        await db.select().from(approvals).where(eq(approvals.versionId, v1.id))
+      ).map((a) => [a.stageName, a.actorId]),
     ).toEqual([
       ["Team approver", "jordan"],
       ["Legal", "alex"],
@@ -633,8 +1002,15 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     const [m] = await db
       .select({ id: memberships.id })
       .from(memberships)
-      .where(and(eq(memberships.userId, "priya"), eq(memberships.teamId, "coral-offers")));
-    await db.insert(membershipRoles).values({ membershipId: m!.id, role: "approver" });
+      .where(
+        and(
+          eq(memberships.userId, "priya"),
+          eq(memberships.teamId, "coral-offers"),
+        ),
+      );
+    await db
+      .insert(membershipRoles)
+      .values({ membershipId: m!.id, role: "approver" });
     people.priya = await loadPersona(db, "priya");
   });
   afterEach(async () => {
@@ -643,32 +1019,68 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   const wrote = { ok: false, ...REASONS.wroteVersion };
   const decisionsOn = async (templateId: string, number: number) =>
-    db.select().from(approvals).where(eq(approvals.versionId, (await version(templateId, number))!.id));
+    db
+      .select()
+      .from(approvals)
+      .where(eq(approvals.versionId, (await version(templateId, number))!.id));
 
   it("Priya edits Maya's draft and Maya submits it: Priya can neither approve nor send it back", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     await edit("priya", templateId, "Priya's sentence.");
     expect((await draftOf(templateId))?.writers).toEqual(["maya", "priya"]);
 
     const submittedAt = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
     // Priya holds Approver, but she isn't asked to review what she wrote.
-    expect((await notificationsAt(submittedAt)).map((n) => [n.userId, n.kind])).toEqual([
+    expect(
+      (await notificationsAt(submittedAt)).map((n) => [n.userId, n.kind]),
+    ).toEqual([
       ["alex", "review_requested"],
       ["jordan", "review_requested"],
     ]);
 
     const at = as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Mine to fix." })).toEqual(wrote);
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual(wrote);
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "Mine to fix.",
+      }),
+    ).toEqual(wrote);
     expect(await version(templateId, 1)).toMatchObject({ state: "in_review" });
     expect(await decisionsOn(templateId, 1)).toEqual([]);
     expect(await auditAt(at)).toEqual([]);
 
     // Jordan wrote none of it.
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual({
       ok: true,
       wentLive: true,
       number: 1,
@@ -677,53 +1089,149 @@ describe("maker-checker: nobody decides a version they wrote", () => {
   });
 
   it("writers carry across a change request; the approver who asked can approve the next round", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     await edit("priya", templateId, "Priya's sentence.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
 
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
-    expect(await draftOf(templateId)).toMatchObject({ createdBy: "maya", writers: ["maya", "priya"] });
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "Spell out the APR.",
+      }),
+    ).toEqual({ ok: true });
+    expect(await draftOf(templateId)).toMatchObject({
+      createdBy: "maya",
+      writers: ["maya", "priya"],
+    });
 
     // Maya fixes it alone and resubmits: Priya wrote round one, so round two isn't hers to decide either.
     await edit("maya", templateId, "The APR is 21.99%.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
-    expect((await version(templateId, 1, 2))?.writers).toEqual(["maya", "priya"]);
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 2,
+    });
+    expect((await version(templateId, 1, 2))?.writers).toEqual([
+      "maya",
+      "priya",
+    ]);
 
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "x" })).toEqual(wrote);
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual(wrote);
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        reason: "x",
+      }),
+    ).toEqual(wrote);
 
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({ ok: true, wentLive: true });
   });
 
   it("whoever submitted round one stays barred from round two, even without editing it", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     as("priya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     expect((await version(templateId, 1))?.writers).toEqual(["maya", "priya"]);
 
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "Spell out the APR.",
+      }),
+    ).toEqual({ ok: true });
     await edit("maya", templateId, "The APR is 21.99%.");
     const resubmitted = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
-    expect(await version(templateId, 1, 2)).toMatchObject({ submittedBy: "maya", writers: ["maya", "priya"] });
-    expect((await notificationsAt(resubmitted)).map((n) => n.userId)).toEqual(["alex", "jordan"]);
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 2,
+    });
+    expect(await version(templateId, 1, 2)).toMatchObject({
+      submittedBy: "maya",
+      writers: ["maya", "priya"],
+    });
+    expect((await notificationsAt(resubmitted)).map((n) => n.userId)).toEqual([
+      "alex",
+      "jordan",
+    ]);
 
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 2, reason: "x" })).toEqual(wrote);
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual(wrote);
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        reason: "x",
+      }),
+    ).toEqual(wrote);
   });
 
   it("a change request that finds a draft already open merges the version's writers into it", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     await edit("priya", templateId, "Priya's sentence.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     // Nothing in the app opens a draft while a version is in review; put one there to check the guard.
     const v1 = (await version(templateId, 1))!;
     await db.insert(versions).values({
@@ -740,27 +1248,65 @@ describe("maker-checker: nobody decides a version they wrote", () => {
     });
 
     as("jordan");
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "Spell out the APR.",
+      }),
+    ).toEqual({ ok: true });
     const drafts = await db
       .select({ id: versions.id, writers: versions.writers })
       .from(versions)
-      .where(and(eq(versions.templateId, templateId), eq(versions.state, "draft")));
-    expect(drafts).toEqual([{ id: `v_open_${templateId}`, writers: ["maya", "priya"] }]);
+      .where(
+        and(eq(versions.templateId, templateId), eq(versions.state, "draft")),
+      );
+    expect(drafts).toEqual([
+      { id: `v_open_${templateId}`, writers: ["maya", "priya"] },
+    ]);
   });
 
   it("an approver who only sent it back becomes a writer once they edit the next round", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     as("priya");
-    expect(await requestChanges({ templateId, versionNumber: 1, round: 1, reason: "Too vague." })).toEqual({ ok: true });
+    expect(
+      await requestChanges({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        reason: "Too vague.",
+      }),
+    ).toEqual({ ok: true });
     expect((await draftOf(templateId))?.writers).toEqual(["maya"]);
 
     await edit("priya", templateId, "Priya's fix.");
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 2 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 2,
+    });
     as("priya");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 2, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toEqual(wrote);
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 2,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toEqual(wrote);
   });
 });
 
@@ -771,18 +1317,26 @@ describe("setSunset", () => {
     const templateId = ids["balance-transfer"]!;
     const at = as("alex");
     const day = new Date(at.getTime() + 30 * DAY).toISOString().slice(0, 10);
-    expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: day })).toEqual({ ok: true });
+    expect(
+      await setSunset({ templateId, versionNumber: 1, sunsetAt: day }),
+    ).toEqual({ ok: true });
     expect(await version(templateId, 1)).toMatchObject({
       sunsetAt: sunsetInstant(day, "America/New_York"),
       sunsetSetBy: "alex",
     });
-    expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.sunset_set"]);
-    expect((await noticesAt(at)).map((n) => [n.consumerId, n.kind])).toEqual([["coral", "sunset_scheduled"]]);
+    expect((await auditAt(at)).map((r) => r.action)).toEqual([
+      "version.sunset_set",
+    ]);
+    expect((await noticesAt(at)).map((n) => [n.consumerId, n.kind])).toEqual([
+      ["coral", "sunset_scheduled"],
+    ]);
     expect(refresh).toHaveBeenCalledTimes(1);
 
     // The same date again (a double click) writes nothing.
     const again = as("alex");
-    expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: day })).toEqual({ ok: true });
+    expect(
+      await setSunset({ templateId, versionNumber: 1, sunsetAt: day }),
+    ).toEqual({ ok: true });
     expect(await auditAt(again)).toEqual([]);
     expect(await noticesAt(again)).toEqual([]);
   });
@@ -794,31 +1348,70 @@ describe("setSunset", () => {
 
     it("stores 00:00 Eastern on the day picked, and records the day and the zone", async () => {
       const at = as("alex");
-      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2027-03-01" })).toEqual({ ok: true });
+      expect(
+        await setSunset({
+          templateId: templateId(),
+          versionNumber: 1,
+          sunsetAt: "2027-03-01",
+        }),
+      ).toEqual({ ok: true });
       // 00:00 EST is 05:00 UTC; midnight UTC would be 7 PM Eastern on February 28.
-      expect((await version(templateId(), 1))!.sunsetAt).toEqual(new Date("2027-03-01T05:00:00.000Z"));
+      expect((await version(templateId(), 1))!.sunsetAt).toEqual(
+        new Date("2027-03-01T05:00:00.000Z"),
+      );
       const [audit] = await auditAt(at);
-      expect(audit!.details).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" });
+      expect(audit!.details).toMatchObject({
+        sunsetAt: "2027-03-01T05:00:00.000Z",
+        sunsetDay: "2027-03-01",
+        zone: "America/New_York",
+      });
       const [notice] = await noticesAt(at);
-      expect(notice!.payload).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01" });
+      expect(notice!.payload).toMatchObject({
+        sunsetAt: "2027-03-01T05:00:00.000Z",
+        sunsetDay: "2027-03-01",
+      });
     });
 
     it("stores 00:00 in the zone Platform settings name", async () => {
-      await db.insert(settings).values({ key: "business_zone", value: "America/Los_Angeles" });
+      await db
+        .insert(settings)
+        .values({ key: "business_zone", value: "America/Los_Angeles" });
       as("alex");
-      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2027-03-01" })).toEqual({ ok: true });
-      expect((await version(templateId(), 1))!.sunsetAt).toEqual(new Date("2027-03-01T08:00:00.000Z")); // 00:00 PST
+      expect(
+        await setSunset({
+          templateId: templateId(),
+          versionNumber: 1,
+          sunsetAt: "2027-03-01",
+        }),
+      ).toEqual({ ok: true });
+      expect((await version(templateId(), 1))!.sunsetAt).toEqual(
+        new Date("2027-03-01T08:00:00.000Z"),
+      ); // 00:00 PST
     });
 
     it("reads 'after today' there: at 23:30 Eastern, the next day is still after today", async () => {
       as("alex");
       env.now = new Date("2026-10-05T03:30:00.000Z"); // 23:30 EDT on October 4; already the 5th in UTC
-      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2026-10-04" })).toEqual({
+      expect(
+        await setSunset({
+          templateId: templateId(),
+          versionNumber: 1,
+          sunsetAt: "2026-10-04",
+        }),
+      ).toEqual({
         ok: false,
         ...REFUSALS.sunsetAfterToday,
       });
-      expect(await setSunset({ templateId: templateId(), versionNumber: 1, sunsetAt: "2026-10-05" })).toEqual({ ok: true });
-      expect((await version(templateId(), 1))!.sunsetAt).toEqual(new Date("2026-10-05T04:00:00.000Z")); // in half an hour
+      expect(
+        await setSunset({
+          templateId: templateId(),
+          versionNumber: 1,
+          sunsetAt: "2026-10-05",
+        }),
+      ).toEqual({ ok: true });
+      expect((await version(templateId(), 1))!.sunsetAt).toEqual(
+        new Date("2026-10-05T04:00:00.000Z"),
+      ); // in half an hour
     });
   });
 
@@ -826,21 +1419,29 @@ describe("setSunset", () => {
     const templateId = ids["balance-transfer"]!;
     const at = as("jordan");
     const later = new Date(at.getTime() + 40 * DAY).toISOString().slice(0, 10);
-    expect(await setSunset({ templateId, versionNumber: 2, sunsetAt: later })).toEqual({
+    expect(
+      await setSunset({ templateId, versionNumber: 2, sunsetAt: later }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.sunsetNotSuperseded,
     });
-    expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: "2026-01-01" })).toEqual({
+    expect(
+      await setSunset({ templateId, versionNumber: 1, sunsetAt: "2026-01-01" }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.sunsetAfterToday,
     });
-    expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: "soon" })).toEqual({
+    expect(
+      await setSunset({ templateId, versionNumber: 1, sunsetAt: "soon" }),
+    ).toEqual({
       ok: false,
       code: "invalid_date",
       reason: "Pick a valid date.",
     });
     as("maya");
-    expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: later })).toEqual({
+    expect(
+      await setSunset({ templateId, versionNumber: 1, sunsetAt: later }),
+    ).toEqual({
       ok: false,
       ...REASONS.generic,
     });
@@ -848,22 +1449,40 @@ describe("setSunset", () => {
 
   it("refuses a new date once the sunset has passed, and writes nothing", async () => {
     const templateId = ids["balance-transfer"]!;
-    const where = and(eq(versions.templateId, templateId), eq(versions.number, 1));
+    const where = and(
+      eq(versions.templateId, templateId),
+      eq(versions.number, 1),
+    );
     const before = (await version(templateId, 1))!;
     const at = as("jordan");
     // Yesterday's midnight in the business time zone, as a date picked in the dialog is stored.
-    const passed = sunsetInstant(new Date(at.getTime() - DAY).toISOString().slice(0, 10), "America/New_York");
+    const passed = sunsetInstant(
+      new Date(at.getTime() - DAY).toISOString().slice(0, 10),
+      "America/New_York",
+    );
     await db.update(versions).set({ sunsetAt: passed }).where(where);
     try {
       const { rev } = (await version(templateId, 1))!;
       // Any date, the one it already has included (that is no double click: the date is final).
-      for (const day of [1, 40].map((n) => new Date(at.getTime() + n * DAY)).concat(passed)) {
-        expect(await setSunset({ templateId, versionNumber: 1, sunsetAt: day.toISOString().slice(0, 10) })).toEqual({
+      for (const day of [1, 40]
+        .map((n) => new Date(at.getTime() + n * DAY))
+        .concat(passed)) {
+        expect(
+          await setSunset({
+            templateId,
+            versionNumber: 1,
+            sunsetAt: day.toISOString().slice(0, 10),
+          }),
+        ).toEqual({
           ok: false,
           ...REFUSALS.sunsetPassed,
         });
       }
-      expect(await version(templateId, 1)).toMatchObject({ state: "superseded", sunsetAt: passed, rev });
+      expect(await version(templateId, 1)).toMatchObject({
+        state: "superseded",
+        sunsetAt: passed,
+        rev,
+      });
       expect(await auditAt(at)).toEqual([]);
       expect(await noticesAt(at)).toEqual([]);
       expect(await notificationsAt(at)).toEqual([]);
@@ -882,25 +1501,46 @@ describe("the two-person revoke (scenario 6)", () => {
   /** Jordan has started a revoke on Balance Transfer v1. */
   async function jordanStartsRevoke() {
     as("jordan");
-    expect(await startRevoke({ templateId: ids["balance-transfer"]!, versionNumber: 1, reason })).toEqual({ ok: true });
+    expect(
+      await startRevoke({
+        templateId: ids["balance-transfer"]!,
+        versionNumber: 1,
+        reason,
+      }),
+    ).toEqual({ ok: true });
   }
 
   it("Jordan starts a revoke on Balance Transfer v1 and can't confirm it himself", async () => {
     const templateId = ids["balance-transfer"]!;
     const at = as("jordan");
-    expect(await startRevoke({ templateId, versionNumber: 1, reason })).toEqual({ ok: true });
+    expect(await startRevoke({ templateId, versionNumber: 1, reason })).toEqual(
+      { ok: true },
+    );
     const v1 = (await version(templateId, 1))!;
     expect(v1.state).toBe("superseded");
-    expect(v1.revoke).toEqual({ reason, startedBy: "jordan", startedAt: at.toISOString() });
-    expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.revoke_started"]);
-    expect((await notificationsAt(at)).map((n) => [n.userId, n.kind])).toEqual([["alex", "revoke_started"]]);
+    expect(v1.revoke).toEqual({
+      reason,
+      startedBy: "jordan",
+      startedAt: at.toISOString(),
+    });
+    expect((await auditAt(at)).map((r) => r.action)).toEqual([
+      "version.revoke_started",
+    ]);
+    expect((await notificationsAt(at)).map((n) => [n.userId, n.kind])).toEqual([
+      ["alex", "revoke_started"],
+    ]);
 
     as("jordan");
-    expect(await startRevoke({ templateId, versionNumber: 1, reason })).toEqual({
+    expect(await startRevoke({ templateId, versionNumber: 1, reason })).toEqual(
+      {
+        ok: false,
+        ...REFUSALS.revokePending,
+      },
+    );
+    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({
       ok: false,
-      ...REFUSALS.revokePending,
+      ...REASONS.ownRevoke,
     });
-    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, ...REASONS.ownRevoke });
     expect((await version(templateId, 1))?.state).toBe("superseded");
   });
 
@@ -908,12 +1548,22 @@ describe("the two-person revoke (scenario 6)", () => {
     await jordanStartsRevoke();
     const templateId = ids["balance-transfer"]!;
     const at = as("alex");
-    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: true });
+    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({
+      ok: true,
+    });
     const v1 = (await version(templateId, 1))!;
     expect(v1.state).toBe("revoked");
-    expect(v1.revoke).toMatchObject({ startedBy: "jordan", confirmedBy: "alex", confirmedAt: at.toISOString() });
-    expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.revoked"]);
-    expect((await noticesAt(at)).map((n) => [n.consumerId, n.kind])).toEqual([["coral", "revoked"]]);
+    expect(v1.revoke).toMatchObject({
+      startedBy: "jordan",
+      confirmedBy: "alex",
+      confirmedAt: at.toISOString(),
+    });
+    expect((await auditAt(at)).map((r) => r.action)).toEqual([
+      "version.revoked",
+    ]);
+    expect((await noticesAt(at)).map((n) => [n.consumerId, n.kind])).toEqual([
+      ["coral", "revoked"],
+    ]);
     // Jordan (the starter) and Priya (who submitted v1) hear about it; Alex doesn't notify himself.
     expect((await notificationsAt(at)).map((n) => [n.userId, n.kind])).toEqual([
       ["jordan", "version_revoked"],
@@ -921,29 +1571,59 @@ describe("the two-person revoke (scenario 6)", () => {
     ]);
 
     as("jordan");
-    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, ...REFUSALS.alreadyRevoked });
-    expect(await cancelRevoke({ templateId, versionNumber: 1 })).toEqual({ ok: false, ...REFUSALS.alreadyRevoked });
+    expect(await confirmRevoke({ templateId, versionNumber: 1 })).toEqual({
+      ok: false,
+      ...REFUSALS.alreadyRevoked,
+    });
+    expect(await cancelRevoke({ templateId, versionNumber: 1 })).toEqual({
+      ok: false,
+      ...REFUSALS.alreadyRevoked,
+    });
   });
 
   it("an author can't start, confirm or cancel a revoke", async () => {
     const templateId = ids["holiday-points"]!;
     as("maya");
-    expect(await startRevoke({ templateId, versionNumber: 2, reason })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await confirmRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, ...REASONS.generic });
+    expect(await startRevoke({ templateId, versionNumber: 2, reason })).toEqual(
+      { ok: false, ...REASONS.generic },
+    );
+    expect(await confirmRevoke({ templateId, versionNumber: 2 })).toEqual({
+      ok: false,
+      ...REASONS.generic,
+    });
+    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({
+      ok: false,
+      ...REASONS.generic,
+    });
   });
 
   it("another approver may cancel a pending revoke; the version keeps its state", async () => {
     const templateId = ids["holiday-points"]!;
     as("alex");
-    expect(await startRevoke({ templateId, versionNumber: 2, reason: "Wrong bonus" })).toEqual({ ok: true });
+    expect(
+      await startRevoke({
+        templateId,
+        versionNumber: 2,
+        reason: "Wrong bonus",
+      }),
+    ).toEqual({ ok: true });
     const at = as("jordan");
-    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: true });
-    expect(await version(templateId, 2)).toMatchObject({ state: "active", revoke: null });
-    expect((await auditAt(at)).map((r) => r.action)).toEqual(["version.revoke_cancelled"]);
+    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({
+      ok: true,
+    });
+    expect(await version(templateId, 2)).toMatchObject({
+      state: "active",
+      revoke: null,
+    });
+    expect((await auditAt(at)).map((r) => r.action)).toEqual([
+      "version.revoke_cancelled",
+    ]);
 
     as("jordan");
-    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({ ok: false, ...REFUSALS.noRevokePending });
+    expect(await cancelRevoke({ templateId, versionNumber: 2 })).toEqual({
+      ok: false,
+      ...REFUSALS.noRevokePending,
+    });
   });
 });
 
@@ -951,12 +1631,27 @@ describe("the two-person revoke (scenario 6)", () => {
 
 describe("after the Active version is revoked (handoff review D1)", () => {
   const NAME = "Revoke Recovery — Terms";
-  const PROMO: Variable = { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "SPRING" };
-  const FEE: Variable = { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95.00" };
+  const PROMO: Variable = {
+    key: "promo_code",
+    label: "Promo code",
+    type: "text",
+    required: false,
+    sample: "SPRING",
+  };
+  const FEE: Variable = {
+    key: "annual_fee",
+    label: "Annual fee",
+    type: "currency",
+    required: true,
+    sample: "95.00",
+  };
   let templateId: string;
 
   /** Saves the open draft's variables the way autosave does. */
-  async function saveVariables(userId: string, change: (variables: Variable[]) => Variable[]) {
+  async function saveVariables(
+    userId: string,
+    change: (variables: Variable[]) => Variable[],
+  ) {
     const draft = (await draftOf(templateId))!;
     const saved = await saveDraft(people[userId]!, draft.id, {
       rev: draft.rev,
@@ -969,27 +1664,64 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   /** Revokes a version: Jordan starts it, Alex confirms it. */
   async function revoke(versionNumber: number) {
     as("jordan");
-    expect(await startRevoke({ templateId, versionNumber, reason: "Wrong APR in the legal notices." })).toEqual({ ok: true });
+    expect(
+      await startRevoke({
+        templateId,
+        versionNumber,
+        reason: "Wrong APR in the legal notices.",
+      }),
+    ).toEqual({ ok: true });
     as("alex");
-    expect(await confirmRevoke({ templateId, versionNumber })).toEqual({ ok: true });
+    expect(await confirmRevoke({ templateId, versionNumber })).toEqual({
+      ok: true,
+    });
     expect((await version(templateId, versionNumber))?.state).toBe("revoked");
   }
 
   // v1 goes live; v2 adds an optional promo code and replaces it, so v1 is Superseded with no sunset
   // and still renders; Coral renders v2; then v2 is revoked. Nothing is Active.
   beforeEach(async () => {
-    ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
+    ({ templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+      name: NAME,
+    }));
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({ ok: true, wentLive: true });
 
     as("maya");
     await startDraft({ templateId });
     await saveVariables("maya", (variables) => [...variables, PROMO]);
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 2,
+      round: 1,
+    });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 2,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({ ok: true, wentLive: true });
 
     const v2 = (await version(templateId, 2))!;
     await db.insert(renderLog).values({
@@ -1005,7 +1737,10 @@ describe("after the Active version is revoked (handoff review D1)", () => {
       outcome: "ok",
     });
     await revoke(2);
-    expect(await version(templateId, 1)).toMatchObject({ state: "superseded", sunsetAt: null });
+    expect(await version(templateId, 1)).toMatchObject({
+      state: "superseded",
+      sunsetAt: null,
+    });
   });
 
   // From there, one step at a time: each step builds the ones before it.
@@ -1024,7 +1759,11 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   async function submittedV3() {
     await draftWithFee();
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 3,
+      round: 1,
+    });
   }
   /** ...and Jordan approved it: v3 is Active. */
   async function liveV3() {
@@ -1032,7 +1771,16 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     const at = as("jordan");
     // There's no previous Active version for a sunset to land on: the date is ignored.
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
-    expect(await approveVersion({ templateId, versionNumber: 3, round: 1, sunsetPrevious: sunset, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 3,
+        round: 1,
+        sunsetPrevious: sunset,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: ["typical"],
+      }),
+    ).toEqual({
       ok: true,
       wentLive: true,
       number: 3,
@@ -1048,12 +1796,18 @@ describe("after the Active version is revoked (handoff review D1)", () => {
       canStartDraft: true,
     });
     as("sam");
-    expect((await getWorkspaceHeader("coral-offers", templateId)).canStartDraft, "a viewer can't edit").toBe(false);
+    expect(
+      (await getWorkspaceHeader("coral-offers", templateId)).canStartDraft,
+      "a viewer can't edit",
+    ).toBe(false);
 
     const at = as("maya");
     vi.mocked(redirect).mockClear();
     await startDraft({ templateId });
-    expect(vi.mocked(redirect)).toHaveBeenCalledWith(`/coral-offers/templates/${templateId}`, "replace");
+    expect(vi.mocked(redirect)).toHaveBeenCalledWith(
+      `/coral-offers/templates/${templateId}`,
+      "replace",
+    );
 
     const v2 = (await version(templateId, 2))!;
     const draft = (await draftOf(templateId))!;
@@ -1068,9 +1822,17 @@ describe("after the Active version is revoked (handoff review D1)", () => {
       sampleSets: v2.sampleSets,
       contractChanges: null,
     });
-    expect(blockIds(draft.body), "the same block ids, so comment threads carry over").toEqual(blockIds(v2.body));
-    expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([["draft.started", { basedOn: 2 }]]);
-    expect((await version(templateId, 2))?.state, "the revoked version stays revoked").toBe("revoked");
+    expect(
+      blockIds(draft.body),
+      "the same block ids, so comment threads carry over",
+    ).toEqual(blockIds(v2.body));
+    expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
+      ["draft.started", { basedOn: 2 }],
+    ]);
+    expect(
+      (await version(templateId, 2))?.state,
+      "the revoked version stays revoked",
+    ).toBe("revoked");
 
     const header = await getWorkspaceHeader("coral-offers", templateId);
     expect(header).toMatchObject({
@@ -1093,17 +1855,40 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect(document.baseline?.map((v) => v.key)).not.toContain(PROMO.key);
 
     const summary = await getSubmitSummary(people.maya!, { templateId });
-    expect(summary).toMatchObject({ ok: true, summary: { number: 3, round: 1, baseline: { number: 1, variables: v1.variables } } });
+    expect(summary).toMatchObject({
+      ok: true,
+      summary: {
+        number: 3,
+        round: 1,
+        baseline: { number: 1, variables: v1.variables },
+      },
+    });
   });
 
   it("submit freezes the contract changes against v1, not the revoked v2", async () => {
     await draftWithFee();
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 3,
+      round: 1,
+    });
     const v3 = (await version(templateId, 3))!;
     expect(v3.contractChanges).toEqual([
-      { kind: "added", key: PROMO.key, breaking: false, type: "text", required: false },
-      { kind: "added", key: FEE.key, breaking: true, type: "currency", required: true },
+      {
+        kind: "added",
+        key: PROMO.key,
+        breaking: false,
+        type: "text",
+        required: false,
+      },
+      {
+        kind: "added",
+        key: FEE.key,
+        breaking: true,
+        type: "currency",
+        required: true,
+      },
     ]);
   });
 
@@ -1114,30 +1899,59 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     const at = as("jordan");
     // There's no previous Active version for a sunset to land on: the date is ignored.
     const sunset = new Date(at.getTime() + 14 * DAY).toISOString().slice(0, 10);
-    expect(await approveVersion({ templateId, versionNumber: 3, round: 1, sunsetPrevious: sunset, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: ["typical"] })).toEqual({
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 3,
+        round: 1,
+        sunsetPrevious: sunset,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: ["typical"],
+      }),
+    ).toEqual({
       ok: true,
       wentLive: true,
       number: 3,
       round: 1,
     });
 
-    expect(await version(templateId, 3)).toMatchObject({ state: "active", activatedAt: at });
+    expect(await version(templateId, 3)).toMatchObject({
+      state: "active",
+      activatedAt: at,
+    });
     expect(await version(templateId, 2)).toEqual(v2Before);
     expect(await version(templateId, 1)).toEqual(v1Before);
     expect((await auditAt(at)).map((r) => [r.action, r.details])).toEqual([
-      ["version.activated", { number: 3, round: 1, supersedes: null, stage: "Team approver", outputsViewed: ["pdf", "web"] }],
+      [
+        "version.activated",
+        {
+          number: 3,
+          round: 1,
+          supersedes: null,
+          stage: "Team approver",
+          outputsViewed: ["pdf", "web"],
+        },
+      ],
     ]);
 
     const notices = await noticesAt(at);
-    expect(notices.map((n) => [n.consumerId, n.kind])).toEqual([["coral", "new_version"]]);
+    expect(notices.map((n) => [n.consumerId, n.kind])).toEqual([
+      ["coral", "new_version"],
+    ]);
     expect(notices[0]!.payload).toMatchObject({
       templateName: NAME,
       versionNumber: 3,
       activeVersion: 3,
-      contractLines: describeChanges((await version(templateId, 3))!.contractChanges!, 3),
+      contractLines: describeChanges(
+        (await version(templateId, 3))!.contractChanges!,
+        3,
+      ),
     });
     expect(notices[0]!.payload).toMatchObject({
-      contractLines: ["v3 adds optional `promo_code` (Text).", "v3 adds required `annual_fee` (Currency)."],
+      contractLines: [
+        "v3 adds optional `promo_code` (Text).",
+        "v3 adds required `annual_fee` (Currency).",
+      ],
     });
 
     as("maya");
@@ -1153,14 +1967,28 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     await revoke(3);
     // v1's sunset passes as well.
     const passed = new Date(env.now.getTime() - DAY);
-    await db.update(versions).set({ sunsetAt: passed }).where(and(eq(versions.templateId, templateId), eq(versions.number, 1)));
+    await db
+      .update(versions)
+      .set({ sunsetAt: passed })
+      .where(and(eq(versions.templateId, templateId), eq(versions.number, 1)));
 
     as("maya");
     await startDraft({ templateId });
-    expect((await draftOf(templateId))?.basedOnVersionId).toBe((await version(templateId, 3))!.id);
-    expect((await getWorkspaceDocument("coral-offers", templateId)).baseline).toBeNull();
-    expect(await getSubmitSummary(people.maya!, { templateId })).toMatchObject({ ok: true, summary: { number: 4, round: 1, baseline: null } });
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 4, round: 1 });
+    expect((await draftOf(templateId))?.basedOnVersionId).toBe(
+      (await version(templateId, 3))!.id,
+    );
+    expect(
+      (await getWorkspaceDocument("coral-offers", templateId)).baseline,
+    ).toBeNull();
+    expect(await getSubmitSummary(people.maya!, { templateId })).toMatchObject({
+      ok: true,
+      summary: { number: 4, round: 1, baseline: null },
+    });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 4,
+      round: 1,
+    });
     expect((await version(templateId, 4))?.contractChanges).toBeNull();
   });
 });
@@ -1175,23 +2003,49 @@ describe("a variable renamed in a draft", () => {
    * One editing session, as the workspace runs it: the editor's variable store opens on the saved list,
    * `edit` works on it, and autosave sends the list it reports through the route's own parser.
    */
-  async function editVariables(userId: string, edit: (store: ReturnType<typeof createVariableStore>) => void) {
+  async function editVariables(
+    userId: string,
+    edit: (store: ReturnType<typeof createVariableStore>) => void,
+  ) {
     const draft = (await draftOf(templateId))!;
     const store = createVariableStore(draft.variables);
     edit(store);
-    const text = JSON.stringify({ rev: draft.rev, sessionKey: `d8-session-${minute}`, variables: store.getState().variables });
+    const text = JSON.stringify({
+      rev: draft.rev,
+      sessionKey: `d8-session-${minute}`,
+      variables: store.getState().variables,
+    });
     const parsed = parseDraftPatchText(text);
     if (!parsed.ok) throw new Error(parsed.message);
-    expect(await saveDraft(people[userId]!, draft.id, parsed.patch)).toMatchObject({ ok: true });
+    expect(
+      await saveDraft(people[userId]!, draft.id, parsed.patch),
+    ).toMatchObject({ ok: true });
   }
 
   // v1 goes live with `first_name`, and Coral renders it, so it hears about the next version.
   beforeEach(async () => {
-    ({ templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE, name: NAME }));
+    ({ templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+      name: NAME,
+    }));
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({ ok: true, wentLive: true });
     const v1 = (await version(templateId, 1))!;
     expect(v1.variables.map((v) => v.key)).toContain("first_name");
     await db.insert(renderLog).values({
@@ -1212,42 +2066,81 @@ describe("a variable renamed in a draft", () => {
   async function renamedDraft() {
     as("maya");
     await startDraft({ templateId });
-    await editVariables("maya", (store) => store.getState().update("first_name", { key: "given_name" }));
-    expect((await draftOf(templateId))!.variables.find((v) => v.key === "given_name")).toMatchObject({ id: "first_name" });
+    await editVariables("maya", (store) =>
+      store.getState().update("first_name", { key: "given_name" }),
+    );
+    expect(
+      (await draftOf(templateId))!.variables.find(
+        (v) => v.key === "given_name",
+      ),
+    ).toMatchObject({ id: "first_name" });
 
     // A new page visit: the store opens on the saved list, and the next rename chains onto the first.
-    await editVariables("maya", (store) => store.getState().update("given_name", { key: "name_on_card" }));
+    await editVariables("maya", (store) =>
+      store.getState().update("given_name", { key: "name_on_card" }),
+    );
   }
   /** ...and submitted it as v2. */
   async function submittedV2() {
     await renamedDraft();
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 2,
+      round: 1,
+    });
   }
   /** ...and Jordan approved it: v2 is Active. */
   async function liveV2() {
     await submittedV2();
     as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 2,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({ ok: true, wentLive: true });
   }
 
   it("is saved with the draft: renamed in one session and again after a reload, it is one rename against v1", async () => {
     await renamedDraft();
     const summary = await getSubmitSummary(people.maya!, { templateId });
     if (!summary.ok) throw new Error(summary.reason);
-    expect(describeChanges(diffVariables(summary.summary.baseline!.variables, summary.summary.variables), 2)).toEqual([
-      "v2 renames `first_name` to `name_on_card`.",
-    ]);
+    expect(
+      describeChanges(
+        diffVariables(
+          summary.summary.baseline!.variables,
+          summary.summary.variables,
+        ),
+        2,
+      ),
+    ).toEqual(["v2 renames `first_name` to `name_on_card`."]);
   });
 
   it("submit stores one key_renamed with the old and the new key, not a removal and an addition", async () => {
     await renamedDraft();
     const at = as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 2,
+      round: 1,
+    });
     expect((await version(templateId, 2))!.contractChanges).toEqual([
-      { kind: "key_renamed", key: "name_on_card", breaking: true, from: "first_name", to: "name_on_card" },
+      {
+        kind: "key_renamed",
+        key: "name_on_card",
+        breaking: true,
+        from: "first_name",
+        to: "name_on_card",
+      },
     ]);
-    expect((await auditAt(at)).find((r) => r.action === "version.submitted")?.details).toMatchObject({
+    expect(
+      (await auditAt(at)).find((r) => r.action === "version.submitted")
+        ?.details,
+    ).toMatchObject({
       contractChanges: 1,
       breaking: true,
     });
@@ -1256,12 +2149,30 @@ describe("a variable renamed in a draft", () => {
   it("approved, the consumer notice carries the rename for Coral to map", async () => {
     await submittedV2();
     const at = as("jordan");
-    expect(await approveVersion({ templateId, versionNumber: 2, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
-    const [notice] = (await noticesAt(at)).filter((n) => n.kind === "new_version");
+    expect(
+      await approveVersion({
+        templateId,
+        versionNumber: 2,
+        round: 1,
+        outputsViewed: OUTPUT_KEYS,
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({ ok: true, wentLive: true });
+    const [notice] = (await noticesAt(at)).filter(
+      (n) => n.kind === "new_version",
+    );
     expect(notice).toMatchObject({ consumerId: "coral", templateId });
     expect(notice!.payload).toMatchObject({
       versionNumber: 2,
-      contractChanges: [{ kind: "key_renamed", key: "name_on_card", breaking: true, from: "first_name", to: "name_on_card" }],
+      contractChanges: [
+        {
+          kind: "key_renamed",
+          key: "name_on_card",
+          breaking: true,
+          from: "first_name",
+          to: "name_on_card",
+        },
+      ],
       contractLines: ["v2 renames `first_name` to `name_on_card`."],
     });
     const served = noticeView(notice!);
@@ -1275,7 +2186,9 @@ describe("a variable renamed in a draft", () => {
         text: "v2 renames `first_name` to `name_on_card`.",
       },
     ]);
-    expect(served.message).toBe(`${NAME} v2 is available. It renames first_name to name_on_card.`);
+    expect(served.message).toBe(
+      `${NAME} v2 is available. It renames first_name to name_on_card.`,
+    );
   });
 
   it("in the next version, a new variable under the old key is an addition, not the renamed one", async () => {
@@ -1283,11 +2196,27 @@ describe("a variable renamed in a draft", () => {
     as("maya");
     await startDraft({ templateId });
     await editVariables("maya", (store) =>
-      store.getState().create({ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }),
+      store.getState().create({
+        key: "first_name",
+        label: "First name",
+        type: "text",
+        required: true,
+        sample: "Maya",
+      }),
     );
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 3, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 3,
+      round: 1,
+    });
     expect((await version(templateId, 3))!.contractChanges).toEqual([
-      { kind: "added", key: "first_name", breaking: true, type: "text", required: true },
+      {
+        kind: "added",
+        key: "first_name",
+        breaking: true,
+        type: "text",
+        required: true,
+      },
     ]);
   });
 });
@@ -1295,10 +2224,20 @@ describe("a variable renamed in a draft", () => {
 // ── Submit freezes only what the summary showed (handoff review I8) ──
 
 describe("submit is a compare-and-set on the summary's rev", () => {
-  const GIFT: Variable = { key: "gift_card", label: "Gift card", type: "text", required: false, sample: "Amazon" };
+  const GIFT: Variable = {
+    key: "gift_card",
+    label: "Gift card",
+    type: "text",
+    required: false,
+    sample: "Amazon",
+  };
 
   it("refuses a summary the draft has moved past, and writes nothing", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     as("maya");
     const read = await getSubmitSummary(people.maya!, { templateId });
     if (!read.ok) throw new Error(read.reason);
@@ -1308,26 +2247,47 @@ describe("submit is a compare-and-set on the summary's rev", () => {
     // A save lands after the summary was read: from a debounce still running on this page, or another tab.
     const draft = (await draftOf(templateId))!;
     expect(
-      await saveDraft(people.maya!, draft.id, { rev: draft.rev, sessionKey: "i8-late", variables: [...draft.variables, GIFT] }),
+      await saveDraft(people.maya!, draft.id, {
+        rev: draft.rev,
+        sessionKey: "i8-late",
+        variables: [...draft.variables, GIFT],
+      }),
     ).toMatchObject({ ok: true, rev: 1 });
     const before = (await draftOf(templateId))!;
 
     const at = as("maya");
-    expect(await submitVersion({ templateId, note: "Ready.", rev: read.summary.rev })).toEqual({
+    expect(
+      await submitVersion({
+        templateId,
+        note: "Ready.",
+        rev: read.summary.rev,
+      }),
+    ).toEqual({
       ok: false,
       ...REFUSALS.summaryStale,
     });
-    expect(await draftOf(templateId), "still the same draft, unfrozen, with the late save in it").toEqual(before);
+    expect(
+      await draftOf(templateId),
+      "still the same draft, unfrozen, with the late save in it",
+    ).toEqual(before);
     expect(await auditAt(at)).toEqual([]);
     expect(await notificationsAt(at)).toEqual([]);
     expect(refresh).not.toHaveBeenCalled();
   });
 
   it("submits with the rev of a summary read after that save, freezing what it showed", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     as("maya");
     const draft = (await draftOf(templateId))!;
-    await saveDraft(people.maya!, draft.id, { rev: draft.rev, sessionKey: "i8-early", variables: [...draft.variables, GIFT] });
+    await saveDraft(people.maya!, draft.id, {
+      rev: draft.rev,
+      sessionKey: "i8-early",
+      variables: [...draft.variables, GIFT],
+    });
 
     const read = await getSubmitSummary(people.maya!, { templateId });
     if (!read.ok) throw new Error(read.reason);
@@ -1335,16 +2295,26 @@ describe("submit is a compare-and-set on the summary's rev", () => {
     expect(read.summary.variables.map((v) => v.key)).toContain(GIFT.key);
 
     as("maya");
-    expect(await submitVersion({ templateId, rev: read.summary.rev })).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitVersion({ templateId, rev: read.summary.rev })).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     const v1 = (await version(templateId, 1))!;
     expect(v1.state).toBe("in_review");
     expect(v1.variables.map((v) => v.key)).toContain(GIFT.key);
   });
 
   it("refuses a call without a rev", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     as("maya");
-    const unchecked = submitVersion as (input: { templateId: string }) => ReturnType<typeof submitVersion>;
+    const unchecked = submitVersion as (input: {
+      templateId: string;
+    }) => ReturnType<typeof submitVersion>;
     expect(await unchecked({ templateId })).toMatchObject({ ok: false });
     expect((await draftOf(templateId))?.state).toBe("draft");
   });
@@ -1354,11 +2324,28 @@ describe("submit is a compare-and-set on the summary's rev", () => {
 
 describe("permission checks come first", () => {
   it("refuses a viewer, and an unknown template the same way, without writing", async () => {
-    const { templateId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
+    const { templateId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
     const at = as("sam");
-    expect(await submitNow(templateId)).toEqual({ ok: false, ...REASONS.generic });
-    expect(await submitVersion({ templateId: "UC-ZZZZZZ", rev: 0 })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await requestChanges({ templateId: ids["cash-back"]!, versionNumber: 2, round: 1, reason: "x" })).toEqual({
+    expect(await submitNow(templateId)).toEqual({
+      ok: false,
+      ...REASONS.generic,
+    });
+    expect(await submitVersion({ templateId: "UC-ZZZZZZ", rev: 0 })).toEqual({
+      ok: false,
+      ...REASONS.generic,
+    });
+    expect(
+      await requestChanges({
+        templateId: ids["cash-back"]!,
+        versionNumber: 2,
+        round: 1,
+        reason: "x",
+      }),
+    ).toEqual({
       ok: false,
       ...REASONS.generic,
     });
@@ -1369,7 +2356,13 @@ describe("permission checks come first", () => {
   it("refuses an approver on another team", async () => {
     as("jordan");
     const deposits = ids["high-yield-savings"]!;
-    expect(await startRevoke({ templateId: deposits, versionNumber: 2, reason: "x" })).toEqual({
+    expect(
+      await startRevoke({
+        templateId: deposits,
+        versionNumber: 2,
+        reason: "x",
+      }),
+    ).toEqual({
       ok: false,
       ...REASONS.generic,
     });
@@ -1383,30 +2376,64 @@ describe("permission checks come first", () => {
 describe("the writers backfill in the migration", () => {
   it("rebuilds every version's writers from its creator, submitter, edits and returned rounds", async () => {
     const folder = "./src/server/db/migrations";
-    const file = readdirSync(folder).find((name) => name.endsWith("_version_writers.sql"))!;
-    const [, backfill] = readFileSync(`${folder}/${file}`, "utf8").split("--> statement-breakpoint");
+    const file = readdirSync(folder).find((name) =>
+      name.endsWith("_version_writers.sql"),
+    )!;
+    const [, backfill] = readFileSync(`${folder}/${file}`, "utf8").split(
+      "--> statement-breakpoint",
+    );
     const writersById = async () =>
       Object.fromEntries(
-        (await db.select({ id: versions.id, writers: versions.writers }).from(versions)).map((v) => [v.id, [...v.writers].sort()]),
+        (
+          await db
+            .select({ id: versions.id, writers: versions.writers })
+            .from(versions)
+        ).map((v) => [v.id, [...v.writers].sort()]),
       );
 
     // Versions the app wrote with more than one writer: Priya edits Maya's draft before Maya submits it, and
     // the round Jordan sends back carries both writers on; Priya submits another template Maya created.
-    const edited = (await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE })).templateId;
+    const edited = (
+      await createTemplateWithDraft(db, {
+        teamId: "coral-offers",
+        createdBy: "maya",
+        at: BASE,
+      })
+    ).templateId;
     await edit("priya", edited, "Priya's sentence.");
     as("maya");
     expect(await submitNow(edited)).toEqual({ ok: true, number: 1, round: 1 });
     as("jordan");
-    expect(await requestChanges({ templateId: edited, versionNumber: 1, round: 1, reason: "Spell out the APR." })).toEqual({ ok: true });
+    expect(
+      await requestChanges({
+        templateId: edited,
+        versionNumber: 1,
+        round: 1,
+        reason: "Spell out the APR.",
+      }),
+    ).toEqual({ ok: true });
     await edit("maya", edited, "The APR is 21.99%.");
     as("maya");
     expect(await submitNow(edited)).toEqual({ ok: true, number: 1, round: 2 });
-    const submittedByPriya = (await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE })).templateId;
+    const submittedByPriya = (
+      await createTemplateWithDraft(db, {
+        teamId: "coral-offers",
+        createdBy: "maya",
+        at: BASE,
+      })
+    ).templateId;
     as("priya");
-    expect(await submitNow(submittedByPriya)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(submittedByPriya)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
 
     const recorded = await writersById();
-    expect(Object.values(recorded).some((w) => w.length > 1), "some version has two writers").toBe(true);
+    expect(
+      Object.values(recorded).some((w) => w.length > 1),
+      "some version has two writers",
+    ).toBe(true);
     await libsql.execute("UPDATE versions SET writers = '[]'");
     await libsql.execute(backfill!);
     expect(await writersById()).toEqual(recorded);
@@ -1418,13 +2445,26 @@ describe("the writers backfill in the migration", () => {
 describe("the SMS footer backfill in the migration", () => {
   it("gives every submitted version its content type's footer, and leaves drafts and documents without one", async () => {
     const folder = "./src/server/db/migrations";
-    const file = readdirSync(folder).find((name) => name.endsWith("_version_sms_footer.sql"))!;
-    const [, backfill] = readFileSync(`${folder}/${file}`, "utf8").split("--> statement-breakpoint");
+    const file = readdirSync(folder).find((name) =>
+      name.endsWith("_version_sms_footer.sql"),
+    )!;
+    const [, backfill] = readFileSync(`${folder}/${file}`, "utf8").split(
+      "--> statement-breakpoint",
+    );
     const footers = async () =>
-      Object.fromEntries((await db.select({ id: versions.id, smsFooter: versions.smsFooter }).from(versions)).map((v) => [v.id, v.smsFooter]));
+      Object.fromEntries(
+        (
+          await db
+            .select({ id: versions.id, smsFooter: versions.smsFooter })
+            .from(versions)
+        ).map((v) => [v.id, v.smsFooter]),
+      );
 
     const recorded = await footers();
-    expect(Object.values(recorded).filter(Boolean).length, "some alert versions are submitted").toBeGreaterThan(0);
+    expect(
+      Object.values(recorded).filter(Boolean).length,
+      "some alert versions are submitted",
+    ).toBeGreaterThan(0);
     await libsql.execute("UPDATE versions SET sms_footer = NULL");
     await libsql.execute(backfill!);
     expect(await footers()).toEqual(recorded);
@@ -1435,20 +2475,36 @@ describe("the SMS footer backfill in the migration", () => {
 
 describe("submitting an alert", () => {
   const t = (text: string): JSONContent => ({ type: "text", text });
-  const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
-  const field = (...inline: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: inline }] });
+  const chip = (key: string): JSONContent => ({
+    type: "variable",
+    attrs: { key },
+  });
+  const field = (...inline: JSONContent[]): JSONContent => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: inline }],
+  });
 
   /** A draft turned into an Alert's: its template on the Alert content type, Push and SMS on. */
   async function alertDraft(sms: JSONContent) {
-    const { templateId, draftId } = await createTemplateWithDraft(db, { teamId: "coral-offers", createdBy: "maya", at: BASE });
-    await db.update(schema.templates).set({ contentTypeId: "ct_alert" }).where(eq(schema.templates.id, templateId));
+    const { templateId, draftId } = await createTemplateWithDraft(db, {
+      teamId: "coral-offers",
+      createdBy: "maya",
+      at: BASE,
+    });
+    await db
+      .update(schema.templates)
+      .set({ contentTypeId: "ct_alert" })
+      .where(eq(schema.templates.id, templateId));
     await db
       .update(versions)
       .set({
         body: { type: "doc", content: [{ type: "paragraph" }] },
         channels: ["push", "sms"],
         channelFields: {
-          push: { title: field(t("Your offer ends soon")), body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")) },
+          push: {
+            title: field(t("Your offer ends soon")),
+            body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")),
+          },
           sms: { text: sms },
         },
       })
@@ -1457,67 +2513,133 @@ describe("submitting an alert", () => {
   }
 
   it("refuses characters the author typed outside GSM-7, and writes nothing", async () => {
-    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", it’s ending.")));
+    const templateId = await alertDraft(
+      field(t("Hi "), chip("first_name"), t(", it’s ending.")),
+    );
     const before = await draftOf(templateId);
     const at = as("maya");
     expect(await submitNow(templateId)).toEqual({
       ok: false,
       code: "sms_characters",
-      reason: "Replace ’ in the SMS message before submitting. It isn't in the SMS character set.",
+      reason:
+        "Replace ’ in the SMS message before submitting. It isn't in the SMS character set.",
     });
     expect(await draftOf(templateId)).toEqual(before);
     expect(await auditAt(at)).toEqual([]);
   });
 
   it("measures the SMS with the content type's footer and part budget, using the long sample values", async () => {
-    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(". " + "Your offer ends Friday. ".repeat(4))));
+    const templateId = await alertDraft(
+      field(
+        t("Hi "),
+        chip("first_name"),
+        t(". " + "Your offer ends Friday. ".repeat(4)),
+      ),
+    );
     // The footer and the long first name take it past one part: fine at the Alert's 3.
-    await db.update(schema.contentTypes).set({ smsMaxParts: 1 }).where(eq(schema.contentTypes.id, "ct_alert"));
+    await db
+      .update(schema.contentTypes)
+      .set({ smsMaxParts: 1 })
+      .where(eq(schema.contentTypes.id, "ct_alert"));
     try {
       as("maya");
       expect(await submitNow(templateId)).toEqual({
         ok: false,
         code: "sms_too_many_parts",
-        reason: "With the long sample values, the SMS is 2 parts. Keep it to 1 part or fewer.",
+        reason:
+          "With the long sample values, the SMS is 2 parts. Keep it to 1 part or fewer.",
       });
     } finally {
-      await db.update(schema.contentTypes).set({ smsMaxParts: 3 }).where(eq(schema.contentTypes.id, "ct_alert"));
+      await db
+        .update(schema.contentTypes)
+        .set({ smsMaxParts: 3 })
+        .where(eq(schema.contentTypes.id, "ct_alert"));
     }
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     expect((await version(templateId, 1))?.state).toBe("in_review");
   });
 
   it("freezes the content type's SMS footer into the version: a later change to it doesn't reach the submitted text", async () => {
-    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")));
-    const [{ smsFooter: footer }] = await db.select({ smsFooter: schema.contentTypes.smsFooter }).from(schema.contentTypes).where(eq(schema.contentTypes.id, "ct_alert"));
+    const templateId = await alertDraft(
+      field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")),
+    );
+    const [{ smsFooter: footer }] = await db
+      .select({ smsFooter: schema.contentTypes.smsFooter })
+      .from(schema.contentTypes)
+      .where(eq(schema.contentTypes.id, "ct_alert"));
     expect(footer).toBeTruthy();
     as("maya");
-    expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+    expect(await submitNow(templateId)).toEqual({
+      ok: true,
+      number: 1,
+      round: 1,
+    });
     expect((await version(templateId, 1))?.smsFooter).toBe(footer);
-    await db.update(schema.contentTypes).set({ smsFooter: "Coral: Text STOP to end." }).where(eq(schema.contentTypes.id, "ct_alert"));
+    await db
+      .update(schema.contentTypes)
+      .set({ smsFooter: "Coral: Text STOP to end." })
+      .where(eq(schema.contentTypes.id, "ct_alert"));
     try {
       expect((await version(templateId, 1))?.smsFooter).toBe(footer);
     } finally {
-      await db.update(schema.contentTypes).set({ smsFooter: footer }).where(eq(schema.contentTypes.id, "ct_alert"));
+      await db
+        .update(schema.contentTypes)
+        .set({ smsFooter: footer })
+        .where(eq(schema.contentTypes.id, "ct_alert"));
     }
   });
 
   it("resubmits a sent-back alert as the next round, each round freezing its own footer, redlined against the live version", async () => {
-    const templateId = await alertDraft(field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")));
+    const templateId = await alertDraft(
+      field(t("Hi "), chip("first_name"), t(", your offer ends Friday.")),
+    );
     const alertFooter = async (smsFooter: string) =>
-      db.update(schema.contentTypes).set({ smsFooter }).where(eq(schema.contentTypes.id, "ct_alert"));
-    const [{ smsFooter: footer }] = await db.select({ smsFooter: schema.contentTypes.smsFooter }).from(schema.contentTypes).where(eq(schema.contentTypes.id, "ct_alert"));
+      db
+        .update(schema.contentTypes)
+        .set({ smsFooter })
+        .where(eq(schema.contentTypes.id, "ct_alert"));
+    const [{ smsFooter: footer }] = await db
+      .select({ smsFooter: schema.contentTypes.smsFooter })
+      .from(schema.contentTypes)
+      .where(eq(schema.contentTypes.id, "ct_alert"));
     const editDraft = async (fields: Partial<ChannelFields>) => {
       const draft = (await draftOf(templateId))!;
-      await db.update(versions).set({ channelFields: { ...draft.channelFields, ...fields }, rev: draft.rev + 1 }).where(eq(versions.id, draft.id));
+      await db
+        .update(versions)
+        .set({
+          channelFields: { ...draft.channelFields, ...fields },
+          rev: draft.rev + 1,
+        })
+        .where(eq(versions.id, draft.id));
     };
-    const title = (text: string) => ({ push: { title: field(t(text)), body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")) } });
+    const title = (text: string) => ({
+      push: {
+        title: field(t(text)),
+        body: field(t("Hi "), chip("first_name"), t(", it ends Friday.")),
+      },
+    });
     try {
       as("maya");
-      expect(await submitNow(templateId)).toEqual({ ok: true, number: 1, round: 1 });
+      expect(await submitNow(templateId)).toEqual({
+        ok: true,
+        number: 1,
+        round: 1,
+      });
       as("jordan");
-      expect(await approveVersion({ templateId, versionNumber: 1, round: 1, outputsViewed: OUTPUT_KEYS, sampleSetsSeen: [] })).toMatchObject({ ok: true, wentLive: true });
+      expect(
+        await approveVersion({
+          templateId,
+          versionNumber: 1,
+          round: 1,
+          outputsViewed: OUTPUT_KEYS,
+          sampleSetsSeen: [],
+        }),
+      ).toMatchObject({ ok: true, wentLive: true });
       const v1 = (await version(templateId, 1))!;
 
       // v2, round 1: a new title, submitted under a new footer; Jordan sends it back.
@@ -1525,30 +2647,75 @@ describe("submitting an alert", () => {
       expect(await startDraft({ templateId })).toMatchObject({ ok: true });
       await editDraft(title("Your offer ends Friday"));
       await alertFooter("Coral: Text STOP to end.");
-      expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 1 });
+      expect(await submitNow(templateId)).toEqual({
+        ok: true,
+        number: 2,
+        round: 1,
+      });
       as("jordan");
-      expect(await requestChanges({ templateId, versionNumber: 2, round: 1, reason: "Say which card." })).toEqual({ ok: true });
+      expect(
+        await requestChanges({
+          templateId,
+          versionNumber: 2,
+          round: 1,
+          reason: "Say which card.",
+        }),
+      ).toEqual({ ok: true });
 
       // v2, round 2: the draft the send-back opened carries round 1's fields; Maya rewrites the title.
       as("maya");
-      expect((await draftOf(templateId))!.channelFields).toEqual((await version(templateId, 2, 1))!.channelFields);
+      expect((await draftOf(templateId))!.channelFields).toEqual(
+        (await version(templateId, 2, 1))!.channelFields,
+      );
       await editDraft(title("Your Coral card offer ends Friday"));
       await alertFooter("Coral: Reply STOP to stop.");
-      expect(await submitNow(templateId)).toEqual({ ok: true, number: 2, round: 2 });
-      const [round1, round2] = [(await version(templateId, 2, 1))!, (await version(templateId, 2, 2))!];
-      expect([v1.smsFooter, round1.smsFooter, round2.smsFooter]).toEqual([footer, "Coral: Text STOP to end.", "Coral: Reply STOP to stop."]);
+      expect(await submitNow(templateId)).toEqual({
+        ok: true,
+        number: 2,
+        round: 2,
+      });
+      const [round1, round2] = [
+        (await version(templateId, 2, 1))!,
+        (await version(templateId, 2, 2))!,
+      ];
+      expect([v1.smsFooter, round1.smsFooter, round2.smsFooter]).toEqual([
+        footer,
+        "Coral: Text STOP to end.",
+        "Coral: Reply STOP to stop.",
+      ]);
       expect(round2.basedOnVersionId).toBe(round1.id);
 
       // Both rounds are redlined against v1, the live version, fields and footer alike: never against each other.
       as("jordan");
       for (const round of [null, 1] as const) {
-        const screen = await getReviewScreen("coral-offers", templateId, 2, round);
-        expect(screen.baseline).toMatchObject({ id: v1.id, number: 1, state: "active", channelFields: v1.channelFields, smsFooter: footer });
+        const screen = await getReviewScreen(
+          "coral-offers",
+          templateId,
+          2,
+          round,
+        );
+        expect(screen.baseline).toMatchObject({
+          id: v1.id,
+          number: 1,
+          state: "active",
+          channelFields: v1.channelFields,
+          smsFooter: footer,
+        });
         const redline = diffChannelFields(screen.baseline, screen.version);
-        expect(redline.fields.filter((f) => f.status !== "unchanged").map((f) => [f.field.id, f.status])).toEqual([["push.title", "changed"]]);
-        expect(redline.footer).toEqual({ from: footer, to: screen.version.smsFooter, status: "changed" });
+        expect(
+          redline.fields
+            .filter((f) => f.status !== "unchanged")
+            .map((f) => [f.field.id, f.status]),
+        ).toEqual([["push.title", "changed"]]);
+        expect(redline.footer).toEqual({
+          from: footer,
+          to: screen.version.smsFooter,
+          status: "changed",
+        });
       }
-      expect((await getReviewScreen("coral-offers", templateId, 2, 1)).replacedBy).toMatchObject({ number: 2, round: 2, label: "v2, round 2" });
+      expect(
+        (await getReviewScreen("coral-offers", templateId, 2, 1)).replacedBy,
+      ).toMatchObject({ number: 2, round: 2, label: "v2, round 2" });
     } finally {
       await alertFooter(footer!);
     }
@@ -1560,7 +2727,8 @@ describe("submitting an alert", () => {
     expect(await submitNow(templateId)).toEqual({
       ok: false,
       code: "public_shortener",
-      reason: "The SMS message links through bit.ly, a public link shortener carriers filter. Use a link on your own domain.",
+      reason:
+        "The SMS message links through bit.ly, a public link shortener carriers filter. Use a link on your own domain.",
     });
   });
 });

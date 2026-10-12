@@ -10,7 +10,10 @@ import type { SimCustomerRow } from "@/simulator/types";
 
 export async function getSimCustomers(): Promise<SimCustomerRow[]> {
   await connection();
-  const rows = await simDb.select().from(simCustomers).orderBy(asc(simCustomers.id));
+  const rows = await simDb
+    .select()
+    .from(simCustomers)
+    .orderBy(asc(simCustomers.id));
   return rows.map(customerRow);
 }
 
@@ -31,7 +34,11 @@ export async function getSimBatches(limit = 30): Promise<SimBatchSummary[]> {
   await connection();
   const [offers, deliveries] = await Promise.all([
     simDb.select({ id: simOffers.id, name: simOffers.name }).from(simOffers),
-    simDb.select().from(simDeliveries).orderBy(desc(simDeliveries.at), desc(simDeliveries.id)).limit(2000),
+    simDb
+      .select()
+      .from(simDeliveries)
+      .orderBy(desc(simDeliveries.at), desc(simDeliveries.id))
+      .limit(2000),
   ]);
   const names = new Map(offers.map((o) => [o.id, o.name]));
   const batches = new Map<string, SimBatchSummary & { people: Set<string> }>();

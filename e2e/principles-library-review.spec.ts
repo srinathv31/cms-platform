@@ -55,7 +55,10 @@ test("the template ids this spec names are the seed's", async () => {
       });
       if (rows[0]) found[id] = String(rows[0].name);
     }
-    expect(found, "each id is the seeded template of that name (npm run db:reset, or update the ids)").toEqual(SEEDED);
+    expect(
+      found,
+      "each id is the seeded template of that name (npm run db:reset, or update the ids)",
+    ).toEqual(SEEDED);
   } finally {
     db.close();
   }

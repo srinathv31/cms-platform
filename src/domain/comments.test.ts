@@ -25,7 +25,11 @@ const NOW = new Date("2026-10-04T12:00:00.000Z");
 const GENERIC = { ok: false, ...REASONS.generic };
 const CLOSED = { ok: false, ...COMMENT_REFUSALS.closed };
 
-function person(userId: string, teams: Record<string, TeamRole[]> = {}, platformRole: Viewer["platformRole"] = null): Viewer {
+function person(
+  userId: string,
+  teams: Record<string, TeamRole[]> = {},
+  platformRole: Viewer["platformRole"] = null,
+): Viewer {
   return {
     userId,
     name: userId[0]!.toUpperCase() + userId.slice(1),
@@ -50,7 +54,11 @@ const sam = person("sam", { "coral-offers": ["viewer"] });
 const naomi = person("naomi", { deposits: ["approver", "team_admin"] });
 const taylor = person("taylor", {}, "auditor");
 
-const TEMPLATE = { id: "UC-4F7K2Q", name: "Spring Travel Rewards — Terms", teamId: "coral-offers" };
+const TEMPLATE = {
+  id: "UC-4F7K2Q",
+  name: "Spring Travel Rewards — Terms",
+  teamId: "coral-offers",
+};
 
 function version(patch: Partial<CommentVersion> = {}): CommentVersion {
   return {
@@ -78,23 +86,44 @@ function template(patch: Partial<CommentTemplate> = {}): CommentTemplate {
     ...patch,
   };
 }
-const reviewNaming = (...ids: string[]) => template({ inReview: { number: 3, round: 1, stageApproverIds: ids } });
+const reviewNaming = (...ids: string[]) =>
+  template({ inReview: { number: 3, round: 1, stageApproverIds: ids } });
 
-function thread(origin: Partial<CommentThread["origin"]> = {}, patch: Partial<Omit<CommentThread, "origin">> = {}): CommentThread {
+function thread(
+  origin: Partial<CommentThread["origin"]> = {},
+  patch: Partial<Omit<CommentThread, "origin">> = {},
+): CommentThread {
   return {
     id: "th_1",
     blockId: "b_two",
     status: "open",
-    origin: { id: "v_3", number: 3, round: 1, state: "in_review", createdBy: "maya", submittedBy: "maya", ...origin },
+    origin: {
+      id: "v_3",
+      number: 3,
+      round: 1,
+      state: "in_review",
+      createdBy: "maya",
+      submittedBy: "maya",
+      ...origin,
+    },
     ...patch,
   };
 }
-const onDraft = () => thread({ id: "v_draft", number: null, round: null, state: "draft", submittedBy: null });
+const onDraft = () =>
+  thread({
+    id: "v_draft",
+    number: null,
+    round: null,
+    state: "draft",
+    submittedBy: null,
+  });
 
 describe("which versions take comments", () => {
   it("a draft and a version in review do; a decided version is a record", () => {
     for (const state of VERSION_STATES) {
-      expect(takesComments(state), state).toBe(state === "draft" || state === "in_review");
+      expect(takesComments(state), state).toBe(
+        state === "draft" || state === "in_review",
+      );
     }
   });
 
@@ -120,87 +149,188 @@ describe("which versions take comments", () => {
 describe("canComment: who may start a thread", () => {
   it("the team's authors and approvers, on a draft or a version in review", () => {
     for (const viewer of [maya, jordan]) {
-      expect(canComment(viewer, { teamId: "coral-offers", version: version() })).toEqual({ ok: true });
-      expect(canComment(viewer, { teamId: "coral-offers", version: version({ state: "draft", number: null, round: null }) })).toEqual({
+      expect(
+        canComment(viewer, { teamId: "coral-offers", version: version() }),
+      ).toEqual({ ok: true });
+      expect(
+        canComment(viewer, {
+          teamId: "coral-offers",
+          version: version({ state: "draft", number: null, round: null }),
+        }),
+      ).toEqual({
         ok: true,
       });
     }
   });
 
   it("nobody, on a decided version, and the reason says why", () => {
-    for (const state of ["active", "superseded", "revoked", "changes_requested"] as const) {
-      expect(canComment(jordan, { teamId: "coral-offers", version: version({ state }) }), state).toEqual(CLOSED);
+    for (const state of [
+      "active",
+      "superseded",
+      "revoked",
+      "changes_requested",
+    ] as const) {
+      expect(
+        canComment(jordan, {
+          teamId: "coral-offers",
+          version: version({ state }),
+        }),
+        state,
+      ).toEqual(CLOSED);
     }
   });
 
   it("not a viewer of the team, nor someone on another team", () => {
-    expect(canComment(sam, { teamId: "coral-offers", version: version() })).toEqual(GENERIC);
-    expect(canComment(naomi, { teamId: "coral-offers", version: version() })).toEqual(GENERIC);
+    expect(
+      canComment(sam, { teamId: "coral-offers", version: version() }),
+    ).toEqual(GENERIC);
+    expect(
+      canComment(naomi, { teamId: "coral-offers", version: version() }),
+    ).toEqual(GENERIC);
   });
 
   it("someone the waiting stage names, from any team, while the version is in review only", () => {
     const named = { stageApproverIds: ["naomi"] };
-    expect(canComment(naomi, { teamId: "coral-offers", version: version(named) })).toEqual({ ok: true });
-    expect(canComment(naomi, { teamId: "coral-offers", version: version({ ...named, state: "active" }) })).toEqual(GENERIC);
+    expect(
+      canComment(naomi, { teamId: "coral-offers", version: version(named) }),
+    ).toEqual({ ok: true });
+    expect(
+      canComment(naomi, {
+        teamId: "coral-offers",
+        version: version({ ...named, state: "active" }),
+      }),
+    ).toEqual(GENERIC);
     // The Auditor stays read-only, named or not.
-    expect(canComment(taylor, { teamId: "coral-offers", version: version({ stageApproverIds: ["taylor"] }) })).toEqual(GENERIC);
+    expect(
+      canComment(taylor, {
+        teamId: "coral-offers",
+        version: version({ stageApproverIds: ["taylor"] }),
+      }),
+    ).toEqual(GENERIC);
   });
 });
 
 describe("canActOnThread: who may reply, resolve and reopen", () => {
   it("the team acts on any thread while the template has an open draft (its margin shows them all)", () => {
-    const withDraft = template({ hasDraft: true, inReview: null, next: { number: 3, round: 1 } });
-    expect(canActOnThread(maya, { template: withDraft, thread: onDraft() })).toEqual({ ok: true });
-    expect(canActOnThread(jordan, { template: withDraft, thread: thread({ number: 1, state: "active" }) })).toEqual({ ok: true });
+    const withDraft = template({
+      hasDraft: true,
+      inReview: null,
+      next: { number: 3, round: 1 },
+    });
+    expect(
+      canActOnThread(maya, { template: withDraft, thread: onDraft() }),
+    ).toEqual({ ok: true });
+    expect(
+      canActOnThread(jordan, {
+        template: withDraft,
+        thread: thread({ number: 1, state: "active" }),
+      }),
+    ).toEqual({ ok: true });
   });
 
   it("the team acts on the threads the version in review shows", () => {
-    expect(canActOnThread(jordan, { template: template(), thread: thread() })).toEqual({ ok: true });
-    expect(canActOnThread(jordan, { template: template(), thread: thread({ number: 1, state: "changes_requested" }) })).toEqual({ ok: true });
+    expect(
+      canActOnThread(jordan, { template: template(), thread: thread() }),
+    ).toEqual({ ok: true });
+    expect(
+      canActOnThread(jordan, {
+        template: template(),
+        thread: thread({ number: 1, state: "changes_requested" }),
+      }),
+    ).toEqual({ ok: true });
   });
 
   it("nobody acts on a thread when nothing on the template takes comments", () => {
-    const record = template({ hasDraft: false, inReview: null, next: { number: 3, round: 1 } });
-    expect(canActOnThread(maya, { template: record, thread: thread({ number: 2, state: "active" }) })).toEqual(CLOSED);
+    const record = template({
+      hasDraft: false,
+      inReview: null,
+      next: { number: 3, round: 1 },
+    });
+    expect(
+      canActOnThread(maya, {
+        template: record,
+        thread: thread({ number: 2, state: "active" }),
+      }),
+    ).toEqual(CLOSED);
   });
 
   it("someone the stage names acts on the version in review's threads, and on no other", () => {
     const named = reviewNaming("naomi");
-    expect(canActOnThread(naomi, { template: named, thread: thread() })).toEqual({ ok: true });
+    expect(
+      canActOnThread(naomi, { template: named, thread: thread() }),
+    ).toEqual({ ok: true });
     // An earlier version's thread: the version in review shows it.
-    expect(canActOnThread(naomi, { template: named, thread: thread({ number: 2, state: "active" }) })).toEqual({ ok: true });
+    expect(
+      canActOnThread(naomi, {
+        template: named,
+        thread: thread({ number: 2, state: "active" }),
+      }),
+    ).toEqual({ ok: true });
     // A thread begun in the open draft: they can't see it, and it is refused as if it weren't there.
     const withDraft = { ...named, hasDraft: true };
-    expect(canActOnThread(naomi, { template: withDraft, thread: onDraft() })).toEqual(GENERIC);
+    expect(
+      canActOnThread(naomi, { template: withDraft, thread: onDraft() }),
+    ).toEqual(GENERIC);
     // With nothing in review, being named on a stage gives them nothing.
-    expect(canActOnThread(naomi, { template: { ...withDraft, inReview: null }, thread: thread({ state: "active" }) })).toEqual(GENERIC);
+    expect(
+      canActOnThread(naomi, {
+        template: { ...withDraft, inReview: null },
+        thread: thread({ state: "active" }),
+      }),
+    ).toEqual(GENERIC);
   });
 
   it("not a viewer of the team", () => {
-    expect(canActOnThread(sam, { template: template({ hasDraft: true }), thread: thread() })).toEqual(GENERIC);
+    expect(
+      canActOnThread(sam, {
+        template: template({ hasDraft: true }),
+        thread: thread(),
+      }),
+    ).toEqual(GENERIC);
   });
 });
 
 describe("commentText: what a comment may say", () => {
   it("is trimmed, not empty, and at most COMMENT_MAX characters", () => {
     expect(commentText("  Fine.  ")).toEqual({ ok: true, body: "Fine." });
-    expect(commentText(" \n ")).toEqual({ ok: false, ...COMMENT_REFUSALS.empty });
-    expect(commentText("x".repeat(COMMENT_MAX))).toEqual({ ok: true, body: "x".repeat(COMMENT_MAX) });
-    expect(commentText("x".repeat(COMMENT_MAX + 1))).toEqual({ ok: false, ...COMMENT_REFUSALS.tooLong });
-    expect(COMMENT_REFUSALS.tooLong.reason).toBe("Keep a comment under 4,000 characters.");
+    expect(commentText(" \n ")).toEqual({
+      ok: false,
+      ...COMMENT_REFUSALS.empty,
+    });
+    expect(commentText("x".repeat(COMMENT_MAX))).toEqual({
+      ok: true,
+      body: "x".repeat(COMMENT_MAX),
+    });
+    expect(commentText("x".repeat(COMMENT_MAX + 1))).toEqual({
+      ok: false,
+      ...COMMENT_REFUSALS.tooLong,
+    });
+    expect(COMMENT_REFUSALS.tooLong.reason).toBe(
+      "Keep a comment under 4,000 characters.",
+    );
   });
 });
 
 describe("commentAnchors: where a thread can anchor", () => {
   it("is the fields of the channels that are on, in registry order, then the body's blocks", () => {
-    expect(commentAnchors(["b_one", "b_two"], ["pdf", "email"])).toEqual(["email.subject", "email.preheader", "b_one", "b_two"]);
-    expect(commentAnchors([], ["sms", "push"])).toEqual(["push.title", "push.subtitle", "push.body", "sms.text"]);
+    expect(commentAnchors(["b_one", "b_two"], ["pdf", "email"])).toEqual([
+      "email.subject",
+      "email.preheader",
+      "b_one",
+      "b_two",
+    ]);
+    expect(commentAnchors([], ["sms", "push"])).toEqual([
+      "push.title",
+      "push.subtitle",
+      "push.body",
+      "sms.text",
+    ]);
     expect(commentAnchors(["b_one"], ["pdf", "web"])).toEqual(["b_one"]);
   });
 });
 
 describe("addComment", () => {
-  const input =(patch: Partial<Parameters<typeof addComment>[0]> = {}) => ({
+  const input = (patch: Partial<Parameters<typeof addComment>[0]> = {}) => ({
     viewer: jordan,
     template: TEMPLATE,
     version: version(),
@@ -228,12 +358,25 @@ describe("addComment", () => {
         resolvedAt: null,
         createdAt: NOW,
       },
-      comment: { id: "cm_new", threadId: "th_new", authorId: "jordan", body: "Still right?", kind: "comment", createdAt: NOW },
+      comment: {
+        id: "cm_new",
+        threadId: "th_new",
+        authorId: "jordan",
+        body: "Still right?",
+        kind: "comment",
+        createdAt: NOW,
+      },
       effects: [
         {
           kind: "audit",
           action: "comment.added",
-          details: { threadId: "th_new", blockId: "b_two", number: 3, round: 1, quote: "spend $1,000" },
+          details: {
+            threadId: "th_new",
+            blockId: "b_two",
+            number: 3,
+            round: 1,
+            quote: "spend $1,000",
+          },
         },
         {
           kind: "notification",
@@ -248,34 +391,69 @@ describe("addComment", () => {
   });
 
   it("names a second round in review, and links to it", () => {
-    const result = addComment(input({ version: version({ id: "v_3r2", round: 2 }) }));
+    const result = addComment(
+      input({ version: version({ id: "v_3r2", round: 2 }) }),
+    );
     expect(result.ok && result.effects[1]).toMatchObject({
       title: "Jordan commented on Spring Travel Rewards — Terms v3, round 2.",
-      link: { to: "review", templateId: TEMPLATE.id, versionNumber: 3, round: 2 },
+      link: {
+        to: "review",
+        templateId: TEMPLATE.id,
+        versionNumber: 3,
+        round: 2,
+      },
     });
   });
 
   it("asks who may comment and whether the version takes comments", () => {
     expect(addComment(input({ viewer: sam }))).toEqual(GENERIC);
-    expect(addComment(input({ version: version({ state: "active" }) }))).toEqual(CLOSED);
+    expect(
+      addComment(input({ version: version({ state: "active" }) })),
+    ).toEqual(CLOSED);
   });
 
   it("refuses a comment with nothing in it, or too much", () => {
-    expect(addComment(input({ body: "   " }))).toEqual({ ok: false, ...COMMENT_REFUSALS.empty });
-    expect(addComment(input({ body: "x".repeat(COMMENT_MAX + 1) }))).toEqual({ ok: false, ...COMMENT_REFUSALS.tooLong });
+    expect(addComment(input({ body: "   " }))).toEqual({
+      ok: false,
+      ...COMMENT_REFUSALS.empty,
+    });
+    expect(addComment(input({ body: "x".repeat(COMMENT_MAX + 1) }))).toEqual({
+      ok: false,
+      ...COMMENT_REFUSALS.tooLong,
+    });
   });
 
   it("needs the block in a frozen version's body; a draft takes any block, and any version takes the whole-version thread", () => {
-    expect(addComment(input({ blockId: "b_gone" }))).toEqual({ ok: false, ...COMMENT_REFUSALS.noBlock });
-    expect(addComment(input({ blockId: DOCUMENT_THREAD }))).toMatchObject({ ok: true });
-    const draft = version({ id: "v_draft", number: null, round: null, state: "draft", submittedBy: null });
-    expect(addComment(input({ version: draft, blockId: "b_not_saved_yet" }))).toMatchObject({ ok: true });
+    expect(addComment(input({ blockId: "b_gone" }))).toEqual({
+      ok: false,
+      ...COMMENT_REFUSALS.noBlock,
+    });
+    expect(addComment(input({ blockId: DOCUMENT_THREAD }))).toMatchObject({
+      ok: true,
+    });
+    const draft = version({
+      id: "v_draft",
+      number: null,
+      round: null,
+      state: "draft",
+      submittedBy: null,
+    });
+    expect(
+      addComment(input({ version: draft, blockId: "b_not_saved_yet" })),
+    ).toMatchObject({ ok: true });
   });
 
   it("takes a thread on a field of a channel that is on (a message's threads are on its fields), not of one that is off", () => {
     const blockIds = commentAnchors([], ["push", "sms"]);
-    expect(addComment(input({ blockIds, blockId: "push.title", quote: null }))).toMatchObject({ ok: true, thread: { blockId: "push.title", quote: null } });
-    expect(addComment(input({ blockIds, blockId: "email.subject", quote: null }))).toEqual({ ok: false, ...COMMENT_REFUSALS.noBlock });
+    expect(
+      addComment(input({ blockIds, blockId: "push.title", quote: null })),
+    ).toMatchObject({
+      ok: true,
+      thread: { blockId: "push.title", quote: null },
+    });
+    expect(
+      addComment(input({ blockIds, blockId: "email.subject", quote: null })),
+    ).toEqual({ ok: false, ...COMMENT_REFUSALS.noBlock });
   });
 
   it("cuts a long quote to QUOTE_MAX characters, and keeps none when it is blank", () => {
@@ -291,7 +469,14 @@ describe("addComment", () => {
   });
 
   it("tells a draft's author, with a link to the template; nobody hears of their own comment", () => {
-    const draft = version({ id: "v_draft", number: null, round: null, state: "draft", submittedBy: null, createdBy: "maya" });
+    const draft = version({
+      id: "v_draft",
+      number: null,
+      round: null,
+      state: "draft",
+      submittedBy: null,
+      createdBy: "maya",
+    });
     const onDraftResult = addComment(input({ version: draft }));
     expect(onDraftResult.ok && onDraftResult.effects[1]).toMatchObject({
       to: { kind: "user", userId: "maya" },
@@ -319,12 +504,25 @@ describe("reply", () => {
     const result = reply(input());
     expect(result).toEqual({
       ok: true,
-      comment: { id: "cm_reply", threadId: "th_1", authorId: "jordan", body: "Agreed.", kind: "comment", createdAt: NOW },
+      comment: {
+        id: "cm_reply",
+        threadId: "th_1",
+        authorId: "jordan",
+        body: "Agreed.",
+        kind: "comment",
+        createdAt: NOW,
+      },
       effects: [
         {
           kind: "audit",
           action: "comment.added",
-          details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1, reply: true },
+          details: {
+            threadId: "th_1",
+            blockId: "b_two",
+            number: 3,
+            round: 1,
+            reply: true,
+          },
         },
         ...["maya", "priya"].map((userId) => ({
           kind: "notification",
@@ -339,29 +537,66 @@ describe("reply", () => {
   });
 
   it("links a decided version's thread to its review screen, for whoever can't open the workspace", () => {
-    const decided = reply(input({ template: template({ hasDraft: true }), thread: thread({ number: 2, state: "active" }) }));
+    const decided = reply(
+      input({
+        template: template({ hasDraft: true }),
+        thread: thread({ number: 2, state: "active" }),
+      }),
+    );
     expect(decided.ok && decided.effects[1]).toMatchObject({
-      link: { to: "template", templateId: TEMPLATE.id, reviewVersion: { number: 2 } },
+      link: {
+        to: "template",
+        templateId: TEMPLATE.id,
+        reviewVersion: { number: 2 },
+      },
     });
   });
 
   it("names a round sent back, in the sentence and the link: the bare link would open the newer round", () => {
-    const sentBack = thread({ number: 3, round: 1, state: "changes_requested" });
-    const result = reply(input({ template: template({ hasDraft: true, inReview: null }), thread: sentBack }));
+    const sentBack = thread({
+      number: 3,
+      round: 1,
+      state: "changes_requested",
+    });
+    const result = reply(
+      input({
+        template: template({ hasDraft: true, inReview: null }),
+        thread: sentBack,
+      }),
+    );
     expect(result.ok && result.effects[1]).toMatchObject({
       title: "Jordan replied on Spring Travel Rewards — Terms v3, round 1.",
-      link: { to: "template", templateId: TEMPLATE.id, reviewVersion: { number: 3, round: 1 } },
+      link: {
+        to: "template",
+        templateId: TEMPLATE.id,
+        reviewVersion: { number: 3, round: 1 },
+      },
     });
   });
 
   it("answers a resolved thread too, without reopening it", () => {
-    expect(reply(input({ thread: thread({}, { status: "resolved" }) }))).toMatchObject({ ok: true });
+    expect(
+      reply(input({ thread: thread({}, { status: "resolved" }) })),
+    ).toMatchObject({ ok: true });
   });
 
   it("asks where the thread can be answered, then the text", () => {
-    expect(reply(input({ template: template({ inReview: null }) }))).toEqual(CLOSED);
-    expect(reply(input({ viewer: naomi, template: reviewNaming("naomi", "x"), thread: onDraft() }))).toEqual(GENERIC);
-    expect(reply(input({ body: "" }))).toEqual({ ok: false, ...COMMENT_REFUSALS.empty });
+    expect(reply(input({ template: template({ inReview: null }) }))).toEqual(
+      CLOSED,
+    );
+    expect(
+      reply(
+        input({
+          viewer: naomi,
+          template: reviewNaming("naomi", "x"),
+          thread: onDraft(),
+        }),
+      ),
+    ).toEqual(GENERIC);
+    expect(reply(input({ body: "" }))).toEqual({
+      ok: false,
+      ...COMMENT_REFUSALS.empty,
+    });
   });
 });
 
@@ -378,22 +613,48 @@ describe("resolveThread and reopenThread", () => {
     expect(resolveThread(input())).toEqual({
       ok: true,
       changes: { status: "resolved", resolvedBy: "jordan", resolvedAt: NOW },
-      effects: [{ kind: "audit", action: "thread.resolved", details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1 } }],
+      effects: [
+        {
+          kind: "audit",
+          action: "thread.resolved",
+          details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1 },
+        },
+      ],
     });
-    expect(reopenThread(input({ thread: thread({}, { status: "resolved" }) }))).toEqual({
+    expect(
+      reopenThread(input({ thread: thread({}, { status: "resolved" }) })),
+    ).toEqual({
       ok: true,
       changes: { status: "open", resolvedBy: null, resolvedAt: null },
-      effects: [{ kind: "audit", action: "thread.reopened", details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1 } }],
+      effects: [
+        {
+          kind: "audit",
+          action: "thread.reopened",
+          details: { threadId: "th_1", blockId: "b_two", number: 3, round: 1 },
+        },
+      ],
     });
   });
 
   it("asks for a thread already where it was asked to go: nothing to write, still ok", () => {
-    expect(resolveThread(input({ thread: thread({}, { status: "resolved" }) }))).toEqual({ ok: true, changes: null, effects: [] });
-    expect(reopenThread(input())).toEqual({ ok: true, changes: null, effects: [] });
+    expect(
+      resolveThread(input({ thread: thread({}, { status: "resolved" }) })),
+    ).toEqual({ ok: true, changes: null, effects: [] });
+    expect(reopenThread(input())).toEqual({
+      ok: true,
+      changes: null,
+      effects: [],
+    });
   });
 
   it("refuses where the thread can't be answered, before anything else", () => {
-    expect(resolveThread(input({ template: template({ inReview: null }) }))).toEqual(CLOSED);
-    expect(reopenThread(input({ viewer: sam, thread: thread({}, { status: "resolved" }) }))).toEqual(GENERIC);
+    expect(
+      resolveThread(input({ template: template({ inReview: null }) })),
+    ).toEqual(CLOSED);
+    expect(
+      reopenThread(
+        input({ viewer: sam, thread: thread({}, { status: "resolved" }) }),
+      ),
+    ).toEqual(GENERIC);
   });
 });

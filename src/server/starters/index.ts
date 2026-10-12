@@ -3,9 +3,18 @@ import { ensureBlockIds } from "@/editor/schema";
 import type { StarterContent } from "@/domain/lifecycle/types";
 import { assertNever } from "@/domain/assert-never";
 import { VariableKit } from "../seed/variables";
-import { blankAlert, cardActivity, paymentReminder, statementReady, type AlertStarter } from "./alerts";
+import {
+  blankAlert,
+  cardActivity,
+  paymentReminder,
+  statementReady,
+  type AlertStarter,
+} from "./alerts";
 import { blankBody } from "./blank";
-import { cardOfferTermsBody, cardOfferTermsVariables } from "./card-offer-terms";
+import {
+  cardOfferTermsBody,
+  cardOfferTermsVariables,
+} from "./card-offer-terms";
 import { STARTERS, type StarterChoice, type StarterKey } from "./catalog";
 import { feeScheduleBody, feeScheduleVariables } from "./fee-schedule";
 import {
@@ -38,11 +47,19 @@ export interface BuildStarterOptions {
  * type's three required H2 sections in order; an alert's is one empty paragraph, beside its push and
  * SMS fields. Every block (nested ones too) has its id.
  */
-export function buildStarter(choice: StarterChoice, { scope, now }: BuildStarterOptions): StarterContent {
+export function buildStarter(
+  choice: StarterChoice,
+  { scope, now }: BuildStarterOptions,
+): StarterContent {
   const kit = new VariableKit(now.getTime());
-  const meta = STARTERS[choice.family].find((s) => s.key === choice.starterKey)!;
+  const meta = STARTERS[choice.family].find(
+    (s) => s.key === choice.starterKey,
+  )!;
 
-  const base = (body: StarterContent["body"], variables: StarterContent["variables"]): StarterContent => ({
+  const base = (
+    body: StarterContent["body"],
+    variables: StarterContent["variables"],
+  ): StarterContent => ({
     key: meta.key,
     name: meta.name,
     body: ensureBlockIds(body),

@@ -46,11 +46,20 @@ export const REVIEW_EVENT_ACTIONS: ReadonlySet<string> = new Set([
  * The version an event is about, as its row or sentence names it: the round for a review event (with
  * history), the plain "vN" for the rest (sunsets and revokes are about the released version). Null for none.
  */
-export function eventVersionLabel(action: string, v: NumberedRound | null, style: LabelStyle = "chrome"): string | null {
-  return v === null ? null : versionLabel(v, { style, history: REVIEW_EVENT_ACTIONS.has(action) });
+export function eventVersionLabel(
+  action: string,
+  v: NumberedRound | null,
+  style: LabelStyle = "chrome",
+): string | null {
+  return v === null
+    ? null
+    : versionLabel(v, { style, history: REVIEW_EVENT_ACTIONS.has(action) });
 }
 
-export function describeActivity(e: ActivityEvent, actor: Person | null): string {
+export function describeActivity(
+  e: ActivityEvent,
+  actor: Person | null,
+): string {
   const d = e.details ?? {};
   const who = actor?.name ?? SYSTEM_ACTOR;
   const version = e.version ?? fromDetails(d);
@@ -60,13 +69,17 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
     case "template.created": {
       // Phase 7a: an import names the file it came from ("Maya Chen imported Spring offer.docx.").
       const file = text(d.filename);
-      return typeof d.source === "string" && d.source.startsWith("import:") && file
+      return typeof d.source === "string" &&
+        d.source.startsWith("import:") &&
+        file
         ? `${who} imported ${file}${/[.!?]$/.test(file) ? "" : "."}`
         : `${who} created the template.`;
     }
     case "draft.started": {
       const from = numberOr(d.basedOn);
-      return from === null ? `${who} started a draft.` : `${who} started a draft from v${from}.`;
+      return from === null
+        ? `${who} started a draft.`
+        : `${who} started a draft from v${from}.`;
     }
     case "draft.edited":
       return `${who} edited the draft.`;
@@ -77,7 +90,9 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
     case "version.stage_approved":
     case "version.approved": {
       const stage = text(d.stage);
-      return stage ? `${who} approved ${v} (${stage}).` : `${who} approved ${v}.`;
+      return stage
+        ? `${who} approved ${v} (${stage}).`
+        : `${who} approved ${v}.`;
     }
     case "version.activated": {
       // The released number, and the round it was approved on when that wasn't the first.
@@ -88,11 +103,15 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
           : `${who} approved ${live}, making it Active.`;
       }
       const replaced = numberOr(d.supersedes);
-      return replaced === null ? `${live} became Active.` : `${live} became Active, replacing v${replaced}.`;
+      return replaced === null
+        ? `${live} became Active.`
+        : `${live} became Active, replacing v${replaced}.`;
     }
     case "version.superseded": {
       const by = numberOr(d.supersededBy);
-      return by === null ? `${v} was superseded.` : `${v} was superseded by v${by}.`;
+      return by === null
+        ? `${v} was superseded.`
+        : `${v} was superseded by v${by}.`;
     }
     case "version.sunset_set": {
       // The day as picked, read in the business time zone it was set in.
@@ -106,7 +125,9 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
     case "version.sunset_passed": {
       // Written by the sweep (SunsetPassedDetails): the day is the sunset's, in the business time zone.
       const day = recordedSunsetDay(d);
-      return day ? `${v} stopped rendering: its sunset passed on ${formatLongDate(day)}.` : `${v} stopped rendering: its sunset passed.`;
+      return day
+        ? `${v} stopped rendering: its sunset passed on ${formatLongDate(day)}.`
+        : `${v} stopped rendering: its sunset passed.`;
     }
     case "version.revoke_started":
       return withText(`${who} started revoking ${v}`, d.reason);
@@ -123,7 +144,9 @@ export function describeActivity(e: ActivityEvent, actor: Person | null): string
       // says which, so the sentence names it once. A row from before rounds names the next version instead.
       const answeredBy = numberOr(d.resolvedWith);
       if (d.auto === true && answeredBy !== null) {
-        const sameVersion = numberOr(d.resolvedWithRound) !== null && answeredBy === version?.number;
+        const sameVersion =
+          numberOr(d.resolvedWithRound) !== null &&
+          answeredBy === version?.number;
         return sameVersion
           ? `${who} answered the change request on ${v} by resubmitting.`
           : `${who} answered the change request on ${v} with v${answeredBy}.`;

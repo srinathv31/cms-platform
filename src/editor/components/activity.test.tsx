@@ -26,15 +26,40 @@ import { FormatBubble } from "./format-bubble";
 import { InlineVariableField } from "./inline-variable-field";
 import { SlashMenu, createSlashMenuController } from "./slash-menu";
 import { TableMenu } from "./table-menu";
-import { VariablePicker, createVariablePickerController } from "./variable-picker";
+import {
+  VariablePicker,
+  createVariablePickerController,
+} from "./variable-picker";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-const VARIABLES: Variable[] = [{ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }];
-const CONTENT = doc(h2("Offer details", "offer_details"), p("Hello there"), { type: "table", content: [{ type: "tableRow", content: [{ type: "tableCell", content: [p("Cell")] }] }] });
-const SUBJECT: JSONContent = doc({ type: "paragraph", content: [text("Hi "), { type: "variable", attrs: { key: "first_name" } }] });
+const VARIABLES: Variable[] = [
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+];
+const CONTENT = doc(h2("Offer details", "offer_details"), p("Hello there"), {
+  type: "table",
+  content: [
+    {
+      type: "tableRow",
+      content: [{ type: "tableCell", content: [p("Cell")] }],
+    },
+  ],
+});
+const SUBJECT: JSONContent = doc({
+  type: "paragraph",
+  content: [text("Hi "), { type: "variable", attrs: { key: "first_name" } }],
+});
 
-const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
+const wait = (ms: number) =>
+  act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 
 let setMode: (mode: "visible" | "hidden") => void = () => {};
 let root: Root | null = null;
@@ -89,9 +114,17 @@ afterEach(async () => {
   document.body.innerHTML = "";
 });
 
-type DomEditor = { getText: () => string; commands: { setTextSelection: (p: number) => boolean }; on: (event: "destroy", fn: () => void) => void };
-const liveDoc = (host: HTMLElement) => host.querySelector<HTMLElement & { editor?: DomEditor }>(".ucomp-doc.ProseMirror");
-const liveField = (host: HTMLElement) => host.querySelector<HTMLElement>(".ucomp-field-input.ProseMirror");
+type DomEditor = {
+  getText: () => string;
+  commands: { setTextSelection: (p: number) => boolean };
+  on: (event: "destroy", fn: () => void) => void;
+};
+const liveDoc = (host: HTMLElement) =>
+  host.querySelector<HTMLElement & { editor?: DomEditor }>(
+    ".ucomp-doc.ProseMirror",
+  );
+const liveField = (host: HTMLElement) =>
+  host.querySelector<HTMLElement>(".ucomp-field-input.ProseMirror");
 
 /**
  * Hide, and re-show right as TipTap destroys the hidden editor (its cleanup timer), before React
@@ -100,10 +133,15 @@ const liveField = (host: HTMLElement) => host.querySelector<HTMLElement>(".ucomp
  */
 async function hideAndShow(host: HTMLElement, times = 1) {
   for (let i = 0; i < times; i++) {
-    const editors = [liveDoc(host)?.editor, (liveField(host) as { editor?: unknown } | null)?.editor].filter(Boolean) as Array<{
+    const editors = [
+      liveDoc(host)?.editor,
+      (liveField(host) as { editor?: unknown } | null)?.editor,
+    ].filter(Boolean) as Array<{
       on: (event: "destroy", fn: () => void) => void;
     }>;
-    const destroyed = new Promise<void>((resolve) => editors[0]?.on("destroy", () => queueMicrotask(resolve)));
+    const destroyed = new Promise<void>((resolve) =>
+      editors[0]?.on("destroy", () => queueMicrotask(resolve)),
+    );
     await act(async () => setMode("hidden"));
     await vi.runOnlyPendingTimersAsync(); // TipTap's scheduled destruction of the hidden editor
     await destroyed;
@@ -133,18 +171,30 @@ describe("hidden and re-shown with <Activity>", () => {
     const bar = host.querySelector(".ucomp-block-handle > div");
     expect(bar).not.toBeNull();
     await act(async () => {
-      dom.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+      dom.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "a", bubbles: true }),
+      );
     });
     expect(bar?.hasAttribute("data-typing")).toBe(true);
     // The table control's Alt+F10 listener is attached too (caret in the table).
     await act(async () => {
-      dom.editor!.commands.setTextSelection(dom.editor!.getText().indexOf("Cell") + 4);
+      dom.editor!.commands.setTextSelection(
+        dom.editor!.getText().indexOf("Cell") + 4,
+      );
     });
     await wait(10);
-    const trigger = host.querySelector<HTMLButtonElement>('[aria-label="Table options"]');
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Table options"]',
+    );
     expect(trigger).not.toBeNull();
     await act(async () => {
-      dom.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", altKey: true, bubbles: true }));
+      dom.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "F10",
+          altKey: true,
+          bubbles: true,
+        }),
+      );
     });
     expect(document.activeElement).toBe(trigger);
     expect(errors).toEqual([]);
@@ -160,7 +210,11 @@ describe("the editor's chrome before its view is mounted", () => {
     // No element: the view doesn't exist yet (`editor.view.dom` would throw).
     const editor = new ReactEditor({
       element: null,
-      extensions: editorExtensions({ store: runtime.variables, slashRender: slash.render, pickerRender: picker.render }),
+      extensions: editorExtensions({
+        store: runtime.variables,
+        slashRender: slash.render,
+        pickerRender: picker.render,
+      }),
       content: CONTENT,
     });
     expect(() => editor.view.dom).toThrow();
@@ -173,7 +227,10 @@ describe("the editor's chrome before its view is mounted", () => {
     document.body.appendChild(frame);
     errors = [];
     await act(async () => {
-      root = createRoot(host, { onUncaughtError: (error) => errors.push(error), onCaughtError: (error) => errors.push(error) });
+      root = createRoot(host, {
+        onUncaughtError: (error) => errors.push(error),
+        onCaughtError: (error) => errors.push(error),
+      });
       root.render(
         <>
           <ChipPopover editor={editor} root={runtime} chip={chip} />
@@ -195,10 +252,18 @@ describe("the editor's chrome before its view is mounted", () => {
     await act(async () => {
       editor.commands.setTextSelection(editor.state.doc.content.size - 4); // in the table cell
     });
-    const trigger = frame.querySelector<HTMLButtonElement>('[aria-label="Table options"]');
+    const trigger = frame.querySelector<HTMLButtonElement>(
+      '[aria-label="Table options"]',
+    );
     expect(trigger).not.toBeNull();
     await act(async () => {
-      dom.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", altKey: true, bubbles: true }));
+      dom.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "F10",
+          altKey: true,
+          bubbles: true,
+        }),
+      );
     });
     expect(document.activeElement).toBe(trigger);
     expect(errors).toEqual([]);

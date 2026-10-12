@@ -1,4 +1,9 @@
-import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { resetDemoData } from "./helpers/access";
 import { settled } from "./helpers/settled";
 
@@ -20,7 +25,11 @@ const CORAL = [
   "Rate Change Notice",
 ];
 /** The Coral templates that are alerts (Push and SMS); every other template is a document. */
-const ALERTS = ["Card Used Abroad", "Payment Due Reminder", "Rate Change Heads-up"];
+const ALERTS = [
+  "Card Used Abroad",
+  "Payment Due Reminder",
+  "Rate Change Heads-up",
+];
 const DEPOSITS = [
   "Everyday Checking — Fee Schedule",
   "High-Yield Savings — Rate Disclosure",
@@ -48,17 +57,94 @@ interface PersonaSpec {
   rows: string[];
 }
 
-const CROSS_TEAM_SPACES = ["All teams", "Card Statements", "Coral Offers", "Deposits"];
+const CROSS_TEAM_SPACES = [
+  "All teams",
+  "Card Statements",
+  "Coral Offers",
+  "Deposits",
+];
 
 const PERSONAS: PersonaSpec[] = [
-  { id: "maya", name: "Maya Chen", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: null, rows: CORAL },
-  { id: "jordan", name: "Jordan Ellis", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: 2, rows: CORAL },
-  { id: "alex", name: "Alex Kim", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage", "Audit"], settings: true, review: 2, rows: CORAL },
-  { id: "priya", name: "Priya Raman", spaces: ["Coral Offers", "Deposits"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: null, rows: CORAL },
-  { id: "sam", name: "Sam Ortiz", spaces: ["Coral Offers"], landing: "/coral-offers/library", nav: ["Library", "Review", "Usage"], settings: false, review: null, rows: CORAL },
-  { id: "riley", name: "Riley Brooks", spaces: CROSS_TEAM_SPACES, landing: "/all/library", nav: ["Library", "Review", "Usage", "Audit"], settings: true, review: null, rows: ALL },
-  { id: "taylor", name: "Taylor Nguyen", spaces: CROSS_TEAM_SPACES, landing: "/all/library", nav: ["Library", "Review", "Usage", "Audit"], settings: false, review: null, rows: ALL },
-  { id: "morgan", name: "Morgan Lee", spaces: [], landing: "/request-access", nav: [], settings: false, review: null, rows: [] },
+  {
+    id: "maya",
+    name: "Maya Chen",
+    spaces: ["Coral Offers"],
+    landing: "/coral-offers/library",
+    nav: ["Library", "Review", "Usage"],
+    settings: false,
+    review: null,
+    rows: CORAL,
+  },
+  {
+    id: "jordan",
+    name: "Jordan Ellis",
+    spaces: ["Coral Offers"],
+    landing: "/coral-offers/library",
+    nav: ["Library", "Review", "Usage"],
+    settings: false,
+    review: 2,
+    rows: CORAL,
+  },
+  {
+    id: "alex",
+    name: "Alex Kim",
+    spaces: ["Coral Offers"],
+    landing: "/coral-offers/library",
+    nav: ["Library", "Review", "Usage", "Audit"],
+    settings: true,
+    review: 2,
+    rows: CORAL,
+  },
+  {
+    id: "priya",
+    name: "Priya Raman",
+    spaces: ["Coral Offers", "Deposits"],
+    landing: "/coral-offers/library",
+    nav: ["Library", "Review", "Usage"],
+    settings: false,
+    review: null,
+    rows: CORAL,
+  },
+  {
+    id: "sam",
+    name: "Sam Ortiz",
+    spaces: ["Coral Offers"],
+    landing: "/coral-offers/library",
+    nav: ["Library", "Review", "Usage"],
+    settings: false,
+    review: null,
+    rows: CORAL,
+  },
+  {
+    id: "riley",
+    name: "Riley Brooks",
+    spaces: CROSS_TEAM_SPACES,
+    landing: "/all/library",
+    nav: ["Library", "Review", "Usage", "Audit"],
+    settings: true,
+    review: null,
+    rows: ALL,
+  },
+  {
+    id: "taylor",
+    name: "Taylor Nguyen",
+    spaces: CROSS_TEAM_SPACES,
+    landing: "/all/library",
+    nav: ["Library", "Review", "Usage", "Audit"],
+    settings: false,
+    review: null,
+    rows: ALL,
+  },
+  {
+    id: "morgan",
+    name: "Morgan Lee",
+    spaces: [],
+    landing: "/request-access",
+    nav: [],
+    settings: false,
+    review: null,
+    rows: [],
+  },
 ];
 
 // ── Fixtures ──
@@ -80,17 +166,20 @@ const test = base.extend<Fixtures>({
     async ({ page, calmPrefetch }, use) => {
       const problems: string[] = [];
       page.on("console", (msg) => {
-        if (msg.type() === "error") problems.push(`console.error: ${msg.text()} @ ${msg.location().url}`);
+        if (msg.type() === "error")
+          problems.push(`console.error: ${msg.text()} @ ${msg.location().url}`);
       });
       page.on("pageerror", (err) => problems.push(`pageerror: ${err.message}`));
       page.on("crash", () => problems.push("page crashed"));
       await page.addInitScript(observeLayoutShift);
       if (calmPrefetch) {
-        await page.context().route(/\/templates\/UC-[A-Z0-9]+\?_rsc=/, (route) =>
-          route.request().headers()["next-router-prefetch"] === "1"
-            ? route.fulfill({ status: 204 })
-            : route.continue(),
-        );
+        await page
+          .context()
+          .route(/\/templates\/UC-[A-Z0-9]+\?_rsc=/, (route) =>
+            route.request().headers()["next-router-prefetch"] === "1"
+              ? route.fulfill({ status: 204 })
+              : route.continue(),
+          );
       }
       await use(problems);
       expect(problems, "console errors and page errors").toEqual([]);
@@ -101,7 +190,10 @@ const test = base.extend<Fixtures>({
 
 /** Runs in the page before any script: records every layout shift (buffered) from document start. */
 function observeLayoutShift() {
-  const w = window as unknown as { __cls: number; __shifts: { value: number; at: number; nodes: string[] }[] };
+  const w = window as unknown as {
+    __cls: number;
+    __shifts: { value: number; at: number; nodes: string[] }[];
+  };
   w.__cls = 0;
   w.__shifts = [];
   try {
@@ -119,7 +211,9 @@ function observeLayoutShift() {
           at: Math.round(entry.startTime),
           nodes: (entry.sources ?? []).map((s) => {
             const el = s.node as HTMLElement | undefined;
-            return el ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}.${String(el.className).slice(0, 60)}` : "?";
+            return el
+              ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}.${String(el.className).slice(0, 60)}`
+              : "?";
           }),
         });
       }
@@ -139,21 +233,28 @@ async function readCls(page: Page) {
 /** React has attached its handlers to the shell (the profile button is interactive). */
 async function hydrated(page: Page) {
   await page.waitForFunction(() => {
-    const el = document.querySelector("button[aria-label$='profile and persona']");
+    const el = document.querySelector(
+      "button[aria-label$='profile and persona']",
+    );
     return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps"));
   });
 }
 
 async function asPersona(page: Page, id: string) {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:3100";
-  await page.context().addCookies([{ name: PERSONA_COOKIE, value: id, url: baseURL }]);
+  await page
+    .context()
+    .addCookies([{ name: PERSONA_COOKIE, value: id, url: baseURL }]);
 }
 
 // ── Page helpers ──
 
-const sidebarNav = (page: Page) => page.locator('[data-slot="sidebar-content"]');
-const sidebarFooter = (page: Page) => page.locator('[data-slot="sidebar-footer"]');
-const profileButton = (page: Page) => page.getByRole("button", { name: /profile and persona/ });
+const sidebarNav = (page: Page) =>
+  page.locator('[data-slot="sidebar-content"]');
+const sidebarFooter = (page: Page) =>
+  page.locator('[data-slot="sidebar-footer"]');
+const profileButton = (page: Page) =>
+  page.getByRole("button", { name: /profile and persona/ });
 
 async function openSwitcher(page: Page) {
   await page.getByRole("button", { name: "Switch team" }).click();
@@ -164,7 +265,9 @@ async function openSwitcher(page: Page) {
 
 async function teamSwitcherEntries(page: Page): Promise<string[]> {
   const menu = await openSwitcher(page);
-  const entries = (await menu.getByRole("menuitem").allInnerTexts()).map((t) => t.trim());
+  const entries = (await menu.getByRole("menuitem").allInnerTexts()).map((t) =>
+    t.trim(),
+  );
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   return entries;
@@ -190,7 +293,9 @@ interface LibraryRow {
 /** Waits for the library list and returns its rows. The "All teams" library has a Team column. */
 async function libraryRows(page: Page): Promise<LibraryRow[]> {
   // Next keeps the previous route alive (display: none) behind the new one, so only count what is shown.
-  const rows = page.locator("main ul > li > a[href*='/templates/']").filter({ visible: true });
+  const rows = page
+    .locator("main ul > li > a[href*='/templates/']")
+    .filter({ visible: true });
   await expect(rows.first()).toBeVisible();
   await hydrated(page);
   const count = await rows.count();
@@ -202,7 +307,10 @@ async function libraryRows(page: Page): Promise<LibraryRow[]> {
     .then((n) => n > 0);
   for (let i = 0; i < count; i++) {
     const row = rows.nth(i);
-    const lines = (await row.innerText()).split("\n").map((l) => l.trim()).filter(Boolean);
+    const lines = (await row.innerText())
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
     // name, "id · kind", [team,] status, active, last edited, owner initials, owner name
     const offset = hasTeamColumn ? 1 : 0;
     const [id, kind] = lines[1]!.split(" · ");
@@ -226,14 +334,17 @@ async function expectLanded(page: Page, spec: PersonaSpec) {
 }
 
 async function openTemplate(page: Page, name: string) {
-  await page.getByRole("link", { name: new RegExp(`^${escapeRe(name)}`) }).click();
+  await page
+    .getByRole("link", { name: new RegExp(`^${escapeRe(name)}`) })
+    .click();
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
   await hydrated(page);
 }
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const editor = (page: Page): Locator => page.locator(".ProseMirror").filter({ visible: true });
+const editor = (page: Page): Locator =>
+  page.locator(".ProseMirror").filter({ visible: true });
 
 /**
  * The server renders the document as static markup with the editor's classes; the live editor
@@ -255,11 +366,19 @@ async function liveEditor(page: Page): Promise<Locator> {
  */
 async function caretAtEndOf(page: Page, paragraph: Locator) {
   const box = (await paragraph.boundingBox())!;
-  await paragraph.click({ position: { x: box.width - 3, y: box.height - 9 }, delay: 90 });
+  await paragraph.click({
+    position: { x: box.width - 3, y: box.height - 9 },
+    delay: 90,
+  });
   await expect
     .poll(() =>
       page.evaluate(
-        () => (document.querySelector(".ProseMirror") as unknown as { editor: { state: { selection: { from: number } } } }).editor.state.selection.from,
+        () =>
+          (
+            document.querySelector(".ProseMirror") as unknown as {
+              editor: { state: { selection: { from: number } } };
+            }
+          ).editor.state.selection.from,
       ),
     )
     .toBeGreaterThan(1);
@@ -293,25 +412,39 @@ test.afterAll(() => {
 
 test.describe("shell and library, per persona", () => {
   for (const spec of PERSONAS) {
-    test(`${spec.id}: lands, switcher, nav, settings, review badge, library rows`, async ({ page }) => {
+    test(`${spec.id}: lands, switcher, nav, settings, review badge, library rows`, async ({
+      page,
+    }) => {
       await asPersona(page, spec.id);
       await page.goto("/");
       await expectLanded(page, spec);
 
       if (spec.id === "morgan") {
         // No team: a "No team yet" header, no nav, no Settings, and the request-access page.
-        await expect(page.getByRole("heading", { level: 1, name: "Request access" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Switch team" })).toHaveCount(0);
+        await expect(
+          page.getByRole("heading", { level: 1, name: "Request access" }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole("button", { name: "Switch team" }),
+        ).toHaveCount(0);
         await expect(sidebarNav(page).getByRole("link")).toHaveCount(0);
-        await expect(sidebarNav(page).getByText("No team yet").or(page.getByText("No team yet"))).toBeVisible();
-        await expect(sidebarFooter(page).getByRole("link", { name: "Settings" })).toHaveCount(0);
+        await expect(
+          sidebarNav(page)
+            .getByText("No team yet")
+            .or(page.getByText("No team yet")),
+        ).toBeVisible();
+        await expect(
+          sidebarFooter(page).getByRole("link", { name: "Settings" }),
+        ).toHaveCount(0);
         // Having no team, Morgan cannot open anyone's library: it falls back to request access.
         await page.goto("/coral-offers/library");
         await expect(page).toHaveURL(/\/request-access$/);
         return;
       }
 
-      await expect(profileButton(page)).toHaveAccessibleName(new RegExp(`^${spec.name},`));
+      await expect(profileButton(page)).toHaveAccessibleName(
+        new RegExp(`^${spec.name},`),
+      );
 
       // Team switcher entries
       expect(await teamSwitcherEntries(page)).toEqual(spec.spaces);
@@ -322,8 +455,12 @@ test.describe("shell and library, per persona", () => {
       await expect(auditLink).toHaveCount(spec.nav.includes("Audit") ? 1 : 0);
 
       // Settings (alex, riley only)
-      await expect(sidebarFooter(page).getByRole("link", { name: "Settings" })).toHaveCount(spec.settings ? 1 : 0);
-      await expect(sidebarFooter(page).getByRole("button", { name: "Help" })).toBeVisible();
+      await expect(
+        sidebarFooter(page).getByRole("link", { name: "Settings" }),
+      ).toHaveCount(spec.settings ? 1 : 0);
+      await expect(
+        sidebarFooter(page).getByRole("button", { name: "Help" }),
+      ).toBeVisible();
 
       // Review badge ("2" for jordan and alex only: Cash Back v3 and the Card Used Abroad alert)
       const review = sidebarNav(page).getByRole("link", { name: /^Review/ });
@@ -338,33 +475,61 @@ test.describe("shell and library, per persona", () => {
       const rows = await libraryRows(page);
       expect(names(rows)).toEqual([...spec.rows].sort());
       // Each row says which kind it is: the three Coral alerts are Alerts, every other template a Document.
-      expect(rows.filter((r) => r.kind === "Alert").map((r) => r.name).sort(), "the rows that say Alert").toEqual(ALERTS);
-      expect(rows.filter((r) => r.kind === "Document"), "every other row says Document").toHaveLength(rows.length - ALERTS.length);
+      expect(
+        rows
+          .filter((r) => r.kind === "Alert")
+          .map((r) => r.name)
+          .sort(),
+        "the rows that say Alert",
+      ).toEqual(ALERTS);
+      expect(
+        rows.filter((r) => r.kind === "Document"),
+        "every other row says Document",
+      ).toHaveLength(rows.length - ALERTS.length);
       if (spec.landing.startsWith("/all/")) {
         expect(rows).toHaveLength(14);
-        await expect(page.locator(".caps-label", { hasText: /^Team$/ }).filter({ visible: true })).toHaveCount(1);
+        await expect(
+          page
+            .locator(".caps-label", { hasText: /^Team$/ })
+            .filter({ visible: true }),
+        ).toHaveCount(1);
         const byTeam = Object.groupBy(rows, (r) => r.team ?? "");
-        expect(Object.keys(byTeam).sort()).toEqual(["Card Statements", "Coral Offers", "Deposits"]);
+        expect(Object.keys(byTeam).sort()).toEqual([
+          "Card Statements",
+          "Coral Offers",
+          "Deposits",
+        ]);
         expect(byTeam["Coral Offers"]).toHaveLength(8);
         expect(byTeam["Deposits"]).toHaveLength(3);
         expect(byTeam["Card Statements"]).toHaveLength(3);
       } else {
-        expect(rows.every((r) => r.href.startsWith("/coral-offers/templates/"))).toBe(true);
-        for (const n of [...DEPOSITS, ...CARD_STATEMENTS]) expect(names(rows)).not.toContain(n);
+        expect(
+          rows.every((r) => r.href.startsWith("/coral-offers/templates/")),
+        ).toBe(true);
+        for (const n of [...DEPOSITS, ...CARD_STATEMENTS])
+          expect(names(rows)).not.toContain(n);
       }
-      await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Library" }),
+      ).toBeVisible();
 
       // The one primary action: authors get "New template", nobody else does.
       const newTemplate = page.getByRole("button", { name: "New template" });
-      await expect(newTemplate).toHaveCount(spec.id === "maya" || spec.id === "priya" ? 1 : 0);
+      await expect(newTemplate).toHaveCount(
+        spec.id === "maya" || spec.id === "priya" ? 1 : 0,
+      );
     });
   }
 
-  test("Card Statements content never appears for a Coral persona, even by URL", async ({ page }) => {
+  test("Card Statements content never appears for a Coral persona, even by URL", async ({
+    page,
+  }) => {
     // Find a Card Statements template id the way a Platform Admin sees it.
     await asPersona(page, "riley");
     await page.goto("/all/library");
-    const insert = (await libraryRows(page)).find((r) => r.name === "Statement Insert — Rate Change")!;
+    const insert = (await libraryRows(page)).find(
+      (r) => r.name === "Statement Insert — Rate Change",
+    )!;
     expect(insert.team).toBe("Card Statements");
 
     await asPersona(page, "maya");
@@ -374,15 +539,24 @@ test.describe("shell and library, per persona", () => {
     for (const n of CARD_STATEMENTS) expect(names(rows)).not.toContain(n);
 
     // The same template under the Coral space, or under its own space, is not Maya's to open.
-    for (const href of [`/coral-offers/templates/${insert.id}`, `/card-statements/templates/${insert.id}`]) {
+    for (const href of [
+      `/coral-offers/templates/${insert.id}`,
+      `/card-statements/templates/${insert.id}`,
+    ]) {
       await page.goto(href);
-      await expect(page.getByText("Statement Insert", { exact: false })).toHaveCount(0);
-      await expect(page.locator("main h1").filter({ visible: true })).not.toContainText("Statement Insert");
+      await expect(
+        page.getByText("Statement Insert", { exact: false }),
+      ).toHaveCount(0);
+      await expect(
+        page.locator("main h1").filter({ visible: true }),
+      ).not.toContainText("Statement Insert");
       await expect(editor(page)).toHaveCount(0);
     }
   });
 
-  test("priya sees Deposits as a separate space and loses it when she leaves", async ({ page }) => {
+  test("priya sees Deposits as a separate space and loses it when she leaves", async ({
+    page,
+  }) => {
     await asPersona(page, "priya");
     await page.goto("/coral-offers/library");
     await libraryRows(page);
@@ -390,15 +564,21 @@ test.describe("shell and library, per persona", () => {
     await menu.getByRole("menuitem", { name: "Deposits" }).click();
     await expect(page).toHaveURL(/\/deposits\/library$/);
     expect(names(await libraryRows(page))).toEqual([...DEPOSITS].sort());
-    await expect(page.getByRole("button", { name: "Switch team" })).toContainText("Deposits");
+    await expect(
+      page.getByRole("button", { name: "Switch team" }),
+    ).toContainText("Deposits");
     // Viewer on Deposits: no New template there.
-    await expect(page.getByRole("button", { name: "New template" })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "New template" }),
+    ).toHaveCount(0);
     // But she can't open Card Statements: she is sent home.
     await page.goto("/card-statements/library");
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
   });
 
-  test("riley and taylor: every team's library is reachable from the switcher", async ({ page }) => {
+  test("riley and taylor: every team's library is reachable from the switcher", async ({
+    page,
+  }) => {
     await asPersona(page, "riley");
     await page.goto("/");
     await expect(page).toHaveURL(/\/all\/library$/);
@@ -407,7 +587,9 @@ test.describe("shell and library, per persona", () => {
     await menu.getByRole("menuitem", { name: "Card Statements" }).click();
     await expect(page).toHaveURL(/\/card-statements\/library$/);
     expect(names(await libraryRows(page))).toEqual([...CARD_STATEMENTS].sort());
-    await expect(page.getByRole("button", { name: "New template" })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "New template" }),
+    ).toHaveCount(0);
   });
 });
 
@@ -417,13 +599,19 @@ test.describe("shell and library, per persona", () => {
 
 async function switchVia(page: Page, personaName: string) {
   await profileButton(page).click();
-  await page.getByRole("menuitemradio", { name: new RegExp(personaName) }).click();
+  await page
+    .getByRole("menuitemradio", { name: new RegExp(personaName) })
+    .click();
   await expect(page.getByRole("menu")).toBeHidden();
-  await expect(profileButton(page)).toHaveAccessibleName(new RegExp(`^${personaName},`));
+  await expect(profileButton(page)).toHaveAccessibleName(
+    new RegExp(`^${personaName},`),
+  );
 }
 
 test.describe("persona switcher", () => {
-  test("lists all nine personas with a one-line role summary", async ({ page }) => {
+  test("lists all nine personas with a one-line role summary", async ({
+    page,
+  }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
     await profileButton(page).click();
@@ -432,27 +620,46 @@ test.describe("persona switcher", () => {
     await expect(items.nth(0)).toContainText("Maya Chen");
     await expect(items.nth(0)).toContainText("Coral Offers · Author");
     await expect(items.nth(0)).toBeChecked();
-    await expect(page.getByRole("menuitemradio", { name: /Riley Brooks/ })).toContainText("Platform Admin");
-    await expect(page.getByRole("menuitemradio", { name: /Morgan Lee/ })).toContainText("No team yet");
+    await expect(
+      page.getByRole("menuitemradio", { name: /Riley Brooks/ }),
+    ).toContainText("Platform Admin");
+    await expect(
+      page.getByRole("menuitemradio", { name: /Morgan Lee/ }),
+    ).toContainText("No team yet");
   });
 
-  test("switching keeps the URL when the new persona may see it, otherwise goes home", async ({ page }) => {
+  test("switching keeps the URL when the new persona may see it, otherwise goes home", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await libraryRows(page);
 
     // Maya → Jordan on the library: same URL, Review badge appears (Cash Back v3 and the Card Used Abroad alert).
     await switchVia(page, "Jordan Ellis");
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
-    await expect(sidebarNav(page).getByRole("link", { name: /^Review/ }).locator("[aria-label='2 waiting']")).toHaveText("2");
+    await expect(
+      sidebarNav(page)
+        .getByRole("link", { name: /^Review/ })
+        .locator("[aria-label='2 waiting']"),
+    ).toHaveText("2");
 
     // Jordan → Alex deep inside a template: same URL, Audit appears, Settings appears.
     await openTemplate(page, "Balance Transfer Intro — Terms");
     const templateUrl = page.url();
     await switchVia(page, "Alex Kim");
     await expect(page).toHaveURL(templateUrl);
-    await expect(sidebarNav(page).getByRole("link", { name: "Audit" })).toBeVisible();
-    await expect(sidebarFooter(page).getByRole("link", { name: "Settings" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1, name: "Balance Transfer Intro — Terms" })).toBeVisible();
+    await expect(
+      sidebarNav(page).getByRole("link", { name: "Audit" }),
+    ).toBeVisible();
+    await expect(
+      sidebarFooter(page).getByRole("link", { name: "Settings" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Balance Transfer Intro — Terms",
+      }),
+    ).toBeVisible();
 
     // Alex → Riley: a Platform Admin may see any team, so the URL stays.
     await switchVia(page, "Riley Brooks");
@@ -468,7 +675,9 @@ test.describe("persona switcher", () => {
     // Priya → Morgan: no team, so request access.
     await switchVia(page, "Morgan Lee");
     await expect(page).toHaveURL(/\/request-access$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Request access" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Request access" }),
+    ).toBeVisible();
     await expect(sidebarNav(page).getByRole("link")).toHaveCount(0);
 
     // Morgan → Maya: from request access, someone with a team lands in it.
@@ -494,7 +703,9 @@ test.describe("persona switcher", () => {
 const ring = (page: Page) => page.locator("[data-slot='share-ring']");
 
 test.describe("workspace", () => {
-  test("SHARE ring appears exactly on templates that have an Active version", async ({ page }) => {
+  test("SHARE ring appears exactly on templates that have an Active version", async ({
+    page,
+  }) => {
     await asPersona(page, "riley");
     await page.goto("/all/library");
     const rows = await libraryRows(page);
@@ -508,33 +719,53 @@ test.describe("workspace", () => {
 
     for (const row of rows) {
       await page.goto(row.href);
-      await expect(page.getByRole("heading", { level: 1, name: row.name })).toBeVisible();
-      await expect(page.getByRole("navigation", { name: "Template" })).toBeVisible();
-      await expect(ring(page), `${row.name} (${row.status}, active ${row.active})`).toHaveCount(
-        row.active !== "—" ? 1 : 0,
-      );
+      await expect(
+        page.getByRole("heading", { level: 1, name: row.name }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("navigation", { name: "Template" }),
+      ).toBeVisible();
+      await expect(
+        ring(page),
+        `${row.name} (${row.status}, active ${row.active})`,
+      ).toHaveCount(row.active !== "—" ? 1 : 0);
       // A Platform Admin never edits: every workspace is "View only".
       await expect(page.getByText("View only", { exact: true })).toBeVisible();
     }
   });
 
-  test("workspace header: name, template ID, status badge, version label", async ({ page }) => {
+  test("workspace header: name, template ID, status badge, version label", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await openTemplate(page, "Balance Transfer Intro — Terms");
-    const header = page.locator("main header:has(h1)").filter({ visible: true });
+    const header = page
+      .locator("main header:has(h1)")
+      .filter({ visible: true });
     await expect(header.getByText(/^UC-[0-9A-Z]{6}$/)).toBeVisible();
     await expect(header.locator("[data-status='active']")).toHaveText("Active");
     await expect(header.getByText("v2", { exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Content" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Content" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     for (const tab of ["Content", "Versions", "Usage", "Activity"]) {
-      await expect(page.getByRole("navigation", { name: "Template" }).getByRole("link", { name: tab })).toBeVisible();
+      await expect(
+        page
+          .getByRole("navigation", { name: "Template" })
+          .getByRole("link", { name: tab }),
+      ).toBeVisible();
     }
   });
 
-  test("the SHARE ring opens the integration sheet and Esc closes it", async ({ page }) => {
+  test("the SHARE ring opens the integration sheet and Esc closes it", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await openTemplate(page, "Balance Transfer Intro — Terms");
-    const share = page.getByRole("button", { name: /^Share Balance Transfer Intro — Terms/ });
+    const share = page.getByRole("button", {
+      name: /^Share Balance Transfer Intro — Terms/,
+    });
     await expect(share).toBeVisible();
     await expect(ring(page)).toHaveCount(1);
     const box = (await share.boundingBox())!;
@@ -547,7 +778,9 @@ test.describe("workspace", () => {
     const sheet = page.getByRole("dialog");
     await expect(sheet).toBeVisible();
     await expect(sheet.getByText("Integration", { exact: true })).toBeVisible();
-    await expect(sheet.getByText("Balance Transfer Intro — Terms")).toBeVisible();
+    await expect(
+      sheet.getByText("Balance Transfer Intro — Terms"),
+    ).toBeVisible();
     await expect(sheet.getByText(/^UC-[0-9A-Z]{6}$/)).toBeVisible();
     // The integration panel names the Active version in more than one place (the summary and the contract).
     await expect(sheet.getByText("v2", { exact: true }).first()).toBeVisible();
@@ -558,14 +791,23 @@ test.describe("workspace", () => {
     await expect(page).toHaveURL(/\/templates\/UC-/);
   });
 
-  test("a template without an Active version has no SHARE ring (Annual Fee Waiver)", async ({ page }) => {
+  test("a template without an Active version has no SHARE ring (Annual Fee Waiver)", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await openTemplate(page, "Annual Fee Waiver — Terms");
-    await expect(page.locator("main header:has(h1)").filter({ visible: true }).locator("[data-status='draft']")).toBeVisible();
+    await expect(
+      page
+        .locator("main header:has(h1)")
+        .filter({ visible: true })
+        .locator("[data-status='draft']"),
+    ).toBeVisible();
     await expect(ring(page)).toHaveCount(0);
   });
 
-  test("priya on Deposits: a viewer sees View only and no editor chrome", async ({ page }) => {
+  test("priya on Deposits: a viewer sees View only and no editor chrome", async ({
+    page,
+  }) => {
     await asPersona(page, "priya");
     await page.goto("/deposits/library");
     await openTemplate(page, "Everyday Checking — Fee Schedule");
@@ -578,8 +820,12 @@ test.describe("workspace", () => {
     await editor(page).locator("p").first().click({ clickCount: 3 });
     await page.mouse.move(400, 400);
     await expect(page.locator(".ucomp-block-handle")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Insert block below" })).toHaveCount(0);
-    await expect(page.getByRole("toolbar", { name: "Format text" })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Insert block below" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("toolbar", { name: "Format text" }),
+    ).toHaveCount(0);
     await page.keyboard.type("/ should not type");
     await expect(page.getByRole("option")).toHaveCount(0);
     await expect(editor(page)).not.toContainText("should not type");
@@ -596,14 +842,20 @@ test.describe("workspace", () => {
     await expect(page.locator(".ucomp-block-handle")).toHaveCount(0);
   });
 
-  test("maya is read-only on a version that is not an open draft", async ({ page }) => {
+  test("maya is read-only on a version that is not an open draft", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await openTemplate(page, "Balance Transfer Intro — Terms");
     await expect(editor(page)).toHaveAttribute("contenteditable", "false");
-    await expect(page.getByRole("toolbar", { name: "Format text" })).toHaveCount(0);
+    await expect(
+      page.getByRole("toolbar", { name: "Format text" }),
+    ).toHaveCount(0);
   });
 
-  test("maya on Annual Fee Waiver: types in the editor, `/` opens the block menu, Heading 2 inserts", async ({ page }) => {
+  test("maya on Annual Fee Waiver: types in the editor, `/` opens the block menu, Heading 2 inserts", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await openTemplate(page, "Annual Fee Waiver — Terms");
     await expect(page.getByText("View only", { exact: true })).toHaveCount(0);
@@ -654,10 +906,15 @@ test.describe("workspace", () => {
     await page.keyboard.press("Enter");
     await expect(options).toHaveCount(0);
     await page.keyboard.type("Added section");
-    await expect(ed.getByRole("heading", { level: 2, name: "Added section" })).toBeVisible();
+    await expect(
+      ed.getByRole("heading", { level: 2, name: "Added section" }),
+    ).toBeVisible();
 
     // The bubble toolbar follows a text selection and Bold toggles the mark.
-    await dragSelect(page, ed.locator("p", { hasText: "Typed by the gate spec." }));
+    await dragSelect(
+      page,
+      ed.locator("p", { hasText: "Typed by the gate spec." }),
+    );
     const toolbar = page.getByRole("toolbar", { name: "Format text" });
     await expect(toolbar).toBeVisible();
     await toolbar.getByRole("button", { name: "Bold" }).click();
@@ -675,10 +932,16 @@ test.describe("workspace", () => {
     await expect(async () => {
       await page.mouse.move(box.x + box.width / 2, box.y - 30);
       await page.mouse.move(box.x + 40, box.y + box.height / 2, { steps: 8 });
-      await page.mouse.move(box.x + 60, box.y + box.height / 2 + 1, { steps: 4 });
-      await expect(page.getByRole("button", { name: "Insert block below" })).toBeVisible({ timeout: 700 });
+      await page.mouse.move(box.x + 60, box.y + box.height / 2 + 1, {
+        steps: 4,
+      });
+      await expect(
+        page.getByRole("button", { name: "Insert block below" }),
+      ).toBeVisible({ timeout: 700 });
     }).toPass({ timeout: 10_000 });
-    await expect(page.getByLabel("Drag to move block, or click for options")).toBeVisible();
+    await expect(
+      page.getByLabel("Drag to move block, or click for options"),
+    ).toBeVisible();
   });
 });
 
@@ -687,7 +950,9 @@ test.describe("workspace", () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 test.describe("overlays", () => {
-  test("settings modal opens from the sidebar and closes with Esc, back to the page behind it", async ({ page }) => {
+  test("settings modal opens from the sidebar and closes with Esc, back to the page behind it", async ({
+    page,
+  }) => {
     await asPersona(page, "alex");
     await page.goto("/coral-offers/library");
     await libraryRows(page);
@@ -696,13 +961,20 @@ test.describe("overlays", () => {
     await expect(dialog).toBeVisible();
     await expect(page).toHaveURL(/\/coral-offers\/settings\/members$/);
     await expect(dialog.getByText("Team", { exact: true })).toBeVisible();
-    for (const label of ["Members", "Access requests", "Recertification", "Inactivity"]) {
+    for (const label of [
+      "Members",
+      "Access requests",
+      "Recertification",
+      "Inactivity",
+    ]) {
       await expect(dialog.getByRole("link", { name: label })).toBeVisible();
     }
     // Alex is not a Platform Admin: no Platform group.
     await expect(dialog.getByText("Platform", { exact: true })).toHaveCount(0);
     // The library stays behind the modal (the page is inert while it is open, so look by tag).
-    await expect(page.locator("main h1", { hasText: "Library" }).filter({ visible: true })).toBeVisible();
+    await expect(
+      page.locator("main h1", { hasText: "Library" }).filter({ visible: true }),
+    ).toBeVisible();
 
     await dialog.getByRole("link", { name: "Recertification" }).click();
     await expect(page).toHaveURL(/\/settings\/recertification$/);
@@ -711,10 +983,14 @@ test.describe("overlays", () => {
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Library" }),
+    ).toBeVisible();
   });
 
-  test("settings modal closes with its X button; riley sees both groups", async ({ page }) => {
+  test("settings modal closes with its X button; riley sees both groups", async ({
+    page,
+  }) => {
     await asPersona(page, "riley");
     await page.goto("/all/library");
     await libraryRows(page);
@@ -723,7 +999,12 @@ test.describe("overlays", () => {
     await expect(dialog).toBeVisible();
     await expect(page).toHaveURL(/\/all\/settings\/teams$/);
     await expect(dialog.getByText("Platform", { exact: true })).toBeVisible();
-    for (const label of ["Teams", "Content types", "Channel rules", "Approval chains"]) {
+    for (const label of [
+      "Teams",
+      "Content types",
+      "Channel rules",
+      "Approval chains",
+    ]) {
       await expect(dialog.getByRole("link", { name: label })).toBeVisible();
     }
     await dialog.getByRole("button", { name: "Close settings" }).click();
@@ -731,7 +1012,9 @@ test.describe("overlays", () => {
     await expect(page).toHaveURL(/\/all\/library$/);
   });
 
-  test("settings opened by URL still shows the modal, and Esc goes to the library", async ({ page }) => {
+  test("settings opened by URL still shows the modal, and Esc goes to the library", async ({
+    page,
+  }) => {
     await asPersona(page, "alex");
     await page.goto("/coral-offers/settings/members");
     await expect(page.getByRole("dialog")).toBeVisible();
@@ -740,30 +1023,45 @@ test.describe("overlays", () => {
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
   });
 
-  test("a persona without settings access cannot open the modal by URL", async ({ page }) => {
+  test("a persona without settings access cannot open the modal by URL", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/settings/members");
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  test("⌘K opens the palette; it lists pages and this team's templates; Enter navigates", async ({ page }) => {
+  test("⌘K opens the palette; it lists pages and this team's templates; Enter navigates", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await libraryRows(page);
     const dialog = page.getByRole("dialog");
     await page.keyboard.press("ControlOrMeta+K");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("option", { name: "Library" })).toBeVisible();
-    await expect(dialog.getByRole("option", { name: /Annual Fee Waiver/ })).toBeVisible();
-    await expect(dialog.getByRole("option", { name: /Statement Insert/ })).toHaveCount(0);
+    await expect(
+      dialog.getByRole("option", { name: /Annual Fee Waiver/ }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("option", { name: /Statement Insert/ }),
+    ).toHaveCount(0);
     // Base UI focuses the search a frame after the dialog shows; type once it has focus.
     await expect(dialog.locator("input")).toBeFocused();
     await page.keyboard.type("balance");
     await expect(dialog.getByRole("option")).toHaveCount(1);
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-/);
-    await expect(page.getByRole("heading", { level: 1, name: "Balance Transfer Intro — Terms" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Balance Transfer Intro — Terms",
+      }),
+    ).toBeVisible();
   });
 
-  test("demo drawer: reset returns to Maya on the Coral Offers library", async ({ page }) => {
+  test("demo drawer: reset returns to Maya on the Coral Offers library", async ({
+    page,
+  }) => {
     await asPersona(page, "riley");
     await page.goto("/all/usage");
     await expect(profileButton(page)).toHaveAccessibleName(/^Riley Brooks,/);
@@ -771,7 +1069,9 @@ test.describe("overlays", () => {
     const drawer = page.getByRole("dialog", { name: "Demo" });
     await expect(drawer).toBeVisible();
     await expect(drawer.getByRole("button", { name: "+1 day" })).toBeVisible();
-    await expect(drawer.getByRole("button", { name: "+15 days" })).toBeVisible();
+    await expect(
+      drawer.getByRole("button", { name: "+15 days" }),
+    ).toBeVisible();
     await drawer.getByRole("button", { name: "Reset demo" }).click();
     const confirm = page.getByRole("alertdialog");
     await expect(confirm).toBeVisible();
@@ -787,7 +1087,10 @@ test.describe("overlays", () => {
     await page.goto("/coral-offers/review");
     await page.getByRole("button", { name: "Demo", exact: true }).click();
     await page.getByRole("button", { name: "Reset demo" }).click();
-    await page.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Cancel" })
+      .click();
     await expect(page.getByRole("alertdialog")).toBeHidden();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
@@ -795,7 +1098,9 @@ test.describe("overlays", () => {
     await expect(profileButton(page)).toHaveAccessibleName(/^Alex Kim,/);
   });
 
-  test("alex sees the access request card and can dismiss it", async ({ page }) => {
+  test("alex sees the access request card and can dismiss it", async ({
+    page,
+  }) => {
     await asPersona(page, "alex");
     await page.goto("/coral-offers/library");
     const card = page.locator("[data-slot='sidebar-card']");
@@ -814,7 +1119,9 @@ test.describe("overlays", () => {
     await expect(card).toHaveCount(0);
   });
 
-  test("the other nav pages render under their sidebar item", async ({ page }) => {
+  test("the other nav pages render under their sidebar item", async ({
+    page,
+  }) => {
     await asPersona(page, "alex");
     await page.goto("/coral-offers/library");
     await hydrated(page);
@@ -824,17 +1131,25 @@ test.describe("overlays", () => {
       ["Audit", "/coral-offers/audit"],
       ["Library", "/coral-offers/library"],
     ] as const) {
-      await sidebarNav(page).getByRole("link", { name: new RegExp(`^${label}`) }).click();
+      await sidebarNav(page)
+        .getByRole("link", { name: new RegExp(`^${label}`) })
+        .click();
       await expect(page).toHaveURL(new RegExp(`${path}$`));
-      await expect(page.getByRole("heading", { level: 1, name: label })).toBeVisible();
-      await expect(sidebarNav(page).getByRole("link", { name: new RegExp(`^${label}`) })).toHaveAttribute("aria-current", "page");
+      await expect(
+        page.getByRole("heading", { level: 1, name: label }),
+      ).toBeVisible();
+      await expect(
+        sidebarNav(page).getByRole("link", { name: new RegExp(`^${label}`) }),
+      ).toHaveAttribute("aria-current", "page");
     }
   });
 
   test("audit is not reachable for a persona without it", async ({ page }) => {
     await page.goto("/coral-offers/audit");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(sidebarNav(page).getByRole("link", { name: "Audit" })).toHaveCount(0);
+    await expect(
+      sidebarNav(page).getByRole("link", { name: "Audit" }),
+    ).toHaveCount(0);
   });
 });
 
@@ -849,9 +1164,17 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
     // Hydration, streamed holes, the live editor swap-in: wait for each, then for the layout and the fonts to hold still.
     await hydrated(page);
     await page.waitForFunction(() => {
-      const shown = (el: Element) => (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true }) && el.getClientRects().length > 0;
-      const loading = [...document.querySelectorAll('[data-slot="skeleton"], [aria-busy="true"]')].some(shown);
-      const editors = [...document.querySelectorAll(".ProseMirror")].filter(shown);
+      const shown = (el: Element) =>
+        (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true }) &&
+        el.getClientRects().length > 0;
+      const loading = [
+        ...document.querySelectorAll(
+          '[data-slot="skeleton"], [aria-busy="true"]',
+        ),
+      ].some(shown);
+      const editors = [...document.querySelectorAll(".ProseMirror")].filter(
+        shown,
+      );
       return !loading && editors.every((el) => "pmViewDesc" in el);
     });
     await settled(page);
@@ -859,12 +1182,22 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
 
   async function report(label: string, page: Page) {
     const { cls, shifts } = await readCls(page);
-    console.log(`CLS ${label}: ${cls.toFixed(4)}${shifts.length ? ` ${JSON.stringify(shifts)}` : ""}`);
-    test.info().annotations.push({ type: "cls", description: `${label}: ${cls.toFixed(4)}` });
-    expect(cls, `${label} layout shifts: ${JSON.stringify(shifts)}`).toBeLessThan(LIMIT);
+    console.log(
+      `CLS ${label}: ${cls.toFixed(4)}${shifts.length ? ` ${JSON.stringify(shifts)}` : ""}`,
+    );
+    test.info().annotations.push({
+      type: "cls",
+      description: `${label}: ${cls.toFixed(4)}`,
+    });
+    expect(
+      cls,
+      `${label} layout shifts: ${JSON.stringify(shifts)}`,
+    ).toBeLessThan(LIMIT);
   }
 
-  test("the probe itself works: a forced shift is recorded", async ({ page }) => {
+  test("the probe itself works: a forced shift is recorded", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await libraryRows(page);
     await settle(page);
@@ -873,7 +1206,11 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
       box.style.cssText = "height:300px;width:300px;background:#ccc";
       document.querySelector("main")!.prepend(box);
     });
-    await expect.poll(async () => (await readCls(page)).cls, { message: "the injected block's shift is reported" }).toBeGreaterThan(LIMIT);
+    await expect
+      .poll(async () => (await readCls(page)).cls, {
+        message: "the injected block's shift is reported",
+      })
+      .toBeGreaterThan(LIMIT);
   });
 
   for (const id of ["maya", "alex", "riley"]) {
@@ -886,9 +1223,13 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
     });
   }
 
-  test("workspace on an Active template, hard load (with the SHARE ring)", async ({ page }) => {
+  test("workspace on an Active template, hard load (with the SHARE ring)", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
-    const href = (await libraryRows(page)).find((r) => r.name.startsWith("Balance Transfer"))!.href;
+    const href = (await libraryRows(page)).find((r) =>
+      r.name.startsWith("Balance Transfer"),
+    )!.href;
     await page.goto(href);
     await expect(ring(page)).toBeVisible();
     await expect(editor(page)).toBeVisible();
@@ -898,7 +1239,9 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
 
   test("workspace on an editable draft, hard load", async ({ page }) => {
     await page.goto("/coral-offers/library");
-    const href = (await libraryRows(page)).find((r) => r.name.startsWith("Annual Fee"))!.href;
+    const href = (await libraryRows(page)).find((r) =>
+      r.name.startsWith("Annual Fee"),
+    )!.href;
     await page.goto(href);
     await expect(editor(page)).toHaveAttribute("contenteditable", "true");
     await settle(page);
@@ -910,9 +1253,13 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
   for (const name of ["Balance Transfer", "Payment Due Reminder"]) {
     test(`the Usage tab of ${name}, hard load`, async ({ page }) => {
       await page.goto("/coral-offers/library");
-      const href = (await libraryRows(page)).find((r) => r.name.startsWith(name))!.href;
+      const href = (await libraryRows(page)).find((r) =>
+        r.name.startsWith(name),
+      )!.href;
       await page.goto(`${href}/usage`);
-      await expect(page.getByRole("heading", { name: "Renders by channel" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Renders by channel" }),
+      ).toBeVisible();
       await settle(page);
       await report(`Usage tab, ${name} (hard load)`, page);
     });
@@ -921,13 +1268,17 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
   // The save status ("Saving…", "Saved") is the Revert menu's trigger, with a chevron after the text:
   // the text keeps the width of its widest state, so the chevron stays put as each save lands (N10).
   // Not a threshold: any shift counts, since the one it caught measured 0.000002.
-  test("typing into a draft shifts nothing as each save lands", async ({ page }) => {
+  test("typing into a draft shifts nothing as each save lands", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await openTemplate(page, "Annual Fee Waiver — Terms");
     const ed = await liveEditor(page);
     await expect(ed).toHaveAttribute("contenteditable", "true");
     await settle(page);
-    const status = page.locator("[data-status][aria-live='polite']").filter({ visible: true });
+    const status = page
+      .locator("[data-status][aria-live='polite']")
+      .filter({ visible: true });
     const before = (await readCls(page)).shifts.length;
 
     // Two saves, each landing well after the last keystroke (a shift within 500 ms of input isn't counted).
@@ -937,14 +1288,22 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
       await page.keyboard.type(` ${text}`);
       await expect(status).toHaveText("Saving…");
       await expect(status).toHaveText("Saved", { timeout: 15_000 });
-      await expect(status, "the status is on screen, where a shift would be reported").toBeInViewport();
+      await expect(
+        status,
+        "the status is on screen, where a shift would be reported",
+      ).toBeInViewport();
     }
     await settled(page);
     const { shifts } = await readCls(page);
-    expect(shifts.slice(before), "layout shifts after typing, while each save landed").toEqual([]);
+    expect(
+      shifts.slice(before),
+      "layout shifts after typing, while each save landed",
+    ).toEqual([]);
   });
 
-  test("library → workspace → library by clicking (soft navigation)", async ({ page }) => {
+  test("library → workspace → library by clicking (soft navigation)", async ({
+    page,
+  }) => {
     await page.goto("/coral-offers/library");
     await libraryRows(page);
     await settle(page);
@@ -968,7 +1327,9 @@ test.describe("CLS (layout-shift, buffered) < 0.01", () => {
     await libraryRows(page);
     await settle(page);
     const after = (await readCls(page)).cls;
-    console.log(`CLS persona switch maya→jordan: delta ${(after - before).toFixed(4)} (total ${after.toFixed(4)})`);
+    console.log(
+      `CLS persona switch maya→jordan: delta ${(after - before).toFixed(4)} (total ${after.toFixed(4)})`,
+    );
     expect(after - before).toBeLessThan(LIMIT);
   });
 });
@@ -986,7 +1347,9 @@ test.describe("router prefetch", () => {
   // Found in Phase 1 QA: on the production build, the library page re-requested the prefetch of
   // every visible link (~650 requests a second) until the tab closed. Aborting only the
   // `/templates/UC-…` prefetches stopped it, so the template-row links are the trigger.
-  test("the library does not re-prefetch its links in a loop", async ({ page }) => {
+  test("the library does not re-prefetch its links in a loop", async ({
+    page,
+  }) => {
     let rsc = 0;
     page.on("request", (r) => {
       if (r.url().includes("_rsc=")) rsc++;
@@ -999,18 +1362,30 @@ test.describe("router prefetch", () => {
     expect(rsc).toBeLessThan(60);
   });
 
-  test("the workspace does not re-prefetch its links in a loop", async ({ page }) => {
+  test("the workspace does not re-prefetch its links in a loop", async ({
+    page,
+  }) => {
     let rsc = 0;
     page.on("request", (r) => {
       if (r.url().includes("_rsc=")) rsc++;
     });
     // Template ids depend on the seed's order of draws, so take this one from the library instead of hardcoding it.
     await page.goto("/coral-offers/library");
-    const href = await page.getByRole("link", { name: /^Balance Transfer Intro — Terms/ }).first().getAttribute("href");
-    expect(href, "the Balance Transfer template's link").toMatch(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}$/);
+    const href = await page
+      .getByRole("link", { name: /^Balance Transfer Intro — Terms/ })
+      .first()
+      .getAttribute("href");
+    expect(href, "the Balance Transfer template's link").toMatch(
+      /\/coral-offers\/templates\/UC-[0-9A-Z]{6}$/,
+    );
     rsc = 0;
     await page.goto(href!);
-    await expect(page.getByRole("heading", { level: 1, name: "Balance Transfer Intro — Terms" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Balance Transfer Intro — Terms",
+      }),
+    ).toBeVisible();
     await expect(ring(page)).toBeVisible();
     await page.waitForTimeout(PREFETCH_WINDOW_MS);
     console.log(`workspace RSC requests in ~3s: ${rsc}`);

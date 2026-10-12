@@ -1,7 +1,12 @@
 import type { Client, InValue } from "@libsql/client";
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { correlation, render, validValues, type Variable } from "../api/helpers";
+import {
+  correlation,
+  render,
+  validValues,
+  type Variable,
+} from "../api/helpers";
 import { beat, expect, tap, untilUncovered } from "./scenario";
 
 // Shared by the going-live specs (scenarios 4, 5 and 6): the Spring Travel fixture, the cleanup that puts
@@ -16,22 +21,53 @@ export const TEAM = "coral-offers";
 const FIXTURE_MARK = "e2e-golive-fixture";
 
 export const CUSTOMERS = {
-  olivia: { name: "Olivia Bennett", first: "Olivia", last: "Bennett", email: "olivia.bennett@example.com", apr: "21.99" },
-  marcus: { name: "Marcus Delgado", first: "Marcus", last: "Delgado", email: "marcus.delgado@example.com", apr: "24.49" },
-  anjali: { name: "Anjali Kapoor", first: "Anjali", last: "Kapoor", email: "anjali.kapoor@example.com", apr: "19.24" },
-  fatima: { name: "Fatima Al-Sayed", first: "Fatima", last: "Al-Sayed", email: "fatima.al-sayed@example.com", apr: "26.99" },
+  olivia: {
+    name: "Olivia Bennett",
+    first: "Olivia",
+    last: "Bennett",
+    email: "olivia.bennett@example.com",
+    apr: "21.99",
+  },
+  marcus: {
+    name: "Marcus Delgado",
+    first: "Marcus",
+    last: "Delgado",
+    email: "marcus.delgado@example.com",
+    apr: "24.49",
+  },
+  anjali: {
+    name: "Anjali Kapoor",
+    first: "Anjali",
+    last: "Kapoor",
+    email: "anjali.kapoor@example.com",
+    apr: "19.24",
+  },
+  fatima: {
+    name: "Fatima Al-Sayed",
+    first: "Fatima",
+    last: "Al-Sayed",
+    email: "fatima.al-sayed@example.com",
+    apr: "26.99",
+  },
   long: {
     name: "Maximiliano-Bartholomew Featherstonehaugh-Villiers-Montgomery",
     first: "Maximiliano-Bartholomew",
     last: "Featherstonehaugh-Villiers-Montgomery",
-    email: "maximiliano-bartholomew.featherstonehaugh-villiers-montgomery@example.com",
+    email:
+      "maximiliano-bartholomew.featherstonehaugh-villiers-montgomery@example.com",
     apr: "29.99",
   },
 } as const;
 export type Customer = (typeof CUSTOMERS)[keyof typeof CUSTOMERS];
 
 /** The five customers scenario 4 sends to: four ordinary ones and the long-name one. */
-export const FIVE: readonly Customer[] = [CUSTOMERS.olivia, CUSTOMERS.marcus, CUSTOMERS.anjali, CUSTOMERS.fatima, CUSTOMERS.long];
+export const FIVE: readonly Customer[] = [
+  CUSTOMERS.olivia,
+  CUSTOMERS.marcus,
+  CUSTOMERS.anjali,
+  CUSTOMERS.fatima,
+  CUSTOMERS.long,
+];
 
 // ── The database ─────────────────────────────────────────────────────────────
 
@@ -43,23 +79,35 @@ export async function busy<T>(run: () => Promise<T>): Promise<T> {
     try {
       return await run();
     } catch (error) {
-      const text = String((error as { code?: unknown; message?: unknown })?.code ?? "") + String((error as Error)?.message ?? "");
-      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text)) throw error;
+      const text =
+        String((error as { code?: unknown; message?: unknown })?.code ?? "") +
+        String((error as Error)?.message ?? "");
+      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text))
+        throw error;
       await new Promise((resolve) => setTimeout(resolve, 40 * 2 ** attempt));
     }
   }
 }
 
-export async function rows(db: Client, sql: string, args: InValue[] = []): Promise<Row[]> {
+export async function rows(
+  db: Client,
+  sql: string,
+  args: InValue[] = [],
+): Promise<Row[]> {
   const result = await busy(() => db.execute({ sql, args }));
-  return result.rows.map((row) => Object.fromEntries(result.columns.map((column) => [column, row[column] as InValue])));
+  return result.rows.map((row) =>
+    Object.fromEntries(
+      result.columns.map((column) => [column, row[column] as InValue]),
+    ),
+  );
 }
 
 export async function run(db: Client, sql: string, args: InValue[] = []) {
   await busy(() => db.execute({ sql, args }));
 }
 
-export const json = (value: InValue) => (value === null || value === undefined ? null : JSON.parse(String(value)));
+export const json = (value: InValue) =>
+  value === null || value === undefined ? null : JSON.parse(String(value));
 
 // ── The fixture: Spring Travel Rewards — Terms, v2 Active ───────────────────
 
@@ -71,7 +119,8 @@ export interface SpringFixture {
 }
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const newTemplateId = () => `UC-${Array.from({ length: 6 }, () => CROCKFORD[Math.floor(Math.random() * 32)]).join("")}`;
+const newTemplateId = () =>
+  `UC-${Array.from({ length: 6 }, () => CROCKFORD[Math.floor(Math.random() * 32)]).join("")}`;
 
 const variable = (key: string) => ({ type: "variable", attrs: { key } });
 const text = (value: string) => ({ type: "text", text: value });
@@ -84,7 +133,12 @@ const text = (value: string) => ({ type: "text", text: value });
  * that died is removed first.
  */
 export async function createSpringTravel(db: Client): Promise<SpringFixture> {
-  for (const stale of await rows(db, "SELECT id FROM templates WHERE starter_key = ?", [FIXTURE_MARK])) await removeTemplate(db, String(stale.id));
+  for (const stale of await rows(
+    db,
+    "SELECT id FROM templates WHERE starter_key = ?",
+    [FIXTURE_MARK],
+  ))
+    await removeTemplate(db, String(stale.id));
 
   const [base] = await rows(
     db,
@@ -92,14 +146,23 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
      WHERE t.team_id = ? AND v.name = 'Cash Back Welcome Bonus — Terms' AND v.number = 2 AND v.state = 'active'`,
     [TEAM],
   );
-  if (!base) throw new Error("The seed has no Cash Back Welcome Bonus v2 (Active) to clone. Run npm run db:reset.");
-  const [baseTemplate] = await rows(db, "SELECT * FROM templates WHERE id = ?", [base.template_id]);
+  if (!base)
+    throw new Error(
+      "The seed has no Cash Back Welcome Bonus v2 (Active) to clone. Run npm run db:reset.",
+    );
+  const [baseTemplate] = await rows(
+    db,
+    "SELECT * FROM templates WHERE id = ?",
+    [base.template_id],
+  );
 
   const templateId = newTemplateId();
   const v2Id = `v_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`;
   const at = Date.now() - 3 * 86_400_000;
 
-  const body = JSON.parse(String(base.body)) as { content: { type: string; attrs?: { id?: string }; content?: unknown[] }[] };
+  const body = JSON.parse(String(base.body)) as {
+    content: { type: string; attrs?: { id?: string }; content?: unknown[] }[];
+  };
   // The offer text: first name and last name in the greeting (so the long name shows), then the terms.
   const greeting = body.content.find((block) => block.type === "paragraph");
   if (!greeting) throw new Error("The cloned body has no paragraph.");
@@ -108,32 +171,75 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
     variable("first_name"),
     text(" "),
     variable("last_name"),
-    text(", spend $1,000 on travel in your first 3 months and earn $200 back. Your purchase APR is "),
+    text(
+      ", spend $1,000 on travel in your first 3 months and earn $200 back. Your purchase APR is ",
+    ),
     variable("purchase_apr"),
     text("."),
   ];
 
   const variables: Variable[] = [
-    { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-    { key: "last_name", label: "Last name", type: "text", required: true, sample: "Chen" },
-    { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
-    { key: "home_state", label: "Home state", type: "us_state", required: true, sample: "NJ" },
-    { key: "offer_end_date", label: "Offer end date", type: "date", required: false, sample: "2026-11-19" },
+    {
+      key: "first_name",
+      label: "First name",
+      type: "text",
+      required: true,
+      sample: "Maya",
+    },
+    {
+      key: "last_name",
+      label: "Last name",
+      type: "text",
+      required: true,
+      sample: "Chen",
+    },
+    {
+      key: "purchase_apr",
+      label: "Purchase APR",
+      type: "percent",
+      required: true,
+      sample: "21.99",
+    },
+    {
+      key: "home_state",
+      label: "Home state",
+      type: "us_state",
+      required: true,
+      sample: "NJ",
+    },
+    {
+      key: "offer_end_date",
+      label: "Offer end date",
+      type: "date",
+      required: false,
+      sample: "2026-11-19",
+    },
   ] as unknown as Variable[];
   const keys = variables.map((v) => v.key);
-  const sampleSets = (JSON.parse(String(base.sample_sets)) as { id: string; values: Record<string, string> }[]).map((set) => ({
+  const sampleSets = (
+    JSON.parse(String(base.sample_sets)) as {
+      id: string;
+      values: Record<string, string>;
+    }[]
+  ).map((set) => ({
     ...set,
-    values: Object.fromEntries(Object.entries(set.values).filter(([key]) => keys.includes(key))),
+    values: Object.fromEntries(
+      Object.entries(set.values).filter(([key]) => keys.includes(key)),
+    ),
   }));
 
-  await run(db, "INSERT INTO templates (id, team_id, content_type_id, created_by, created_at, starter_key) VALUES (?, ?, ?, ?, ?, ?)", [
-    templateId,
-    TEAM,
-    baseTemplate.content_type_id,
-    "maya",
-    at - 86_400_000,
-    FIXTURE_MARK,
-  ]);
+  await run(
+    db,
+    "INSERT INTO templates (id, team_id, content_type_id, created_by, created_at, starter_key) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      templateId,
+      TEAM,
+      baseTemplate.content_type_id,
+      "maya",
+      at - 86_400_000,
+      FIXTURE_MARK,
+    ],
+  );
 
   const version: Row = {
     ...base,
@@ -147,8 +253,27 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
     body: JSON.stringify(body),
     channel_fields: JSON.stringify({
       email: {
-        subject: { type: "doc", content: [{ type: "paragraph", content: [variable("first_name"), text(", your Spring Travel Rewards terms")] }] },
-        preheader: { type: "doc", content: [{ type: "paragraph", content: [text("What to know before you spend.")] }] },
+        subject: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                variable("first_name"),
+                text(", your Spring Travel Rewards terms"),
+              ],
+            },
+          ],
+        },
+        preheader: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [text("What to know before you spend.")],
+            },
+          ],
+        },
       },
     }),
     channels: JSON.stringify(["pdf", "web", "email"]),
@@ -171,20 +296,33 @@ export async function createSpringTravel(db: Client): Promise<SpringFixture> {
     import_upload_id: null,
   };
   const columns = Object.keys(version);
-  await run(db, `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`, columns.map((c) => version[c]));
+  await run(
+    db,
+    `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
+    columns.map((c) => version[c]),
+  );
   await run(
     db,
     "INSERT INTO approvals (id, version_id, stage_id, stage_position, stage_name, actor_id, decision, reason, sample_sets_seen, decided_at) VALUES (?, ?, 'stage_disclosure_0', 0, 'Team approver', 'jordan', 'approved', NULL, ?, ?)",
-    [`ap_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`, v2Id, JSON.stringify(sampleSets.map((s) => s.id)), at],
+    [
+      `ap_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
+      v2Id,
+      JSON.stringify(sampleSets.map((s) => s.id)),
+      at,
+    ],
   );
-  await run(db, "INSERT INTO audit_events (id, at, actor_id, team_id, template_id, version_id, action, details) VALUES (?, ?, 'jordan', ?, ?, ?, 'version.activated', ?)", [
-    `ae_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
-    at,
-    TEAM,
-    templateId,
-    v2Id,
-    JSON.stringify({ number: 2, supersedes: null, stage: "Team approver" }),
-  ]);
+  await run(
+    db,
+    "INSERT INTO audit_events (id, at, actor_id, team_id, template_id, version_id, action, details) VALUES (?, ?, 'jordan', ?, ?, ?, 'version.activated', ?)",
+    [
+      `ae_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
+      at,
+      TEAM,
+      templateId,
+      v2Id,
+      JSON.stringify({ number: 2, supersedes: null, stage: "Team approver" }),
+    ],
+  );
   return { templateId, v2Id, variables };
 }
 
@@ -194,7 +332,10 @@ export async function removeTemplate(db: Client, id: string) {
   const threads = "(SELECT id FROM comment_threads WHERE template_id = ?)";
   const statements: [string, InValue[]][] = [
     // Coral's own reads of this template's notices.
-    ["DELETE FROM sim_notice_reads WHERE notice_id IN (SELECT id FROM consumer_notices WHERE template_id = ?)", [id]],
+    [
+      "DELETE FROM sim_notice_reads WHERE notice_id IN (SELECT id FROM consumer_notices WHERE template_id = ?)",
+      [id],
+    ],
     ["DELETE FROM sim_deliveries WHERE template_id = ?", [id]],
     ["DELETE FROM sim_links WHERE template_id = ?", [id]],
     [`DELETE FROM comments WHERE thread_id IN ${threads}`, [id]],
@@ -222,10 +363,14 @@ export interface Snapshot {
   simLinks: Row[];
 }
 
-const idSet = async (db: Client, sql: string) => new Set((await rows(db, sql)).map((r) => String(Object.values(r)[0])));
+const idSet = async (db: Client, sql: string) =>
+  new Set((await rows(db, sql)).map((r) => String(Object.values(r)[0])));
 
 export async function takeSnapshot(db: Client): Promise<Snapshot> {
-  const [clock] = await rows(db, "SELECT value FROM settings WHERE key = 'clock_offset_days'");
+  const [clock] = await rows(
+    db,
+    "SELECT value FROM settings WHERE key = 'clock_offset_days'",
+  );
   return {
     clock: clock ? String(clock.value) : null,
     simNoticeReads: await idSet(db, "SELECT notice_id FROM sim_notice_reads"),
@@ -251,8 +396,17 @@ export interface RestoreScope {
  * leave it advanced), then the deliveries of the named offers and the render_log rows they made, those
  * offers' links, the reads of the named templates' notices, and the fixture's own rows.
  */
-export async function restore(db: Client, snapshot: Snapshot, scope: RestoreScope = {}) {
-  const { templates = [], offers = [], noticeTemplates = [], clock = true } = scope;
+export async function restore(
+  db: Client,
+  snapshot: Snapshot,
+  scope: RestoreScope = {},
+) {
+  const {
+    templates = [],
+    offers = [],
+    noticeTemplates = [],
+    clock = true,
+  } = scope;
   const problems: unknown[] = [];
   const attempt = async (fn: () => Promise<void>) => {
     try {
@@ -265,19 +419,36 @@ export async function restore(db: Client, snapshot: Snapshot, scope: RestoreScop
 
   await attempt(async () => {
     if (!clock) return;
-    if (snapshot.clock === null) await run(db, "DELETE FROM settings WHERE key = 'clock_offset_days'");
+    if (snapshot.clock === null)
+      await run(db, "DELETE FROM settings WHERE key = 'clock_offset_days'");
     else
-      await run(db, "INSERT INTO settings (key, value) VALUES ('clock_offset_days', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [snapshot.clock]);
+      await run(
+        db,
+        "INSERT INTO settings (key, value) VALUES ('clock_offset_days', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [snapshot.clock],
+      );
   });
 
   await attempt(async () => {
     if (offers.length === 0) return;
-    const all = await rows(db, `SELECT id, correlation_id FROM sim_deliveries WHERE offer_id IN (${marks(offers.length)})`, [...offers]);
+    const all = await rows(
+      db,
+      `SELECT id, correlation_id FROM sim_deliveries WHERE offer_id IN (${marks(offers.length)})`,
+      [...offers],
+    );
     const fresh = all.filter((r) => !snapshot.simDeliveries.has(String(r.id)));
     for (let i = 0; i < fresh.length; i += 200) {
       const chunk = fresh.slice(i, i + 200);
-      await run(db, `DELETE FROM render_log WHERE correlation_id IN (${marks(chunk.length)})`, chunk.map((r) => r.correlation_id));
-      await run(db, `DELETE FROM sim_deliveries WHERE id IN (${marks(chunk.length)})`, chunk.map((r) => r.id));
+      await run(
+        db,
+        `DELETE FROM render_log WHERE correlation_id IN (${marks(chunk.length)})`,
+        chunk.map((r) => r.correlation_id),
+      );
+      await run(
+        db,
+        `DELETE FROM sim_deliveries WHERE id IN (${marks(chunk.length)})`,
+        chunk.map((r) => r.id),
+      );
     }
   });
 
@@ -287,20 +458,34 @@ export async function restore(db: Client, snapshot: Snapshot, scope: RestoreScop
     // Links: each named offer goes back to what it was (the fixture's offer: none).
     for (const offer of offers) {
       const was = snapshot.simLinks.find((r) => String(r.offer_id) === offer);
-      const now = (await rows(db, "SELECT * FROM sim_links WHERE offer_id = ?", [offer]))[0];
+      const now = (
+        await rows(db, "SELECT * FROM sim_links WHERE offer_id = ?", [offer])
+      )[0];
       if (now && was && JSON.stringify(now) === JSON.stringify(was)) continue;
       await run(db, "DELETE FROM sim_links WHERE offer_id = ?", [offer]);
       if (was) {
         const columns = Object.keys(was);
-        await run(db, `INSERT INTO sim_links (${columns.join(", ")}) VALUES (${marks(columns.length)})`, columns.map((c) => was[c]));
+        await run(
+          db,
+          `INSERT INTO sim_links (${columns.join(", ")}) VALUES (${marks(columns.length)})`,
+          columns.map((c) => was[c]),
+        );
       }
     }
   });
 
   await attempt(async () => {
     for (const template of noticeTemplates) {
-      const reads = await rows(db, "SELECT r.notice_id FROM sim_notice_reads r JOIN consumer_notices n ON n.id = r.notice_id WHERE n.template_id = ?", [template]);
-      for (const read of reads) if (!snapshot.simNoticeReads.has(String(read.notice_id))) await run(db, "DELETE FROM sim_notice_reads WHERE notice_id = ?", [read.notice_id]);
+      const reads = await rows(
+        db,
+        "SELECT r.notice_id FROM sim_notice_reads r JOIN consumer_notices n ON n.id = r.notice_id WHERE n.template_id = ?",
+        [template],
+      );
+      for (const read of reads)
+        if (!snapshot.simNoticeReads.has(String(read.notice_id)))
+          await run(db, "DELETE FROM sim_notice_reads WHERE notice_id = ?", [
+            read.notice_id,
+          ]);
     }
   });
 
@@ -309,15 +494,25 @@ export async function restore(db: Client, snapshot: Snapshot, scope: RestoreScop
 
 /** The demo clock's day as the app sees it (UTC), `plusDays` from today: YYYY-MM-DD. */
 export async function clockDay(db: Client, plusDays = 0): Promise<string> {
-  const [row] = await rows(db, "SELECT value FROM settings WHERE key = 'clock_offset_days'");
+  const [row] = await rows(
+    db,
+    "SELECT value FROM settings WHERE key = 'clock_offset_days'",
+  );
   const offset = row ? Number(JSON.parse(String(row.value))) : 0;
-  return new Date(Date.now() + (offset + plusDays) * 86_400_000).toISOString().slice(0, 10);
+  return new Date(Date.now() + (offset + plusDays) * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 // ── Coral, as the API sees it ────────────────────────────────────────────────
 
 /** One render as Coral's send service would make it: its own consumer id, a real version, never a preview. */
-export function coralRender(request: APIRequestContext, fixture: SpringFixture, version: number, label: string) {
+export function coralRender(
+  request: APIRequestContext,
+  fixture: SpringFixture,
+  version: number,
+  label: string,
+) {
   return render(request, {
     templateId: fixture.templateId,
     consumer: "coral",
@@ -329,21 +524,25 @@ export function coralRender(request: APIRequestContext, fixture: SpringFixture, 
 /** Coral's link of the offer to the fixture, as a person would have left it after scenario 4: pinned to v2, mapped. */
 export async function linkSpringOffer(db: Client, fixture: SpringFixture) {
   await run(db, "DELETE FROM sim_links WHERE offer_id = ?", [SPRING_OFFER]);
-  await run(db, "INSERT INTO sim_links (id, offer_id, template_id, template_name, pinned_version, channels, mapping, linked_at) VALUES (?, ?, ?, ?, 2, ?, ?, ?)", [
-    `lnk_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
-    SPRING_OFFER,
-    fixture.templateId,
-    SPRING_NAME,
-    JSON.stringify(["pdf", "web", "email"]),
-    JSON.stringify({
-      first_name: "customer.firstName",
-      last_name: "customer.lastName",
-      purchase_apr: "customer.purchaseApr",
-      home_state: "customer.homeState",
-      offer_end_date: "offer.endsOn",
-    }),
-    Date.now() - 86_400_000,
-  ]);
+  await run(
+    db,
+    "INSERT INTO sim_links (id, offer_id, template_id, template_name, pinned_version, channels, mapping, linked_at) VALUES (?, ?, ?, ?, 2, ?, ?, ?)",
+    [
+      `lnk_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
+      SPRING_OFFER,
+      fixture.templateId,
+      SPRING_NAME,
+      JSON.stringify(["pdf", "web", "email"]),
+      JSON.stringify({
+        first_name: "customer.firstName",
+        last_name: "customer.lastName",
+        purchase_apr: "customer.purchaseApr",
+        home_state: "customer.homeState",
+        offer_end_date: "offer.endsOn",
+      }),
+      Date.now() - 86_400_000,
+    ],
+  );
 }
 
 // ── Driving the screens ──────────────────────────────────────────────────────
@@ -358,22 +557,33 @@ export async function click(target: Locator) {
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 export { escapeRe };
 
-export const profileButton = (page: Page) => page.getByRole("button", { name: /profile and persona/ });
+export const profileButton = (page: Page) =>
+  page.getByRole("button", { name: /profile and persona/ });
 
 /** Through the persona switcher, as a presenter would: the URL stays, the page re-reads as the new person. */
 export async function switchPersona(page: Page, person: string) {
   const url = page.url();
   await click(profileButton(page));
-  await click(page.getByRole("menuitemradio", { name: new RegExp(escapeRe(person)) }));
+  await click(
+    page.getByRole("menuitemradio", { name: new RegExp(escapeRe(person)) }),
+  );
   await expect(page.getByRole("menu")).toBeHidden();
-  await expect(profileButton(page)).toHaveAccessibleName(new RegExp(`^${escapeRe(person)},`));
+  await expect(profileButton(page)).toHaveAccessibleName(
+    new RegExp(`^${escapeRe(person)},`),
+  );
   await expect(page).toHaveURL(url);
 }
 
 /** React has attached its handlers to the element (an interactive element of a simulator page). */
 export async function reactReady(target: Locator) {
   await expect
-    .poll(() => target.evaluate((el) => Object.keys(el).some((k) => k.startsWith("__reactProps"))), { message: "the page is interactive" })
+    .poll(
+      () =>
+        target.evaluate((el) =>
+          Object.keys(el).some((k) => k.startsWith("__reactProps")),
+        ),
+      { message: "the page is interactive" },
+    )
     .toBe(true);
 }
 
@@ -394,24 +604,37 @@ export async function openSimulator(page: Page) {
   await click(drawer.getByRole("button", { name: "Open simulator" }));
   await expect(page).toHaveURL(/\/sim$/);
   await expect(page.getByRole("table", { name: "Offers" })).toBeVisible();
-  await reactReady(page.getByRole("table", { name: "Offers" }).getByRole("link").first());
+  await reactReady(
+    page.getByRole("table", { name: "Offers" }).getByRole("link").first(),
+  );
 }
 
 /** From the simulator: "Back to Stencil". */
 export async function backToUcomp(page: Page) {
   await click(page.getByRole("link", { name: "Back to Stencil" }));
-  await expect(page.getByRole("link", { name: "Back to Stencil" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Back to Stencil" })).toHaveCount(
+    0,
+  );
 }
 
 /** Opens one offer from the simulator's offers table. */
 export async function openOffer(page: Page, offerName: string) {
-  await click(page.getByRole("table", { name: "Offers" }).getByRole("link", { name: offerName, exact: true }));
-  await expect(page.getByRole("heading", { level: 1, name: offerName })).toBeVisible();
+  await click(
+    page
+      .getByRole("table", { name: "Offers" })
+      .getByRole("link", { name: offerName, exact: true }),
+  );
+  await expect(
+    page.getByRole("heading", { level: 1, name: offerName }),
+  ).toBeVisible();
   await reactReady(page.getByRole("tab", { name: "Template" }));
 }
 
 /** The offer's tab, picked in the page (the URL follows). */
-export async function openOfferTab(page: Page, tab: "Template" | "Values" | "Send") {
+export async function openOfferTab(
+  page: Page,
+  tab: "Template" | "Values" | "Send",
+) {
   const control = page.getByRole("tab", { name: tab, exact: true });
   await reactReady(control);
   await click(control);
@@ -419,16 +642,27 @@ export async function openOfferTab(page: Page, tab: "Template" | "Values" | "Sen
 }
 
 /** The Send tab's customer picker: ticks each name, as a person would. */
-export async function selectCustomers(page: Page, customers: readonly { name: string }[]) {
+export async function selectCustomers(
+  page: Page,
+  customers: readonly { name: string }[],
+) {
   for (const customer of customers) {
-    const box = page.getByRole("checkbox", { name: `Select ${customer.name}`, exact: true });
+    const box = page.getByRole("checkbox", {
+      name: `Select ${customer.name}`,
+      exact: true,
+    });
     await reactReady(box);
     // A page that has just changed (a relink lands on Send) can reset the picker once more as it settles:
     // a person would see the box still empty and press it again. Press until the tick is there after the
     // page has painted twice, which is when a reset would have shown.
     for (let attempt = 0; attempt < 4; attempt++) {
       if ((await box.getAttribute("aria-checked")) !== "true") await click(box);
-      await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+      await page.evaluate(
+        () =>
+          new Promise<void>((done) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => done())),
+          ),
+      );
       if ((await box.getAttribute("aria-checked")) === "true") break;
     }
     await expect(box).toHaveAttribute("aria-checked", "true");
@@ -436,13 +670,16 @@ export async function selectCustomers(page: Page, customers: readonly { name: st
 }
 
 /** The results headline ("15 delivered", "0 delivered, 4 failed") of the newest send. */
-export const resultsHeadline = (page: Page) => page.getByRole("heading", { level: 3 }).filter({ hasText: /\d+ delivered/ });
+export const resultsHeadline = (page: Page) =>
+  page.getByRole("heading", { level: 3 }).filter({ hasText: /\d+ delivered/ });
 
 /** The results grid's rows (one per customer). */
-export const resultsRows = (page: Page) => page.getByRole("table", { name: "Results" }).locator("tbody tr");
+export const resultsRows = (page: Page) =>
+  page.getByRole("table", { name: "Results" }).locator("tbody tr");
 
 /** The Send button: "Send", or "Send to 2 customers" once some are chosen. */
-export const sendButton = (page: Page) => page.getByRole("button", { name: /^Send( to \d+ customers?)?$/ });
+export const sendButton = (page: Page) =>
+  page.getByRole("button", { name: /^Send( to \d+ customers?)?$/ });
 
 /** Send, once the page can take it. */
 export async function send(page: Page) {
@@ -460,9 +697,23 @@ export { dropDemoNoise } from "../media/demo";
  * API's message verbatim on screen. When every failure shares one message the grid says it once, in the
  * results header; when they differ each cell carries its own. Either way the sentence is shown as received.
  */
-export async function expectFailed(page: Page, count: number, error: { status: number; code: string; message: string }) {
-  const cells = page.getByRole("table", { name: "Results" }).locator("td").filter({ hasText: "Failed" });
+export async function expectFailed(
+  page: Page,
+  count: number,
+  error: { status: number; code: string; message: string },
+) {
+  const cells = page
+    .getByRole("table", { name: "Results" })
+    .locator("td")
+    .filter({ hasText: "Failed" });
   await expect(cells).toHaveCount(count);
-  for (let i = 0; i < count; i++) await expect(cells.nth(i)).toContainText(`${error.status} ${error.code}`);
-  await expect(page.getByText(error.message, { exact: false }).filter({ visible: true }).first(), "the API's message, verbatim").toBeVisible();
+  for (let i = 0; i < count; i++)
+    await expect(cells.nth(i)).toContainText(`${error.status} ${error.code}`);
+  await expect(
+    page
+      .getByText(error.message, { exact: false })
+      .filter({ visible: true })
+      .first(),
+    "the API's message, verbatim",
+  ).toBeVisible();
 }

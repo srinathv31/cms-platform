@@ -8,7 +8,12 @@ import { IMPORT_REFUSALS } from "./import-types";
 import { REFUSALS } from "./lifecycle/refusals";
 import { REASONS } from "./permissions";
 import { PLATFORM_REFUSALS } from "./platform-config/refusals";
-import { REQUEST_REFUSALS, refusal, refuse, type RefusalCode } from "./refusals";
+import {
+  REQUEST_REFUSALS,
+  refusal,
+  refuse,
+  type RefusalCode,
+} from "./refusals";
 import { OUTPUT_REFUSALS } from "./review-outputs";
 
 // Every refusal people read carries a stable code, and the code is what code branches on
@@ -28,7 +33,9 @@ const TABLES = {
 } as const;
 
 const entries = Object.entries(TABLES).flatMap(([table, entries]) =>
-  Object.entries(entries as Record<string, { code: string; reason?: unknown }>).map(([key, entry]) => ({
+  Object.entries(
+    entries as Record<string, { code: string; reason?: unknown }>,
+  ).map(([key, entry]) => ({
     name: `${table}.${key}`,
     entry,
   })),
@@ -40,18 +47,22 @@ describe("refusal codes", () => {
   });
 
   it("gives every refusal a code: a short snake_case identifier", () => {
-    for (const { name, entry } of entries) expect(entry.code, name).toMatch(/^[a-z]+(_[a-z]+)*$/);
+    for (const { name, entry } of entries)
+      expect(entry.code, name).toMatch(/^[a-z]+(_[a-z]+)*$/);
   });
 
   it("gives no two refusals the same code", () => {
     const byCode = new Map<string, string[]>();
-    for (const { name, entry } of entries) byCode.set(entry.code, [...(byCode.get(entry.code) ?? []), name]);
+    for (const { name, entry } of entries)
+      byCode.set(entry.code, [...(byCode.get(entry.code) ?? []), name]);
     const shared = [...byCode].filter(([, names]) => names.length > 1);
     expect(shared).toEqual([]);
   });
 
   it("keeps `failed`, the code a refusal made in the browser carries, for the browser", () => {
-    expect(entries.map((e) => e.entry.code)).not.toContain("failed" satisfies RefusalCode);
+    expect(entries.map((e) => e.entry.code)).not.toContain(
+      "failed" satisfies RefusalCode,
+    );
   });
 
   it("words every fixed refusal as one plain sentence or two", () => {
@@ -71,11 +82,22 @@ describe("refusal and refuse", () => {
   });
 
   it("builds a worded refusal whose code is readable without calling it", () => {
-    const lastAdmin = refusal("last_admin", (team: string) => `${team} needs at least one Team Admin.`);
+    const lastAdmin = refusal(
+      "last_admin",
+      (team: string) => `${team} needs at least one Team Admin.`,
+    );
     expect(lastAdmin.code).toBe("last_admin");
-    expect(lastAdmin("Coral Offers")).toEqual({ code: "last_admin", reason: "Coral Offers needs at least one Team Admin." });
-    expect(ACCESS_REFUSALS.lastAdmin.code).toBe(ACCESS_REFUSALS.lastAdmin("Deposits").code);
-    expect(STAGE_REFUSALS.waitingOn("Legal reviewer")).toEqual({ code: "waiting_on_stage", reason: "Waiting on Legal reviewer." });
+    expect(lastAdmin("Coral Offers")).toEqual({
+      code: "last_admin",
+      reason: "Coral Offers needs at least one Team Admin.",
+    });
+    expect(ACCESS_REFUSALS.lastAdmin.code).toBe(
+      ACCESS_REFUSALS.lastAdmin("Deposits").code,
+    );
+    expect(STAGE_REFUSALS.waitingOn("Legal reviewer")).toEqual({
+      code: "waiting_on_stage",
+      reason: "Waiting on Legal reviewer.",
+    });
   });
 
   it("refuse gives the result rules, read models and actions return", () => {
@@ -102,11 +124,15 @@ describe("nothing branches on a refusal's sentence", () => {
           ? [join(dir, e.name)]
           : [],
     );
-  const sources = ["components", "server", "app", "lib"].flatMap((dir) => files(join(root, dir)));
+  const sources = ["components", "server", "app", "lib"].flatMap((dir) =>
+    files(join(root, dir)),
+  );
   const TABLE = Object.keys(TABLES).join("|");
   const COMPARES = [
     // `x === REASONS.generic`, `REFUSALS.summaryStale.reason !== y`
-    new RegExp(`[!=]==\\s*(${TABLE})\\.|\\b(${TABLE})\\.[A-Za-z]+(\\.reason)?\\s*[!=]==`),
+    new RegExp(
+      `[!=]==\\s*(${TABLE})\\.|\\b(${TABLE})\\.[A-Za-z]+(\\.reason)?\\s*[!=]==`,
+    ),
     // `result.reason === "You submitted…"` (a sentence; codes are lower case), `reason.startsWith(…)`
     /\breason\s*[!=]==\s*["'`][A-Z]|\breason\??\.(startsWith|endsWith|includes|match)\(/,
   ];
@@ -115,8 +141,13 @@ describe("nothing branches on a refusal's sentence", () => {
     expect(sources.length).toBeGreaterThan(200);
   });
 
-  it.each(COMPARES.map((pattern) => [pattern.source, pattern] as const))("none matches %s", (_, pattern) => {
-    const hits = sources.filter((path) => pattern.test(readFileSync(path, "utf8"))).map((path) => path.slice(root.length + 1));
-    expect(hits).toEqual([]);
-  });
+  it.each(COMPARES.map((pattern) => [pattern.source, pattern] as const))(
+    "none matches %s",
+    (_, pattern) => {
+      const hits = sources
+        .filter((path) => pattern.test(readFileSync(path, "utf8")))
+        .map((path) => path.slice(root.length + 1));
+      expect(hits).toEqual([]);
+    },
+  );
 });

@@ -18,18 +18,30 @@ describe("the phone's geometry", () => {
   });
 
   it("fits the whole phone in the box, never above 1", () => {
-    expect(phoneScale({ width: 531, height: 647 }, "ios", "standard")).toBeCloseTo(647 / 903);
-    expect(phoneScale({ width: 2000, height: 2000 }, "ios", "standard")).toBe(1);
+    expect(
+      phoneScale({ width: 531, height: 647 }, "ios", "standard"),
+    ).toBeCloseTo(647 / 903);
+    expect(phoneScale({ width: 2000, height: 2000 }, "ios", "standard")).toBe(
+      1,
+    );
   });
 
   it("draws a compact phone at the standard phone's scale, so it reads smaller", () => {
     const box = { width: 531, height: 647 };
-    expect(phoneScale(box, "ios", "compact")).toBe(phoneScale(box, "ios", "standard"));
-    expect(phoneScale(box, "ios", "large")).toBeLessThan(phoneScale(box, "ios", "standard"));
+    expect(phoneScale(box, "ios", "compact")).toBe(
+      phoneScale(box, "ios", "standard"),
+    );
+    expect(phoneScale(box, "ios", "large")).toBeLessThan(
+      phoneScale(box, "ios", "standard"),
+    );
   });
 
   it("holds the smallest scale in a short box, and the phone runs past its bottom", () => {
-    expect(phoneScale({ width: 650, height: 447 }, "android", "standard")).toBe(MIN_SCALE);
-    expect(phoneScale({ width: 650, height: 447 }, "android", "standard", 0.3)).toBeCloseTo(447 / 958);
+    expect(phoneScale({ width: 650, height: 447 }, "android", "standard")).toBe(
+      MIN_SCALE,
+    );
+    expect(
+      phoneScale({ width: 650, height: 447 }, "android", "standard", 0.3),
+    ).toBeCloseTo(447 / 958);
   });
 });

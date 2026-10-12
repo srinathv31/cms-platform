@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import { requireSpaceFromParams, settingsAccessFor } from "@/server/queries/spaces";
+import {
+  requireSpaceFromParams,
+  settingsAccessFor,
+} from "@/server/queries/spaces";
 import { SettingsDialog } from "./settings-dialog";
 import { SettingsNavList } from "./settings-nav-list";
 import { visibleGroups } from "./sections";
@@ -15,7 +18,9 @@ async function SettingsNav({ params }: { params: TeamParams }) {
   const access = settingsAccessFor(space.viewer, space.slug);
   if (visibleGroups(access).length === 0) redirect(`/${space.slug}/library`);
   const trails = access.team ? await getTeamNavTrails(space.slug) : {};
-  return <SettingsNavList teamSlug={space.slug} access={access} trails={trails} />;
+  return (
+    <SettingsNavList teamSlug={space.slug} access={access} trails={trails} />
+  );
 }
 
 function SettingsNavSkeleton() {
@@ -32,7 +37,9 @@ function SettingsNavSkeleton() {
           </div>
         ))}
       </div>
-      <p className="mt-auto px-3 pt-6 text-[13px] text-text-muted">Stencil · v0.1</p>
+      <p className="mt-auto px-3 pt-6 text-[13px] text-text-muted">
+        Stencil · v0.1
+      </p>
     </div>
   );
 }

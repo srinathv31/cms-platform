@@ -8,25 +8,36 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import type { ActionResult } from "@/domain/review-types";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-const server = vi.hoisted(() => ({ startDraft: vi.fn<(input: { templateId: string }) => Promise<ActionResult>>() }));
+const server = vi.hoisted(() => ({
+  startDraft: vi.fn<(input: { templateId: string }) => Promise<ActionResult>>(),
+}));
 const toast = vi.hoisted(() => ({ error: vi.fn() }));
 
-vi.mock("next/navigation", () => ({ unstable_rethrow: () => undefined, useSelectedLayoutSegment: () => null }));
+vi.mock("next/navigation", () => ({
+  unstable_rethrow: () => undefined,
+  useSelectedLayoutSegment: () => null,
+}));
 vi.mock("sonner", () => ({ toast }));
-vi.mock("@/server/actions/templates", () => ({ startDraft: server.startDraft }));
+vi.mock("@/server/actions/templates", () => ({
+  startDraft: server.startDraft,
+}));
 vi.mock("@/server/actions/review", () => ({ submitVersion: vi.fn() }));
 
 const { EditButton } = await import("./workspace-actions");
-const { WorkspaceSessionProvider } = await import("./session/workspace-session");
+const { WorkspaceSessionProvider } =
+  await import("./session/workspace-session");
 
 const TEMPLATE = "UC-4F7K2Q";
 let root: Root;
 let container: HTMLElement;
 
 const edit = () => container.querySelector<HTMLButtonElement>("button")!;
-const tick = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+const tick = () =>
+  act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 
 beforeEach(async () => {
   server.startDraft.mockReset();
@@ -52,7 +63,9 @@ describe("Edit", () => {
   it("opens the draft through startDraft", async () => {
     // On success the action redirects; until the new page is up, its promise stays out.
     let redirected!: (result: ActionResult) => void;
-    server.startDraft.mockReturnValue(new Promise((resolve) => (redirected = resolve)));
+    server.startDraft.mockReturnValue(
+      new Promise((resolve) => (redirected = resolve)),
+    );
     await act(async () => edit().click());
     expect(server.startDraft).toHaveBeenCalledWith({ templateId: TEMPLATE });
     expect(edit().disabled, "pending until the draft's page is up").toBe(true);
@@ -61,7 +74,10 @@ describe("Edit", () => {
   });
 
   it("shows the refusal's sentence when the server refuses", async () => {
-    server.startDraft.mockResolvedValue({ ok: false, ...REFUSALS.newerInReview });
+    server.startDraft.mockResolvedValue({
+      ok: false,
+      ...REFUSALS.newerInReview,
+    });
     await act(async () => edit().click());
     await tick();
     expect(toast.error).toHaveBeenCalledWith("A newer version is in review.");
@@ -72,6 +88,8 @@ describe("Edit", () => {
     server.startDraft.mockRejectedValue(new TypeError("Failed to fetch"));
     await act(async () => edit().click());
     await tick();
-    expect(toast.error).toHaveBeenCalledWith("Couldn't open a draft. Try again.");
+    expect(toast.error).toHaveBeenCalledWith(
+      "Couldn't open a draft. Try again.",
+    );
   });
 });

@@ -52,13 +52,21 @@ export function StartRevokeDialog({
   });
   const invalid = validateRevokeReason(reason);
   const lines = useMemo(
-    () => consequences({ kind: "revoke", number: versionNumber, activeNumber, pending: true }, usage, new Date(nowIso)),
+    () =>
+      consequences(
+        { kind: "revoke", number: versionNumber, activeNumber, pending: true },
+        usage,
+        new Date(nowIso),
+      ),
     [versionNumber, activeNumber, usage, nowIso],
   );
   const fieldId = `revoke-${versionNumber}-reason`;
   const problemId = `${fieldId}-problem`;
   // Too long is said as it happens; blank, once they've tried (or left a field that holds only blanks).
-  const problem = invalid !== null && (tried || reason.trim().length > REVOKE_REASON_MAX) ? invalid : null;
+  const problem =
+    invalid !== null && (tried || reason.trim().length > REVOKE_REASON_MAX)
+      ? invalid
+      : null;
 
   return (
     <ActionDialog
@@ -85,7 +93,9 @@ export function StartRevokeDialog({
             field.current?.focus();
             return;
           }
-          submit(null, () => startRevoke({ templateId, versionNumber, reason: reason.trim() }));
+          submit(null, () =>
+            startRevoke({ templateId, versionNumber, reason: reason.trim() }),
+          );
         },
       }}
     >
@@ -96,7 +106,10 @@ export function StartRevokeDialog({
             Reason
           </Label>
           {problem ? (
-            <p id={problemId} className="text-[13px] leading-5 text-danger-text">
+            <p
+              id={problemId}
+              className="text-[13px] leading-5 text-danger-text"
+            >
               {problem}
             </p>
           ) : null}
@@ -144,7 +157,12 @@ export function ConfirmRevokeDialog({
     onOpenChange(false);
   });
   const lines = useMemo(
-    () => consequences({ kind: "revoke", number: versionNumber, activeNumber }, usage, new Date(nowIso)),
+    () =>
+      consequences(
+        { kind: "revoke", number: versionNumber, activeNumber },
+        usage,
+        new Date(nowIso),
+      ),
     [versionNumber, activeNumber, usage, nowIso],
   );
 
@@ -162,11 +180,13 @@ export function ConfirmRevokeDialog({
       primary={{
         label: "Confirm revoke",
         destructive: true,
-        onClick: () => submit(null, () => confirmRevoke({ templateId, versionNumber })),
+        onClick: () =>
+          submit(null, () => confirmRevoke({ templateId, versionNumber })),
       }}
     >
       <p className="text-[14px] leading-[1.55] text-text">
-        <span className="font-medium">{startedBy}</span> started this revoke: <span className="whitespace-pre-line">&ldquo;{reason}&rdquo;</span>
+        <span className="font-medium">{startedBy}</span> started this revoke:{" "}
+        <span className="whitespace-pre-line">&ldquo;{reason}&rdquo;</span>
       </p>
       <Consequences lines={lines} />
     </ActionDialog>

@@ -11,10 +11,20 @@ import { Shade } from "./android/shade";
 import { Banner } from "./ios/banner";
 import { Expanded } from "./ios/expanded";
 import { LockScreen } from "./ios/lock-screen";
-import type { DeviceClock, DeviceSettings, PhoneFit, PushContent, PushMeasure, PushScreen } from "./types";
+import type {
+  DeviceClock,
+  DeviceSettings,
+  PhoneFit,
+  PushContent,
+  PushMeasure,
+  PushScreen,
+} from "./types";
 
 /** The clock the phone shows when the caller doesn't set one. */
-export const DEFAULT_CLOCK: DeviceClock = { time: "9:41", date: "Friday, October 9" };
+export const DEFAULT_CLOCK: DeviceClock = {
+  time: "9:41",
+  date: "Friday, October 9",
+};
 
 export interface PushPreviewProps {
   settings: DeviceSettings;
@@ -39,7 +49,16 @@ export interface PushPreviewProps {
  * laid out at its real size and scaled to fit its container (give the parent a height), so it cuts the
  * text exactly as that phone does. Android never shows the subtitle.
  */
-export function PushPreview({ settings, screen, content, onScreenChange, onMeasure, clock = DEFAULT_CLOCK, fit, className }: PushPreviewProps) {
+export function PushPreview({
+  settings,
+  screen,
+  content,
+  onScreenChange,
+  onMeasure,
+  clock = DEFAULT_CLOCK,
+  fit,
+  className,
+}: PushPreviewProps) {
   const root = useRef<HTMLElement>(null);
 
   // Where the expanded view goes back to: the screen it was opened from.
@@ -48,10 +67,12 @@ export function PushPreview({ settings, screen, content, onScreenChange, onMeasu
     if (screen !== "expanded") collapsed.current = screen;
   }, [screen]);
   const onToggle = onScreenChange
-    ? () => onScreenChange(screen === "expanded" ? collapsed.current : "expanded")
+    ? () =>
+        onScreenChange(screen === "expanded" ? collapsed.current : "expanded")
     : undefined;
 
-  const hasSubtitle = Boolean(content.subtitle?.trim()) && settings.platform === "ios";
+  const hasSubtitle =
+    Boolean(content.subtitle?.trim()) && settings.platform === "ios";
   useMeasure(
     root,
     JSON.stringify([settings, screen, content]),

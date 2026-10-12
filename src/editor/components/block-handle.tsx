@@ -34,28 +34,46 @@ const BUTTON =
  * gutter 2.25rem) the wrap puts them one above the other, the grip on top, instead of leaving the + off the
  * screen's edge or over the text.
  */
-const FIT_GUTTER = "w-max flex-wrap-reverse max-w-[var(--ucomp-doc-gutter,3.5rem)]";
+const FIT_GUTTER =
+  "w-max flex-wrap-reverse max-w-[var(--ucomp-doc-gutter,3.5rem)]";
 
 type Current = { node: PMNode | null; pos: number };
 
-export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMenuController }) {
+export function BlockHandle({
+  editor,
+  slash,
+}: {
+  editor: Editor;
+  slash: SlashMenuController;
+}) {
   const current = useRef<Current>({ node: null, pos: -1 });
   const bar = useRef<HTMLDivElement>(null);
   const [grip, setGrip] = useState<HTMLElement | null>(null);
   // The block menu, from the grip (under it) or the keyboard (from a button in the gutter).
-  const [gripMenu, setGripMenu] = useState<{ blockPos: number; open: boolean } | null>(null);
+  const [gripMenu, setGripMenu] = useState<{
+    blockPos: number;
+    open: boolean;
+  } | null>(null);
   const [keyMenu, setKeyMenu] = useState<{ blockPos: number } | null>(null);
   const menuOpen = useRef(false);
 
   // While the grip's menu is open the handle stays on its block (no following the pointer, no hiding,
   // no dragging): the DragHandle's own lock.
   const lockHandle = (locked: boolean) => {
-    if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta("lockDragHandle", locked));
+    if (!editor.isDestroyed)
+      editor.view.dispatch(editor.state.tr.setMeta("lockDragHandle", locked));
   };
   const openGripMenu = () => {
     const { node, pos } = current.current;
     // Still closing (its exit animation): the next click opens it again.
-    if (gripMenu || !node || pos < 0 || editor.isDestroyed || isRequiredHeading(node)) return;
+    if (
+      gripMenu ||
+      !node ||
+      pos < 0 ||
+      editor.isDestroyed ||
+      isRequiredHeading(node)
+    )
+      return;
     menuOpen.current = true;
     lockHandle(true);
     setGripMenu({ blockPos: pos, open: true });
@@ -76,8 +94,20 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
     const parent = dom.parentElement;
     if (!parent) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "F10" || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
-      if (!(event.target instanceof Node) || !dom.contains(event.target) || editor.isDestroyed) return;
+      if (
+        event.key !== "F10" ||
+        !event.altKey ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey
+      )
+        return;
+      if (
+        !(event.target instanceof Node) ||
+        !dom.contains(event.target) ||
+        editor.isDestroyed
+      )
+        return;
       // The document's current editor only (TipTap marks its element with it): a re-created editor
       // can share the element with one that is on its way out.
       if ((dom as HTMLElement & { editor?: unknown }).editor !== editor) return;
@@ -98,7 +128,8 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
     const parent = handle?.parentElement;
     if (!handle || !parent) return;
     const onDragStart = (event: DragEvent) => {
-      if (event.target !== handle || !isRequiredHeading(current.current.node)) return;
+      if (event.target !== handle || !isRequiredHeading(current.current.node))
+        return;
       event.preventDefault();
       event.stopPropagation();
     };
@@ -113,7 +144,8 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
     const surface = dom.parentElement;
     const onKeyDown = () => bar.current?.setAttribute("data-typing", "");
     const onMouseMove = (event: MouseEvent) => {
-      if (event.movementX !== 0 || event.movementY !== 0) bar.current?.removeAttribute("data-typing");
+      if (event.movementX !== 0 || event.movementY !== 0)
+        bar.current?.removeAttribute("data-typing");
     };
     dom.addEventListener("keydown", onKeyDown);
     surface?.addEventListener("mousemove", onMouseMove);
@@ -131,16 +163,31 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
     const dom = editor.view.nodeDOM(pos);
     if (!(dom instanceof HTMLElement)) return null;
     const block = dom.getBoundingClientRect();
-    const line = dom.matches("p, h1, h2, h3") ? dom : dom.querySelector<HTMLElement>("p, h1, h2, h3");
+    const line = dom.matches("p, h1, h2, h3")
+      ? dom
+      : dom.querySelector<HTMLElement>("p, h1, h2, h3");
     let top = block.top;
     let height = block.height;
     if (line) {
       const style = getComputedStyle(line);
-      const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.5;
-      top = line.getBoundingClientRect().top + Number.parseFloat(style.paddingTop || "0");
+      const lineHeight =
+        Number.parseFloat(style.lineHeight) ||
+        Number.parseFloat(style.fontSize) * 1.5;
+      top =
+        line.getBoundingClientRect().top +
+        Number.parseFloat(style.paddingTop || "0");
       height = lineHeight;
     }
-    const rect = { x: block.left, y: top, left: block.left, top, width: block.width, height, right: block.right, bottom: top + height };
+    const rect = {
+      x: block.left,
+      y: top,
+      left: block.left,
+      top,
+      width: block.width,
+      height,
+      right: block.right,
+      bottom: top + height,
+    };
     return { getBoundingClientRect: () => rect };
   };
 
@@ -160,7 +207,9 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
       if (editor.isDestroyed) return;
       const { selection, doc, tr } = editor.state;
       if (!isNodeRangeSelection(selection)) return;
-      editor.view.dispatch(tr.setSelection(TextSelection.near(doc.resolve(selection.to), -1)));
+      editor.view.dispatch(
+        tr.setSelection(TextSelection.near(doc.resolve(selection.to), -1)),
+      );
     }, 0);
   };
 
@@ -188,12 +237,17 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
           getReferencedVirtualElement={firstLineRect}
           onNodeChange={({ node, pos }) => {
             current.current = { node, pos };
-            if (isRequiredHeading(node)) bar.current?.setAttribute("data-required", "");
+            if (isRequiredHeading(node))
+              bar.current?.setAttribute("data-required", "");
             else bar.current?.removeAttribute("data-required");
           }}
           onElementDragEnd={settleSelection}
         >
-          <div ref={bar} className={`group/handle flex items-center gap-px pr-1.5 data-typing:invisible ${FIT_GUTTER}`} onMouseLeave={hideWhenLeaving}>
+          <div
+            ref={bar}
+            className={`group/handle flex items-center gap-px pr-1.5 data-typing:invisible ${FIT_GUTTER}`}
+            onMouseLeave={hideWhenLeaving}
+          >
             <button
               type="button"
               tabIndex={-1}
@@ -207,7 +261,9 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
             <GripTrigger
               ref={setGrip}
               open={gripMenu?.open ?? false}
-              onOpenChange={(open) => (open ? openGripMenu() : onGripMenuOpenChange(false))}
+              onOpenChange={(open) =>
+                open ? openGripMenu() : onGripMenuOpenChange(false)
+              }
               className={`${BUTTON} cursor-grab active:cursor-grabbing group-data-required/handle:invisible data-popup-open:bg-hover data-popup-open:text-text-muted`}
             >
               <GripVertical className="size-4" strokeWidth={1.75} aria-hidden />
@@ -216,7 +272,12 @@ export function BlockHandle({ editor, slash }: { editor: Editor; slash: SlashMen
         </DragHandle>
       </GripBlockMenu>
       {keyMenu ? (
-        <KeyboardBlockMenu key={keyMenu.blockPos} editor={editor} blockPos={keyMenu.blockPos} onClose={() => setKeyMenu(null)} />
+        <KeyboardBlockMenu
+          key={keyMenu.blockPos}
+          editor={editor}
+          blockPos={keyMenu.blockPos}
+          onClose={() => setKeyMenu(null)}
+        />
       ) : null}
     </>
   );

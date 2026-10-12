@@ -22,7 +22,8 @@ const QUOTE = /^ {0,3}>[ \t]?/;
 const DIVIDER_CELL = /^[ \t]*:?-+:?[ \t]*$/;
 
 /** Inline syntax that only Markdown writes: `**bold**` or a `[link](https://…)`. */
-const INLINE_MARKDOWN = /\*\*[^*\s][^*]*\*\*|\[[^\]\n]+\]\((?:https?:\/\/|mailto:)[^)\s]+\)/;
+const INLINE_MARKDOWN =
+  /\*\*[^*\s][^*]*\*\*|\[[^\]\n]+\]\((?:https?:\/\/|mailto:)[^)\s]+\)/;
 
 /**
  * True when plain text reads as Markdown: a `#` heading, a list item, a pipe table, a rule between
@@ -33,7 +34,12 @@ export function looksLikeMarkdown(text: string): boolean {
   const lines = splitLines(text);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (HEADING.test(line) || FENCE.test(line) || (ITEM.test(line) && !RULE.test(line))) return true;
+    if (
+      HEADING.test(line) ||
+      FENCE.test(line) ||
+      (ITEM.test(line) && !RULE.test(line))
+    )
+      return true;
     if (isTableStart(lines, i)) return true;
     if (lines.length > 1 && RULE.test(line)) return true;
   }
@@ -67,7 +73,13 @@ function indentOf(line: string): number {
 /** A line that starts a block of its own (it ends a paragraph or a list). */
 function startsBlock(lines: string[], index: number): boolean {
   const line = lines[index];
-  return HEADING.test(line) || EMPTY_HEADING.test(line) || RULE.test(line) || FENCE.test(line) || isTableStart(lines, index);
+  return (
+    HEADING.test(line) ||
+    EMPTY_HEADING.test(line) ||
+    RULE.test(line) ||
+    FENCE.test(line) ||
+    isTableStart(lines, index)
+  );
 }
 
 function blocksToHtml(lines: string[]): string {
@@ -94,7 +106,8 @@ function blocksToHtml(lines: string[]): string {
       const marker = fence[1];
       i++;
       while (i < lines.length && !lines[i].trimStart().startsWith(marker)) {
-        if (!isBlank(lines[i])) out.push(`<p>${escapeHtml(lines[i].trim())}</p>`);
+        if (!isBlank(lines[i]))
+          out.push(`<p>${escapeHtml(lines[i].trim())}</p>`);
         i++;
       }
       i++; // the closing fence
@@ -146,7 +159,9 @@ function splitRow(line: string): string[] {
   let row = line.trim();
   if (row.startsWith("|")) row = row.slice(1);
   if (row.endsWith("|") && !row.endsWith("\\|")) row = row.slice(0, -1);
-  return row.split(/(?<!\\)\|/).map((cell) => cell.replace(/\\\|/g, "|").trim());
+  return row
+    .split(/(?<!\\)\|/)
+    .map((cell) => cell.replace(/\\\|/g, "|").trim());
 }
 
 function isDivider(line: string): boolean {
@@ -159,7 +174,13 @@ function isDivider(line: string): boolean {
 function isTableStart(lines: string[], index: number): boolean {
   const line = lines[index];
   const next = lines[index + 1];
-  return line.includes("|") && next !== undefined && next.includes("|") && isDivider(next) && !isDivider(line);
+  return (
+    line.includes("|") &&
+    next !== undefined &&
+    next.includes("|") &&
+    isDivider(next) &&
+    !isDivider(line)
+  );
 }
 
 /** Writes the table starting at `start`; returns the index after it. */
@@ -167,11 +188,19 @@ function table(lines: string[], start: number, out: string[]): number {
   const header = splitRow(lines[start]);
   const width = header.length;
   const cells = (row: string[], tag: "th" | "td") =>
-    Array.from({ length: width }, (_, column) => `<${tag}><p>${inline(row[column] ?? "")}</p></${tag}>`).join("");
+    Array.from(
+      { length: width },
+      (_, column) => `<${tag}><p>${inline(row[column] ?? "")}</p></${tag}>`,
+    ).join("");
 
   const rows = [`<tr>${cells(header, "th")}</tr>`];
   let i = start + 2;
-  while (i < lines.length && !isBlank(lines[i]) && lines[i].includes("|") && !startsBlock(lines, i)) {
+  while (
+    i < lines.length &&
+    !isBlank(lines[i]) &&
+    lines[i].includes("|") &&
+    !startsBlock(lines, i)
+  ) {
     rows.push(`<tr>${cells(splitRow(lines[i]), "td")}</tr>`);
     i++;
   }
@@ -218,17 +247,28 @@ function list(lines: string[], start: number, out: string[]): number {
     if (item) {
       const indent = indentOf(item[1]);
       const ordered = /\d/.test(item[2]);
-      while (stack.length > 1 && indent < stack[stack.length - 1].indent) stack.pop();
+      while (stack.length > 1 && indent < stack[stack.length - 1].indent)
+        stack.pop();
       let top = stack.at(-1);
       if (top && indent < top.indent) top.indent = indent; // a shallower first level: same list
       if (!top || indent > top.indent) {
-        const nested: List = { ordered, start: ordered ? parseInt(item[2], 10) : 1, indent, items: [] };
+        const nested: List = {
+          ordered,
+          start: ordered ? parseInt(item[2], 10) : 1,
+          indent,
+          items: [],
+        };
         if (top) top.items[top.items.length - 1].lists.push(nested);
         else roots.push(nested);
         stack.push(nested);
         top = nested;
       } else if (top.ordered !== ordered) {
-        const sibling: List = { ordered, start: ordered ? parseInt(item[2], 10) : 1, indent, items: [] };
+        const sibling: List = {
+          ordered,
+          start: ordered ? parseInt(item[2], 10) : 1,
+          indent,
+          items: [],
+        };
         stack.pop();
         const parent = stack.at(-1);
         if (parent) parent.items[parent.items.length - 1].lists.push(sibling);
@@ -244,7 +284,12 @@ function list(lines: string[], start: number, out: string[]): number {
 
     // Not an item: a continuation of the item above, or the end of the list.
     const top = stack.at(-1);
-    if (!top || startsBlock(lines, i) || (afterBlank && indentOf(line) <= stack[0].indent)) break;
+    if (
+      !top ||
+      startsBlock(lines, i) ||
+      (afterBlank && indentOf(line) <= stack[0].indent)
+    )
+      break;
     const current = top.items[top.items.length - 1];
     if (afterBlank) current.paragraphs.push([line.trim()]);
     else current.paragraphs[current.paragraphs.length - 1].push(line.trim());
@@ -261,12 +306,16 @@ function list(lines: string[], start: number, out: string[]): number {
 function listHtml(list: List): string {
   const items = list.items
     .map((item) => {
-      const paragraphs = item.paragraphs.map((lines) => `<p>${inlineLines(lines)}</p>`).join("");
+      const paragraphs = item.paragraphs
+        .map((lines) => `<p>${inlineLines(lines)}</p>`)
+        .join("");
       return `<li>${paragraphs}${item.lists.map(listHtml).join("")}</li>`;
     })
     .join("");
   if (!list.ordered) return `<ul>${items}</ul>`;
-  return list.start === 1 ? `<ol>${items}</ol>` : `<ol start="${list.start}">${items}</ol>`;
+  return list.start === 1
+    ? `<ol>${items}</ol>`
+    : `<ol start="${list.start}">${items}</ol>`;
 }
 
 // ── Inline ───────────────────────────────────────────────────────
@@ -277,7 +326,9 @@ function inlineLines(lines: string[]): string {
     .map((line, index) => {
       const last = index === lines.length - 1;
       const hard = !last && (/ {2,}$/.test(line) || /\\$/.test(line));
-      const text = inline(line.trim().replace(/\\$/, (match) => (last ? match : "")));
+      const text = inline(
+        line.trim().replace(/\\$/, (match) => (last ? match : "")),
+      );
       return last ? text : `${text}${hard ? "<br>" : " "}`;
     })
     .join("");
@@ -299,10 +350,16 @@ function inline(text: string): string {
   let s = text
     .replace(/\{\{[^{}\n]*\}\}/g, (match) => keep(escapeHtml(match)))
     .replace(ESCAPABLE, (_, char: string) => keep(escapeHtml(char)))
-    .replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, _ticks, code: string) => keep(escapeHtml(code.trim())))
+    .replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, _ticks, code: string) =>
+      keep(escapeHtml(code.trim())),
+    )
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g, (_, label: string, href: string) =>
-      SAFE_HREF.test(href) ? `${keep(`<a href="${escapeHtml(href)}">`)}${label}${keep("</a>")}` : label,
+    .replace(
+      /\[([^\]]+)\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g,
+      (_, label: string, href: string) =>
+        SAFE_HREF.test(href)
+          ? `${keep(`<a href="${escapeHtml(href)}">`)}${label}${keep("</a>")}`
+          : label,
     )
     .replace(/<((?:https?:\/\/|mailto:)[^\s<>]+)>/g, (_, href: string) =>
       keep(`<a href="${escapeHtml(href)}">${escapeHtml(href)}</a>`),
@@ -312,16 +369,29 @@ function inline(text: string): string {
   s = escapeHtml(s)
     .replace(/\*\*\*(?=\S)([\s\S]*?\S)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, "<strong>$1</strong>")
-    .replace(/(^|[^\p{L}\p{N}_])__(?=\S)([\s\S]*?\S)__(?![\p{L}\p{N}_])/gu, "$1<strong>$2</strong>")
+    .replace(
+      /(^|[^\p{L}\p{N}_])__(?=\S)([\s\S]*?\S)__(?![\p{L}\p{N}_])/gu,
+      "$1<strong>$2</strong>",
+    )
     .replace(/(^|[^*])\*(?=[^\s*])([\s\S]*?[^\s*])\*(?!\*)/g, "$1<em>$2</em>")
-    .replace(/(^|[^\p{L}\p{N}_])_(?=[^\s_])([\s\S]*?[^\s_])_(?![\p{L}\p{N}_])/gu, "$1<em>$2</em>")
+    .replace(
+      /(^|[^\p{L}\p{N}_])_(?=[^\s_])([\s\S]*?[^\s_])_(?![\p{L}\p{N}_])/gu,
+      "$1<em>$2</em>",
+    )
     .replace(/~~(?=\S)([\s\S]*?\S)~~/g, "$1");
 
   // Placeholders can nest (a `{{key}}` inside a code span): restore until none are left.
-  const restore = (value: string): string => value.replace(/\u0000(\d+)\u0000/g, (_, n: string) => restore(kept[Number(n)]));
+  const restore = (value: string): string =>
+    value.replace(/\u0000(\d+)\u0000/g, (_, n: string) =>
+      restore(kept[Number(n)]),
+    );
   return restore(s);
 }
 
 function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

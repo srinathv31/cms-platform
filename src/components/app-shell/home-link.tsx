@@ -16,7 +16,9 @@ export function HomeLink() {
       <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
         <Component aria-hidden strokeWidth={1.75} className="size-[18px]" />
       </span>
-      <span className="font-display text-[22px] leading-none tracking-[-0.01em] text-text">Stencil</span>
+      <span className="font-display text-[22px] leading-none tracking-[-0.01em] text-text">
+        Stencil
+      </span>
       <LinkPending className="ml-auto" />
     </Link>
   );

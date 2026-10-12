@@ -37,19 +37,32 @@ describe("setSunset", () => {
         {
           kind: "audit",
           action: "version.sunset_set",
-          details: { number: 1, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: ZONE, previousSunsetAt: null },
+          details: {
+            number: 1,
+            sunsetAt: "2027-03-01T05:00:00.000Z",
+            sunsetDay: "2027-03-01",
+            zone: ZONE,
+            previousSunsetAt: null,
+          },
         },
         {
           kind: "consumer_notice",
           notice: "sunset_scheduled",
           versionId: "v_1",
-          payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: ZONE },
+          payload: {
+            versionNumber: 1,
+            activeVersion: 2,
+            sunsetAt: "2027-03-01T05:00:00.000Z",
+            sunsetDay: "2027-03-01",
+            zone: ZONE,
+          },
         },
         {
           kind: "notification",
           notification: "sunset_scheduled",
           to: { kind: "user", userId: "priya" },
-          title: "Balance Transfer Intro v1 will stop rendering on March 1, 2027.",
+          title:
+            "Balance Transfer Intro v1 will stop rendering on March 1, 2027.",
           link: { to: "versions", templateId: TEMPLATE.id },
         },
       ],
@@ -67,28 +80,51 @@ describe("setSunset", () => {
       expect(result.ok && result.effects[0]).toEqual({
         kind: "audit",
         action: "version.sunset_set",
-        details: { number: 1, sunsetAt: sunsetAt.toISOString(), sunsetDay, zone: ZONE, previousSunsetAt: "2026-10-25T04:00:00.000Z" },
+        details: {
+          number: 1,
+          sunsetAt: sunsetAt.toISOString(),
+          sunsetDay,
+          zone: ZONE,
+          previousSunsetAt: "2026-10-25T04:00:00.000Z",
+        },
       });
     }
   });
 
   it("ends the day at 00:00 in the zone, across a DST change", () => {
     // 2026-11-01: clocks go back at 02:00, so its midnight is still EDT; the next day's is EST.
-    expect(run({ sunsetDay: "2026-11-01" })).toMatchObject({ changes: { sunsetAt: new Date("2026-11-01T04:00:00.000Z") } });
-    expect(run({ sunsetDay: "2026-11-02" })).toMatchObject({ changes: { sunsetAt: new Date("2026-11-02T05:00:00.000Z") } });
-    expect(run({ sunsetDay: "2026-11-02", zone: "UTC" })).toMatchObject({ changes: { sunsetAt: new Date("2026-11-02T00:00:00.000Z") } });
+    expect(run({ sunsetDay: "2026-11-01" })).toMatchObject({
+      changes: { sunsetAt: new Date("2026-11-01T04:00:00.000Z") },
+    });
+    expect(run({ sunsetDay: "2026-11-02" })).toMatchObject({
+      changes: { sunsetAt: new Date("2026-11-02T05:00:00.000Z") },
+    });
+    expect(run({ sunsetDay: "2026-11-02", zone: "UTC" })).toMatchObject({
+      changes: { sunsetAt: new Date("2026-11-02T00:00:00.000Z") },
+    });
   });
 
   it.each([
     ["today", "2026-10-04"],
     ["in the past", "2026-01-01"],
   ])("refuses a date %s", (_, sunsetDay) => {
-    expect(run({ sunsetDay })).toEqual({ ok: false, code: "sunset_not_after_today", reason: "Pick a date after today." });
+    expect(run({ sunsetDay })).toEqual({
+      ok: false,
+      code: "sunset_not_after_today",
+      reason: "Pick a date after today.",
+    });
   });
 
   it("reads today in the business time zone: at 23:30 Eastern, tomorrow is still tomorrow", () => {
-    expect(run({ now: LATE_EVENING, sunsetDay: TOMORROW_DAY })).toMatchObject({ ok: true, changes: { sunsetAt: TOMORROW } });
-    expect(run({ now: LATE_EVENING, sunsetDay: "2026-10-04" })).toEqual({ ok: false, code: "sunset_not_after_today", reason: "Pick a date after today." });
+    expect(run({ now: LATE_EVENING, sunsetDay: TOMORROW_DAY })).toMatchObject({
+      ok: true,
+      changes: { sunsetAt: TOMORROW },
+    });
+    expect(run({ now: LATE_EVENING, sunsetDay: "2026-10-04" })).toEqual({
+      ok: false,
+      code: "sunset_not_after_today",
+      reason: "Pick a date after today.",
+    });
   });
 
   it("sends the contract changes consumers will meet on the Active version, when given", () => {
@@ -111,13 +147,19 @@ describe("setSunset", () => {
 
   it("doesn't notify the author when they set it", () => {
     const result = run({ actorId: "priya" });
-    expect(result.ok && result.effects.map((e) => e.kind)).toEqual(["audit", "consumer_notice"]);
+    expect(result.ok && result.effects.map((e) => e.kind)).toEqual([
+      "audit",
+      "consumer_notice",
+    ]);
   });
 
   it("moves a sunset that is still to come, even one due at the next midnight", () => {
     const scheduled = { ...v1, sunsetAt: TOMORROW };
     const result = run({ version: scheduled, sunsetDay: MARCH_1_DAY });
-    expect(result.ok && result.changes).toEqual({ sunsetAt: MARCH_1, sunsetSetBy: "jordan" });
+    expect(result.ok && result.changes).toEqual({
+      sunsetAt: MARCH_1,
+      sunsetSetBy: "jordan",
+    });
   });
 
   // A version past its sunset has stopped rendering and its consumers have moved on: a new date would
@@ -138,8 +180,15 @@ describe("setSunset", () => {
   });
 
   it("says the version isn't Superseded before it says the sunset passed", () => {
-    const revoked = { ...v1, state: "revoked" as const, sunsetAt: new Date("2026-10-03T00:00:00.000Z") };
-    expect(run({ version: revoked })).toEqual({ ok: false, ...REFUSALS.sunsetNotSuperseded });
+    const revoked = {
+      ...v1,
+      state: "revoked" as const,
+      sunsetAt: new Date("2026-10-03T00:00:00.000Z"),
+    };
+    expect(run({ version: revoked })).toEqual({
+      ok: false,
+      ...REFUSALS.sunsetNotSuperseded,
+    });
   });
 });
 
@@ -159,7 +208,8 @@ describe("sweepSunsets", () => {
     activeNumber: 2,
     ...over,
   });
-  const sweep = (versions: SunsetFacts[], now = NOW, zone = ZONE) => sweepSunsets({ versions, now, zone });
+  const sweep = (versions: SunsetFacts[], now = NOW, zone = ZONE) =>
+    sweepSunsets({ versions, now, zone });
 
   it("records a passed sunset as the system, dated at the sunset, with its day and the zone, and tells consumers", () => {
     expect(sweep([facts()])).toEqual([
@@ -172,13 +222,24 @@ describe("sweepSunsets", () => {
           {
             kind: "audit",
             action: "version.sunset_passed",
-            details: { number: 1, sunsetAt: "2026-10-04T04:00:00.000Z", sunsetDay: "2026-10-04", zone: ZONE },
+            details: {
+              number: 1,
+              sunsetAt: "2026-10-04T04:00:00.000Z",
+              sunsetDay: "2026-10-04",
+              zone: ZONE,
+            },
           },
           {
             kind: "consumer_notice",
             notice: "sunset_passed",
             versionId: "v_bt1",
-            payload: { versionNumber: 1, activeVersion: 2, sunsetAt: "2026-10-04T04:00:00.000Z", sunsetDay: "2026-10-04", zone: ZONE },
+            payload: {
+              versionNumber: 1,
+              activeVersion: 2,
+              sunsetAt: "2026-10-04T04:00:00.000Z",
+              sunsetDay: "2026-10-04",
+              zone: ZONE,
+            },
           },
         ],
       },
@@ -186,20 +247,40 @@ describe("sweepSunsets", () => {
   });
 
   it("one audit row and one notice per passed sunset, nothing else: no notification", () => {
-    const passed = sweep([facts({ id: "v_a" }), facts({ id: "v_b", templateId: "UC-OTHER1", activeNumber: 5 })]);
+    const passed = sweep([
+      facts({ id: "v_a" }),
+      facts({ id: "v_b", templateId: "UC-OTHER1", activeNumber: 5 }),
+    ]);
     expect(passed.map((p) => p.effects.map((e) => e.kind))).toEqual([
       ["audit", "consumer_notice"],
       ["audit", "consumer_notice"],
     ]);
     expect(passed.map((p) => p.effects[1])).toMatchObject([
-      { notice: "sunset_passed", versionId: "v_a", payload: { activeVersion: 2 } },
-      { notice: "sunset_passed", versionId: "v_b", payload: { activeVersion: 5 } },
+      {
+        notice: "sunset_passed",
+        versionId: "v_a",
+        payload: { activeVersion: 2 },
+      },
+      {
+        notice: "sunset_passed",
+        versionId: "v_b",
+        payload: { activeVersion: 5 },
+      },
     ]);
   });
 
   it("the notice names the Active version to move to, or none when nothing is Active", () => {
-    const [passed] = sweep([facts({ state: "revoked", revokedAt: new Date(SUNSET.getTime() + 1), activeNumber: null })]);
-    expect(passed!.effects[1]).toMatchObject({ kind: "consumer_notice", payload: { versionNumber: 1, activeVersion: null } });
+    const [passed] = sweep([
+      facts({
+        state: "revoked",
+        revokedAt: new Date(SUNSET.getTime() + 1),
+        activeNumber: null,
+      }),
+    ]);
+    expect(passed!.effects[1]).toMatchObject({
+      kind: "consumer_notice",
+      payload: { versionNumber: 1, activeVersion: null },
+    });
   });
 
   it("passed is sunsetPassed: from the sunset's instant, not a millisecond before", () => {
@@ -211,40 +292,70 @@ describe("sweepSunsets", () => {
 
   it("finds exactly the passed sunsets nothing records yet, oldest first", () => {
     const versions = [
-      facts({ id: "v_later", sunsetAt: new Date(SUNSET.getTime() - MS_PER_DAY) }),
+      facts({
+        id: "v_later",
+        sunsetAt: new Date(SUNSET.getTime() - MS_PER_DAY),
+      }),
       facts({ id: "v_recorded", passedRecorded: true }),
       facts({ id: "v_ahead", sunsetAt: TOMORROW }),
       facts({ id: "v_none", sunsetAt: null }),
-      facts({ id: "v_earlier", sunsetAt: new Date(SUNSET.getTime() - 3 * MS_PER_DAY) }),
+      facts({
+        id: "v_earlier",
+        sunsetAt: new Date(SUNSET.getTime() - 3 * MS_PER_DAY),
+      }),
       facts({ id: "v_same_b" }),
       facts({ id: "v_same_a" }),
     ];
     // Same instant: by id.
-    expect(sweep(versions).map((p) => p.versionId)).toEqual(["v_earlier", "v_later", "v_same_a", "v_same_b"]);
+    expect(sweep(versions).map((p) => p.versionId)).toEqual([
+      "v_earlier",
+      "v_later",
+      "v_same_a",
+      "v_same_b",
+    ]);
   });
 
   it("is idempotent: once its row is written, the next sweep, now or later, finds nothing, so no second notice", () => {
     expect(sweep([facts()]).map((p) => p.versionId)).toEqual(["v_bt1"]);
     const recorded = facts({ passedRecorded: true });
     expect(sweep([recorded])).toEqual([]);
-    expect(sweep([recorded], new Date(NOW.getTime() + 30 * MS_PER_DAY))).toEqual([]);
+    expect(
+      sweep([recorded], new Date(NOW.getTime() + 30 * MS_PER_DAY)),
+    ).toEqual([]);
   });
 
   it("names the day in the business time zone it reads at the sweep, in the row and the notice", () => {
     const [passed] = sweep([facts()], NOW, "America/Los_Angeles");
-    expect(passed!.effects[0]).toMatchObject({ details: { sunsetDay: "2026-10-03", zone: "America/Los_Angeles" } });
-    expect(passed!.effects[1]).toMatchObject({ payload: { sunsetDay: "2026-10-03", zone: "America/Los_Angeles" } });
+    expect(passed!.effects[0]).toMatchObject({
+      details: { sunsetDay: "2026-10-03", zone: "America/Los_Angeles" },
+    });
+    expect(passed!.effects[1]).toMatchObject({
+      payload: { sunsetDay: "2026-10-03", zone: "America/Los_Angeles" },
+    });
   });
 
   it("skips a version revoked at or before its sunset (its renders had already stopped); records one revoked after", () => {
-    expect(sweep([facts({ state: "revoked", revokedAt: new Date(SUNSET.getTime() - MS_PER_DAY) })])).toEqual([]);
+    expect(
+      sweep([
+        facts({
+          state: "revoked",
+          revokedAt: new Date(SUNSET.getTime() - MS_PER_DAY),
+        }),
+      ]),
+    ).toEqual([]);
     expect(sweep([facts({ state: "revoked", revokedAt: SUNSET })])).toEqual([]);
     expect(sweep([facts({ state: "revoked", revokedAt: null })])).toEqual([]);
-    expect(sweep([facts({ state: "revoked", revokedAt: new Date(SUNSET.getTime() + 1) })]).map((p) => p.at)).toEqual([SUNSET]);
+    expect(
+      sweep([
+        facts({ state: "revoked", revokedAt: new Date(SUNSET.getTime() + 1) }),
+      ]).map((p) => p.at),
+    ).toEqual([SUNSET]);
   });
 
   it("records nothing for a state that never carries a sunset, or an unnumbered version", () => {
-    for (const state of VERSION_STATES.filter((x) => x !== "superseded" && x !== "revoked")) {
+    for (const state of VERSION_STATES.filter(
+      (x) => x !== "superseded" && x !== "revoked",
+    )) {
       expect(sweep([facts({ state })]), state).toEqual([]);
     }
     expect(sweep([facts({ number: null })])).toEqual([]);

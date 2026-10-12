@@ -16,7 +16,8 @@ export interface VariableDraft {
 export type DraftField = "label" | "key" | "sample";
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
-export type DraftResult = { ok: true; variable: Variable } | { ok: false; errors: DraftErrors };
+export type DraftResult =
+  { ok: true; variable: Variable } | { ok: false; errors: DraftErrors };
 
 export interface DraftContext {
   /** Keys already in the list, except the one being edited. */
@@ -24,9 +25,19 @@ export interface DraftContext {
 }
 
 /** A new draft. The key is generated from the label (and made unique). */
-export function newDraft(label: string, takenKeys: ReadonlySet<string>, type: VariableType = "text"): VariableDraft {
+export function newDraft(
+  label: string,
+  takenKeys: ReadonlySet<string>,
+  type: VariableType = "text",
+): VariableDraft {
   const clean = label.trim();
-  return { label: clean, key: generatedKey(clean, takenKeys), type, required: true, sample: "" };
+  return {
+    label: clean,
+    key: generatedKey(clean, takenKeys),
+    type,
+    required: true,
+    sample: "",
+  };
 }
 
 export function draftFromVariable(variable: Variable): VariableDraft {
@@ -34,12 +45,18 @@ export function draftFromVariable(variable: Variable): VariableDraft {
 }
 
 /** The key a label produces: snake_case, unique in the list. */
-export function generatedKey(label: string, takenKeys: ReadonlySet<string>): string {
+export function generatedKey(
+  label: string,
+  takenKeys: ReadonlySet<string>,
+): string {
   return uniqueKey(toKey(label), takenKeys);
 }
 
 /** Checks a draft. The sample is optional; when given it must suit the type and is stored canonically. */
-export function validateDraft(draft: VariableDraft, { takenKeys }: DraftContext): DraftResult {
+export function validateDraft(
+  draft: VariableDraft,
+  { takenKeys }: DraftContext,
+): DraftResult {
   const errors: DraftErrors = {};
   const label = draft.label.trim();
   const key = draft.key.trim();
@@ -47,7 +64,8 @@ export function validateDraft(draft: VariableDraft, { takenKeys }: DraftContext)
   if (!label) errors.label = "Enter a label";
 
   if (!key) errors.key = "Enter a key";
-  else if (!isValidKey(key)) errors.key = "Use a–z, 0–9 and _, starting with a letter";
+  else if (!isValidKey(key))
+    errors.key = "Use a–z, 0–9 and _, starting with a letter";
   else if (takenKeys.has(key)) errors.key = "Another variable has this key";
 
   let sample = "";
@@ -58,7 +76,16 @@ export function validateDraft(draft: VariableDraft, { takenKeys }: DraftContext)
   }
 
   if (errors.label || errors.key || errors.sample) return { ok: false, errors };
-  return { ok: true, variable: { key, label, type: draft.type, required: draft.required, sample } };
+  return {
+    ok: true,
+    variable: {
+      key,
+      label,
+      type: draft.type,
+      required: draft.required,
+      sample,
+    },
+  };
 }
 
 /**

@@ -18,7 +18,13 @@ vi.mock("@/server/db/client", async () => {
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
-const { auditEvents, memberships, notifications, recertifications, recertItems } = schema;
+const {
+  auditEvents,
+  memberships,
+  notifications,
+  recertifications,
+  recertItems,
+} = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
 const day = (n: number) => new Date(BASE.getTime() + n * DAY);
@@ -30,7 +36,9 @@ seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
-  recertId = (await db.query.recertifications.findFirst({ where: eq(recertifications.teamId, "coral-offers") }))!.id;
+  recertId = (await db.query.recertifications.findFirst({
+    where: eq(recertifications.teamId, "coral-offers"),
+  }))!.id;
 });
 
 beforeEach(() => {
@@ -39,18 +47,37 @@ beforeEach(() => {
 
 const coral = (userId: string) =>
   db.query.memberships.findFirst({
-    where: and(eq(memberships.teamId, "coral-offers"), eq(memberships.userId, userId)),
+    where: and(
+      eq(memberships.teamId, "coral-offers"),
+      eq(memberships.userId, userId),
+    ),
   });
-const count = async (table: typeof auditEvents | typeof notifications) => (await db.select().from(table)).length;
+const count = async (table: typeof auditEvents | typeof notifications) =>
+  (await db.select().from(table)).length;
 const auditAfter = (at: Date) =>
-  db.select().from(auditEvents).where(gt(auditEvents.at, at)).orderBy(asc(auditEvents.at), asc(auditEvents.action));
+  db
+    .select()
+    .from(auditEvents)
+    .where(gt(auditEvents.at, at))
+    .orderBy(asc(auditEvents.at), asc(auditEvents.action));
 
 /** Alex confirms every member but Sam on day 16 (recertification Keep does not restart Devon's inactivity clock). */
 const alexKeepsAllButSam = () =>
   db
     .update(recertItems)
     .set({ decision: "keep", decidedBy: "alex", decidedAt: day(16) })
-    .where(and(eq(recertItems.recertId, recertId), inArray(recertItems.userId, ["dana", "devon", "jordan", "maya", "priya"])));
+    .where(
+      and(
+        eq(recertItems.recertId, recertId),
+        inArray(recertItems.userId, [
+          "dana",
+          "devon",
+          "jordan",
+          "maya",
+          "priya",
+        ]),
+      ),
+    );
 
 /** The sweep as it runs `n` days after the seed. */
 async function sweepAt(n: number) {
@@ -61,7 +88,11 @@ async function sweepAt(n: number) {
 describe("runAccessSweep across the seed's deadlines", () => {
   it("finds nothing to do on a freshly seeded database", async () => {
     const before = await count(auditEvents);
-    expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+    expect(await runAccessSweep()).toEqual({
+      membershipChanges: [],
+      recertsClosed: [],
+      effects: [],
+    });
     expect(await count(auditEvents)).toBe(before);
   });
 
@@ -69,8 +100,15 @@ describe("runAccessSweep across the seed's deadlines", () => {
     const result = await sweepAt(15);
     expect(result.membershipChanges).toEqual([]);
     expect(result.recertsClosed).toEqual([]);
-    expect(await coral("devon")).toMatchObject({ status: "active", statusReason: null });
-    expect((await db.query.recertifications.findFirst({ where: eq(recertifications.id, recertId) }))!.completedAt).toBeNull();
+    expect(await coral("devon")).toMatchObject({
+      status: "active",
+      statusReason: null,
+    });
+    expect(
+      (await db.query.recertifications.findFirst({
+        where: eq(recertifications.id, recertId),
+      }))!.completedAt,
+    ).toBeNull();
   });
 
   it("31 days on (Alex kept everyone but Sam): Devon suspended at day 25, Sam lapsed at the deadline", async () => {
@@ -81,7 +119,9 @@ describe("runAccessSweep across the seed's deadlines", () => {
 
     const suspendAt = day(25); // 95 days idle at the seed + 25 = 120
     const dueAt = day(30);
-    expect(result.recertsClosed).toEqual([{ id: recertId, completedAt: dueAt }]);
+    expect(result.recertsClosed).toEqual([
+      { id: recertId, completedAt: dueAt },
+    ]);
     expect(result.membershipChanges).toHaveLength(2);
 
     expect(await coral("devon")).toMatchObject({
@@ -94,10 +134,13 @@ describe("runAccessSweep across the seed's deadlines", () => {
       statusReason: "recert_unconfirmed",
       statusChangedAt: dueAt,
     });
-    for (const kept of ["dana", "jordan", "maya", "priya"]) expect((await coral(kept))!.status).toBe("active");
-    expect((await db.query.recertifications.findFirst({ where: eq(recertifications.id, recertId) }))!.completedAt).toEqual(
-      dueAt,
-    );
+    for (const kept of ["dana", "jordan", "maya", "priya"])
+      expect((await coral(kept))!.status).toBe("active");
+    expect(
+      (await db.query.recertifications.findFirst({
+        where: eq(recertifications.id, recertId),
+      }))!.completedAt,
+    ).toEqual(dueAt);
 
     // Audit rows, by the system, backdated to each boundary, in time order.
     const rows = await auditAfter(day(15));
@@ -106,7 +149,11 @@ describe("runAccessSweep across the seed's deadlines", () => {
       ["access.lapsed", dueAt, null, "coral-offers"],
       ["recert.closed", dueAt, null, "coral-offers"],
     ]);
-    expect(rows[0]!.details).toMatchObject({ userId: "devon", reason: "inactivity_auto", daysInactive: 120 });
+    expect(rows[0]!.details).toMatchObject({
+      userId: "devon",
+      reason: "inactivity_auto",
+      daysInactive: 120,
+    });
     expect(rows[1]!.details).toMatchObject({ userId: "sam", recertId });
     expect(rows[2]!.details).toMatchObject({ kept: 5, removed: 0, lapsed: 1 });
     expect(await count(auditEvents)).toBe(auditBefore + 3);
@@ -118,9 +165,19 @@ describe("runAccessSweep across the seed's deadlines", () => {
       .where(gt(notifications.createdAt, day(15)))
       .orderBy(asc(notifications.createdAt), asc(notifications.userId));
     expect(sent.map((n) => [n.kind, n.userId, n.createdAt, n.href])).toEqual([
-      ["access_suspended", "alex", suspendAt, "/coral-offers/settings/inactivity"],
+      [
+        "access_suspended",
+        "alex",
+        suspendAt,
+        "/coral-offers/settings/inactivity",
+      ],
       ["access_suspended", "devon", suspendAt, "/request-access"],
-      ["access_lapsed", "alex", dueAt, "/coral-offers/settings/recertification"],
+      [
+        "access_lapsed",
+        "alex",
+        dueAt,
+        "/coral-offers/settings/recertification",
+      ],
       ["access_lapsed", "sam", dueAt, "/request-access"],
     ]);
   });
@@ -130,8 +187,16 @@ describe("runAccessSweep across the seed's deadlines", () => {
     await sweepAt(31);
     const audit = await count(auditEvents);
     const sent = await count(notifications);
-    expect(await sweepAt(31)).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
-    expect(await sweepAt(32)).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+    expect(await sweepAt(31)).toEqual({
+      membershipChanges: [],
+      recertsClosed: [],
+      effects: [],
+    });
+    expect(await sweepAt(32)).toEqual({
+      membershipChanges: [],
+      recertsClosed: [],
+      effects: [],
+    });
     expect(await count(auditEvents)).toBe(audit);
     expect(await count(notifications)).toBe(sent);
   });
@@ -143,7 +208,12 @@ describe("runAccessSweep across the seed's deadlines", () => {
     const result = await sweepAt(82);
     const flagAt = day(81);
     expect((await coral("dana"))!.inactivityFlaggedAt).toEqual(flagAt);
-    expect(result.effects.map((e) => [e.kind, e.kind === "audit" ? e.action : e.notification])).toEqual(
+    expect(
+      result.effects.map((e) => [
+        e.kind,
+        e.kind === "audit" ? e.action : e.notification,
+      ]),
+    ).toEqual(
       expect.arrayContaining([
         ["audit", "access.flagged_inactive"],
         ["notification", "inactivity_flagged"],
@@ -152,12 +222,19 @@ describe("runAccessSweep across the seed's deadlines", () => {
     const flagged = await db
       .select()
       .from(notifications)
-      .where(and(eq(notifications.kind, "inactivity_flagged"), eq(notifications.createdAt, flagAt)));
+      .where(
+        and(
+          eq(notifications.kind, "inactivity_flagged"),
+          eq(notifications.createdAt, flagAt),
+        ),
+      );
     expect(flagged.map((n) => n.userId)).toEqual(["alex"]);
     // Again: already flagged, nothing new.
-    expect((await runAccessSweep()).effects.filter((e) => e.kind === "audit" && e.action === "access.flagged_inactive")).toEqual(
-      [],
-    );
+    expect(
+      (await runAccessSweep()).effects.filter(
+        (e) => e.kind === "audit" && e.action === "access.flagged_inactive",
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -165,7 +242,11 @@ describe("runAccessSweep in one 31-day jump with nobody confirmed", () => {
   it("lapses every unconfirmed member at the deadline; Devon's earlier suspension wins", async () => {
     const result = await sweepAt(31);
     const statuses = await db
-      .select({ userId: memberships.userId, status: memberships.status, at: memberships.statusChangedAt })
+      .select({
+        userId: memberships.userId,
+        status: memberships.status,
+        at: memberships.statusChangedAt,
+      })
       .from(memberships)
       .where(eq(memberships.teamId, "coral-offers"))
       .orderBy(memberships.userId);
@@ -179,7 +260,11 @@ describe("runAccessSweep in one 31-day jump with nobody confirmed", () => {
       { userId: "sam", status: "lapsed", at: day(30) },
     ]);
     expect(result.recertsClosed).toHaveLength(1);
-    expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+    expect(await runAccessSweep()).toEqual({
+      membershipChanges: [],
+      recertsClosed: [],
+      effects: [],
+    });
   });
 });
 
@@ -197,13 +282,27 @@ describe("runAccessSweep never leaves a team without a Team Admin", () => {
       { userId: "naomi", status: "active" },
     ]);
     expect((await coral("jordan"))?.status).not.toBe("active"); // everyone else did lapse or go idle
-    const kept = await db.select().from(auditEvents).where(eq(auditEvents.action, "access.kept_last_admin"));
-    expect(kept.map((r) => r.teamId).sort()).toEqual(["card-statements", "coral-offers", "deposits"].sort());
+    const kept = await db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "access.kept_last_admin"));
+    expect(kept.map((r) => r.teamId).sort()).toEqual(
+      ["card-statements", "coral-offers", "deposits"].sort(),
+    );
     const told = await db
       .select({ userId: notifications.userId, href: notifications.href })
       .from(notifications)
-      .where(and(eq(notifications.userId, "riley"), eq(notifications.href, "/all/settings/teams")));
+      .where(
+        and(
+          eq(notifications.userId, "riley"),
+          eq(notifications.href, "/all/settings/teams"),
+        ),
+      );
     expect(told).toHaveLength(3);
-    expect(await runAccessSweep()).toEqual({ membershipChanges: [], recertsClosed: [], effects: [] });
+    expect(await runAccessSweep()).toEqual({
+      membershipChanges: [],
+      recertsClosed: [],
+      effects: [],
+    });
   });
 });

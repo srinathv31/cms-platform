@@ -2,7 +2,11 @@
 
 import { useId, type ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /** Per variant: hovering a blocked button leaves its fill as it is. */
@@ -16,7 +20,11 @@ const STILL = {
 
 export type BlockedButtonProps = Omit<
   ComponentProps<typeof Button>,
-  "variant" | "disabled" | "focusableWhenDisabled" | "onClick" | "aria-describedby"
+  | "variant"
+  | "disabled"
+  | "focusableWhenDisabled"
+  | "onClick"
+  | "aria-describedby"
 > & {
   variant?: keyof typeof STILL;
   /** Why it can't be pressed: its tooltip and its accessible description. */
@@ -32,7 +40,14 @@ export type BlockedButtonProps = Omit<
  * `disabled`, so shadcn's `disabled:` classes don't match it: the `data-disabled:` ones here grey it out,
  * and keep hover and press from moving it.
  */
-export function BlockedButton({ variant = "outline", reason, describedBy, className, children, ...props }: BlockedButtonProps) {
+export function BlockedButton({
+  variant = "outline",
+  reason,
+  describedBy,
+  className,
+  children,
+  ...props
+}: BlockedButtonProps) {
   const ownId = useId();
   return (
     <>

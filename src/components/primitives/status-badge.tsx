@@ -9,17 +9,27 @@ import type { VersionState } from "@/domain/types";
 
 const TONE: Record<StatusMeta["tone"], string> = {
   draft: "bg-status-draft text-status-draft-text border-status-draft-border",
-  review: "bg-status-review text-status-review-text border-status-review-border",
-  changes: "bg-status-changes text-status-changes-text border-status-changes-border",
-  active: "bg-status-active text-status-active-text border-status-active-border",
-  superseded: "bg-status-superseded text-status-superseded-text border-status-superseded-border",
-  revoked: "bg-status-revoked text-status-revoked-text border-status-revoked-border",
+  review:
+    "bg-status-review text-status-review-text border-status-review-border",
+  changes:
+    "bg-status-changes text-status-changes-text border-status-changes-border",
+  active:
+    "bg-status-active text-status-active-text border-status-active-border",
+  superseded:
+    "bg-status-superseded text-status-superseded-text border-status-superseded-border",
+  revoked:
+    "bg-status-revoked text-status-revoked-text border-status-revoked-border",
 };
 
 function StatusIcon({ icon }: { icon: StatusMeta["icon"] }) {
   switch (icon) {
     case "dot":
-      return <span aria-hidden className="size-1.5 rounded-full bg-current opacity-70" />;
+      return (
+        <span
+          aria-hidden
+          className="size-1.5 rounded-full bg-current opacity-70"
+        />
+      );
     case "clock":
       return <Clock aria-hidden strokeWidth={2} />;
     case "corner-up-left":
@@ -61,13 +71,18 @@ export function StatusBadge({
     <Badge
       variant="outline"
       data-status={state}
-      className={cn("h-[22px] gap-1.5 px-2 text-[12px] font-medium", TONE[meta.tone], className)}
+      className={cn(
+        "h-[22px] gap-1.5 px-2 text-[12px] font-medium",
+        TONE[meta.tone],
+        className,
+      )}
     >
       <StatusIcon icon={meta.icon} />
       {meta.label}
       {state === "superseded" && sunsetDay ? (
         <span className="font-normal">
-          · Sunset{sunsetPassed ? " passed" : ""} {formatShortDate(sunsetDay, now)}
+          · Sunset{sunsetPassed ? " passed" : ""}{" "}
+          {formatShortDate(sunsetDay, now)}
         </span>
       ) : null}
     </Badge>

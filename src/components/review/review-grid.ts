@@ -82,7 +82,8 @@ export const RV = {
   bar: "sticky bottom-[-3.5rem] z-20 col-start-1 row-start-3 -mr-(--canvas-pad-x) -ml-[calc(var(--canvas-pad-x)+1.25rem)] flex items-center gap-2 self-end h-[3.5625rem] @max-[26rem]/canvas:h-auto @max-[26rem]/canvas:min-h-[3.5625rem] @max-[26rem]/canvas:flex-wrap @max-[26rem]/canvas:py-2 border-t border-hairline bg-canvas pr-28 pl-[calc(var(--canvas-pad-x)+1.25rem)] @min-[53rem]/ws:hidden",
 
   /** The rail's top section (the stepper and the decision), pinned above the scroll. */
-  railHead: "shrink-0 border-b border-hairline pt-1.5 pb-4 pl-(--rail-pl) pr-(--rail-pr)",
+  railHead:
+    "shrink-0 border-b border-hairline pt-1.5 pb-4 pl-(--rail-pl) pr-(--rail-pr)",
 
   /** The rail's scrolling section. Stacked, it simply flows: the canvas scrolls. */
   railBody:

@@ -14,7 +14,13 @@ import {
   type SweepInput,
   type SweepResult,
 } from "../access-types";
-import { inactivityAnchor, inactivity, flaggedFor, suspensionHeld, type Inactivity } from "./inactivity";
+import {
+  inactivityAnchor,
+  inactivity,
+  flaggedFor,
+  suspensionHeld,
+  type Inactivity,
+} from "./inactivity";
 import { recertProgress } from "./recertification";
 import { sortRoles } from "./roles";
 
@@ -52,12 +58,17 @@ interface SweepPlan {
 export function sweepAccess(input: SweepInput): SweepResult {
   const { now } = input;
   const t = now.getTime();
-  const teamName = (id: string) => input.teams.find((x) => x.id === id)?.name ?? id;
-  const personName = (id: string) => input.people.find((x) => x.id === id)?.name ?? id;
+  const teamName = (id: string) =>
+    input.teams.find((x) => x.id === id)?.name ?? id;
+  const personName = (id: string) =>
+    input.people.find((x) => x.id === id)?.name ?? id;
 
   const due = input.recerts
     .filter((r) => r.completedAt === null && r.dueAt.getTime() <= t)
-    .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime() || a.id.localeCompare(b.id));
+    .sort(
+      (a, b) =>
+        a.dueAt.getTime() - b.dueAt.getTime() || a.id.localeCompare(b.id),
+    );
 
   // 1. What would end each active membership, earliest first; a tie goes to the review.
   const plans: SweepPlan[] = [...input.memberships]
@@ -71,13 +82,21 @@ export function sweepAccess(input: SweepInput): SweepResult {
       for (const r of due) {
         if (!reviewed || r.teamId !== m.teamId) continue;
         const item = r.items.find((i) => i.userId === m.userId);
-        if (item && item.decision === null) boundaries.push({ kind: "lapse", at: r.dueAt, recert: r });
+        if (item && item.decision === null)
+          boundaries.push({ kind: "lapse", at: r.dueAt, recert: r });
       }
       const idle = inactivity(m, now);
       if (idle.state === "suspend_due" && !suspensionHeld(m, idle)) {
-        boundaries.push({ kind: "auto_suspend", at: idle.suspendAt, daysInactive: INACTIVITY_SUSPEND_DAYS });
+        boundaries.push({
+          kind: "auto_suspend",
+          at: idle.suspendAt,
+          daysInactive: INACTIVITY_SUSPEND_DAYS,
+        });
       }
-      boundaries.sort((a, b) => a.at.getTime() - b.at.getTime() || (a.kind === "lapse" ? -1 : 1));
+      boundaries.sort(
+        (a, b) =>
+          a.at.getTime() - b.at.getTime() || (a.kind === "lapse" ? -1 : 1),
+      );
       return { m, idle, boundaries, held: false };
     });
 
@@ -104,7 +123,10 @@ export function sweepAccess(input: SweepInput): SweepResult {
 
     // The 90-day flag, if it came before whatever ended the membership.
     const set: MembershipSet = {};
-    const flagged = idle.state !== "ok" && !flaggedFor(m, idle) && (!first || idle.flagAt.getTime() < first.at.getTime());
+    const flagged =
+      idle.state !== "ok" &&
+      !flaggedFor(m, idle) &&
+      (!first || idle.flagAt.getTime() < first.at.getTime());
     if (flagged) {
       set.inactivityFlaggedAt = idle.flagAt;
       effects.push({
@@ -124,7 +146,11 @@ export function sweepAccess(input: SweepInput): SweepResult {
         effects.push({
           kind: "notification",
           notification: "inactivity_flagged",
-          to: { kind: "team_admins", teamId: team.id, exceptUserIds: [member.id] },
+          to: {
+            kind: "team_admins",
+            teamId: team.id,
+            exceptUserIds: [member.id],
+          },
           teamId: team.id,
           title: `${member.name} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days.`,
           body: `Access to ${team.name} is suspended automatically on ${formatLongDate(idle.suspendAt)}.`,
@@ -140,8 +166,15 @@ export function sweepAccess(input: SweepInput): SweepResult {
         effects.push(...keptLastAdminEffects(b, team, member));
       }
     } else if (first?.kind === "lapse") {
-      Object.assign(set, { status: "lapsed", statusReason: "recert_unconfirmed", statusChangedAt: first.at } satisfies MembershipSet);
-      lapsedByRecert.set(first.recert.id, (lapsedByRecert.get(first.recert.id) ?? 0) + 1);
+      Object.assign(set, {
+        status: "lapsed",
+        statusReason: "recert_unconfirmed",
+        statusChangedAt: first.at,
+      } satisfies MembershipSet);
+      lapsedByRecert.set(
+        first.recert.id,
+        (lapsedByRecert.get(first.recert.id) ?? 0) + 1,
+      );
       const by = formatLongDate(first.at);
       effects.push(
         {
@@ -171,7 +204,11 @@ export function sweepAccess(input: SweepInput): SweepResult {
         {
           kind: "notification",
           notification: "access_lapsed",
-          to: { kind: "team_admins", teamId: team.id, exceptUserIds: [member.id] },
+          to: {
+            kind: "team_admins",
+            teamId: team.id,
+            exceptUserIds: [member.id],
+          },
           teamId: team.id,
           title: `${member.name}'s access to ${team.name} lapsed: not recertified by ${by}.`,
           link: { to: "settings", teamId: team.id, section: "recertification" },
@@ -179,7 +216,11 @@ export function sweepAccess(input: SweepInput): SweepResult {
         },
       );
     } else if (first?.kind === "auto_suspend") {
-      Object.assign(set, { status: "suspended", statusReason: "inactivity_auto", statusChangedAt: first.at } satisfies MembershipSet);
+      Object.assign(set, {
+        status: "suspended",
+        statusReason: "inactivity_auto",
+        statusChangedAt: first.at,
+      } satisfies MembershipSet);
       effects.push(
         {
           kind: "audit",
@@ -187,7 +228,12 @@ export function sweepAccess(input: SweepInput): SweepResult {
           teamId: team.id,
           actorId: null,
           at: first.at,
-          details: { userId: member.id, userName: member.name, reason: "inactivity_auto", daysInactive: first.daysInactive },
+          details: {
+            userId: member.id,
+            userName: member.name,
+            reason: "inactivity_auto",
+            daysInactive: first.daysInactive,
+          },
         },
         {
           kind: "notification",
@@ -201,7 +247,11 @@ export function sweepAccess(input: SweepInput): SweepResult {
         {
           kind: "notification",
           notification: "access_suspended",
-          to: { kind: "team_admins", teamId: team.id, exceptUserIds: [member.id] },
+          to: {
+            kind: "team_admins",
+            teamId: team.id,
+            exceptUserIds: [member.id],
+          },
           teamId: team.id,
           title: `${member.name}'s access to ${team.name} was suspended after ${first.daysInactive} days without a sign-in.`,
           link: { to: "settings", teamId: team.id, section: "inactivity" },
@@ -210,7 +260,8 @@ export function sweepAccess(input: SweepInput): SweepResult {
       );
     }
 
-    if (Object.keys(set).length > 0) membershipChanges.push({ kind: "update", membershipId: m.id, set });
+    if (Object.keys(set).length > 0)
+      membershipChanges.push({ kind: "update", membershipId: m.id, set });
   }
 
   const recertsClosed = due.map((r) => ({ id: r.id, completedAt: r.dueAt }));
@@ -239,10 +290,18 @@ export function sweepAccess(input: SweepInput): SweepResult {
 }
 
 /** The last Team Admin kept past a boundary: an audit row, and the Platform Admins are told. */
-function keptLastAdminEffects(b: Boundary, team: Named, member: Named): AccessEffect[] {
+function keptLastAdminEffects(
+  b: Boundary,
+  team: Named,
+  member: Named,
+): AccessEffect[] {
   const details =
     b.kind === "lapse"
-      ? { recertId: b.recert.id, label: b.recert.label, dueAt: b.at.toISOString() }
+      ? {
+          recertId: b.recert.id,
+          label: b.recert.label,
+          dueAt: b.at.toISOString(),
+        }
       : { daysInactive: b.daysInactive };
   const title =
     b.kind === "lapse"

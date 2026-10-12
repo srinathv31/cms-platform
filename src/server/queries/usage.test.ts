@@ -1,11 +1,19 @@
 import type { Client } from "@libsql/client";
 import { inArray } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { HEATMAP_WEEKS, HISTORY_DAYS, TREND_WEEKS, USAGE_WINDOW_DAYS } from "@/domain/golive-types";
+import {
+  HEATMAP_WEEKS,
+  HISTORY_DAYS,
+  TREND_WEEKS,
+  USAGE_WINDOW_DAYS,
+} from "@/domain/golive-types";
 import { CHANNELS, type Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getTemplateUsage, getUsageDashboard } from "./usage";
 
@@ -34,7 +42,8 @@ const ids = seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
-  for (const id of ["maya", "riley", "eli"]) people[id] = await loadPersona(db, id);
+  for (const id of ["maya", "riley", "eli"])
+    people[id] = await loadPersona(db, id);
 });
 
 function as(userId: string) {
@@ -42,8 +51,14 @@ function as(userId: string) {
 }
 
 /** Direct SQL: one number from render_log, usage rows only, for a team (or every team). */
-async function direct(where: string, team: string | null, args: (string | number)[] = []): Promise<number> {
-  const teamClause = team ? "and template_id in (select id from templates where team_id = ?)" : "";
+async function direct(
+  where: string,
+  team: string | null,
+  args: (string | number)[] = [],
+): Promise<number> {
+  const teamClause = team
+    ? "and template_id in (select id from templates where team_id = ?)"
+    : "";
   const result = await libsql.execute({
     sql: `select count(*) as n from render_log where is_preview = 0 and consumer_id is not null and coalesce(error_code, '') <> 'unknown_consumer' and at <= ? ${teamClause} and ${where}`,
     args: [env.now.getTime(), ...(team ? [team] : []), ...args],
@@ -54,17 +69,31 @@ async function direct(where: string, team: string | null, args: (string | number
 const since = () => env.now.getTime() - USAGE_WINDOW_DAYS * DAY;
 
 /** Insert render_log rows for a test and remove them after. */
-async function withRows(rows: (typeof schema.renderLog.$inferInsert)[], run: () => Promise<void>) {
+async function withRows(
+  rows: (typeof schema.renderLog.$inferInsert)[],
+  run: () => Promise<void>,
+) {
   await db.insert(schema.renderLog).values(rows);
   try {
     await run();
   } finally {
-    await db.delete(schema.renderLog).where(inArray(schema.renderLog.id, rows.map((r) => r.id)));
+    await db.delete(schema.renderLog).where(
+      inArray(
+        schema.renderLog.id,
+        rows.map((r) => r.id),
+      ),
+    );
   }
 }
 
-async function versionIdOf(templateId: string, number: number): Promise<string> {
-  const result = await libsql.execute({ sql: "select id from versions where template_id = ? and number = ?", args: [templateId, number] });
+async function versionIdOf(
+  templateId: string,
+  number: number,
+): Promise<string> {
+  const result = await libsql.execute({
+    sql: "select id from versions where template_id = ? and number = ?",
+    args: [templateId, number],
+  });
   return String(result.rows[0]!.id);
 }
 
@@ -106,17 +135,34 @@ describe("getUsageDashboard", () => {
     const prev = s - USAGE_WINDOW_DAYS * DAY;
     // One denominator: a render is an attempt, succeeded or failed.
     const ok = await direct("outcome = 'ok' and at >= ?", "coral-offers", [s]);
-    const errors = await direct("outcome = 'error' and at >= ?", "coral-offers", [s]);
+    const errors = await direct(
+      "outcome = 'error' and at >= ?",
+      "coral-offers",
+      [s],
+    );
     const renders = ok + errors;
-    const previous = await direct("at >= ? and at < ?", "coral-offers", [prev, s]);
+    const previous = await direct("at >= ? and at < ?", "coral-offers", [
+      prev,
+      s,
+    ]);
 
-    expect(d.space).toEqual({ slug: "coral-offers", name: "Coral Offers", isAll: false });
+    expect(d.space).toEqual({
+      slug: "coral-offers",
+      name: "Coral Offers",
+      isAll: false,
+    });
     expect(d.today).toBe("2026-10-04");
     expect(ok).toBeGreaterThan(1000);
     expect(d.stats.renders).toMatchObject({ value: renders, previous });
-    expect(d.stats.renders.trendPct).toBe(Math.round(((renders - previous) / previous) * 1000) / 10);
+    expect(d.stats.renders.trendPct).toBe(
+      Math.round(((renders - previous) / previous) * 1000) / 10,
+    );
     expect(d.stats.renders.display).toMatch(/^\d+(\.\d)?k$/);
-    expect(d.success).toEqual({ ok, errors, pct: Math.round((ok / renders) * 1000) / 10 });
+    expect(d.success).toEqual({
+      ok,
+      errors,
+      pct: Math.round((ok / renders) * 1000) / 10,
+    });
     expect(errors).toBeGreaterThan(0);
 
     // Every breakdown adds up to the same total.
@@ -129,7 +175,9 @@ describe("getUsageDashboard", () => {
     expect(d.onActive.active + d.onActive.other).toBe(renders);
     // Failures reconcile: no row has more failures than renders, and the Failures card's rate is the same ratio.
     expect(d.rows.every((r) => r.errors30d <= r.renders30d)).toBe(true);
-    expect(d.byTemplate.map((t) => t.renders)).toEqual([...d.byTemplate.map((t) => t.renders)].sort((a, b) => b - a));
+    expect(d.byTemplate.map((t) => t.renders)).toEqual(
+      [...d.byTemplate.map((t) => t.renders)].sort((a, b) => b - a),
+    );
 
     const consumers = await libsql.execute({
       sql: "select count(distinct consumer_id) as n from render_log where is_preview = 0 and consumer_id is not null and at >= ? and at <= ? and template_id in (select id from templates where team_id = 'coral-offers')",
@@ -145,22 +193,55 @@ describe("getUsageDashboard", () => {
     expect(d.stats.nearingSunset).toMatchObject({
       value: 1,
       display: "1",
-      soonest: { templateName: "Balance Transfer Intro — Terms", versionNumber: 1, daysAway: 21 },
+      soonest: {
+        templateName: "Balance Transfer Intro — Terms",
+        versionNumber: 1,
+        daysAway: 21,
+      },
     });
-    const v1 = d.rows.find((r) => r.template.id === ids["balance-transfer"] && r.versionNumber === 1)!;
+    const v1 = d.rows.find(
+      (r) => r.template.id === ids["balance-transfer"] && r.versionNumber === 1,
+    )!;
     // The sunset is a day in the business time zone: October 25, 00:00 Eastern.
-    expect(v1).toMatchObject({ consumer: { id: "coral", name: "Coral" }, versionState: "superseded", sunsetDay: "2026-10-25", sunsetPassed: false });
+    expect(v1).toMatchObject({
+      consumer: { id: "coral", name: "Coral" },
+      versionState: "superseded",
+      sunsetDay: "2026-10-25",
+      sunsetPassed: false,
+    });
     expect(v1.tags).toEqual([{ tone: "warning", text: "sunset in 21 days" }]);
     expect(v1.spark).toHaveLength(USAGE_WINDOW_DAYS);
     expect(v1.spark.at(-1)).toBeGreaterThan(0); // the seed's latest v1 render was 37 minutes ago
-    expect(d.onActive.otherVersions).toEqual([{ template: { id: ids["balance-transfer"], name: "Balance Transfer Intro — Terms" }, versionNumber: 1, renders: v1.renders30d }]);
+    expect(d.onActive.otherVersions).toEqual([
+      {
+        template: {
+          id: ids["balance-transfer"],
+          name: "Balance Transfer Intro — Terms",
+        },
+        versionNumber: 1,
+        renders: v1.renders30d,
+      },
+    ]);
 
     // Tagged rows first: danger (failed renders), then the warning, then the rest by renders.
-    const ranks = d.rows.map((r) => (r.tags.some((t) => t.tone === "danger") ? 0 : r.tags.some((t) => t.tone === "warning") ? 1 : 2));
+    const ranks = d.rows.map((r) =>
+      r.tags.some((t) => t.tone === "danger")
+        ? 0
+        : r.tags.some((t) => t.tone === "warning")
+          ? 1
+          : 2,
+    );
     expect(ranks).toEqual([...ranks].sort());
-    expect(d.rows[0]!.tags[0]).toMatchObject({ tone: "danger", text: expect.stringMatching(/^\d+ failed renders?$/) });
+    expect(d.rows[0]!.tags[0]).toMatchObject({
+      tone: "danger",
+      text: expect.stringMatching(/^\d+ failed renders?$/),
+    });
     // The revoked Holiday Points v1 stopped rendering 34 days ago: not in the last 30 days.
-    expect(d.rows.some((r) => r.template.id === ids["holiday-points"] && r.versionNumber === 1)).toBe(false);
+    expect(
+      d.rows.some(
+        (r) => r.template.id === ids["holiday-points"] && r.versionNumber === 1,
+      ),
+    ).toBe(false);
   });
 
   it("series: an 18-week heatmap with levels 0–4, 13 weeks, 90 days, all matching SQL", async () => {
@@ -168,25 +249,42 @@ describe("getUsageDashboard", () => {
     const d = await getUsageDashboard("coral-offers");
     expect(d.heatmap.weeks).toHaveLength(HEATMAP_WEEKS);
     const cells = d.heatmap.weeks.flat();
-    expect(new Set(cells.map((c) => c.level))).toEqual(new Set([0, 1, 2, 3, 4]));
+    expect(new Set(cells.map((c) => c.level))).toEqual(
+      new Set([0, 1, 2, 3, 4]),
+    );
     expect(cells.at(-1)!.date >= d.today).toBe(true);
     const first = Date.parse(`${cells[0]!.date}T00:00:00Z`);
-    expect(d.heatmap.total).toBe(await direct("at >= ?", "coral-offers", [first]));
-    expect(d.heatmap.busiest!.count).toBe(Math.max(...cells.map((c) => c.count)));
+    expect(d.heatmap.total).toBe(
+      await direct("at >= ?", "coral-offers", [first]),
+    );
+    expect(d.heatmap.busiest!.count).toBe(
+      Math.max(...cells.map((c) => c.count)),
+    );
 
     expect(d.weekly).toHaveLength(TREND_WEEKS);
     expect(d.daily).toHaveLength(HISTORY_DAYS);
     expect(d.daily.at(-1)!.date).toBe(d.today);
     const day = d.daily.find((x) => x.date === "2026-09-12")!; // the Cash Back burst of failures (22.3 days ago)
     const start = Date.parse("2026-09-12T00:00:00Z");
-    expect(day.errors).toBe(await direct("outcome = 'error' and at >= ? and at < ?", "coral-offers", [start, start + DAY]));
-    expect(day.count).toBe(await direct("at >= ? and at < ?", "coral-offers", [start, start + DAY]));
+    expect(day.errors).toBe(
+      await direct("outcome = 'error' and at >= ? and at < ?", "coral-offers", [
+        start,
+        start + DAY,
+      ]),
+    );
+    expect(day.count).toBe(
+      await direct("at >= ? and at < ?", "coral-offers", [start, start + DAY]),
+    );
     expect(day.errors).toBeLessThanOrEqual(day.count);
     const week = d.weekly.at(-2)!;
     const ws = Date.parse(`${week.weekStart}T00:00:00Z`);
-    expect(week.count).toBe(await direct("at >= ? and at < ?", "coral-offers", [ws, ws + 7 * DAY]));
+    expect(week.count).toBe(
+      await direct("at >= ? and at < ?", "coral-offers", [ws, ws + 7 * DAY]),
+    );
     // Every channel's renders, the Payment Due Reminder alert's push and SMS among them.
-    expect(CHANNELS.reduce((sum, channel) => sum + week.channels[channel], 0)).toBe(week.count);
+    expect(
+      CHANNELS.reduce((sum, channel) => sum + week.channels[channel], 0),
+    ).toBe(week.count);
     expect(week.channels.push).toBeGreaterThan(0);
     expect(week.channels.sms).toBeGreaterThan(0);
   });
@@ -199,10 +297,41 @@ describe("getUsageDashboard", () => {
     const t = env.now.getTime() - 3_600_000;
     await withRows(
       [
-        logRow({ id: "rl_test_preview", at: t, templateId: bt, versionId: v2, versionNumber: 2, consumerId: null, isPreview: true }),
-        logRow({ id: "rl_test_preview_c", at: t, templateId: bt, versionId: v2, versionNumber: 2, consumerId: "coral", isPreview: true }),
-        logRow({ id: "rl_test_noconsumer", at: t, templateId: bt, versionId: v2, versionNumber: 2, consumerId: null }),
-        logRow({ id: "rl_test_noconsumer_err", at: t, templateId: bt, versionId: v2, versionNumber: 2, consumerId: null, outcome: "error" }),
+        logRow({
+          id: "rl_test_preview",
+          at: t,
+          templateId: bt,
+          versionId: v2,
+          versionNumber: 2,
+          consumerId: null,
+          isPreview: true,
+        }),
+        logRow({
+          id: "rl_test_preview_c",
+          at: t,
+          templateId: bt,
+          versionId: v2,
+          versionNumber: 2,
+          consumerId: "coral",
+          isPreview: true,
+        }),
+        logRow({
+          id: "rl_test_noconsumer",
+          at: t,
+          templateId: bt,
+          versionId: v2,
+          versionNumber: 2,
+          consumerId: null,
+        }),
+        logRow({
+          id: "rl_test_noconsumer_err",
+          at: t,
+          templateId: bt,
+          versionId: v2,
+          versionNumber: 2,
+          consumerId: null,
+          outcome: "error",
+        }),
       ],
       async () => {
         const after = await getUsageDashboard("coral-offers");
@@ -217,12 +346,25 @@ describe("getUsageDashboard", () => {
     const bt = ids["balance-transfer"]!;
     const v2 = await versionIdOf(bt, 2);
     const t = env.now.getTime() - 3_600_000;
-    const typo = (id: string) => logRow({ id, at: t, templateId: bt, versionId: v2, versionNumber: 2, consumerId: "corall", outcome: "error", errorCode: "unknown_consumer" });
-    await withRows([typo("rl_test_typo_1"), typo("rl_test_typo_2"), typo("rl_test_typo_3")], async () => {
-      expect(await getUsageDashboard("coral-offers")).toEqual(before);
-      const usage = await getTemplateUsage("coral-offers", bt);
-      expect(JSON.stringify(usage)).not.toContain("orall");
-    });
+    const typo = (id: string) =>
+      logRow({
+        id,
+        at: t,
+        templateId: bt,
+        versionId: v2,
+        versionNumber: 2,
+        consumerId: "corall",
+        outcome: "error",
+        errorCode: "unknown_consumer",
+      });
+    await withRows(
+      [typo("rl_test_typo_1"), typo("rl_test_typo_2"), typo("rl_test_typo_3")],
+      async () => {
+        expect(await getUsageDashboard("coral-offers")).toEqual(before);
+        const usage = await getTemplateUsage("coral-offers", bt);
+        expect(JSON.stringify(usage)).not.toContain("orall");
+      },
+    );
   });
 
   it("window boundaries follow the demo clock: exactly 30 days ago is in, a millisecond earlier is the previous window, the future is out", async () => {
@@ -233,14 +375,37 @@ describe("getUsageDashboard", () => {
     const s = since();
     await withRows(
       [
-        logRow({ id: "rl_test_edge_in", at: s, templateId: rc, versionId: v1, versionNumber: 1, consumerId: "coral" }),
-        logRow({ id: "rl_test_edge_prev", at: s - 1, templateId: rc, versionId: v1, versionNumber: 1, consumerId: "coral" }),
-        logRow({ id: "rl_test_future", at: env.now.getTime() + 60_000, templateId: rc, versionId: v1, versionNumber: 1, consumerId: "coral" }),
+        logRow({
+          id: "rl_test_edge_in",
+          at: s,
+          templateId: rc,
+          versionId: v1,
+          versionNumber: 1,
+          consumerId: "coral",
+        }),
+        logRow({
+          id: "rl_test_edge_prev",
+          at: s - 1,
+          templateId: rc,
+          versionId: v1,
+          versionNumber: 1,
+          consumerId: "coral",
+        }),
+        logRow({
+          id: "rl_test_future",
+          at: env.now.getTime() + 60_000,
+          templateId: rc,
+          versionId: v1,
+          versionNumber: 1,
+          consumerId: "coral",
+        }),
       ],
       async () => {
         const after = await getUsageDashboard("coral-offers");
         expect(after.stats.renders.value).toBe(before.stats.renders.value + 1);
-        expect(after.stats.renders.previous).toBe(before.stats.renders.previous + 1);
+        expect(after.stats.renders.previous).toBe(
+          before.stats.renders.previous + 1,
+        );
         expect(after.daily.at(-1)).toEqual(before.daily.at(-1));
       },
     );
@@ -253,10 +418,15 @@ describe("getUsageDashboard", () => {
       const d = await getUsageDashboard("coral-offers");
       expect(d.today).toBe("2026-10-26");
       expect(d.stats.nearingSunset).toMatchObject({ value: 0, soonest: null });
-      const v1 = d.rows.find((r) => r.template.id === ids["balance-transfer"] && r.versionNumber === 1)!;
+      const v1 = d.rows.find(
+        (r) =>
+          r.template.id === ids["balance-transfer"] && r.versionNumber === 1,
+      )!;
       expect(v1.tags).toEqual([{ tone: "danger", text: "renders fail" }]);
       expect(v1).toMatchObject({ sunsetDay: "2026-10-25", sunsetPassed: true });
-      expect(d.stats.renders.value).toBe(await direct("at >= ?", "coral-offers", [since()]));
+      expect(d.stats.renders.value).toBe(
+        await direct("at >= ?", "coral-offers", [since()]),
+      );
     } finally {
       env.now = BASE;
     }
@@ -266,8 +436,13 @@ describe("getUsageDashboard", () => {
     as("riley");
     const d = await getUsageDashboard("all");
     expect(d.space).toEqual({ slug: "all", name: "All teams", isAll: true });
-    expect(d.stats.renders.value).toBe(await direct("at >= ?", null, [since()]));
-    expect(d.byConsumer.map((c) => c.consumer.name).sort()).toEqual(["Coral", "Deposits Online"]);
+    expect(d.stats.renders.value).toBe(
+      await direct("at >= ?", null, [since()]),
+    );
+    expect(d.byConsumer.map((c) => c.consumer.name).sort()).toEqual([
+      "Coral",
+      "Deposits Online",
+    ]);
   });
 
   // Speed, deterministically: a wall-clock budget failed under full-suite load (the machine, not the code).
@@ -284,14 +459,20 @@ describe("getUsageDashboard", () => {
       for (const [name, run, most] of [
         ["dashboard, all teams", () => getUsageDashboard("all"), 7],
         ["dashboard, one team", () => getUsageDashboard("coral-offers"), 8],
-        ["template", () => getTemplateUsage("coral-offers", ids["balance-transfer"]!), 10], // one is the content type's channels
+        [
+          "template",
+          () => getTemplateUsage("coral-offers", ids["balance-transfer"]!),
+          10,
+        ], // one is the content type's channels
       ] as const) {
         execute.mockClear();
         batch.mockClear();
         const t0 = performance.now();
         await run();
         const statements = execute.mock.calls.length + batch.mock.calls.length;
-        console.info(`usage read model (${name}): ${statements} statements, ${(performance.now() - t0).toFixed(1)} ms`);
+        console.info(
+          `usage read model (${name}): ${statements} statements, ${(performance.now() - t0).toFixed(1)} ms`,
+        );
         expect(statements, name).toBeLessThanOrEqual(most);
       }
     } finally {
@@ -308,9 +489,17 @@ describe("getTemplateUsage", () => {
     const u = await getTemplateUsage("coral-offers", bt);
     const s = since();
     const ok = await direct("at >= ? and template_id = ?", null, [s, bt]);
-    const v1ok = await direct("at >= ? and template_id = ? and version_number = 1", null, [s, bt]);
+    const v1ok = await direct(
+      "at >= ? and template_id = ? and version_number = 1",
+      null,
+      [s, bt],
+    );
 
-    expect(u.template).toEqual({ id: bt, name: "Balance Transfer Intro — Terms", teamSlug: "coral-offers" });
+    expect(u.template).toEqual({
+      id: bt,
+      name: "Balance Transfer Intro — Terms",
+      teamSlug: "coral-offers",
+    });
     expect(u.stats.renders.value).toBe(ok);
     expect(u.stats.consumers.value).toBe(1);
     expect(u.versions.map((v) => [v.number, v.state])).toEqual([
@@ -318,20 +507,46 @@ describe("getTemplateUsage", () => {
       [1, "superseded"],
     ]);
     const v1 = u.versions[1]!;
-    expect(v1).toMatchObject({ sunsetPassed: false, revokedAt: null, tags: [{ tone: "warning", text: "sunset in 21 days" }] });
-    expect(v1.consumers).toEqual([{ id: "coral", name: "Coral", renders30d: v1ok, errors30d: 0, lastRenderAt: new Date(BASE.getTime() - 37 * 60_000).toISOString() }]);
-    expect(u.stillOn).toEqual([{ versionNumber: 1, state: "superseded", renders: v1ok, pct: Math.round((v1ok / ok) * 100) }]);
+    expect(v1).toMatchObject({
+      sunsetPassed: false,
+      revokedAt: null,
+      tags: [{ tone: "warning", text: "sunset in 21 days" }],
+    });
+    expect(v1.consumers).toEqual([
+      {
+        id: "coral",
+        name: "Coral",
+        renders30d: v1ok,
+        errors30d: 0,
+        lastRenderAt: new Date(BASE.getTime() - 37 * 60_000).toISOString(),
+      },
+    ]);
+    expect(u.stillOn).toEqual([
+      {
+        versionNumber: 1,
+        state: "superseded",
+        renders: v1ok,
+        pct: Math.round((v1ok / ok) * 100),
+      },
+    ]);
 
     expect(u.weeklyVersions).toEqual([1, 2]);
     expect(u.weekly).toHaveLength(TREND_WEEKS);
-    for (const w of u.weekly) expect(w.byVersion[1]! + w.byVersion[2]!).toBe(w.count);
+    for (const w of u.weekly)
+      expect(w.byVersion[1]! + w.byVersion[2]!).toBe(w.count);
     expect(u.daily).toHaveLength(HISTORY_DAYS);
     expect(u.rows.map((r) => r.versionNumber).sort()).toEqual([1, 2]);
 
     // The two failed v1 renders 31 days ago: outside the window, still the most recent errors.
     expect(u.stats.errors.value).toBe(0);
     expect(u.recentErrors).toHaveLength(2);
-    expect(u.recentErrors[0]).toMatchObject({ consumer: { id: "coral", name: "Coral" }, versionNumber: 1, channel: "web", code: "invalid_values", text: "A value had the wrong format." });
+    expect(u.recentErrors[0]).toMatchObject({
+      consumer: { id: "coral", name: "Coral" },
+      versionNumber: 1,
+      channel: "web",
+      code: "invalid_values",
+      text: "A value had the wrong format.",
+    });
   });
 
   it("Holiday Points: the revoked v1 keeps its consumer (all time) and its danger tag", async () => {
@@ -341,7 +556,9 @@ describe("getTemplateUsage", () => {
     expect(v1.state).toBe("revoked");
     expect(v1.revokedAt).not.toBeNull();
     expect(v1.tags).toEqual([{ tone: "danger", text: "renders fail" }]);
-    expect(v1.consumers.map((c) => [c.name, c.renders30d])).toEqual([["Coral", 0]]);
+    expect(v1.consumers.map((c) => [c.name, c.renders30d])).toEqual([
+      ["Coral", 0],
+    ]);
     expect(u.stillOn).toEqual([]);
   });
 
@@ -357,9 +574,17 @@ describe("getTemplateUsage", () => {
       sql: "select activated_at from versions where template_id = ? and number = 2 and state = 'active'",
       args: [templateId],
     });
-    expect(u.versions[0]!.activatedAt).toBe(new Date(Number(released.rows[0]!.activated_at)).toISOString());
-    expect(u.versions[0]!.consumers.map((c) => c.name)).toEqual(["Deposits Online"]);
-    expect(new Set(u.rows.filter((r) => r.versionNumber === 2).map((r) => r.versionState))).toEqual(new Set(["active"]));
+    expect(u.versions[0]!.activatedAt).toBe(
+      new Date(Number(released.rows[0]!.activated_at)).toISOString(),
+    );
+    expect(u.versions[0]!.consumers.map((c) => c.name)).toEqual([
+      "Deposits Online",
+    ]);
+    expect(
+      new Set(
+        u.rows.filter((r) => r.versionNumber === 2).map((r) => r.versionState),
+      ),
+    ).toEqual(new Set(["active"]));
   });
 
   it("one denominator: a template whose only render failed reads 1 render, 0% succeeded, 1 failed; with no renders there is no rate", async () => {
@@ -373,12 +598,24 @@ describe("getTemplateUsage", () => {
       expect(none.success).toEqual({ ok: 0, errors: 0, pct: null });
       expect(none.stats.renders.value).toBe(0);
       await withRows(
-        [logRow({ id: "rl_test_only_failure", at: env.now.getTime() - 3_600_000, templateId, versionId, versionNumber: 1, consumerId: "coral", outcome: "error" })],
+        [
+          logRow({
+            id: "rl_test_only_failure",
+            at: env.now.getTime() - 3_600_000,
+            templateId,
+            versionId,
+            versionNumber: 1,
+            consumerId: "coral",
+            outcome: "error",
+          }),
+        ],
         async () => {
           const u = await getTemplateUsage("coral-offers", templateId);
           expect(u.success).toEqual({ ok: 0, errors: 1, pct: 0 });
           expect(u.stats.renders.value).toBe(1);
-          expect(u.rows.map((r) => [r.renders30d, r.errors30d])).toEqual([[1, 1]]);
+          expect(u.rows.map((r) => [r.renders30d, r.errors30d])).toEqual([
+            [1, 1],
+          ]);
           expect(u.daily.at(-1)).toMatchObject({ count: 1, errors: 1 });
         },
       );
@@ -392,11 +629,24 @@ describe("getTemplateUsage", () => {
     const bt = ids["balance-transfer"]!;
     const u = await getTemplateUsage("coral-offers", bt);
     const s = since();
-    const count = (channel: string) => direct("at >= ? and template_id = ? and channel = ?", null, [s, bt, channel]);
+    const count = (channel: string) =>
+      direct("at >= ? and template_id = ? and channel = ?", null, [
+        s,
+        bt,
+        channel,
+      ]);
 
     expect(u.channels).toEqual(["pdf", "web", "email"]);
-    expect(u.byChannel).toEqual({ pdf: await count("pdf"), web: await count("web"), email: await count("email"), push: 0, sms: 0 });
-    expect(u.byChannel.pdf + u.byChannel.web + u.byChannel.email).toBe(u.stats.renders.value);
+    expect(u.byChannel).toEqual({
+      pdf: await count("pdf"),
+      web: await count("web"),
+      email: await count("email"),
+      push: 0,
+      sms: 0,
+    });
+    expect(u.byChannel.pdf + u.byChannel.web + u.byChannel.email).toBe(
+      u.stats.renders.value,
+    );
     expect(u.byChannel.web).toBeGreaterThan(0);
     // No phone for a document.
     expect(u.pushByPlatform).toEqual({ ios: 0, android: 0, unrecorded: 0 });
@@ -408,10 +658,17 @@ describe("getTemplateUsage", () => {
     const alert = ids["payment-due-reminder"]!;
     const u = await getTemplateUsage("coral-offers", alert);
     const s = since();
-    const count = (where: string) => direct(`at >= ? and template_id = ? and ${where}`, null, [s, alert]);
+    const count = (where: string) =>
+      direct(`at >= ? and template_id = ? and ${where}`, null, [s, alert]);
 
     expect(u.channels).toEqual(["push", "sms"]);
-    expect(u.byChannel).toEqual({ pdf: 0, web: 0, email: 0, push: await count("channel = 'push'"), sms: await count("channel = 'sms'") });
+    expect(u.byChannel).toEqual({
+      pdf: 0,
+      web: 0,
+      email: 0,
+      push: await count("channel = 'push'"),
+      sms: await count("channel = 'sms'"),
+    });
     expect(u.byChannel.push).toBeGreaterThan(0);
     expect(u.byChannel.sms).toBeGreaterThan(0);
     expect(u.byChannel.push + u.byChannel.sms).toBe(u.stats.renders.value);
@@ -423,14 +680,30 @@ describe("getTemplateUsage", () => {
     });
     expect(u.pushByPlatform.ios).toBeGreaterThan(0);
     expect(u.pushByPlatform.android).toBeGreaterThan(0);
-    expect(u.pushByPlatform.ios + u.pushByPlatform.android).toBe(u.byChannel.push);
+    expect(u.pushByPlatform.ios + u.pushByPlatform.android).toBe(
+      u.byChannel.push,
+    );
 
     // The seeded failures: the Android push is the latest, then the three SMS, which have no phone.
     expect(u.recentErrors.slice(0, 2)).toEqual([
-      expect.objectContaining({ channel: "push", platform: "android", code: "missing_variables" }),
-      expect.objectContaining({ channel: "push", platform: "android", code: "missing_variables" }),
+      expect.objectContaining({
+        channel: "push",
+        platform: "android",
+        code: "missing_variables",
+      }),
+      expect.objectContaining({
+        channel: "push",
+        platform: "android",
+        code: "missing_variables",
+      }),
     ]);
-    expect(u.recentErrors.slice(2).map((e) => [e.channel, e.platform])).toEqual([["sms", null], ["sms", null], ["sms", null]]);
+    expect(u.recentErrors.slice(2).map((e) => [e.channel, e.platform])).toEqual(
+      [
+        ["sms", null],
+        ["sms", null],
+        ["sms", null],
+      ],
+    );
   });
 
   it("the channel split counts live renders of the last 30 days only; a push with no recorded phone is its own count", async () => {
@@ -440,27 +713,62 @@ describe("getTemplateUsage", () => {
     env.now = new Date(BASE.getTime() - 400 * DAY);
     const at = env.now.getTime();
     const row = (id: string, o: Partial<Parameters<typeof logRow>[0]>) =>
-      logRow({ id: `rl_split_${id}`, at: at - 3_600_000, templateId: alert, versionId, versionNumber: 1, consumerId: "coral", channel: "push", ...o });
+      logRow({
+        id: `rl_split_${id}`,
+        at: at - 3_600_000,
+        templateId: alert,
+        versionId,
+        versionNumber: 1,
+        consumerId: "coral",
+        channel: "push",
+        ...o,
+      });
     try {
       await withRows(
         [
           row("ios", { platform: "ios" }),
-          row("ios-failed", { platform: "ios", outcome: "error", errorCode: "missing_variables" }),
+          row("ios-failed", {
+            platform: "ios",
+            outcome: "error",
+            errorCode: "missing_variables",
+          }),
           row("android", { platform: "android" }),
           // Logged before the platform was kept.
           row("legacy", {}),
           row("sms", { channel: "sms" }),
           // Not usage, or not in the window: previews, an unregistered caller, 31 days ago.
-          row("preview", { platform: "ios", isPreview: true, consumerId: null }),
-          row("unknown", { platform: "ios", outcome: "error", errorCode: "unknown_consumer" }),
+          row("preview", {
+            platform: "ios",
+            isPreview: true,
+            consumerId: null,
+          }),
+          row("unknown", {
+            platform: "ios",
+            outcome: "error",
+            errorCode: "unknown_consumer",
+          }),
           row("old", { platform: "android", at: at - 31 * DAY }),
         ],
         async () => {
           const u = await getTemplateUsage("coral-offers", alert);
-          expect(u.byChannel).toEqual({ pdf: 0, web: 0, email: 0, push: 4, sms: 1 });
-          expect(u.pushByPlatform).toEqual({ ios: 2, android: 1, unrecorded: 1 });
+          expect(u.byChannel).toEqual({
+            pdf: 0,
+            web: 0,
+            email: 0,
+            push: 4,
+            sms: 1,
+          });
+          expect(u.pushByPlatform).toEqual({
+            ios: 2,
+            android: 1,
+            unrecorded: 1,
+          });
           // The failed iPhone push names its phone, the earlier SMS failures none.
-          expect(u.recentErrors[0]).toMatchObject({ channel: "push", platform: "ios", code: "missing_variables" });
+          expect(u.recentErrors[0]).toMatchObject({
+            channel: "push",
+            platform: "ios",
+            code: "missing_variables",
+          });
         },
       );
     } finally {
@@ -470,6 +778,8 @@ describe("getTemplateUsage", () => {
 
   it("404s for a template outside the space", async () => {
     as("maya");
-    await expect(getTemplateUsage("coral-offers", ids["checking-fees"]!)).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
+    await expect(
+      getTemplateUsage("coral-offers", ids["checking-fees"]!),
+    ).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
   });
 });

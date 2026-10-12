@@ -7,7 +7,9 @@ import { PageSkeleton } from "@/simulator/ui/page-frame";
 
 export const metadata: Metadata = { title: "Offer" };
 
-export default function SimOfferPage({ params }: PageProps<"/sim/offers/[offerId]">) {
+export default function SimOfferPage({
+  params,
+}: PageProps<"/sim/offers/[offerId]">) {
   return (
     <Stream fallback={<PageSkeleton panels={[4, 3]} />}>
       <Offer params={params} />
@@ -22,7 +24,17 @@ async function Offer({ params }: { params: Promise<{ offerId: string }> }) {
 
   // A linked offer opens on Send, or on Values while required values are unmapped; an unlinked one on Template.
   // (?tab= overrides it; the client reads that itself.)
-  const defaultTab: OfferTab = !page.link ? "template" : page.blocked ? "values" : "send";
+  const defaultTab: OfferTab = !page.link
+    ? "template"
+    : page.blocked
+      ? "values"
+      : "send";
 
-  return <OfferView page={page} defaultTab={defaultTab} offerNames={{ [page.offer.id]: page.offer.name }} />;
+  return (
+    <OfferView
+      page={page}
+      defaultTab={defaultTab}
+      offerNames={{ [page.offer.id]: page.offer.name }}
+    />
+  );
 }

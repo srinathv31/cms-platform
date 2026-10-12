@@ -28,9 +28,15 @@ export async function TopBarHole() {
 
   return (
     <div className="flex items-center gap-2">
-      {shell.spaces.length > 0 ? <CommandPalette viewerId={viewer.userId} spaces={shell.spaces} /> : null}
+      {shell.spaces.length > 0 ? (
+        <CommandPalette viewerId={viewer.userId} spaces={shell.spaces} />
+      ) : null}
       <NotificationsPopover data={notifications} />
-      <ProfileMenu me={me} personas={personas} canRequestAccess={can(viewer, "access.request").ok} />
+      <ProfileMenu
+        me={me}
+        personas={personas}
+        canRequestAccess={can(viewer, "access.request").ok}
+      />
     </div>
   );
 }

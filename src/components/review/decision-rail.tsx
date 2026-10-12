@@ -76,22 +76,50 @@ function StepRow({
           : `After ${previous?.name ?? "the previous stage"}`;
   const label = STEP_LABEL[step.status];
   return (
-    <li className="relative grid grid-cols-[1.25rem_1fr] gap-x-3" data-step={step.status}>
-      {!last ? <span aria-hidden className="absolute top-6 bottom-[-0.25rem] left-[9.5px] w-px bg-hairline-strong" /> : null}
+    <li
+      className="relative grid grid-cols-[1.25rem_1fr] gap-x-3"
+      data-step={step.status}
+    >
+      {!last ? (
+        <span
+          aria-hidden
+          className="absolute top-6 bottom-[-0.25rem] left-[9.5px] w-px bg-hairline-strong"
+        />
+      ) : null}
       <span
         role={label ? "img" : undefined}
         aria-label={label}
-        className={cn("mt-0.5 grid size-5 place-items-center rounded-full transition-colors", STEP_ICON[step.status])}
+        className={cn(
+          "mt-0.5 grid size-5 place-items-center rounded-full transition-colors",
+          STEP_ICON[step.status],
+        )}
       >
-        {step.status === "done" ? <Check aria-hidden strokeWidth={2.5} className="size-3" /> : null}
-        {step.status === "current" ? <span className="size-2 rounded-full bg-brand" /> : null}
-        {step.status === "returned" ? <CornerUpLeft aria-hidden strokeWidth={2.25} className="size-3" /> : null}
+        {step.status === "done" ? (
+          <Check aria-hidden strokeWidth={2.5} className="size-3" />
+        ) : null}
+        {step.status === "current" ? (
+          <span className="size-2 rounded-full bg-brand" />
+        ) : null}
+        {step.status === "returned" ? (
+          <CornerUpLeft aria-hidden strokeWidth={2.25} className="size-3" />
+        ) : null}
       </span>
       <div className={cn("min-w-0 pb-3.5", last && "pb-0")}>
-        <div className={cn("text-[14px] leading-6", step.status === "waiting" ? "text-text-muted" : "font-medium text-text")}>
+        <div
+          className={cn(
+            "text-[14px] leading-6",
+            step.status === "waiting"
+              ? "text-text-muted"
+              : "font-medium text-text",
+          )}
+        >
           {step.name}
         </div>
-        <div id={reason ? BLOCKED_ID : undefined} title={reason ?? undefined} className="truncate text-[13px] leading-5 text-text-muted">
+        <div
+          id={reason ? BLOCKED_ID : undefined}
+          title={reason ?? undefined}
+          className="truncate text-[13px] leading-5 text-text-muted"
+        >
           {sub}
         </div>
       </div>
@@ -99,8 +127,18 @@ function StepRow({
   );
 }
 
-function Approval({ steps, now, blocked }: { steps: readonly StepView[]; now: Date; blocked: string | null }) {
-  const at = steps.findIndex((s) => s.status === "current" || s.status === "returned");
+function Approval({
+  steps,
+  now,
+  blocked,
+}: {
+  steps: readonly StepView[];
+  now: Date;
+  blocked: string | null;
+}) {
+  const at = steps.findIndex(
+    (s) => s.status === "current" || s.status === "returned",
+  );
   return (
     <section aria-label="Approval">
       <SectionLabel
@@ -116,7 +154,14 @@ function Approval({ steps, now, blocked }: { steps: readonly StepView[]; now: Da
       </SectionLabel>
       <ol className="mt-3">
         {steps.map((s, i) => (
-          <StepRow key={s.position} step={s} last={i === steps.length - 1} previous={steps[i - 1]} now={now} blocked={blocked} />
+          <StepRow
+            key={s.position}
+            step={s}
+            last={i === steps.length - 1}
+            previous={steps[i - 1]}
+            now={now}
+            blocked={blocked}
+          />
         ))}
       </ol>
     </section>
@@ -181,7 +226,10 @@ function Decision({
       data-decided={row.kind === "buttons" ? undefined : ""}
       role={line ? "status" : undefined}
       tabIndex={line ? -1 : undefined}
-      className={cn("mt-4 flex h-8 items-center outline-none", row.kind !== "buttons" && "text-[14px] leading-6 text-text-muted")}
+      className={cn(
+        "mt-4 flex h-8 items-center outline-none",
+        row.kind !== "buttons" && "text-[14px] leading-6 text-text-muted",
+      )}
     >
       {line ? (
         <span className="min-w-0 truncate" title={line}>
@@ -194,13 +242,23 @@ function Decision({
             className="inline-flex min-w-0 items-center gap-1 rounded-sm font-medium text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="truncate">Open {next.label}</span>
-            <ArrowRight aria-hidden strokeWidth={2} className="size-3.5 shrink-0" />
+            <ArrowRight
+              aria-hidden
+              strokeWidth={2}
+              className="size-3.5 shrink-0"
+            />
           </Link>
         ) : null
       ) : access.kind === "open" ? (
         <div className="flex w-full gap-2">
           {approveBlocked ? (
-            <BlockedButton ref={approveRef} variant="default" className="flex-1" reason={approveBlocked} describedBy={describedBy}>
+            <BlockedButton
+              ref={approveRef}
+              variant="default"
+              className="flex-1"
+              reason={approveBlocked}
+              describedBy={describedBy}
+            >
               Approve
             </BlockedButton>
           ) : (
@@ -208,16 +266,32 @@ function Decision({
               Approve
             </Button>
           )}
-          <Button ref={requestRef} variant="outline" className="flex-1 bg-surface" onClick={onRequest}>
+          <Button
+            ref={requestRef}
+            variant="outline"
+            className="flex-1 bg-surface"
+            onClick={onRequest}
+          >
             Request changes
           </Button>
         </div>
       ) : access.kind === "blocked" ? (
         <div className="flex w-full gap-2">
-          <BlockedButton ref={approveRef} variant="default" className="flex-1" reason={access.reason} describedBy={describedBy}>
+          <BlockedButton
+            ref={approveRef}
+            variant="default"
+            className="flex-1"
+            reason={access.reason}
+            describedBy={describedBy}
+          >
             Approve
           </BlockedButton>
-          <BlockedButton ref={requestRef} className="flex-1 bg-surface" reason={access.reason} describedBy={describedBy}>
+          <BlockedButton
+            ref={requestRef}
+            className="flex-1 bg-surface"
+            reason={access.reason}
+            describedBy={describedBy}
+          >
             Request changes
           </BlockedButton>
         </div>
@@ -260,8 +334,18 @@ export function DecisionRail({
 }) {
   // A blocked pair's reason stands on the stage the version waits at, and the two buttons point to it; so
   // does a blocked Approve's, while it waits on the outputs.
-  const blocked = access.kind === "blocked" ? access.reason : access.kind === "open" ? approveBlocked : null;
-  const reason = blocked !== null && row.kind === "buttons" && steps.some((s) => s.status === "current") ? blocked : null;
+  const blocked =
+    access.kind === "blocked"
+      ? access.reason
+      : access.kind === "open"
+        ? approveBlocked
+        : null;
+  const reason =
+    blocked !== null &&
+    row.kind === "buttons" &&
+    steps.some((s) => s.status === "current")
+      ? blocked
+      : null;
   return (
     <aside aria-label="Decision" data-slot="rail" className={RV.rail}>
       <div data-rail-head="" className={RV.railHead}>

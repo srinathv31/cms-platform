@@ -14,7 +14,8 @@ import { GRAPHEME_DATA, GRAPHEME_DATA_VERSION } from "./grapheme-data";
 /** The Unicode version whose grapheme cluster rules and data this module implements. */
 export const UNICODE_VERSION = "17.0.0";
 
-if (GRAPHEME_DATA_VERSION !== UNICODE_VERSION) throw new Error("grapheme-data.ts is for another Unicode version");
+if (GRAPHEME_DATA_VERSION !== UNICODE_VERSION)
+  throw new Error("grapheme-data.ts is for another Unicode version");
 
 // Grapheme_Cluster_Break classes, numbered as the generator numbers them (0 is Other).
 const CR = 1;
@@ -65,7 +66,8 @@ function table(): { starts: Uint32Array; values: Uint8Array } {
 
 /** A code point's properties: its Grapheme_Cluster_Break class, Extended_Pictographic and its InCB class. */
 function properties(cp: number): number {
-  if (cp >= HANGUL_FIRST && cp <= HANGUL_LAST) return (cp - HANGUL_FIRST) % 28 === 0 ? LV : LVT;
+  if (cp >= HANGUL_FIRST && cp <= HANGUL_LAST)
+    return (cp - HANGUL_FIRST) % 28 === 0 ? LV : LVT;
   const { starts, values } = table();
   // The last run that starts at or before cp.
   let low = 0;
@@ -97,10 +99,13 @@ export function graphemes(text: string): { segment: string; index: number }[] {
   // GB12, GB13: how many Regional Indicators precede the break point, back to the last non-RI.
   let regional = 0;
 
-  for (let i = 0; i < text.length; ) {
+  for (let i = 0; i < text.length;) {
     const cp = text.codePointAt(i)!;
     const props = properties(cp);
-    if (previous !== -1 && breaksBetween(previous, props, conjunct, emoji, regional)) {
+    if (
+      previous !== -1 &&
+      breaksBetween(previous, props, conjunct, emoji, regional)
+    ) {
       out.push({ segment: text.slice(start, i), index: start });
       start = i;
     }
@@ -120,7 +125,13 @@ export function graphemeCount(text: string): number {
 }
 
 /** UAX #29's rules GB3 to GB999, in order: is there a boundary between a character and the next? */
-function breaksBetween(before: number, after: number, conjunct: number, emoji: number, regional: number): boolean {
+function breaksBetween(
+  before: number,
+  after: number,
+  conjunct: number,
+  emoji: number,
+  regional: number,
+): boolean {
   const a = gcb(before);
   const b = gcb(after);
   if (a === CR && b === LF) return false; // GB3

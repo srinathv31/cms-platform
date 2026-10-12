@@ -6,7 +6,12 @@ import nextTs from "eslint-config-next/typescript";
 // sets no-restricted-imports replaces an earlier block's for the files both match, so the blocks below
 // cover disjoint files and each lists everything that applies to it.
 const noSimulatorData = {
-  group: ["**/schema/sim", "@/server/db/schema/sim", "@/simulator", "@/simulator/*"],
+  group: [
+    "**/schema/sim",
+    "@/server/db/schema/sim",
+    "@/simulator",
+    "@/simulator/*",
+  ],
   message: "UCOMP code must not read simulator (Coral) data.",
 };
 const noComponents = {
@@ -61,7 +66,11 @@ const editorInternals = {
 // @/editor/schema is public for three names; its other exports are for the editor's own modules.
 const editorSchemaNames = {
   name: "@/editor/schema",
-  allowImportNames: ["baseExtensions", "BaseExtensionOptions", "ensureBlockIds"],
+  allowImportNames: [
+    "baseExtensions",
+    "BaseExtensionOptions",
+    "ensureBlockIds",
+  ],
   message:
     "From @/editor/schema, code outside src/editor uses baseExtensions, BaseExtensionOptions and ensureBlockIds only (src/editor/README.md).",
 };
@@ -78,7 +87,10 @@ const eslintConfig = defineConfig([
     files: ["**/*.{ts,tsx,js,jsx,mjs,mts}"],
     ignores: ["src/editor/**"],
     rules: {
-      "no-restricted-imports": ["error", { paths: [editorSchemaNames], patterns: [editorInternals] }],
+      "no-restricted-imports": [
+        "error",
+        { paths: [editorSchemaNames], patterns: [editorInternals] },
+      ],
     },
   },
   {
@@ -89,9 +101,27 @@ const eslintConfig = defineConfig([
         "error",
         {
           patterns: [
-            { group: ["next", "next/*"], message: "The editor must stay framework-agnostic (no next/*)." },
-            { group: ["@/server", "@/server/*", "@/domain", "@/domain/*", "@/app/*", "@/simulator/*"], message: "The editor may not import app code. Pass data in via props." },
-            { regex: "^@/components/(?!ui(/|$))", message: "The editor may only use shadcn primitives from @/components/ui." },
+            {
+              group: ["next", "next/*"],
+              message: "The editor must stay framework-agnostic (no next/*).",
+            },
+            {
+              group: [
+                "@/server",
+                "@/server/*",
+                "@/domain",
+                "@/domain/*",
+                "@/app/*",
+                "@/simulator/*",
+              ],
+              message:
+                "The editor may not import app code. Pass data in via props.",
+            },
+            {
+              regex: "^@/components/(?!ui(/|$))",
+              message:
+                "The editor may only use shadcn primitives from @/components/ui.",
+            },
           ],
         },
       ],
@@ -105,8 +135,25 @@ const eslintConfig = defineConfig([
         "error",
         {
           patterns: [
-            { group: ["react", "react/*", "next", "next/*", "drizzle-orm", "drizzle-orm/*", "@/server/*", "@/components/*", "@/app/*", "@/simulator/*"], message: "domain/ is pure TypeScript." },
-            { regex: "^@/editor(?!/model(/|$))", message: "domain/ may only use the editor's pure model." },
+            {
+              group: [
+                "react",
+                "react/*",
+                "next",
+                "next/*",
+                "drizzle-orm",
+                "drizzle-orm/*",
+                "@/server/*",
+                "@/components/*",
+                "@/app/*",
+                "@/simulator/*",
+              ],
+              message: "domain/ is pure TypeScript.",
+            },
+            {
+              regex: "^@/editor(?!/model(/|$))",
+              message: "domain/ may only use the editor's pure model.",
+            },
             editorInternals,
           ],
         },
@@ -116,10 +163,20 @@ const eslintConfig = defineConfig([
   {
     // UCOMP never reads the consumer simulator's tables.
     // (editor/ and domain/ already forbid @/server and @/simulator above; flat config would override them here.)
-    files: ["src/app/(product)/**/*", "src/app/api/**/*", "src/components/**/*"],
+    files: [
+      "src/app/(product)/**/*",
+      "src/app/api/**/*",
+      "src/components/**/*",
+    ],
     ignores: ["src/components/device/**/*"],
     rules: {
-      "no-restricted-imports": ["error", { paths: [editorSchemaNames], patterns: [noSimulatorData, editorInternals] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [editorSchemaNames],
+          patterns: [noSimulatorData, editorInternals],
+        },
+      ],
     },
   },
   {
@@ -132,8 +189,24 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             noSimulatorData,
-            { group: ["@/domain", "@/domain/*", "@/server", "@/server/*", "@/editor", "@/editor/*", "@/app/*"], message: "The phone kit takes resolved strings as props: no Stencil internals (Coral uses it too)." },
-            { regex: "^@/components/(?!(ui|primitives|motion|device)(/|$))", message: "The phone kit may use only @/components/ui, primitives and motion." },
+            {
+              group: [
+                "@/domain",
+                "@/domain/*",
+                "@/server",
+                "@/server/*",
+                "@/editor",
+                "@/editor/*",
+                "@/app/*",
+              ],
+              message:
+                "The phone kit takes resolved strings as props: no Stencil internals (Coral uses it too).",
+            },
+            {
+              regex: "^@/components/(?!(ui|primitives|motion|device)(/|$))",
+              message:
+                "The phone kit may use only @/components/ui, primitives and motion.",
+            },
           ],
         },
       ],
@@ -150,7 +223,10 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { paths: [noEditorBarrel, editorSchemaNames], patterns: [noSimulatorData, noComponents, editorInternals] },
+        {
+          paths: [noEditorBarrel, editorSchemaNames],
+          patterns: [noSimulatorData, noComponents, editorInternals],
+        },
       ],
     },
   },
@@ -158,14 +234,30 @@ const eslintConfig = defineConfig([
     // The seed and the reset write the simulator's tables, so the simulator rule doesn't apply to them.
     files: ["src/server/seed/**/*", "src/server/reset.ts"],
     rules: {
-      "no-restricted-imports": ["error", { paths: [noEditorBarrel, editorSchemaNames], patterns: [noComponents, editorInternals] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [noEditorBarrel, editorSchemaNames],
+          patterns: [noComponents, editorInternals],
+        },
+      ],
     },
   },
   {
     // The published /api/v1 wire contract: self-contained types both UCOMP and the simulator compile against.
     files: ["src/contracts/**/*.ts"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ regex: ".*", message: "src/contracts is self-contained: no imports." }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: ".*",
+              message: "src/contracts is self-contained: no imports.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
@@ -195,13 +287,31 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [{ regex: "^@/(server(?!/db/schema/sim$)|domain|editor)(/|$)", message: "The simulator reaches UCOMP only through /api/v1 (it may use its own sim schema)." }] },
+        {
+          patterns: [
+            {
+              regex: "^@/(server(?!/db/schema/sim$)|domain|editor)(/|$)",
+              message:
+                "The simulator reaches UCOMP only through /api/v1 (it may use its own sim schema).",
+            },
+          ],
+        },
       ],
     },
   },
 
   // .agents/ holds vendored agent skills and .claude/ holds local agent worktrees: neither is this app's code.
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "data/**", "playwright-report/**", "test-results/**", ".agents/**", ".claude/**"]),
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "data/**",
+    "playwright-report/**",
+    "test-results/**",
+    ".agents/**",
+    ".claude/**",
+  ]),
 ]);
 
 export default eslintConfig;

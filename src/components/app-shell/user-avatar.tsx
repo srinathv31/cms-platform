@@ -25,9 +25,14 @@ export function UserAvatar({
   return (
     <Avatar size={size} className={className}>
       <AvatarFallback
-        className={cn("font-medium", size === "sm" ? "text-[10px]" : "text-[12px]")}
+        className={cn(
+          "font-medium",
+          size === "sm" ? "text-[10px]" : "text-[12px]",
+        )}
         style={{
-          backgroundColor: muted ? `oklch(0.94 0.008 ${hue})` : `oklch(0.925 0.04 ${hue})`,
+          backgroundColor: muted
+            ? `oklch(0.94 0.008 ${hue})`
+            : `oklch(0.925 0.04 ${hue})`,
           color: muted ? `oklch(0.45 0.015 ${hue})` : `oklch(0.38 0.07 ${hue})`,
         }}
       >

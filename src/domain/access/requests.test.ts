@@ -10,7 +10,16 @@ import {
 import { REASONS } from "../permissions";
 import type { AccessRequestFacts, MembershipFacts } from "../access-types";
 import type { TeamRole } from "../types";
-import { at, ago, CORAL, DEPOSITS, PEOPLE, membership, audits, notes } from "./fixtures";
+import {
+  at,
+  ago,
+  CORAL,
+  DEPOSITS,
+  PEOPLE,
+  membership,
+  audits,
+  notes,
+} from "./fixtures";
 
 function request(opts: Partial<AccessRequestFacts> = {}): AccessRequestFacts {
   return {
@@ -54,7 +63,12 @@ describe("requestAccess", () => {
       expect.objectContaining({
         action: "access.requested",
         teamId: CORAL.id,
-        details: { userId: "morgan", userName: "Morgan Lee", role: "author", reason: "Drafting the spring promotions." },
+        details: {
+          userId: "morgan",
+          userName: "Morgan Lee",
+          role: "author",
+          reason: "Drafting the spring promotions.",
+        },
       }),
     ]);
     const [note] = notes(result.effects);
@@ -68,20 +82,33 @@ describe("requestAccess", () => {
   });
 
   it("offers Viewer, Author and Approver only", () => {
-    for (const role of ["viewer", "author", "approver"] as TeamRole[]) expect(requestAccess({ ...base, role }).ok).toBe(true);
-    expect(requestAccess({ ...base, role: "team_admin" })).toEqual({ ok: false, ...ACCESS_REFUSALS.pickRole });
+    for (const role of ["viewer", "author", "approver"] as TeamRole[])
+      expect(requestAccess({ ...base, role }).ok).toBe(true);
+    expect(requestAccess({ ...base, role: "team_admin" })).toEqual({
+      ok: false,
+      ...ACCESS_REFUSALS.pickRole,
+    });
   });
 
   it("needs a reason, kept short", () => {
-    expect(requestAccess({ ...base, reason: "   " })).toEqual({ ok: false, code: "request_reason_missing", reason: "Add a reason." });
-    expect(requestAccess({ ...base, reason: "x".repeat(501) })).toEqual({ ok: false, ...ACCESS_REFUSALS.reasonTooLong });
+    expect(requestAccess({ ...base, reason: "   " })).toEqual({
+      ok: false,
+      code: "request_reason_missing",
+      reason: "Add a reason.",
+    });
+    expect(requestAccess({ ...base, reason: "x".repeat(501) })).toEqual({
+      ok: false,
+      ...ACCESS_REFUSALS.reasonTooLong,
+    });
     expect(requestAccess({ ...base, reason: "x".repeat(500) }).ok).toBe(true);
   });
 
   it("validateAccessReason is the check requestAccess refuses with: empty first, then too long", () => {
     expect(validateAccessReason("")).toBe(ACCESS_REFUSALS.giveReason);
     expect(validateAccessReason("  \n ")).toBe(ACCESS_REFUSALS.giveReason);
-    expect(validateAccessReason(`  ${"x".repeat(501)}  `)).toBe(ACCESS_REFUSALS.reasonTooLong);
+    expect(validateAccessReason(`  ${"x".repeat(501)}  `)).toBe(
+      ACCESS_REFUSALS.reasonTooLong,
+    );
     expect(validateAccessReason("x".repeat(500))).toBeNull();
     // Spaces around the reason don't count toward the limit, as requestAccess trims first.
     expect(validateAccessReason(`  ${"x".repeat(500)}  `)).toBeNull();
@@ -95,24 +122,51 @@ describe("requestAccess", () => {
       code: "request_pending",
       reason: "You already asked for access to Coral Offers.",
     });
-    expect(requestAccess({ ...base, team: DEPOSITS, requests: [pending] }).ok).toBe(true);
-    expect(requestAccess({ ...base, requests: [{ ...pending, status: "denied" }] }).ok).toBe(true);
+    expect(
+      requestAccess({ ...base, team: DEPOSITS, requests: [pending] }).ok,
+    ).toBe(true);
+    expect(
+      requestAccess({ ...base, requests: [{ ...pending, status: "denied" }] })
+        .ok,
+    ).toBe(true);
   });
 
   it("refuses a role already held, but a member may ask for another one", () => {
     const priya = { ...base, requester: { id: "priya", name: "Priya Raman" } };
     const viewer = membership("priya", ["viewer"], { teamId: DEPOSITS.id });
-    expect(requestAccess({ ...priya, team: DEPOSITS, role: "viewer", memberships: [viewer] })).toEqual({
+    expect(
+      requestAccess({
+        ...priya,
+        team: DEPOSITS,
+        role: "viewer",
+        memberships: [viewer],
+      }),
+    ).toEqual({
       ok: false,
       code: "has_role",
       reason: "You already have Viewer access to Deposits.",
     });
-    expect(requestAccess({ ...priya, team: DEPOSITS, role: "author", memberships: [viewer] }).ok).toBe(true);
+    expect(
+      requestAccess({
+        ...priya,
+        team: DEPOSITS,
+        role: "author",
+        memberships: [viewer],
+      }).ok,
+    ).toBe(true);
   });
 
   it("someone whose access lapsed may ask again for the same role", () => {
-    const lapsed = membership("sam", ["viewer"], { status: "lapsed", statusReason: "recert_unconfirmed" });
-    const result = requestAccess({ ...base, requester: PEOPLE.sam, role: "viewer", memberships: [lapsed] });
+    const lapsed = membership("sam", ["viewer"], {
+      status: "lapsed",
+      statusReason: "recert_unconfirmed",
+    });
+    const result = requestAccess({
+      ...base,
+      requester: PEOPLE.sam,
+      role: "viewer",
+      memberships: [lapsed],
+    });
     expect(result.ok).toBe(true);
   });
 });
@@ -129,7 +183,13 @@ describe("decideAccessRequest", () => {
   };
 
   it("never on your own request", () => {
-    expect(decideAccessRequest({ ...base, request: request({ userId: "alex" }), requester: PEOPLE.alex })).toEqual({
+    expect(
+      decideAccessRequest({
+        ...base,
+        request: request({ userId: "alex" }),
+        requester: PEOPLE.alex,
+      }),
+    ).toEqual({
       ok: false,
       code: "own_request",
       reason: "You can't decide your own access request.",
@@ -137,7 +197,12 @@ describe("decideAccessRequest", () => {
   });
 
   it("only while pending", () => {
-    expect(decideAccessRequest({ ...base, request: request({ status: "approved" }) })).toEqual({
+    expect(
+      decideAccessRequest({
+        ...base,
+        request: request({ status: "approved" }),
+      }),
+    ).toEqual({
       ok: false,
       code: "request_decided",
       reason: "This request was already decided.",
@@ -148,14 +213,31 @@ describe("decideAccessRequest", () => {
     const result = decideAccessRequest(base);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.request).toEqual({ status: "approved", decidedBy: "alex", decidedAt: at(0), decisionNote: null });
+    expect(result.request).toEqual({
+      status: "approved",
+      decidedBy: "alex",
+      decidedAt: at(0),
+      decisionNote: null,
+    });
     expect(result.membership).toEqual({
       kind: "insert",
-      membership: { userId: "morgan", teamId: CORAL.id, roles: ["author"], addedAt: at(0), addedBy: "alex" },
+      membership: {
+        userId: "morgan",
+        teamId: CORAL.id,
+        roles: ["author"],
+        addedAt: at(0),
+        addedBy: "alex",
+      },
     });
     expect(audits(result.effects)[0]).toMatchObject({
       action: "access.granted",
-      details: { requestId: "ar_1", userId: "morgan", userName: "Morgan Lee", role: "author", roles: ["author"] },
+      details: {
+        requestId: "ar_1",
+        userId: "morgan",
+        userName: "Morgan Lee",
+        role: "author",
+        roles: ["author"],
+      },
     });
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_granted",
@@ -176,7 +258,10 @@ describe("decideAccessRequest", () => {
   });
 
   it("approving for a lapsed member reinstates them with the requested role and a fresh inactivity clock", () => {
-    const lapsed = membership("morgan", ["approver"], { status: "lapsed", statusReason: "recert_unconfirmed" });
+    const lapsed = membership("morgan", ["approver"], {
+      status: "lapsed",
+      statusReason: "recert_unconfirmed",
+    });
     const result = decideAccessRequest({ ...base, membership: lapsed });
     expect(result.ok && result.membership).toEqual({
       kind: "update",
@@ -193,20 +278,33 @@ describe("decideAccessRequest", () => {
   });
 
   it("denying needs a note, which the requester sees", () => {
-    expect(decideAccessRequest({ ...base, decision: "deny", note: "  " })).toEqual({
+    expect(
+      decideAccessRequest({ ...base, decision: "deny", note: "  " }),
+    ).toEqual({
       ok: false,
       code: "deny_note_missing",
       reason: "Add a note to explain the decision.",
     });
-    const result = decideAccessRequest({ ...base, decision: "deny", note: " Ask Jordan first. " });
+    const result = decideAccessRequest({
+      ...base,
+      decision: "deny",
+      note: " Ask Jordan first. ",
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.membership).toBeNull();
-    expect(result.request).toMatchObject({ status: "denied", decisionNote: "Ask Jordan first." });
-    expect(audits(result.effects)[0]).toMatchObject({ action: "access.denied", details: { note: "Ask Jordan first." } });
+    expect(result.request).toMatchObject({
+      status: "denied",
+      decisionNote: "Ask Jordan first.",
+    });
+    expect(audits(result.effects)[0]).toMatchObject({
+      action: "access.denied",
+      details: { note: "Ask Jordan first." },
+    });
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_denied",
-      title: "Alex Kim declined your request for Author access to Coral Offers.",
+      title:
+        "Alex Kim declined your request for Author access to Coral Offers.",
       body: "Ask Jordan first.",
       link: { to: "request-access" },
     });
@@ -223,17 +321,32 @@ describe("decideAccessRequest", () => {
 describe("deciding a request: requestDecisionRefusal and validateDecisionNote", () => {
   it("nobody decides their own request, and a decided one stays decided", () => {
     expect(requestDecisionRefusal(request(), PEOPLE.alex)).toBeNull();
-    expect(requestDecisionRefusal(request({ userId: "alex" }), PEOPLE.alex)).toBe(REASONS.ownRequest);
-    expect(requestDecisionRefusal(request({ status: "approved" }), PEOPLE.alex)).toBe(ACCESS_REFUSALS.decided);
+    expect(
+      requestDecisionRefusal(request({ userId: "alex" }), PEOPLE.alex),
+    ).toBe(REASONS.ownRequest);
+    expect(
+      requestDecisionRefusal(request({ status: "approved" }), PEOPLE.alex),
+    ).toBe(ACCESS_REFUSALS.decided);
   });
 
   it("a denial needs a note; any note stays under the limit; decideAccessRequest refuses the same way", () => {
     expect(validateDecisionNote("deny", "  ")).toBe(ACCESS_REFUSALS.denyNote);
     expect(validateDecisionNote("deny", "Not this quarter.")).toBeNull();
     expect(validateDecisionNote("approve", null)).toBeNull();
-    expect(validateDecisionNote("approve", "x".repeat(501))).toBe(ACCESS_REFUSALS.noteTooLong);
-    const input = { request: request(), requester: PEOPLE.morgan, team: CORAL, actor: PEOPLE.alex, now: at(0), membership: null };
-    expect(decideAccessRequest({ ...input, decision: "deny", note: " " })).toEqual({
+    expect(validateDecisionNote("approve", "x".repeat(501))).toBe(
+      ACCESS_REFUSALS.noteTooLong,
+    );
+    const input = {
+      request: request(),
+      requester: PEOPLE.morgan,
+      team: CORAL,
+      actor: PEOPLE.alex,
+      now: at(0),
+      membership: null,
+    };
+    expect(
+      decideAccessRequest({ ...input, decision: "deny", note: " " }),
+    ).toEqual({
       ok: false,
       ...validateDecisionNote("deny", " "),
     });

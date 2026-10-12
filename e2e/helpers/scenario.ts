@@ -1,10 +1,23 @@
-import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { pacing } from "../media/pacing";
 import { demoStage } from "../media/stage";
 
 // Gate media (recording, stills) lives in ../media; the specs get it from here. The helpers below act at test
 // speed. In the `demo` project the `demoStage` fixture swaps in the presentation pacing (../media/pacing.ts).
-export { beat, demoCursor, demoTimeout, isDemo, isShooting, moveTo, shoot } from "../media/demo";
+export {
+  beat,
+  demoCursor,
+  demoTimeout,
+  isDemo,
+  isShooting,
+  moveTo,
+  shoot,
+} from "../media/demo";
 
 // Shared by the scenario specs that drive the workspace as a person would: a test that fails on any
 // console or page error, the live-editor wait, caret and chip readers, and a click counter.
@@ -23,7 +36,8 @@ export const test = base.extend<Fixtures>({
     async ({ page }, use) => {
       const problems: string[] = [];
       page.on("console", (msg) => {
-        if (msg.type() === "error") problems.push(`console.error: ${msg.text()} @ ${msg.location().url}`);
+        if (msg.type() === "error")
+          problems.push(`console.error: ${msg.text()} @ ${msg.location().url}`);
       });
       page.on("pageerror", (err) => problems.push(`pageerror: ${err.message}`));
       page.on("crash", () => problems.push("page crashed"));
@@ -44,7 +58,10 @@ export { expect };
  * button) is not a press.
  */
 function countPointerPresses() {
-  const w = window as unknown as { __mousePresses: number; __mouseMoves: number };
+  const w = window as unknown as {
+    __mousePresses: number;
+    __mouseMoves: number;
+  };
   w.__mousePresses = 0;
   w.__mouseMoves = 0;
   document.addEventListener("mousemove", () => w.__mouseMoves++, true);
@@ -58,14 +75,20 @@ function countPointerPresses() {
 }
 
 export const mousePresses = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __mousePresses: number }).__mousePresses);
+  page.evaluate(
+    () => (window as unknown as { __mousePresses: number }).__mousePresses,
+  );
 
 export const mouseMoves = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __mouseMoves: number }).__mouseMoves);
+  page.evaluate(
+    () => (window as unknown as { __mouseMoves: number }).__mouseMoves,
+  );
 
 export async function asPersona(page: Page, id: string) {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:3100";
-  await page.context().addCookies([{ name: PERSONA_COOKIE, value: id, url: baseURL }]);
+  await page
+    .context()
+    .addCookies([{ name: PERSONA_COOKIE, value: id, url: baseURL }]);
 }
 
 // ── The click counter ──
@@ -74,7 +97,10 @@ export async function asPersona(page: Page, id: string) {
  * A click, at test speed. The specs go through here so the click counter sees every one, and so that the
  * `demo` project can pace them for a recording (the mouse glides to the target, the press is slow).
  */
-export async function tap(target: Locator, options?: Parameters<Locator["click"]>[0]) {
+export async function tap(
+  target: Locator,
+  options?: Parameters<Locator["click"]>[0],
+) {
   if (pacing.click) return pacing.click(target, options);
   await target.click(options);
 }
@@ -82,7 +108,10 @@ export async function tap(target: Locator, options?: Parameters<Locator["click"]
 export interface ClickCounter {
   readonly count: number;
   /** A click through `tap`, counted. */
-  click(target: Locator, options?: Parameters<Locator["click"]>[0]): Promise<void>;
+  click(
+    target: Locator,
+    options?: Parameters<Locator["click"]>[0],
+  ): Promise<void>;
 }
 
 export function clickCounter(): ClickCounter {
@@ -103,7 +132,9 @@ export function clickCounter(): ClickCounter {
 /** Hydrated: React has attached its handlers to the shell (the profile button is interactive). */
 export async function hydrated(page: Page) {
   await page.waitForFunction(() => {
-    const el = document.querySelector("button[aria-label$='profile and persona']");
+    const el = document.querySelector(
+      "button[aria-label$='profile and persona']",
+    );
     return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps"));
   });
 }
@@ -111,13 +142,21 @@ export async function hydrated(page: Page) {
 /** The Library, once its rows are on screen and interactive. */
 export async function openLibrary(page: Page, team = "coral-offers") {
   await page.goto(`/${team}/library`);
-  await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
-  await expect(page.locator("main ul > li > a[href*='/templates/']").filter({ visible: true }).first()).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Library" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("main ul > li > a[href*='/templates/']")
+      .filter({ visible: true })
+      .first(),
+  ).toBeVisible();
   await hydrated(page);
 }
 
 /** Next keeps previous routes alive (hidden) behind the new one, so only look at what is shown. */
-export const editor = (page: Page): Locator => page.locator(".ProseMirror").filter({ visible: true });
+export const editor = (page: Page): Locator =>
+  page.locator(".ProseMirror").filter({ visible: true });
 
 /**
  * The server paints the document as static markup; the live editor swaps in after hydration.
@@ -132,10 +171,12 @@ export async function liveEditor(page: Page): Promise<Locator> {
   return editor(page);
 }
 
-export const nameField = (page: Page) => page.getByRole("textbox", { name: "Template name" });
+export const nameField = (page: Page) =>
+  page.getByRole("textbox", { name: "Template name" });
 
 /** The autosave indicator: "Saved", "Saving…" or why it did not save. */
-export const saveIndicator = (page: Page) => page.locator("[data-status][aria-live='polite']").filter({ visible: true });
+export const saveIndicator = (page: Page) =>
+  page.locator("[data-status][aria-live='polite']").filter({ visible: true });
 
 /** After the last edit: the indicator goes to "Saving…", then settles on "Saved". */
 export async function expectAutosaved(page: Page) {
@@ -145,7 +186,8 @@ export async function expectAutosaved(page: Page) {
 }
 
 /** A chip in the document (the panel keeps an invisible drag image of every chip, so scope to the editor). */
-export const chip = (page: Page, key: string) => editor(page).locator(`[data-variable="${key}"]`);
+export const chip = (page: Page, key: string) =>
+  editor(page).locator(`[data-variable="${key}"]`);
 
 export const panelRow = (page: Page, key: string) =>
   page.locator(`[data-variable-row="${key}"]`).filter({ visible: true });
@@ -156,10 +198,25 @@ export const requiredHeading = (page: Page, key: string) =>
 interface LiveEditor {
   state: {
     doc: {
-      forEach(fn: (node: { type: { name: string }; attrs: Record<string, unknown>; textContent: string }, offset: number) => void): void;
+      forEach(
+        fn: (
+          node: {
+            type: { name: string };
+            attrs: Record<string, unknown>;
+            textContent: string;
+          },
+          offset: number,
+        ) => void,
+      ): void;
       textContent: string;
     };
-    selection: { from: number; to: number; empty: boolean; constructor: { name: string }; $from: { parent: { textContent: string }; parentOffset: number } };
+    selection: {
+      from: number;
+      to: number;
+      empty: boolean;
+      constructor: { name: string };
+      $from: { parent: { textContent: string }; parentOffset: number };
+    };
   };
   view: { dom: HTMLElement };
   can(): { undo(): boolean; redo(): boolean };
@@ -189,14 +246,19 @@ export async function caret(page: Page): Promise<Caret> {
       all: "AllSelection",
       cell: "CellSelection",
     };
-    const dom = [...document.querySelectorAll(".ProseMirror")].find((el) => (el as HTMLElement).offsetParent !== null) as
-      | (HTMLElement & { editor: LiveEditor })
-      | undefined;
+    const dom = [...document.querySelectorAll(".ProseMirror")].find(
+      (el) => (el as HTMLElement).offsetParent !== null,
+    ) as (HTMLElement & { editor: LiveEditor }) | undefined;
     if (!dom) throw new Error("no live editor on screen");
     const { selection, doc } = dom.editor.state;
     let section: string | null = null;
     doc.forEach((node, offset) => {
-      if (node.type.name === "heading" && node.attrs.requiredKey && offset <= selection.from) section = node.textContent;
+      if (
+        node.type.name === "heading" &&
+        node.attrs.requiredKey &&
+        offset <= selection.from
+      )
+        section = node.textContent;
     });
     return {
       focused: document.activeElement === dom,
@@ -204,7 +266,10 @@ export async function caret(page: Page): Promise<Caret> {
       empty: selection.empty,
       // Not constructor.name: production builds minify class names. toJSON().type is ProseMirror's
       // stable selection id ("text", "node", "all"; cell selections register their own).
-      kind: SELECTION_KINDS[(selection as unknown as { toJSON(): { type: string } }).toJSON().type] ?? "Selection",
+      kind:
+        SELECTION_KINDS[
+          (selection as unknown as { toJSON(): { type: string } }).toJSON().type
+        ] ?? "Selection",
       block: selection.$from.parent.textContent,
       offset: selection.$from.parentOffset,
     };
@@ -212,11 +277,13 @@ export async function caret(page: Page): Promise<Caret> {
 }
 
 /** Whether undo and redo have anything left to do. */
-export async function history(page: Page): Promise<{ undo: boolean; redo: boolean }> {
+export async function history(
+  page: Page,
+): Promise<{ undo: boolean; redo: boolean }> {
   return page.evaluate(() => {
-    const dom = [...document.querySelectorAll(".ProseMirror")].find((el) => (el as HTMLElement).offsetParent !== null) as
-      | (HTMLElement & { editor: LiveEditor })
-      | undefined;
+    const dom = [...document.querySelectorAll(".ProseMirror")].find(
+      (el) => (el as HTMLElement).offsetParent !== null,
+    ) as (HTMLElement & { editor: LiveEditor }) | undefined;
     if (!dom) throw new Error("no live editor on screen");
     const can = dom.editor.can();
     return { undo: can.undo(), redo: can.redo() };
@@ -224,11 +291,18 @@ export async function history(page: Page): Promise<{ undo: boolean; redo: boolea
 }
 
 /** Which of these chips are in the document right now. */
-export async function chipsPresent(page: Page, keys: readonly string[]): Promise<string[]> {
+export async function chipsPresent(
+  page: Page,
+  keys: readonly string[],
+): Promise<string[]> {
   return page.evaluate(
     (wanted) => {
-      const dom = [...document.querySelectorAll(".ProseMirror")].find((el) => (el as HTMLElement).offsetParent !== null);
-      return wanted.filter((key) => !!dom?.querySelector(`[data-variable="${key}"]`));
+      const dom = [...document.querySelectorAll(".ProseMirror")].find(
+        (el) => (el as HTMLElement).offsetParent !== null,
+      );
+      return wanted.filter(
+        (key) => !!dom?.querySelector(`[data-variable="${key}"]`),
+      );
     },
     [...keys],
   );
@@ -252,7 +326,11 @@ export async function pointInText(block: Locator, offset: number) {
  * HTML5 drop here, so: press on the row, nudge to start the drag, glide over the target in steps,
  * release.
  */
-export async function dragRowTo(page: Page, row: Locator, target: { x: number; y: number }) {
+export async function dragRowTo(
+  page: Page,
+  row: Locator,
+  target: { x: number; y: number },
+) {
   const box = (await row.boundingBox())!;
   const from = { x: box.x + 64, y: box.y + box.height / 2 };
   if (pacing.dragRow) return pacing.dragRow(page, from, target);
@@ -262,7 +340,10 @@ export async function dragRowTo(page: Page, row: Locator, target: { x: number; y
   await page.mouse.move(from.x - 12, from.y - 8, { steps: 3 });
   await page.mouse.move(target.x, target.y, { steps: 12 });
   // The editor draws where the drop will land; release once it shows.
-  await expect(page.locator(".ucomp-dropcursor"), "the editor shows where the drop lands").toBeVisible();
+  await expect(
+    page.locator(".ucomp-dropcursor"),
+    "the editor shows where the drop lands",
+  ).toBeVisible();
   await page.mouse.up();
 }
 
@@ -273,12 +354,16 @@ export async function expectVisibleFocus(target: Locator, what: string) {
     const style = getComputedStyle(el);
     return {
       focusVisible: el.matches(":focus-visible"),
-      outline: style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0,
+      outline:
+        style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0,
       shadow: style.boxShadow !== "none",
     };
   });
   expect(state.focusVisible, `${what}: matches :focus-visible`).toBe(true);
-  expect(state.outline || state.shadow, `${what}: draws a focus indicator (outline or ring)`).toBe(true);
+  expect(
+    state.outline || state.shadow,
+    `${what}: draws a focus indicator (outline or ring)`,
+  ).toBe(true);
 }
 
 export const NAME = "Spring Travel Rewards — Terms";
@@ -287,13 +372,16 @@ export const NAME = "Spring Travel Rewards — Terms";
 
 /** Types the way a person does: a little slower than the machine can (slower still in the `demo` project). */
 export const typeSlowly = (page: Page, text: string) =>
-  pacing.type ? pacing.type(page, text) : page.keyboard.type(text, { delay: 18 });
+  pacing.type
+    ? pacing.type(page, text)
+    : page.keyboard.type(text, { delay: 18 });
 
 /**
  * The document itself. With Email on, the subject and the preheader are editors too (also
  * `.ProseMirror`), so `editor(page)` stops being one element: use this to mean "the body".
  */
-export const documentEditor = (page: Page): Locator => page.getByRole("textbox", { name: "Document" });
+export const documentEditor = (page: Page): Locator =>
+  page.getByRole("textbox", { name: "Document" });
 
 /**
  * Waits until the point on `target` (its centre, or `at` from its top left) is not covered by another
@@ -301,16 +389,25 @@ export const documentEditor = (page: Page): Locator => page.getByRole("textbox",
  * root element takes the pointer: a click then would be retried by Playwright with the target scrolled
  * into view a different way. A person waits for the screen to settle, and so does this.
  */
-export async function untilUncovered(target: Locator, at?: { x: number; y: number }) {
+export async function untilUncovered(
+  target: Locator,
+  at?: { x: number; y: number },
+) {
   await expect
     .poll(
       () =>
         target.evaluate((el, offset) => {
           const r = el.getBoundingClientRect();
-          const hit = document.elementFromPoint(r.left + (offset?.x ?? r.width / 2), r.top + (offset?.y ?? r.height / 2));
+          const hit = document.elementFromPoint(
+            r.left + (offset?.x ?? r.width / 2),
+            r.top + (offset?.y ?? r.height / 2),
+          );
           return !!hit && (hit === el || el.contains(hit));
         }, at),
-      { message: "the target is not covered (a page transition is still running)" },
+      {
+        message:
+          "the target is not covered (a page transition is still running)",
+      },
     )
     .toBe(true);
 }
@@ -323,5 +420,9 @@ export async function press(clicks: ClickCounter, target: Locator) {
 
 /** A field that is an editor (the email subject, the preheader): its live ProseMirror view is attached. */
 export async function liveField(field: Locator) {
-  await expect.poll(() => field.evaluate((el) => "pmViewDesc" in el), { message: "the field is a live editor" }).toBe(true);
+  await expect
+    .poll(() => field.evaluate((el) => "pmViewDesc" in el), {
+      message: "the field is a live editor",
+    })
+    .toBe(true);
 }

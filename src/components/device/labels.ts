@@ -9,12 +9,18 @@ const SCREEN_LABELS: Record<DevicePlatform, Record<PushScreen, string>> = {
 };
 
 /** The platform's name for a push screen: "Banner" on iPhone, "Heads-up" on Android. */
-export function pushScreenLabel(platform: DevicePlatform, screen: PushScreen): string {
+export function pushScreenLabel(
+  platform: DevicePlatform,
+  screen: PushScreen,
+): string {
   return SCREEN_LABELS[platform][screen];
 }
 
 /** How the skins are named: generic looks, not the makers' own. */
-export const PLATFORM_STYLE: Record<DevicePlatform, string> = { ios: "iOS-style", android: "Android-style" };
+export const PLATFORM_STYLE: Record<DevicePlatform, string> = {
+  ios: "iOS-style",
+  android: "Android-style",
+};
 
 /**
  * What a text thread's header shows when the text has no sender (`SmsContent.sender` empty), in the

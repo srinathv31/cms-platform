@@ -6,9 +6,16 @@ import type { VersionState } from "@/domain/types";
 
 /** Scrolls the canvas (the page's own scroll area, not the window) to its top. */
 function scrollCanvasToTop(from: HTMLElement | null) {
-  for (let node = from?.parentElement ?? null; node; node = node.parentElement) {
+  for (
+    let node = from?.parentElement ?? null;
+    node;
+    node = node.parentElement
+  ) {
     const { overflowY } = getComputedStyle(node);
-    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
+    if (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      node.scrollHeight > node.clientHeight
+    ) {
       node.scrollTo({ top: 0 });
       return;
     }

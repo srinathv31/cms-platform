@@ -23,7 +23,14 @@ import type { Channel, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db as appDb, type Db } from "@/server/db/client";
-import { approvalStages, approvals, consumers, contentTypes, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  approvalStages,
+  approvals,
+  consumers,
+  contentTypes,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { findRound } from "@/server/queries/find-round";
 import { runEngine, type RenderBody } from "./engine";
 import { writeRenderLog } from "./log";
@@ -86,17 +93,35 @@ export type RenderResult =
     }
   | { ok: false; error: RenderError };
 
-const EXTENSION: Readonly<Record<Channel, string>> = { pdf: "pdf", web: "html", email: "json", push: "json", sms: "json" };
+const EXTENSION: Readonly<Record<Channel, string>> = {
+  pdf: "pdf",
+  web: "html",
+  email: "json",
+  push: "json",
+  sms: "json",
+};
 
 const fail = (error: RenderError): RenderResult => ({ ok: false, error });
 
-export function renderFilename(templateId: string, versionNumber: number | null, channel: Channel, round?: number | null): string {
-  const version = versionNumber === null ? "draft" : round == null ? `v${versionNumber}` : `v${versionNumber}-round-${round}`;
+export function renderFilename(
+  templateId: string,
+  versionNumber: number | null,
+  channel: Channel,
+  round?: number | null,
+): string {
+  const version =
+    versionNumber === null
+      ? "draft"
+      : round == null
+        ? `v${versionNumber}`
+        : `v${versionNumber}-round-${round}`;
   return `${templateId}-${version}.${EXTENSION[channel]}`;
 }
 
 /** Renders with the app database and the demo clock. Request time only (the clock awaits connection()). */
-export async function renderTemplate(input: RenderInput): Promise<RenderResult> {
+export async function renderTemplate(
+  input: RenderInput,
+): Promise<RenderResult> {
   return runRender(appDb, input, await now());
 }
 
@@ -114,11 +139,16 @@ type VersionRow = typeof versions.$inferSelect;
  * The pipeline against a given database and time. `renderTemplate` supplies the real ones; the
  * tests run this against a temporary, seeded database.
  */
-export async function runRender(db: Db, input: RenderInput, at: Date): Promise<RenderResult> {
+export async function runRender(
+  db: Db,
+  input: RenderInput,
+  at: Date,
+): Promise<RenderResult> {
   const started = performance.now();
 
   // The route checks these first; repeated here so no caller can skip them. Not logged.
-  if (input.version === "draft" && !input.preview) return fail(badRequest(BAD_REQUEST_MESSAGES.version));
+  if (input.version === "draft" && !input.preview)
+    return fail(badRequest(BAD_REQUEST_MESSAGES.version));
   if (!input.preview && !input.consumerId) return fail(consumerRequired());
   const target = renderTarget(input.channel, input.platform, input.encoding);
   if (!target.ok) return fail(target.error);
@@ -142,12 +172,29 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
   // 2. The version by number (and, previewing, by round), or the open draft.
   const version =
     input.version === "draft"
-      ? await db.query.versions.findFirst({ where: and(eq(versions.templateId, template.id), eq(versions.state, "draft")) })
-      : await findRound(db, template.id, input.version, input.preview ? input.round : undefined);
+      ? await db.query.versions.findFirst({
+          where: and(
+            eq(versions.templateId, template.id),
+            eq(versions.state, "draft"),
+          ),
+        })
+      : await findRound(
+          db,
+          template.id,
+          input.version,
+          input.preview ? input.round : undefined,
+        );
   if (!version) return fail(versionNotFound(template.id, input.version));
 
   // 3–9, then 10: every request that got this far is logged, whatever the outcome.
-  const result = await renderVersion(db, input, target.target, template, version, at);
+  const result = await renderVersion(
+    db,
+    input,
+    target.target,
+    template,
+    version,
+    at,
+  );
   await writeRenderLog(
     db,
     {
@@ -156,7 +203,8 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
       versionNumber: version.number,
       consumerId: input.preview ? null : input.consumerId,
       channel: input.channel,
-      platform: target.target.channel === "push" ? target.target.platform : null,
+      platform:
+        target.target.channel === "push" ? target.target.platform : null,
       isPreview: input.preview,
       correlationId: input.correlationId,
       outcome: result.ok ? "ok" : "error",
@@ -174,31 +222,57 @@ export async function runRender(db: Db, input: RenderInput, at: Date): Promise<R
  * still have active access somewhere (the review screen gets that from `requireSpace`): a person
  * removed from every team, or lapsed, reads nothing they once approved.
  */
-async function previewAllowed(db: Db, viewer: Viewer, template: TemplateRow, version: VersionRow): Promise<boolean> {
+async function previewAllowed(
+  db: Db,
+  viewer: Viewer,
+  template: TemplateRow,
+  version: VersionRow,
+): Promise<boolean> {
   if (can(viewer, "template.view", { teamId: template.teamId }).ok) return true;
   if (version.state === "in_review") {
     const chain = await db
-      .select({ id: approvalStages.id, position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
+      .select({
+        id: approvalStages.id,
+        position: approvalStages.position,
+        name: approvalStages.name,
+        rule: approvalStages.approverRule,
+      })
       .from(approvalStages)
       .where(eq(approvalStages.contentTypeId, template.contentTypeId))
       .orderBy(asc(approvalStages.position));
     const rule = currentStageOf(version, chain)?.rule;
     const named = rule?.kind === "user" ? [rule.userId] : [];
-    if (can(viewer, "template.view", { teamId: template.teamId, stageApproverIds: named }).ok) return true;
+    if (
+      can(viewer, "template.view", {
+        teamId: template.teamId,
+        stageApproverIds: named,
+      }).ok
+    )
+      return true;
   }
   const [decided] = await db
     .select({ id: approvals.id })
     .from(approvals)
-    .where(and(eq(approvals.versionId, version.id), eq(approvals.actorId, viewer.userId)))
+    .where(
+      and(
+        eq(approvals.versionId, version.id),
+        eq(approvals.actorId, viewer.userId),
+      ),
+    )
     .limit(1);
   return decided !== undefined && hasActiveTeamAccess(viewer);
 }
 
-async function activeNumber(db: Db, templateId: string): Promise<number | null> {
+async function activeNumber(
+  db: Db,
+  templateId: string,
+): Promise<number | null> {
   const [row] = await db
     .select({ number: versions.number })
     .from(versions)
-    .where(and(eq(versions.templateId, templateId), eq(versions.state, "active")))
+    .where(
+      and(eq(versions.templateId, templateId), eq(versions.state, "active")),
+    )
     .limit(1);
   return row?.number ?? null;
 }
@@ -215,15 +289,21 @@ async function renderVersion(
 
   if (input.preview) {
     // 3. The CMS's own preview: the persona must be able to see the template's team.
-    if (!input.viewer || !(await previewAllowed(db, input.viewer, template, version))) {
+    if (
+      !input.viewer ||
+      !(await previewAllowed(db, input.viewer, template, version))
+    ) {
       return fail(previewForbidden());
     }
     // 4 is skipped (any state previews), but a Superseded version still names its successor.
-    if (version.state === "superseded") newerVersion = await activeNumber(db, template.id);
+    if (version.state === "superseded")
+      newerVersion = await activeNumber(db, template.id);
   } else {
     // 3. A registered consumer.
     const consumerId = input.consumerId ?? "";
-    const consumer = await db.query.consumers.findFirst({ where: eq(consumers.id, consumerId) });
+    const consumer = await db.query.consumers.findFirst({
+      where: eq(consumers.id, consumerId),
+    });
     if (!consumer) return fail(unknownConsumer(consumerId));
 
     // 4. Version rules. Consumers always pin a number, so `version.number` is set here.
@@ -232,7 +312,9 @@ async function renderVersion(
         number: version.number ?? 0,
         state: version.state,
         sunsetAt: version.sunsetAt,
-        revokedAt: version.revoke?.confirmedAt ? new Date(version.revoke.confirmedAt) : null,
+        revokedAt: version.revoke?.confirmedAt
+          ? new Date(version.revoke.confirmedAt)
+          : null,
       },
       activeNumber: await activeNumber(db, template.id),
       now: at,
@@ -248,13 +330,18 @@ async function renderVersion(
     return fail(channelNotAllowed(template.contentTypeName, input.channel));
   }
   if (!version.channels.includes(input.channel)) {
-    return fail(channelNotEnabled(version.number, input.channel, version.channels));
+    return fail(
+      channelNotEnabled(version.number, input.channel, version.channels),
+    );
   }
 
   // A preview of an unreleased round its label names ("v3 · Round 2") says which round it is, in the
   // PDF's footer and subject and in the filename. A consumer only ever renders a released row: no round.
   const round =
-    input.preview && version.number !== null && !isReleased(version.state) && showsRound(asNumbered(version))
+    input.preview &&
+    version.number !== null &&
+    !isReleased(version.state) &&
+    showsRound(asNumbered(version))
       ? version.round
       : null;
 
@@ -279,7 +366,14 @@ async function renderVersion(
   if (!result.ok) {
     // Anything that throws from stage 7 on is our failure, not the caller's. A message over its limit
     // (push_payload_too_large, sms_too_long) is the values' doing, like invalid_values: not logged.
-    if (result.error.code === "render_failed") reportFailure(template.id, version.number, input.channel, input.correlationId, result.cause);
+    if (result.error.code === "render_failed")
+      reportFailure(
+        template.id,
+        version.number,
+        input.channel,
+        input.correlationId,
+        result.cause,
+      );
     return fail(result.error);
   }
   return {
@@ -297,9 +391,18 @@ async function renderVersion(
  * resolver could quote document text, and with it a customer's value (and an unrenderable
  * character may come from a value). The error's name says which failure it was.
  */
-function reportFailure(templateId: string, version: number | null, channel: Channel, correlationId: string, error: unknown) {
+function reportFailure(
+  templateId: string,
+  version: number | null,
+  channel: Channel,
+  correlationId: string,
+  error: unknown,
+) {
   const name = error instanceof Error ? error.name : typeof error;
-  const frames = error instanceof Error ? (error.stack ?? "").split("\n").slice(1, 6).join("\n") : "";
+  const frames =
+    error instanceof Error
+      ? (error.stack ?? "").split("\n").slice(1, 6).join("\n")
+      : "";
   console.error(
     `[render] ${templateId} ${version === null ? "draft" : `v${version}`} ${channel} failed (${name}), correlation ${correlationId}\n${frames}`,
   );

@@ -36,13 +36,30 @@ export function ChipPopover(props: ChipPopoverProps) {
   return <ChipPopoverPanel key={pos} pos={pos} {...props} />;
 }
 
-function ChipPopoverPanel({ editor, root, chip, pos }: ChipPopoverProps & { pos: number }) {
+function ChipPopoverPanel({
+  editor,
+  root,
+  chip,
+  pos,
+}: ChipPopoverProps & { pos: number }) {
   const node = editor.state.doc.nodeAt(pos);
-  const key = node?.type.name === NODE.variable ? ((node.attrs.key as string | null) ?? null) : null;
-  const anchor = editor.isDestroyed ? null : (editor.view.nodeDOM(pos) as HTMLElement | null);
-  const variable = useStore(root.variables, (s) => (key ? s.byKey.get(key) : undefined));
-  const usage = useStore(root.usage, (s) => (key ? s.byKey.get(key) : undefined));
-  const setPopup = useCallback((element: HTMLElement | null) => chip.getState().setElement(element), [chip]);
+  const key =
+    node?.type.name === NODE.variable
+      ? ((node.attrs.key as string | null) ?? null)
+      : null;
+  const anchor = editor.isDestroyed
+    ? null
+    : (editor.view.nodeDOM(pos) as HTMLElement | null);
+  const variable = useStore(root.variables, (s) =>
+    key ? s.byKey.get(key) : undefined,
+  );
+  const usage = useStore(root.usage, (s) =>
+    key ? s.byKey.get(key) : undefined,
+  );
+  const setPopup = useCallback(
+    (element: HTMLElement | null) => chip.getState().setElement(element),
+    [chip],
+  );
 
   if (!key || !anchor) return null;
 
@@ -66,10 +83,18 @@ function ChipPopoverPanel({ editor, root, chip, pos }: ChipPopoverProps & { pos:
           sideOffset={6}
           collisionPadding={8}
           // Stays within the editor's column (not over a side rail).
-          collisionBoundary={anchor.closest(".ucomp-editor, .ucomp-field") ?? "clipping-ancestors"}
+          collisionBoundary={
+            anchor.closest(".ucomp-editor, .ucomp-field") ??
+            "clipping-ancestors"
+          }
           className="isolate z-50"
         >
-          <Popover.Popup ref={setPopup} initialFocus={false} finalFocus={false} className={POPUP}>
+          <Popover.Popup
+            ref={setPopup}
+            initialFocus={false}
+            finalFocus={false}
+            className={POPUP}
+          >
             <div className="flex items-start gap-3">
               <span
                 className={
@@ -83,13 +108,21 @@ function ChipPopoverPanel({ editor, root, chip, pos }: ChipPopoverProps & { pos:
               <div className="min-w-0 pt-px">
                 {variable ? (
                   <>
-                    <Popover.Title className="truncate text-sm font-medium text-text">{variable.label}</Popover.Title>
-                    <p className="truncate font-mono text-xs text-text-muted">{key}</p>
+                    <Popover.Title className="truncate text-sm font-medium text-text">
+                      {variable.label}
+                    </Popover.Title>
+                    <p className="truncate font-mono text-xs text-text-muted">
+                      {key}
+                    </p>
                   </>
                 ) : (
                   <>
-                    <Popover.Title className="truncate font-mono text-sm text-text">{key}</Popover.Title>
-                    <Popover.Description className="text-xs text-warning-text">Not in the variable list</Popover.Description>
+                    <Popover.Title className="truncate font-mono text-sm text-text">
+                      {key}
+                    </Popover.Title>
+                    <Popover.Description className="text-xs text-warning-text">
+                      Not in the variable list
+                    </Popover.Description>
                   </>
                 )}
               </div>
@@ -100,14 +133,23 @@ function ChipPopoverPanel({ editor, root, chip, pos }: ChipPopoverProps & { pos:
                 <dt className="text-text-muted">Type</dt>
                 <dd className="min-w-0 truncate">
                   {TYPE_META[variable.type].label}
-                  <span className="text-text-muted"> · {variable.required ? "Required" : "Optional"}</span>
+                  <span className="text-text-muted">
+                    {" "}
+                    · {variable.required ? "Required" : "Optional"}
+                  </span>
                 </dd>
                 <dt className="text-text-muted">Sample</dt>
-                <dd className="min-w-0 truncate">{variable.sample ? formatValue(variable.type, variable.sample) : "—"}</dd>
+                <dd className="min-w-0 truncate">
+                  {variable.sample
+                    ? formatValue(variable.type, variable.sample)
+                    : "—"}
+                </dd>
               </dl>
             ) : null}
 
-            {usage && usage.places.length ? <Places places={usage.places} /> : null}
+            {usage && usage.places.length ? (
+              <Places places={usage.places} />
+            ) : null}
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
@@ -121,9 +163,16 @@ function Places({ places }: { places: readonly VariablePlace[] }) {
       <p className="caps-label">Used in</p>
       <ul className="mt-1.5 grid gap-1 text-[13px] leading-5">
         {places.map((place, i) => (
-          <li key={`${place.field}-${place.section ?? ""}-${i}`} className="flex items-baseline justify-between gap-4">
-            <span className="min-w-0 truncate">{place.section ?? place.field}</span>
-            <span className="shrink-0 text-text-muted tabular-nums">{place.count}</span>
+          <li
+            key={`${place.field}-${place.section ?? ""}-${i}`}
+            className="flex items-baseline justify-between gap-4"
+          >
+            <span className="min-w-0 truncate">
+              {place.section ?? place.field}
+            </span>
+            <span className="shrink-0 text-text-muted tabular-nums">
+              {place.count}
+            </span>
           </li>
         ))}
       </ul>

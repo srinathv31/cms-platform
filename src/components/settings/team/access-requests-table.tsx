@@ -2,7 +2,11 @@
 
 import { ROLE_LABEL } from "@/domain/access/roles";
 import { validateDecisionNote } from "@/domain/access/requests";
-import { DECISION_NOTE_MAX, type AccessRequestRow, type AccessRequestsSection } from "@/domain/access-types";
+import {
+  DECISION_NOTE_MAX,
+  type AccessRequestRow,
+  type AccessRequestsSection,
+} from "@/domain/access-types";
 import { decideAccessRequest } from "@/server/actions/access";
 import { formatShortDate } from "@/domain/dates";
 import { firstName } from "./format";
@@ -17,14 +21,25 @@ function pendingRow(r: AccessRequestRow, today: string): RowData {
   const reason = (
     <div className="flex flex-col gap-1">
       <span className="text-[13px] text-text-muted">{`${first}'s reason`}</span>
-      <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-text">{r.reason}</p>
+      <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-text">
+        {r.reason}
+      </p>
     </div>
   );
   return {
     id: r.id,
     person: r.person,
     sub: `Asked ${formatShortDate(r.createdAt, today)}`,
-    cells: [role, <span key="reason" title={r.reason} className="line-clamp-2 text-[13px] leading-snug text-text-muted">{r.reason}</span>],
+    cells: [
+      role,
+      <span
+        key="reason"
+        title={r.reason}
+        className="line-clamp-2 text-[13px] leading-snug text-text-muted"
+      >
+        {r.reason}
+      </span>,
+    ],
     actions: [
       {
         key: "approve",
@@ -34,7 +49,8 @@ function pendingRow(r: AccessRequestRow, today: string): RowData {
           consequence: r.consequences.approve,
           confirmLabel: `Approve as ${role}`,
           detail: reason,
-          run: () => decideAccessRequest({ requestId: r.id, decision: "approve" }),
+          run: () =>
+            decideAccessRequest({ requestId: r.id, decision: "approve" }),
         },
       },
       {
@@ -45,8 +61,14 @@ function pendingRow(r: AccessRequestRow, today: string): RowData {
           consequence: r.consequences.deny,
           confirmLabel: "Deny request",
           detail: reason,
-          note: { label: `Note for ${first}`, max: DECISION_NOTE_MAX, problem: (note) => validateDecisionNote("deny", note)?.reason ?? null },
-          run: (note) => decideAccessRequest({ requestId: r.id, decision: "deny", note }),
+          note: {
+            label: `Note for ${first}`,
+            max: DECISION_NOTE_MAX,
+            problem: (note) =>
+              validateDecisionNote("deny", note)?.reason ?? null,
+          },
+          run: (note) =>
+            decideAccessRequest({ requestId: r.id, decision: "deny", note }),
         },
       },
     ],
@@ -59,21 +81,38 @@ function Decided({ rows, today }: { rows: AccessRequestRow[]; today: string }) {
       {rows.map((r) => {
         const verb = r.status === "approved" ? "Approved" : "Denied";
         return (
-          <div key={r.id} role="row" className="grid min-h-16 grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1.3fr)_9.5rem] items-center gap-x-3 border-b border-hairline py-2.5">
+          <div
+            key={r.id}
+            role="row"
+            className="grid min-h-16 grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1.3fr)_9.5rem] items-center gap-x-3 border-b border-hairline py-2.5"
+          >
             <div role="cell" className="flex min-w-0 items-center gap-3">
               <span aria-hidden className="shrink-0">
-                <UserAvatar initials={r.person.initials} hue={r.person.hue} muted />
+                <UserAvatar
+                  initials={r.person.initials}
+                  hue={r.person.hue}
+                  muted
+                />
               </span>
-              <span className="truncate text-[15px] font-medium text-text-muted">{r.person.name}</span>
+              <span className="truncate text-[15px] font-medium text-text-muted">
+                {r.person.name}
+              </span>
             </div>
-            <div role="cell" className="text-[14px] text-text-muted">{ROLE_LABEL[r.role]}</div>
-            <div role="cell" className="col-span-2 min-w-0 text-[13px] leading-snug text-text-muted">
+            <div role="cell" className="text-[14px] text-text-muted">
+              {ROLE_LABEL[r.role]}
+            </div>
+            <div
+              role="cell"
+              className="col-span-2 min-w-0 text-[13px] leading-snug text-text-muted"
+            >
               <div>
                 {verb}
                 {r.decidedBy ? ` by ${r.decidedBy.name}` : ""}
                 {r.decidedAt ? ` · ${formatShortDate(r.decidedAt, today)}` : ""}
               </div>
-              {r.status === "denied" && r.note ? <div className="line-clamp-2">{r.note}</div> : null}
+              {r.status === "denied" && r.note ? (
+                <div className="line-clamp-2">{r.note}</div>
+              ) : null}
             </div>
           </div>
         );
@@ -82,7 +121,13 @@ function Decided({ rows, today }: { rows: AccessRequestRow[]; today: string }) {
   );
 }
 
-export function AccessRequestsTable({ section, today }: { section: AccessRequestsSection; today: string }) {
+export function AccessRequestsTable({
+  section,
+  today,
+}: {
+  section: AccessRequestsSection;
+  today: string;
+}) {
   return (
     <>
       <RowTable

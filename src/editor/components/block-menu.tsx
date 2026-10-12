@@ -57,7 +57,14 @@ import {
 } from "../lib/list-numbering";
 import { DOCUMENT_MESSAGES } from "../model/document-check";
 import { NUMBERING_STYLES } from "../model/list-markers";
-import { FOCUS_RING, MENU_ICON, MENU_ITEM, MENU_POPUP, MENU_REASON, MENU_SEPARATOR } from "./classes";
+import {
+  FOCUS_RING,
+  MENU_ICON,
+  MENU_ITEM,
+  MENU_POPUP,
+  MENU_REASON,
+  MENU_SEPARATOR,
+} from "./classes";
 
 /** The menu's name, however it was opened. */
 export const BLOCK_MENU_LABEL = "Block options";
@@ -70,7 +77,8 @@ const SUB_TRIGGER = cx(
   MENU_ITEM,
   "focus:text-text data-popup-open:bg-hover data-popup-open:text-text data-open:bg-hover data-open:text-text data-disabled:pointer-events-none data-disabled:opacity-50 [&>svg:last-child]:text-text-muted",
 );
-const RADIO = "gap-3 rounded-lg py-1.5 pr-8 pl-2 text-text focus:bg-hover focus:text-text";
+const RADIO =
+  "gap-3 rounded-lg py-1.5 pr-8 pl-2 text-text focus:bg-hover focus:text-text";
 
 function frameOf(editor: Editor): HTMLElement | null {
   return viewDom(editor)?.closest<HTMLElement>(".ucomp-editor") ?? null;
@@ -83,7 +91,17 @@ function frameOf(editor: Editor): HTMLElement | null {
  * by a hidden label of its own: Base UI points `aria-labelledby` at the trigger, which would read
  * the grip's "Drag to move block, or click for options".
  */
-function BlockMenuPopup({ editor, blockPos, close, anchor }: { editor: Editor; blockPos: number; close: () => void; anchor?: Element | null }) {
+function BlockMenuPopup({
+  editor,
+  blockPos,
+  close,
+  anchor,
+}: {
+  editor: Editor;
+  blockPos: number;
+  close: () => void;
+  anchor?: Element | null;
+}) {
   const frame = frameOf(editor);
   const labelId = useId();
   if (!frame) return null;
@@ -107,7 +125,12 @@ function BlockMenuPopup({ editor, blockPos, close, anchor }: { editor: Editor; b
           <span id={labelId} hidden>
             {BLOCK_MENU_LABEL}
           </span>
-          <BlockMenuItems editor={editor} blockPos={blockPos} frame={frame} close={close} />
+          <BlockMenuItems
+            editor={editor}
+            blockPos={blockPos}
+            frame={frame}
+            close={close}
+          />
         </Menu.Popup>
       </Menu.Positioner>
     </DropdownMenuPortal>
@@ -115,10 +138,26 @@ function BlockMenuPopup({ editor, blockPos, close, anchor }: { editor: Editor; b
 }
 
 /** The items. Mounted each time the menu opens, so the list it acts on is read then (an edit closes the menu). */
-function BlockMenuItems({ editor, blockPos, frame, close }: { editor: Editor; blockPos: number; frame: HTMLElement; close: () => void }) {
-  const [target] = useState<NumberingTarget | null>(() => (editor.isDestroyed ? null : numberingTarget(editor.state, blockPos)));
+function BlockMenuItems({
+  editor,
+  blockPos,
+  frame,
+  close,
+}: {
+  editor: Editor;
+  blockPos: number;
+  frame: HTMLElement;
+  close: () => void;
+}) {
+  const [target] = useState<NumberingTarget | null>(() =>
+    editor.isDestroyed ? null : numberingTarget(editor.state, blockPos),
+  );
   const reasonId = useId();
-  const title = target ? (target.orderedDepth > 0 ? `Numbered list · level ${target.orderedDepth + 1}` : "Numbered list") : null;
+  const title = target
+    ? target.orderedDepth > 0
+      ? `Numbered list · level ${target.orderedDepth + 1}`
+      : "Numbered list"
+    : null;
   return (
     <>
       <Menu.Group>
@@ -127,8 +166,18 @@ function BlockMenuItems({ editor, blockPos, frame, close }: { editor: Editor; bl
             <span className="caps-label">{title}</span>
           </DropdownMenuLabel>
         ) : null}
-        <NumberingSubmenu editor={editor} target={target} frame={frame} reasonId={reasonId} />
-        <StartAt editor={editor} target={target} reasonId={reasonId} close={close} />
+        <NumberingSubmenu
+          editor={editor}
+          target={target}
+          frame={frame}
+          reasonId={reasonId}
+        />
+        <StartAt
+          editor={editor}
+          target={target}
+          reasonId={reasonId}
+          close={close}
+        />
       </Menu.Group>
       {target ? null : (
         <p id={reasonId} className={cx(MENU_REASON, "pb-1.5")}>
@@ -153,12 +202,20 @@ function NumberingSubmenu({
   const value = target ? currentNumberingValue(target.node) : null;
   const choose = (next: unknown) => {
     if (!target || editor.isDestroyed || typeof next !== "string") return;
-    setListNumbering(editor.view, target.pos, next === "default" ? null : styleFromValue(next));
+    setListNumbering(
+      editor.view,
+      target.pos,
+      next === "default" ? null : styleFromValue(next),
+    );
   };
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={!target} aria-describedby={target ? undefined : reasonId} className={SUB_TRIGGER}>
+      <DropdownMenuSubTrigger
+        disabled={!target}
+        aria-describedby={target ? undefined : reasonId}
+        className={SUB_TRIGGER}
+      >
         <ListOrdered {...MENU_ICON} />
         Numbering
       </DropdownMenuSubTrigger>
@@ -175,16 +232,31 @@ function NumberingSubmenu({
           collisionPadding={8}
           className="isolate z-50 outline-none"
         >
-          <Menu.Popup aria-label="Numbering" data-block-menu="" className={cx(MENU_POPUP, "w-48")}>
+          <Menu.Popup
+            aria-label="Numbering"
+            data-block-menu=""
+            className={cx(MENU_POPUP, "w-48")}
+          >
             {target ? (
               <DropdownMenuRadioGroup value={value} onValueChange={choose}>
-                <DropdownMenuRadioItem value="default" closeOnClick className={RADIO}>
+                <DropdownMenuRadioItem
+                  value="default"
+                  closeOnClick
+                  className={RADIO}
+                >
                   Default
-                  <span className="text-text-muted tabular-nums">{numberingPreview(defaultNumbering(target.orderedDepth))}</span>
+                  <span className="text-text-muted tabular-nums">
+                    {numberingPreview(defaultNumbering(target.orderedDepth))}
+                  </span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuSeparator className={MENU_SEPARATOR} />
                 {NUMBERING_STYLES.map((style) => (
-                  <DropdownMenuRadioItem key={numberingValue(style)} value={numberingValue(style)} closeOnClick className={cx(RADIO, "tabular-nums")}>
+                  <DropdownMenuRadioItem
+                    key={numberingValue(style)}
+                    value={numberingValue(style)}
+                    closeOnClick
+                    className={cx(RADIO, "tabular-nums")}
+                  >
                     {numberingPreview(style)}
                   </DropdownMenuRadioItem>
                 ))}
@@ -251,7 +323,9 @@ function StartAt({
     >
       <ListStart {...MENU_ICON} />
       Start at…
-      {start === null ? null : <span className="ml-auto text-text-muted tabular-nums">{start}</span>}
+      {start === null ? null : (
+        <span className="ml-auto text-text-muted tabular-nums">{start}</span>
+      )}
     </DropdownMenuItem>
   );
 }
@@ -272,7 +346,10 @@ function StartAtField({
   const [tried, setTried] = useState(false);
   const id = useId();
   const start = parseListStart(draft);
-  const reason = start === null && (tried || draft.trim() !== "") ? START_RANGE_MESSAGE : null;
+  const reason =
+    start === null && (tried || draft.trim() !== "")
+      ? START_RANGE_MESSAGE
+      : null;
 
   const apply = () => {
     if (start === null) {
@@ -309,11 +386,23 @@ function StartAtField({
   };
 
   return (
-    <div role="group" aria-labelledby={`${id}-label`} onBlur={onBlur} className="flex gap-2.5 rounded-lg px-2 py-0.5 text-text">
-      <ListStart {...MENU_ICON} className={cx(MENU_ICON.className, "mt-1.5 shrink-0")} />
+    <div
+      role="group"
+      aria-labelledby={`${id}-label`}
+      onBlur={onBlur}
+      className="flex gap-2.5 rounded-lg px-2 py-0.5 text-text"
+    >
+      <ListStart
+        {...MENU_ICON}
+        className={cx(MENU_ICON.className, "mt-1.5 shrink-0")}
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-1.5">
-          <label id={`${id}-label`} htmlFor={`${id}-field`} className="shrink-0">
+          <label
+            id={`${id}-label`}
+            htmlFor={`${id}-field`}
+            className="shrink-0"
+          >
             Start at
           </label>
           <Input
@@ -393,7 +482,14 @@ export function GripBlockMenu({
       }}
     >
       {children}
-      {blockPos === null ? null : <BlockMenuPopup editor={editor} blockPos={blockPos} anchor={anchor} close={() => onOpenChange(false)} />}
+      {blockPos === null ? null : (
+        <BlockMenuPopup
+          editor={editor}
+          blockPos={blockPos}
+          anchor={anchor}
+          close={() => onOpenChange(false)}
+        />
+      )}
     </DropdownMenu>
   );
 }
@@ -463,11 +559,18 @@ export function KeyboardBlockMenu({
     const block = editor.view.nodeDOM(blockPos);
     if (!(block instanceof HTMLElement)) return;
     const place = () => {
-      const line = block.matches("p, h1, h2, h3") ? block : block.querySelector<HTMLElement>("p, h1, h2, h3");
+      const line = block.matches("p, h1, h2, h3")
+        ? block
+        : block.querySelector<HTMLElement>("p, h1, h2, h3");
       const lineBox = (line ?? block).getBoundingClientRect();
-      const lineHeight = line ? Number.parseFloat(getComputedStyle(line).lineHeight) || lineBox.height : lineBox.height;
+      const lineHeight = line
+        ? Number.parseFloat(getComputedStyle(line).lineHeight) || lineBox.height
+        : lineBox.height;
       const f = frame.getBoundingClientRect();
-      setStyle({ top: lineBox.top - f.top + Math.min(lineHeight, lineBox.height) / 2, left: block.getBoundingClientRect().left - f.left - 6 });
+      setStyle({
+        top: lineBox.top - f.top + Math.min(lineHeight, lineBox.height) / 2,
+        left: block.getBoundingClientRect().left - f.left - 6,
+      });
     };
     place();
     const observer = new ResizeObserver(place);
@@ -486,7 +589,10 @@ export function KeyboardBlockMenu({
   if (!frame || !style) return null;
 
   return (
-    <div className="absolute z-10 -translate-x-full -translate-y-1/2" style={style}>
+    <div
+      className="absolute z-10 -translate-x-full -translate-y-1/2"
+      style={style}
+    >
       <DropdownMenu
         open={open}
         onOpenChange={setOpen}
@@ -507,7 +613,11 @@ export function KeyboardBlockMenu({
           onBlur={(event) => {
             // Into the menu (or back from it): stay. Anywhere else: go.
             const to = event.relatedTarget;
-            if (open || (to instanceof Element && to.closest("[data-block-menu]"))) return;
+            if (
+              open ||
+              (to instanceof Element && to.closest("[data-block-menu]"))
+            )
+              return;
             onClose();
           }}
           className={cx(
@@ -517,7 +627,11 @@ export function KeyboardBlockMenu({
         >
           <GripVertical className="size-4" strokeWidth={1.75} aria-hidden />
         </DropdownMenuTrigger>
-        <BlockMenuPopup editor={editor} blockPos={blockPos} close={() => setOpen(false)} />
+        <BlockMenuPopup
+          editor={editor}
+          blockPos={blockPos}
+          close={() => setOpen(false)}
+        />
       </DropdownMenu>
     </div>
   );

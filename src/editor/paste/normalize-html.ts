@@ -32,17 +32,79 @@ const WORD = /urn:schemas-microsoft-com:office|class="?Mso|mso-[a-z-]+:/i;
 
 /** Elements whose content is never wanted. */
 const DROP = new Set([
-  "head", "style", "script", "noscript", "template", "meta", "link", "title", "xml",
-  "img", "picture", "svg", "video", "audio", "iframe", "object", "embed", "canvas",
-  "input", "button", "select", "textarea", "form", "map", "area",
+  "head",
+  "style",
+  "script",
+  "noscript",
+  "template",
+  "meta",
+  "link",
+  "title",
+  "xml",
+  "img",
+  "picture",
+  "svg",
+  "video",
+  "audio",
+  "iframe",
+  "object",
+  "embed",
+  "canvas",
+  "input",
+  "button",
+  "select",
+  "textarea",
+  "form",
+  "map",
+  "area",
 ]);
 
 /** Inline wrappers whose children are kept (marks come from their style). */
-const BLOCKS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "table", "tr", "td", "th", "div", "section", "article", "main", "header", "footer", "aside", "blockquote", "center", "figure", "dl", "dt", "dd", "pre", "address", "hr", "body"]);
+const BLOCKS = new Set([
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "ul",
+  "ol",
+  "li",
+  "table",
+  "tr",
+  "td",
+  "th",
+  "div",
+  "section",
+  "article",
+  "main",
+  "header",
+  "footer",
+  "aside",
+  "blockquote",
+  "center",
+  "figure",
+  "dl",
+  "dt",
+  "dd",
+  "pre",
+  "address",
+  "hr",
+  "body",
+]);
 
-const HEADING_CLASS: Record<string, string> = { msotitle: "h1", msoheading1: "h1", msoheading2: "h2", msoheading3: "h3" };
+const HEADING_CLASS: Record<string, string> = {
+  msotitle: "h1",
+  msoheading1: "h1",
+  msoheading2: "h2",
+  msoheading3: "h3",
+};
 
-export function normalizePastedHtml(html: string, options: NormalizeHtmlOptions = {}): string {
+export function normalizePastedHtml(
+  html: string,
+  options: NormalizeHtmlOptions = {},
+): string {
   if (!html) return html;
   const doc = (options.parse ?? parseWithDomParser)(html);
   const body = doc.body;
@@ -69,7 +131,13 @@ function styleOf(el: Element): Map<string, string> {
   for (const part of (el.getAttribute("style") ?? "").split(";")) {
     const i = part.indexOf(":");
     if (i < 0) continue;
-    map.set(part.slice(0, i).trim().toLowerCase(), part.slice(i + 1).trim().toLowerCase());
+    map.set(
+      part.slice(0, i).trim().toLowerCase(),
+      part
+        .slice(i + 1)
+        .trim()
+        .toLowerCase(),
+    );
   }
   return map;
 }
@@ -93,7 +161,9 @@ function marksFromStyle(el: Element): Marks {
   return {
     bold: isBoldWeight(style.get("font-weight")) === true,
     italic: style.get("font-style") === "italic",
-    underline: /underline/.test(style.get("text-decoration") ?? style.get("text-decoration-line") ?? ""),
+    underline: /underline/.test(
+      style.get("text-decoration") ?? style.get("text-decoration-line") ?? "",
+    ),
   };
 }
 
@@ -129,7 +199,8 @@ function cleanInto(node: Node, dest: Element, doc: Document) {
     return;
   }
   if (tag === "br") {
-    if (!el.classList.contains("Apple-interchange-newline")) dest.appendChild(doc.createElement("br"));
+    if (!el.classList.contains("Apple-interchange-newline"))
+      dest.appendChild(doc.createElement("br"));
     return;
   }
   if (tag === "hr") {
@@ -193,12 +264,24 @@ function cleanInto(node: Node, dest: Element, doc: Document) {
     case "strong": {
       // Google Docs wraps the whole clipboard in <b style="font-weight:normal">.
       const weight = isBoldWeight(styleOf(el).get("font-weight"));
-      appendInline(el, weight === false ? null : doc.createElement("strong"), dest, doc);
+      appendInline(
+        el,
+        weight === false ? null : doc.createElement("strong"),
+        dest,
+        doc,
+      );
       return;
     }
     case "i":
     case "em":
-      appendInline(el, styleOf(el).get("font-style") === "normal" ? null : doc.createElement("em"), dest, doc);
+      appendInline(
+        el,
+        styleOf(el).get("font-style") === "normal"
+          ? null
+          : doc.createElement("em"),
+        dest,
+        doc,
+      );
       return;
     case "u":
     case "ins":
@@ -219,13 +302,21 @@ function cleanInto(node: Node, dest: Element, doc: Document) {
 
 function appendBlock(el: Element, dest: Element, doc: Document, tag: string) {
   const block = doc.createElement(tag);
-  const marks = tag === "p" || tag === "li" ? marksFromStyle(el) : { bold: false, italic: false, underline: false };
+  const marks =
+    tag === "p" || tag === "li"
+      ? marksFromStyle(el)
+      : { bold: false, italic: false, underline: false };
   cleanChildren(el, wrapMarks(block, marks, doc), doc);
   dest.appendChild(block);
 }
 
 /** `wrapper` (or nothing) plus any marks from the element's style, around its cleaned children. */
-function appendInline(el: Element, wrapper: Element | null, dest: Element, doc: Document) {
+function appendInline(
+  el: Element,
+  wrapper: Element | null,
+  dest: Element,
+  doc: Document,
+) {
   const marks = marksFromStyle(el);
   if (wrapper?.localName === "strong") marks.bold = false;
   if (wrapper?.localName === "em") marks.italic = false;
@@ -270,11 +361,17 @@ function hasText(el: Element): boolean {
 
 function appendTable(el: Element, dest: Element, doc: Document) {
   const table = doc.createElement("table");
-  const rows = Array.from(el.querySelectorAll("tr")).filter((tr) => tr.closest("table") === el);
+  const rows = Array.from(el.querySelectorAll("tr")).filter(
+    (tr) => tr.closest("table") === el,
+  );
   // Word marks repeated heading rows; the last of them carries mso-yfti-lastfirstrow.
-  const lastHeaderRow = rows.findIndex((tr) => styleOf(tr).get("mso-yfti-lastfirstrow") === "yes");
+  const lastHeaderRow = rows.findIndex(
+    (tr) => styleOf(tr).get("mso-yfti-lastfirstrow") === "yes",
+  );
   rows.forEach((tr, index) => {
-    const header = tr.parentElement?.localName.toLowerCase() === "thead" || index <= lastHeaderRow;
+    const header =
+      tr.parentElement?.localName.toLowerCase() === "thead" ||
+      index <= lastHeaderRow;
     const row = doc.createElement("tr");
     for (const cell of Array.from(tr.children)) {
       const cellTag = cell.localName.toLowerCase();
@@ -326,11 +423,13 @@ function fitBlock(child: Element, doc: Document) {
     // Its own cells were fitted already (appendTable runs inside out), so they hold no tables.
     const blocks: Node[] = [];
     for (const row of Array.from(child.children)) {
-      for (const nested of Array.from(row.children)) blocks.push(...asBlocks(nested, doc));
+      for (const nested of Array.from(row.children))
+        blocks.push(...asBlocks(nested, doc));
     }
     child.replaceWith(...blocks);
   } else if (tag === "ul" || tag === "ol") {
-    for (const item of Array.from(child.children)) if (item.localName.toLowerCase() === "li") fitCell(item, doc);
+    for (const item of Array.from(child.children))
+      if (item.localName.toLowerCase() === "li") fitCell(item, doc);
   }
 }
 
@@ -339,7 +438,8 @@ function asBlocks(cell: Element, doc: Document): Node[] {
   const out: Node[] = [];
   let run: Element | null = null;
   for (const node of Array.from(cell.childNodes)) {
-    const tag = node.nodeType === 1 ? (node as Element).localName.toLowerCase() : "";
+    const tag =
+      node.nodeType === 1 ? (node as Element).localName.toLowerCase() : "";
     if (tag === "p" || tag === "ul" || tag === "ol") {
       run = null;
       out.push(node);
@@ -360,7 +460,10 @@ function asBlocks(cell: Element, doc: Document): Node[] {
 /** Links come underlined by their source's styling (Google Docs, web pages); the editor styles links itself. */
 function unwrapLinkUnderlines(root: Element) {
   for (const u of Array.from(root.querySelectorAll("a u, u:has(> a)"))) {
-    const onlyLink = u.localName === "u" && !u.closest("a") && (u.textContent ?? "") === (u.querySelector("a")?.textContent ?? "");
+    const onlyLink =
+      u.localName === "u" &&
+      !u.closest("a") &&
+      (u.textContent ?? "") === (u.querySelector("a")?.textContent ?? "");
     if (u.closest("a") || onlyLink) u.replaceWith(...Array.from(u.childNodes));
   }
 }
@@ -372,7 +475,8 @@ function pruneEmpty(root: Element) {
       block.removeAttribute(KEEP_EMPTY);
       continue;
     }
-    if (hasText(block) || block.querySelector("br, span[data-variable]")) continue;
+    if (hasText(block) || block.querySelector("br, span[data-variable]"))
+      continue;
     block.remove();
   }
   // A cell or list item left with only whitespace stays (the schema fills it with a line).
@@ -413,7 +517,11 @@ function groupLists(parent: Element) {
     run = [];
   };
   for (const child of Array.from(parent.childNodes)) {
-    if (child.nodeType === 8 || (child.nodeType === 3 && !(child as Text).data.trim())) continue;
+    if (
+      child.nodeType === 8 ||
+      (child.nodeType === 3 && !(child as Text).data.trim())
+    )
+      continue;
     const line = child.nodeType === 1 ? listLine(child as Element) : null;
     if (line && run.length && run[0].id !== line.id) flush();
     if (line) run.push(line);
@@ -471,7 +579,10 @@ function takeMarker(el: Element): string {
   const start = findComment(el, "[if !supportLists]");
   if (start) {
     let node = start.nextSibling;
-    while (node && !(node.nodeType === 8 && (node as Comment).data.trim() === "[endif]")) {
+    while (
+      node &&
+      !(node.nodeType === 8 && (node as Comment).data.trim() === "[endif]")
+    ) {
       const next = node.nextSibling;
       marker += node.textContent ?? "";
       node.parentNode?.removeChild(node);
@@ -480,7 +591,9 @@ function takeMarker(el: Element): string {
     node?.parentNode?.removeChild(node);
     start.parentNode?.removeChild(start);
   } else {
-    const ignore = Array.from(el.querySelectorAll("span")).find((span) => styleOf(span).get("mso-list") === "ignore");
+    const ignore = Array.from(el.querySelectorAll("span")).find(
+      (span) => styleOf(span).get("mso-list") === "ignore",
+    );
     if (ignore) {
       marker = ignore.textContent ?? "";
       ignore.remove();
@@ -491,7 +604,8 @@ function takeMarker(el: Element): string {
 
 function findComment(root: Node, data: string): Comment | null {
   for (const child of Array.from(root.childNodes)) {
-    if (child.nodeType === 8 && (child as Comment).data.trim() === data) return child as Comment;
+    if (child.nodeType === 8 && (child as Comment).data.trim() === data)
+      return child as Comment;
     if (child.nodeType === 1) {
       const found = findComment(child, data);
       if (found) return found;

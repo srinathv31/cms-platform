@@ -39,9 +39,14 @@ function read(key: string): readonly OutputKey[] {
   if (known) return known;
   let stored: readonly OutputKey[] = NONE;
   try {
-    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(key) ?? "[]");
+    const parsed: unknown = JSON.parse(
+      window.sessionStorage.getItem(key) ?? "[]",
+    );
     if (Array.isArray(parsed)) {
-      stored = parsed.filter((value): value is OutputKey => typeof value === "string" && isOutputKey(value));
+      stored = parsed.filter(
+        (value): value is OutputKey =>
+          typeof value === "string" && isOutputKey(value),
+      );
     }
   } catch {
     // Storage off, or not ours to read: start from nothing.
@@ -63,7 +68,11 @@ function add(key: string, output: OutputKey) {
   for (const listener of listeners) listener();
 }
 
-export function useViewedOutputs(viewerId: string, versionId: string, round: number) {
+export function useViewedOutputs(
+  viewerId: string,
+  versionId: string,
+  round: number,
+) {
   const key = `${PREFIX}${viewerId}:${versionId}:${round}`;
   const viewed = useSyncExternalStore(
     subscribe,
@@ -73,7 +82,10 @@ export function useViewedOutputs(viewerId: string, versionId: string, round: num
   /** An output rendered on screen. */
   const onViewed = useCallback((output: OutputKey) => add(key, output), [key]);
 
-  const [refused, setRefused] = useState<{ key: string; outputs: readonly OutputKey[] }>({ key, outputs: NONE });
+  const [refused, setRefused] = useState<{
+    key: string;
+    outputs: readonly OutputKey[];
+  }>({ key, outputs: NONE });
   const failed = refused.key === key ? refused.outputs : NONE;
   /** An output's render is refused (`failed`), or no longer is. */
   const onFailed = useCallback(
@@ -81,7 +93,12 @@ export function useViewedOutputs(viewerId: string, versionId: string, round: num
       setRefused((now) => {
         const before = now.key === key ? now.outputs : NONE;
         if (before.includes(output) === isFailed) return now;
-        return { key, outputs: isFailed ? [...before, output] : before.filter((o) => o !== output) };
+        return {
+          key,
+          outputs: isFailed
+            ? [...before, output]
+            : before.filter((o) => o !== output),
+        };
       }),
     [key],
   );

@@ -32,13 +32,31 @@ const SIMILAR = 0.5;
 const MAX_GAP_PAIRS = 10_000;
 
 /** The document's blocks: a rewritten paragraph reads as one removed and one added. */
-export const TOP_LEVEL: AlignOptions = { ids: true, moves: true, similarity: textSimilarity, evenByPosition: false };
+export const TOP_LEVEL: AlignOptions = {
+  ids: true,
+  moves: true,
+  similarity: textSimilarity,
+  evenByPosition: false,
+};
 /** A list's items: a replaced item reads as one deleted and one inserted. */
-export const LIST_ITEMS: AlignOptions = { ids: true, moves: false, similarity: textSimilarity, evenByPosition: false };
+export const LIST_ITEMS: AlignOptions = {
+  ids: true,
+  moves: false,
+  similarity: textSimilarity,
+  evenByPosition: false,
+};
 /** Inside a list item, a callout or a cell (already paired): its lines pair in order when the counts match. */
-export const INNER_BLOCKS: AlignOptions = { ...LIST_ITEMS, evenByPosition: true };
+export const INNER_BLOCKS: AlignOptions = {
+  ...LIST_ITEMS,
+  evenByPosition: true,
+};
 /** A table's rows: by content, then by position. */
-export const TABLE_ROWS: AlignOptions = { ids: false, moves: false, similarity: rowSimilarity, evenByPosition: true };
+export const TABLE_ROWS: AlignOptions = {
+  ids: false,
+  moves: false,
+  similarity: rowSimilarity,
+  evenByPosition: true,
+};
 
 /** One step of the merged reading order. `b` or `n` is -1 for an insert or a delete. */
 interface Entry {
@@ -47,7 +65,12 @@ interface Entry {
   moved: boolean;
 }
 
-export function align(cx: Cx, before: readonly JSONContent[], after: readonly JSONContent[], opts: AlignOptions): Entry[] {
+export function align(
+  cx: Cx,
+  before: readonly JSONContent[],
+  after: readonly JSONContent[],
+  opts: AlignOptions,
+): Entry[] {
   const m = before.length;
   const n = after.length;
   const b2n = new Int32Array(m).fill(-1);
@@ -72,7 +95,8 @@ export function align(cx: Cx, before: readonly JSONContent[], after: readonly JS
   }
 
   // Content pairs two blocks only when ids can't: both unpaired, and at least one has no id.
-  const mayPair = (i: number, j: number) => b2n[i] < 0 && n2b[j] < 0 && !(beforeIds?.[i] && afterIds?.[j]);
+  const mayPair = (i: number, j: number) =>
+    b2n[i] < 0 && n2b[j] < 0 && !(beforeIds?.[i] && afterIds?.[j]);
 
   // 2. Identical content that occurs once among the unpaired blocks on each side.
   const once = (nodes: readonly JSONContent[], partner: Int32Array) => {
@@ -120,7 +144,8 @@ export function align(cx: Cx, before: readonly JSONContent[], after: readonly JS
     const gn: number[] = [];
     for (let i = i0; i < i1; i++) if (b2n[i] < 0) gb.push(i);
     for (let j = j0; j < j1; j++) if (n2b[j] < 0) gn.push(j);
-    if (gb.length > 0 && gn.length > 0) pairStretch(cx, before, after, gb, gn, opts, mayPair, link);
+    if (gb.length > 0 && gn.length > 0)
+      pairStretch(cx, before, after, gb, gn, opts, mayPair, link);
     i0 = i1 + 1;
     j0 = j1 + 1;
   }
@@ -162,7 +187,11 @@ function pairStretch(
   const N = gn.length;
   if (opts.evenByPosition && M === N) {
     for (let k = 0; k < M; k++) {
-      if (mayPair(gb[k], gn[k]) && family(before[gb[k]]) === family(after[gn[k]])) link(gb[k], gn[k]);
+      if (
+        mayPair(gb[k], gn[k]) &&
+        family(before[gb[k]]) === family(after[gn[k]])
+      )
+        link(gb[k], gn[k]);
     }
     return;
   }
@@ -189,7 +218,11 @@ function pairStretch(
   for (let k = M - 1; k >= 0; k--) {
     for (let l = N - 1; l >= 0; l--) {
       const s = score[k * N + l];
-      best[k * W + l] = Math.max(best[(k + 1) * W + l], best[k * W + l + 1], s > 0 ? s + best[(k + 1) * W + l + 1] : 0);
+      best[k * W + l] = Math.max(
+        best[(k + 1) * W + l],
+        best[k * W + l + 1],
+        s > 0 ? s + best[(k + 1) * W + l + 1] : 0,
+      );
     }
   }
   let k = 0;
@@ -224,6 +257,11 @@ function increasingRun(seq: readonly number[]): boolean[] {
     tails[lo] = k;
   }
   const keep: boolean[] = new Array<boolean>(seq.length).fill(false);
-  for (let k = tails.length > 0 ? tails[tails.length - 1] : -1; k >= 0; k = prev[k]) keep[k] = true;
+  for (
+    let k = tails.length > 0 ? tails[tails.length - 1] : -1;
+    k >= 0;
+    k = prev[k]
+  )
+    keep[k] = true;
   return keep;
 }

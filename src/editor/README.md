@@ -26,29 +26,29 @@ Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composi
 There's no barrel (no `index.ts`): hosts import each export from the module that defines it, so a
 route compiles only the parts of the editor it uses. The entry modules:
 
-| Module | Exports |
-| --- | --- |
-| `@/editor/components/editor-root` | `EditorRoot`, `useContractState`, `useEditorHistory` |
-| `@/editor/components/document-editor` | `DocumentEditor` |
-| `@/editor/components/variables-panel` | `VariablesPanel` |
-| `@/editor/components/inline-variable-field` | `InlineVariableField` |
-| `@/editor/components/static-document` | `StaticDocument` |
-| `@/editor/components/variable-chip` | `VariableChipView`, `VariableChipViewProps` |
-| `@/editor/types` | The component contract: the props types, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `ContractState`, `ThreadAnchor`, `CommentRequest`, `EditorHistory`. |
-| `@/editor/model/types` | `Variable`, `VariableType`, `VARIABLE_TYPES`, `VariableValue(s)`, `SampleSet`, `RequiredSection`, `ContractChange(Kind)`, `JSONContent`, `VariableNodeJSON`, `NODE`. |
-| `@/editor/model/contract` | `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking` |
-| `@/editor/model/variables` | `formatValue`, `validateValue`, `MAX_VALUE_LENGTH`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `US_STATES` and their types |
-| `@/editor/model/sample-sets` | `DEFAULT_SAMPLE_SETS`, `defaultSampleSets`, `sampleSetValues`, `isDefaultSet`, `listSets`, `DefaultSampleSetId` |
-| `@/editor/model/section-title` | `sectionTitleKey`, `matchesSectionTitle` |
-| `@/editor/schema` | `baseExtensions`, `BaseExtensionOptions`, `ensureBlockIds` |
-| `@/editor/paste/normalize-html`, `paste/chips`, `paste/markdown` | `normalizePastedHtml`; `chipsInJSON`, `variableKeys`; `looksLikeMarkdown`, `markdownToHtml` |
+| Module                                                                                     | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/editor/components/editor-root`                                                          | `EditorRoot`, `useContractState`, `useEditorHistory`                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `@/editor/components/document-editor`                                                      | `DocumentEditor`                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `@/editor/components/variables-panel`                                                      | `VariablesPanel`                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `@/editor/components/inline-variable-field`                                                | `InlineVariableField`                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `@/editor/components/static-document`                                                      | `StaticDocument`                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `@/editor/components/variable-chip`                                                        | `VariableChipView`, `VariableChipViewProps`                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `@/editor/types`                                                                           | The component contract: the props types, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `ContractState`, `ThreadAnchor`, `CommentRequest`, `EditorHistory`.                                                                                                                                                                                                                                                                                                                      |
+| `@/editor/model/types`                                                                     | `Variable`, `VariableType`, `VARIABLE_TYPES`, `VariableValue(s)`, `SampleSet`, `RequiredSection`, `ContractChange(Kind)`, `JSONContent`, `VariableNodeJSON`, `NODE`.                                                                                                                                                                                                                                                                                                                      |
+| `@/editor/model/contract`                                                                  | `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking`                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `@/editor/model/variables`                                                                 | `formatValue`, `validateValue`, `MAX_VALUE_LENGTH`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `US_STATES` and their types                                                                                                                                                                                                                                                                                                                                                       |
+| `@/editor/model/sample-sets`                                                               | `DEFAULT_SAMPLE_SETS`, `defaultSampleSets`, `sampleSetValues`, `isDefaultSet`, `listSets`, `DefaultSampleSetId`                                                                                                                                                                                                                                                                                                                                                                           |
+| `@/editor/model/section-title`                                                             | `sectionTitleKey`, `matchesSectionTitle`                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `@/editor/schema`                                                                          | `baseExtensions`, `BaseExtensionOptions`, `ensureBlockIds`                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `@/editor/paste/normalize-html`, `paste/chips`, `paste/markdown`                           | `normalizePastedHtml`; `chipsInJSON`, `variableKeys`; `looksLikeMarkdown`, `markdownToHtml`                                                                                                                                                                                                                                                                                                                                                                                               |
 | `@/editor/model/normalize`, `model/document-check`, `model/table-grid`, `model/characters` | `normalizeDocument`, `normalizeField`, `normalizeFragment`, `HEADING_LEVELS`, `CELL_BLOCKS`, `MAX_SPLIT_COLUMNS`; `documentProblem`, `fieldProblem`, `normalizeAndCheckBody`, `normalizeAndCheckField`, `DOCUMENT_MESSAGES`; `tableGrid`, `linesUp`, `spanValue`, `MAX_TABLE_COLUMNS` (the one export); `LINE_BREAKS`, `CONTROL_CHARACTERS`, `cleanCharacters`, `CharacterRules` (the text rules save normalization and the resolver share; a message's fields keep invisible characters) |
-| `@/editor/model/links`, `model/list-markers`, `model/usage` | `normalizeLink`, `checkLink`, `LINK_SCHEMES`, `INVISIBLE_CHARACTERS`, `withoutInvisible` (the link check every channel shares); `formatMarker`, `resolveNumbering`, `bulletGlyph`, `MARKER_FORMATS`, `ORDERED_LIST_ATTRS` and the rest of the list markers every channel prints; `usageFromJSON`, `VariableUsage` (where each variable is used) |
-| `@/editor/extensions/list-markers` | `listMarkerAttrs`, `withListMarkers`, `listItemMarkers`, `LIST_MARKER_ATTR`, `ListItemStatus`: the same markers on static HTML (the review's redline draws its lists with them). No React |
-| `@/editor/lib/platform` | `isApple`, `modKey`: whether shortcuts read ⌘ or Ctrl, so a host that labels the editor's undo and redo agrees with the keys |
-| `@/editor/state/variable-store` | `createVariableStore`, `VariableStore`: the list behind `EditorRoot` (add, rename with identity kept, delete with tombstones), for code that edits a list the way the panel does, such as a test of autosave |
-| `@/editor/styles.css` | The document's typography and states, for a host that draws editor markup outside the editor (the redline) |
-| `@/editor/testing/editor` | For tests only: headless editors in happy-dom (`mountEditor`, `mountBodyEditor`, `destroyEditors`, `blocks`, …) |
+| `@/editor/model/links`, `model/list-markers`, `model/usage`                                | `normalizeLink`, `checkLink`, `LINK_SCHEMES`, `INVISIBLE_CHARACTERS`, `withoutInvisible` (the link check every channel shares); `formatMarker`, `resolveNumbering`, `bulletGlyph`, `MARKER_FORMATS`, `ORDERED_LIST_ATTRS` and the rest of the list markers every channel prints; `usageFromJSON`, `VariableUsage` (where each variable is used)                                                                                                                                           |
+| `@/editor/extensions/list-markers`                                                         | `listMarkerAttrs`, `withListMarkers`, `listItemMarkers`, `LIST_MARKER_ATTR`, `ListItemStatus`: the same markers on static HTML (the review's redline draws its lists with them). No React                                                                                                                                                                                                                                                                                                 |
+| `@/editor/lib/platform`                                                                    | `isApple`, `modKey`: whether shortcuts read ⌘ or Ctrl, so a host that labels the editor's undo and redo agrees with the keys                                                                                                                                                                                                                                                                                                                                                              |
+| `@/editor/state/variable-store`                                                            | `createVariableStore`, `VariableStore`: the list behind `EditorRoot` (add, rename with identity kept, delete with tombstones), for code that edits a list the way the panel does, such as a test of autosave                                                                                                                                                                                                                                                                              |
+| `@/editor/styles.css`                                                                      | The document's typography and states, for a host that draws editor markup outside the editor (the redline)                                                                                                                                                                                                                                                                                                                                                                                |
+| `@/editor/testing/editor`                                                                  | For tests only: headless editors in happy-dom (`mountEditor`, `mountBodyEditor`, `destroyEditors`, `blocks`, …)                                                                                                                                                                                                                                                                                                                                                                           |
 
 Server and domain code use only the server-safe ones: `schema`, `model/*` and `paste/*`.
 `model/*` and `paste/*` load no React at all; `schema` reaches only the chip's node view (through
@@ -62,72 +62,94 @@ itself in `src/server`. To make a module public, add it to this table and to `ED
 
 ### Components
 
-| Export | What it is |
-| --- | --- |
-| `EditorRoot` | Holds one variable list for everything inside it (document, panel, inline fields). |
-| `DocumentEditor` | The document. Inside a root, or standalone (it then makes a private root). |
-| `VariablesPanel` | The template's variables: insert, drag, edit, delete, contract flags. Inside a root. |
+| Export                | What it is                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EditorRoot`          | Holds one variable list for everything inside it (document, panel, inline fields).                                                                                                                                                                                                                                                                                                                                                   |
+| `DocumentEditor`      | The document. Inside a root, or standalone (it then makes a private root).                                                                                                                                                                                                                                                                                                                                                           |
+| `VariablesPanel`      | The template's variables: insert, drag, edit, delete, contract flags. Inside a root.                                                                                                                                                                                                                                                                                                                                                 |
 | `InlineVariableField` | A channel field with chips: one line (email subject and preheader, a push title or body), or with `lines="lines"` keeping its line breaks as hard breaks (an SMS message: Enter adds one, a paste keeps its lines and blank lines). Optionally the host's `flags` (problems underlined in the text, each with its sentence and a one-click fix), a locked `footer` inside its box, and `size="md"` for a main column. Inside a root. |
-| `StaticDocument` | Server-safe render of a document (no JS), identical markup to the live editor. |
-| `VariableChipView` | The presentational chip, to show a variable outside the editor the same way. |
-| `useContractState()` | Inside a root: `{ variables, changes }`, the live contract diff against `baseline`. |
-| `useEditorHistory()` | Inside a root: `{ canUndo, canRedo, undo, redo }` for a host's own undo and redo buttons. They act on the last-focused field (the document until another field has had focus), where ⌘Z would, without scrolling to the change; read-only, both are false. |
+| `StaticDocument`      | Server-safe render of a document (no JS), identical markup to the live editor.                                                                                                                                                                                                                                                                                                                                                       |
+| `VariableChipView`    | The presentational chip, to show a variable outside the editor the same way.                                                                                                                                                                                                                                                                                                                                                         |
+| `useContractState()`  | Inside a root: `{ variables, changes }`, the live contract diff against `baseline`.                                                                                                                                                                                                                                                                                                                                                  |
+| `useEditorHistory()`  | Inside a root: `{ canUndo, canRedo, undo, redo }` for a host's own undo and redo buttons. They act on the last-focused field (the document until another field has had focus), where ⌘Z would, without scrolling to the change; read-only, both are false.                                                                                                                                                                           |
 
 ### Props
 
 ```ts
 interface EditorRootProps {
-  variables: Variable[];                          // read once; the root owns the list from then on
-  onVariablesChange?: (variables: Variable[]) => void;  // after every list change; never on mount
-  baseline?: Variable[] | null;                   // the list consumers render now: contract flags
-  readOnly?: boolean;                             // view only
-  held?: boolean;                                 // read-only for a while: see Behavior → Held
-  requiredNote?: string;                          // default "Required for disclosures"
+  variables: Variable[]; // read once; the root owns the list from then on
+  onVariablesChange?: (variables: Variable[]) => void; // after every list change; never on mount
+  baseline?: Variable[] | null; // the list consumers render now: contract flags
+  readOnly?: boolean; // view only
+  held?: boolean; // read-only for a while: see Behavior → Held
+  requiredNote?: string; // default "Required for disclosures"
   children: ReactNode;
 }
 
 interface DocumentEditorProps {
-  content: JSONContent;                           // read once; remount with a new `key` to switch
-  onChange?: (doc: JSONContent) => void;          // every edit (debounce in the host); not for
-                                                  // mount-time normalization (ids, trailing line)
+  content: JSONContent; // read once; remount with a new `key` to switch
+  onChange?: (doc: JSONContent) => void; // every edit (debounce in the host); not for
+  // mount-time normalization (ids, trailing line)
   autoFocus?: "start" | "end" | "first-section" | false;
-  align?: "center" | "start";                     // default "center"; see Alignment
-  ref?: Ref<DocumentEditorHandle>;                // { focus(target?), focusThread(id), ... }: see the handle below
+  align?: "center" | "start"; // default "center"; see Alignment
+  ref?: Ref<DocumentEditorHandle>; // { focus(target?), focusThread(id), ... }: see the handle below
   className?: string;
   // Standalone only (inside a root these come from the root and are ignored):
-  variables?: Variable[]; readOnly?: boolean;
-  onVariablesChange?: (variables: Variable[]) => void; requiredNote?: string;
+  variables?: Variable[];
+  readOnly?: boolean;
+  onVariablesChange?: (variables: Variable[]) => void;
+  requiredNote?: string;
   // Review comments (Phase 4; see Behavior → Comments):
-  threads?: readonly ThreadAnchor[];              // open ones are highlighted; resolved ones aren't
-  activeThreadId?: string | null;                 // the stronger highlight
-  onThreadClick?: (threadId: string) => void;     // a click on a highlight
-  onCaretThreadChange?: (threadId: string | null) => void;  // the thread under the caret changed
-  onRequestComment?: (anchor: CommentRequest) => void;      // turns commenting on (read-only too)
+  threads?: readonly ThreadAnchor[]; // open ones are highlighted; resolved ones aren't
+  activeThreadId?: string | null; // the stronger highlight
+  onThreadClick?: (threadId: string) => void; // a click on a highlight
+  onCaretThreadChange?: (threadId: string | null) => void; // the thread under the caret changed
+  onRequestComment?: (anchor: CommentRequest) => void; // turns commenting on (read-only too)
 }
 
-interface ThreadAnchor { id: string; blockId: string; quote?: string | null; status: "open" | "resolved" }
-interface CommentRequest { blockId: string; quote?: string }   // quote absent: about the whole block
+interface ThreadAnchor {
+  id: string;
+  blockId: string;
+  quote?: string | null;
+  status: "open" | "resolved";
+}
+interface CommentRequest {
+  blockId: string;
+  quote?: string;
+} // quote absent: about the whole block
 
-interface VariablesPanelProps { className?: string }
+interface VariablesPanelProps {
+  className?: string;
+}
 
 interface InlineVariableFieldProps {
-  label: string;                                  // accessible name; how "where it's used" names it
-  value: JSONContent | null;                      // one paragraph; read once
-  lines?: "line" | "lines";                       // "lines": Enter and paste add hard breaks (an SMS); read once
-  characters?: "document" | "message";            // "message": a paste keeps invisible characters (push, SMS); read once
+  label: string; // accessible name; how "where it's used" names it
+  value: JSONContent | null; // one paragraph; read once
+  lines?: "line" | "lines"; // "lines": Enter and paste add hard breaks (an SMS); read once
+  characters?: "document" | "message"; // "message": a paste keeps invisible characters (push, SMS); read once
   onChange?: (value: JSONContent) => void;
-  hidden?: boolean;                               // not shown, still in the root (see Composition)
-  flags?: (text: string) => readonly TextFlag[];  // problems underlined in the text (see Behavior, Flags)
-  footer?: ReactNode;                             // fixed text inside the box, after the field's (an SMS footer)
-  size?: "sm" | "md";                             // "sm" 14px for a rail (default); "md" 15px for a main column
-  id?: string; className?: string;
+  hidden?: boolean; // not shown, still in the root (see Composition)
+  flags?: (text: string) => readonly TextFlag[]; // problems underlined in the text (see Behavior, Flags)
+  footer?: ReactNode; // fixed text inside the box, after the field's (an SMS footer)
+  size?: "sm" | "md"; // "sm" 14px for a rail (default); "md" 15px for a main column
+  id?: string;
+  className?: string;
 }
 
-interface TextFlag { from: number; to: number; message: string; replacement?: string }  // offsets into `text`; "" removes
+interface TextFlag {
+  from: number;
+  to: number;
+  message: string;
+  replacement?: string;
+} // offsets into `text`; "" removes
 
 interface StaticDocumentProps {
-  content: JSONContent; variables: readonly Variable[]; align?: "center" | "start"; className?: string;
-  threads?: readonly ThreadAnchor[]; activeThreadId?: string | null;   // Phase 4: the same highlights
+  content: JSONContent;
+  variables: readonly Variable[];
+  align?: "center" | "start";
+  className?: string;
+  threads?: readonly ThreadAnchor[];
+  activeThreadId?: string | null; // Phase 4: the same highlights
 }
 ```
 
@@ -141,32 +163,32 @@ All are required members of the type, so a test double or adapter of the handle 
 ```ts
 interface DocumentEditorHandle {
   focus(target?: FocusTarget): void;
-  focusThread(threadId: string): void;            // reveal in its scroll container + mark active
-  getBlockRect(blockId: string): DOMRect | null;  // viewport coordinates; null when not rendered
-  getThreadRect(threadId: string): DOMRect | null;  // the highlight (first text run), else its block
-  subscribeBlockRects(listener: () => void): () => void;  // block positions may have changed
-  requestComment(blockId: string): void;          // block-level: onRequestComment({ blockId })
+  focusThread(threadId: string): void; // reveal in its scroll container + mark active
+  getBlockRect(blockId: string): DOMRect | null; // viewport coordinates; null when not rendered
+  getThreadRect(threadId: string): DOMRect | null; // the highlight (first text run), else its block
+  subscribeBlockRects(listener: () => void): () => void; // block positions may have changed
+  requestComment(blockId: string): void; // block-level: onRequestComment({ blockId })
 }
 ```
 
 ### Types and utilities
 
-| Export | Use |
-| --- | --- |
-| `Variable`, `VariableType`, `VARIABLE_TYPES`, `RequiredSection`, `SampleSet`, `VariableValue(s)`, `JSONContent`, `VariableNodeJSON`, `NODE` | The model. |
-| `ContractChange`, `ContractChangeKind`, `ContractState`, `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking` | The consumer contract (Submit and review dialogs). `ContractChange` is a union with one member per kind, each with exactly its fields. `diffVariables(baseline, current)` pairs variables by id first (`identityOf`: the id, else the key), then by key, so a renamed variable is one `key_renamed`. |
-| `formatValue`, `validateValue`, `ValidationResult`, `MAX_VALUE_LENGTH`, `longerThan`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `VariableTypeMeta`, `VariableIconKey`, `US_STATES` | Typed values and keys (render, sample sets, server validation). `labelFromKey` keeps whole-word acronyms in capitals ("purchase_apr" → "Purchase APR"). |
-| `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets(variables, today)`, `sampleSetValues(set, variables, today)` | Sample sets (Phase 3): the three default sets for a variable list, and the values to render a set with (its own values, gaps filled from its kind's defaults). `today` is `YYYY-MM-DD`; deterministic for a given day. |
-| `baseExtensions(opts)`, `BaseExtensionOptions` | The schema for server work: `@tiptap/html`, `@tiptap/static-renderer`, import, render. |
-| `ensureBlockIds(doc)` | Adds stable block ids server-side. Call it in seeds, import and server writes. |
-| `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions` | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server. |
-| `chipsInJSON(doc)`, `variableKeys(doc)` | Import: `{{key}}` text → chips in TipTap JSON, and the keys a document uses. |
-| `normalizeDocument(doc)`, `normalizeField(doc, lines?, characters?)`, `normalizeFragment(nodes, edges)` | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. A field (`FieldLines`: `"line"` or `"lines"`) loses its marks and joins its paragraphs; on `"line"` a break is a space, on `"lines"` a hard break. A message's field (`characters: "message"`, a push's or an SMS's) keeps its invisible characters. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
-| `documentProblem(doc)`, `fieldProblem(doc, check?)`, `DOCUMENT_MESSAGES` | The document check's limits beyond the schema (heading levels, list start and style, depth ≤ 9, cell content, table shape, ≤ 12 columns), with the author-facing sentences, and a channel field's check (`FieldCheck`: its lines, and the problem it is refused with: the email's, a push's or an SMS's sentence; the domain picks them by channel). `src/server/render/schema-check.ts` adds the schema parse. |
-| `normalizeAndCheckBody(doc)`, `normalizeAndCheckField(doc)` | What every save does first: normalize, then the check (`{ doc, problem }`). The autosave's pre-check and `src/server/documents/prepare.ts` (autosave and import) both call them. |
-| `sectionTitleKey(text)`, `matchesSectionTitle(text, title)` | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it. |
-| `looksLikeMarkdown(text)`, `markdownToHtml(markdown)` | Phase 7a: whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import. |
-| Component types | `EditorRootProps`, `DocumentEditorProps`, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `VariablesPanelProps`, `InlineVariableFieldProps`, `StaticDocumentProps`, `VariableChipViewProps`, `ThreadAnchor`, `CommentRequest`, `TextFlag`, `TextFlagger`. |
+| Export                                                                                                                                                                                       | Use                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Variable`, `VariableType`, `VARIABLE_TYPES`, `RequiredSection`, `SampleSet`, `VariableValue(s)`, `JSONContent`, `VariableNodeJSON`, `NODE`                                                  | The model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `ContractChange`, `ContractChangeKind`, `ContractState`, `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking`                                                                          | The consumer contract (Submit and review dialogs). `ContractChange` is a union with one member per kind, each with exactly its fields. `diffVariables(baseline, current)` pairs variables by id first (`identityOf`: the id, else the key), then by key, so a renamed variable is one `key_renamed`.                                                                                                                                                                                                                                                                               |
+| `formatValue`, `validateValue`, `ValidationResult`, `MAX_VALUE_LENGTH`, `longerThan`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `VariableTypeMeta`, `VariableIconKey`, `US_STATES` | Typed values and keys (render, sample sets, server validation). `labelFromKey` keeps whole-word acronyms in capitals ("purchase_apr" → "Purchase APR").                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets(variables, today)`, `sampleSetValues(set, variables, today)`                                                                 | Sample sets (Phase 3): the three default sets for a variable list, and the values to render a set with (its own values, gaps filled from its kind's defaults). `today` is `YYYY-MM-DD`; deterministic for a given day.                                                                                                                                                                                                                                                                                                                                                             |
+| `baseExtensions(opts)`, `BaseExtensionOptions`                                                                                                                                               | The schema for server work: `@tiptap/html`, `@tiptap/static-renderer`, import, render.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `ensureBlockIds(doc)`                                                                                                                                                                        | Adds stable block ids server-side. Call it in seeds, import and server writes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions`                                                                                                                              | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `chipsInJSON(doc)`, `variableKeys(doc)`                                                                                                                                                      | Import: `{{key}}` text → chips in TipTap JSON, and the keys a document uses.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `normalizeDocument(doc)`, `normalizeField(doc, lines?, characters?)`, `normalizeFragment(nodes, edges)`                                                                                      | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. A field (`FieldLines`: `"line"` or `"lines"`) loses its marks and joins its paragraphs; on `"line"` a break is a space, on `"lines"` a hard break. A message's field (`characters: "message"`, a push's or an SMS's) keeps its invisible characters. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
+| `documentProblem(doc)`, `fieldProblem(doc, check?)`, `DOCUMENT_MESSAGES`                                                                                                                     | The document check's limits beyond the schema (heading levels, list start and style, depth ≤ 9, cell content, table shape, ≤ 12 columns), with the author-facing sentences, and a channel field's check (`FieldCheck`: its lines, and the problem it is refused with: the email's, a push's or an SMS's sentence; the domain picks them by channel). `src/server/render/schema-check.ts` adds the schema parse.                                                                                                                                                                    |
+| `normalizeAndCheckBody(doc)`, `normalizeAndCheckField(doc)`                                                                                                                                  | What every save does first: normalize, then the check (`{ doc, problem }`). The autosave's pre-check and `src/server/documents/prepare.ts` (autosave and import) both call them.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `sectionTitleKey(text)`, `matchesSectionTitle(text, title)`                                                                                                                                  | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it.                                                                                                                                                                                                                                                                                                                                                                                           |
+| `looksLikeMarkdown(text)`, `markdownToHtml(markdown)`                                                                                                                                        | Phase 7a: whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Component types                                                                                                                                                                              | `EditorRootProps`, `DocumentEditorProps`, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `VariablesPanelProps`, `InlineVariableFieldProps`, `StaticDocumentProps`, `VariableChipViewProps`, `ThreadAnchor`, `CommentRequest`, `TextFlag`, `TextFlagger`.                                                                                                                                                                                                                                                                                                                  |
 
 ## Composition
 
@@ -176,13 +198,26 @@ import { EditorRoot } from "@/editor/components/editor-root";
 import { InlineVariableField } from "@/editor/components/inline-variable-field";
 import { VariablesPanel } from "@/editor/components/variables-panel";
 
-<EditorRoot key={versionId} variables={version.variables} baseline={active?.variables ?? null}
-            readOnly={!canEdit}
-            onVariablesChange={saveVariables}>
-  <InlineVariableField label="Email subject" value={version.channelFields.email?.subject ?? null} onChange={saveSubject} />
-  <DocumentEditor content={version.body} onChange={saveBody} ref={editorRef} align="start" />
+<EditorRoot
+  key={versionId}
+  variables={version.variables}
+  baseline={active?.variables ?? null}
+  readOnly={!canEdit}
+  onVariablesChange={saveVariables}
+>
+  <InlineVariableField
+    label="Email subject"
+    value={version.channelFields.email?.subject ?? null}
+    onChange={saveSubject}
+  />
+  <DocumentEditor
+    content={version.body}
+    onChange={saveBody}
+    ref={editorRef}
+    align="start"
+  />
   <VariablesPanel />
-</EditorRoot>
+</EditorRoot>;
 ```
 
 - **One root, one list.** Chips, panel rows and inline fields always agree. A key renamed in the
@@ -213,7 +248,7 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
   `requiredKey` appears at most once per document; pasted copies never carry one.
 - `callout` → `paragraph+`; HTML `<div data-callout>`.
 - `bulletList` / `orderedList` → `listItem` → `paragraph` then blocks. `orderedList { start,
-  markerFormat, markerDelimiter }`: the numbering style the author chose (null = the default for the
+markerFormat, markerDelimiter }`: the numbering style the author chose (null = the default for the
   list's depth); HTML `start`, `data-marker-format`, `data-marker-delimiter`.
 - `table` → `tableRow` → `tableHeader | tableCell` → `(paragraph | bulletList | orderedList)+`; at
   most 12 columns (the table menu disables "Insert column" at 12, with the reason).
@@ -389,15 +424,15 @@ Mechanics only: the editor highlights, reports and asks; the host stores threads
 
 ## Keyboard
 
-| Where | Keys |
-| --- | --- |
-| Document | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · ⌘⌥M comment (selected text, or the caret's block; read-only too) · Alt+Shift+↑/↓ move block · Alt+F10: block options for the caret's block (Enter opens the menu, Esc back to the text) · Home/End line start/end · ⌘Z / ⇧⌘Z |
-| Highlights | arrows into a highlight report it (`onCaretThreadChange`) |
-| Chip | arrow onto it (selects it) · Enter or Space: popover · Esc: close · Backspace/Delete: remove |
-| Flag (inline field) | arrow onto it: popover · Tab: into the popover's fix (Enter applies it) · Shift+Tab or Esc there: back to the field · Tab there: close, on to the control after the field · Esc: close |
-| Table | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row) · Alt+F10: table options (Enter opens the menu, Esc back to the cell); in a numbered list inside a cell, block options instead |
-| Required heading | Enter at its start adds a line above · edits show the note |
-| Panel | Tab through each row: insert (Enter), edit, Required switch (Space) · ↑ ↓ between rows · New variable · in a form: Enter saves, Esc cancels |
+| Where               | Keys                                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Document            | `/` block menu · `{{` variable picker · ↑ ↓ Enter Tab Esc in either menu · ⌘B ⌘I ⌘U · ⌘K link (on selected text) · ⌘⌥M comment (selected text, or the caret's block; read-only too) · Alt+Shift+↑/↓ move block · Alt+F10: block options for the caret's block (Enter opens the menu, Esc back to the text) · Home/End line start/end · ⌘Z / ⇧⌘Z |
+| Highlights          | arrows into a highlight report it (`onCaretThreadChange`)                                                                                                                                                                                                                                                                                       |
+| Chip                | arrow onto it (selects it) · Enter or Space: popover · Esc: close · Backspace/Delete: remove                                                                                                                                                                                                                                                    |
+| Flag (inline field) | arrow onto it: popover · Tab: into the popover's fix (Enter applies it) · Shift+Tab or Esc there: back to the field · Tab there: close, on to the control after the field · Esc: close                                                                                                                                                          |
+| Table               | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row) · Alt+F10: table options (Enter opens the menu, Esc back to the cell); in a numbered list inside a cell, block options instead                                                                                                                                           |
+| Required heading    | Enter at its start adds a line above · edits show the note                                                                                                                                                                                                                                                                                      |
+| Panel               | Tab through each row: insert (Enter), edit, Required switch (Space) · ↑ ↓ between rows · New variable · in a form: Enter saves, Esc cancels                                                                                                                                                                                                     |
 
 ⌘ is Ctrl outside Apple platforms (⌥ is Alt). Every control has a visible focus ring
 (`--focus-ring`). The editor, its menus, popovers, forms and dialogs pass axe (all rules) in
@@ -446,10 +481,10 @@ handle. `align="start"` puts the text's left edge on the column's left edge (lin
 title above it) and hangs the gutter into the left margin, so give the column that much room on its
 left. Sizes are CSS custom properties, settable on any ancestor:
 
-| Property | Default | What |
-| --- | --- | --- |
-| `--doc-width` | token (`47.5rem`) | the text column |
-| `--ucomp-doc-gutter` | `3.5rem` | the handle gutter (each side when centered, left only with `start`) |
+| Property             | Default           | What                                                                |
+| -------------------- | ----------------- | ------------------------------------------------------------------- |
+| `--doc-width`        | token (`47.5rem`) | the text column                                                     |
+| `--ucomp-doc-gutter` | `3.5rem`          | the handle gutter (each side when centered, left only with `start`) |
 
 Give the document's container generous bottom padding (the workspace uses `max(3.5rem, 40svh)`) so
 menus near the end of a document can open below the caret.
@@ -474,18 +509,18 @@ menus near the end of a document can open below the caret.
 1. **Copy** `src/editor/` as is (tests and fixtures included).
 2. **Install** (all MIT; versions as used here):
 
-   | Package | Version |
-   | --- | --- |
-   | `@tiptap/core`, `@tiptap/pm`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-table`, `@tiptap/extensions`, `@tiptap/extension-unique-id`, `@tiptap/extension-drag-handle`, `@tiptap/extension-drag-handle-react`, `@tiptap/extension-node-range`, `@tiptap/extension-mention`, `@tiptap/suggestion`, `@tiptap/static-renderer` | ^3.31.4 |
-   | peers of the drag handle: `@tiptap/extension-collaboration`, `@tiptap/y-tiptap` | 3.31.4, 3.0.9 |
-   | `@floating-ui/dom` (imported directly; here it arrives through TipTap) | ^1.8.0 |
-   | `@base-ui/react` | ^1.8.0 |
-   | `react`, `react-dom` | 19.2 |
-   | `motion` | ^14.0.0 |
-   | `zustand` | ^5.0.15 |
-   | `lucide-react` | ^1.51.0 |
-   | for the shadcn components: `cmdk` ^1.1.1, `class-variance-authority` ^0.7.1, `cn` ^0.4.0 | |
-   | tests only: `vitest`, `happy-dom` | |
+   | Package                                                                                                                                                                                                                                                                                                                                    | Version       |
+   | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+   | `@tiptap/core`, `@tiptap/pm`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-table`, `@tiptap/extensions`, `@tiptap/extension-unique-id`, `@tiptap/extension-drag-handle`, `@tiptap/extension-drag-handle-react`, `@tiptap/extension-node-range`, `@tiptap/extension-mention`, `@tiptap/suggestion`, `@tiptap/static-renderer` | ^3.31.4       |
+   | peers of the drag handle: `@tiptap/extension-collaboration`, `@tiptap/y-tiptap`                                                                                                                                                                                                                                                            | 3.31.4, 3.0.9 |
+   | `@floating-ui/dom` (imported directly; here it arrives through TipTap)                                                                                                                                                                                                                                                                     | ^1.8.0        |
+   | `@base-ui/react`                                                                                                                                                                                                                                                                                                                           | ^1.8.0        |
+   | `react`, `react-dom`                                                                                                                                                                                                                                                                                                                       | 19.2          |
+   | `motion`                                                                                                                                                                                                                                                                                                                                   | ^14.0.0       |
+   | `zustand`                                                                                                                                                                                                                                                                                                                                  | ^5.0.15       |
+   | `lucide-react`                                                                                                                                                                                                                                                                                                                             | ^1.51.0       |
+   | for the shadcn components: `cmdk` ^1.1.1, `class-variance-authority` ^0.7.1, `cn` ^0.4.0                                                                                                                                                                                                                                                   |               |
+   | tests only: `vitest`, `happy-dom`                                                                                                                                                                                                                                                                                                          |               |
 
 3. **shadcn/ui** (base-nova style, Base UI) at `@/components/ui/*`: `alert-dialog`, `button`,
    `command`, `dropdown-menu`, `input`, `kbd`, `select`, `switch`, `toggle` (and what they import:
@@ -643,27 +678,27 @@ body, an SMS's message) in a page's main column:
 
 ## How it's built
 
-| Need | Piece |
-| --- | --- |
-| Paragraph, H1–H3, lists, marks, link, divider, undo/redo, drop cursor, gap cursor, trailing line | `@tiptap/starter-kit` (code, code block, strike, blockquote off) |
-| Tables | `@tiptap/extension-table` `TableKit` (not resizable; wrapper rendered so static = live) |
-| Stable block ids | `@tiptap/extension-unique-id` |
-| Variable chip, Backspace, `{{` trigger | `@tiptap/extension-mention`, extended (`extensions/variable.ts`) + React NodeView |
-| `/` menu and `{{` picker | `@tiptap/suggestion` + shadcn `Command` (`slash-menu.tsx`, `variable-picker.tsx`); Floating UI `shift` + `size` (`extensions/menu-placement.ts`, `components/menu-layer.ts`) |
-| Chip popover | Base UI `Popover` parts, anchored to the chip, never taking focus (`chip-popover.tsx`) |
-| Panel, forms, dialogs, table menu | shadcn `Button`, `Input`, `Select`, `Switch`, `AlertDialog`, `DropdownMenu` |
-| ⋮⋮ handle | `@tiptap/extension-drag-handle-react` + our `+` (`components/block-handle.tsx`) |
-| Block menu (numbering) | Base UI `Menu` with a submenu and radio items (`components/block-menu.tsx`); target list, previews and edits in `lib/list-numbering.ts` |
-| List markers | `model/list-markers.ts` text, drawn as a decoration (`data-list-marker`) live and as an attribute in the static paint (`extensions/list-markers.ts`); `::before` in `styles.css`, never CSS counters |
-| Dragged-block highlight | `@tiptap/extension-node-range` decoration helper (`extensions/block-range-highlight.ts`) |
-| Format toolbar (+ Comment) | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`, its link field `components/link-field.tsx`); Base UI `Tooltip` |
-| Review-thread highlights | ProseMirror decorations, mapped through edits (`extensions/review-threads.ts`); anchors and quotes in `lib/threads.ts`; the static paint's equivalent mark and block attribute |
-| Inline-field flags | ProseMirror decorations recomputed on each edit from the host's flagger (`extensions/text-flags.ts`); the popover on Base UI `Popover` parts, like the chip's (`components/flag-popover.tsx`) |
-| Thread placement for hosts | `components/comment-bridge.ts` + `lib/block-rects.ts` (rects, ResizeObserver, reveal in the scroll container) |
-| Placeholder | `Placeholder` from `@tiptap/extensions` |
-| Markdown paste | Our parser (`paste/markdown.ts`): Markdown → schema HTML → ProseMirror's clipboard parser (no Markdown dependency) |
-| Server first paint | `@tiptap/static-renderer` (`components/static-document.tsx`) |
-| *Custom* (TipTap has nothing free) | `Callout` node; `RequiredSections` (attribute, dedupe, guard, note); block moves; the root runtime and field binding (usage, drop, focus, popover, rename forwarding, tombstones, paste); single-line fields and fields that keep their lines; Home/End; the paste normalizer; the Markdown parser and the section-merging paste |
+| Need                                                                                             | Piece                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paragraph, H1–H3, lists, marks, link, divider, undo/redo, drop cursor, gap cursor, trailing line | `@tiptap/starter-kit` (code, code block, strike, blockquote off)                                                                                                                                                                                                                                                                 |
+| Tables                                                                                           | `@tiptap/extension-table` `TableKit` (not resizable; wrapper rendered so static = live)                                                                                                                                                                                                                                          |
+| Stable block ids                                                                                 | `@tiptap/extension-unique-id`                                                                                                                                                                                                                                                                                                    |
+| Variable chip, Backspace, `{{` trigger                                                           | `@tiptap/extension-mention`, extended (`extensions/variable.ts`) + React NodeView                                                                                                                                                                                                                                                |
+| `/` menu and `{{` picker                                                                         | `@tiptap/suggestion` + shadcn `Command` (`slash-menu.tsx`, `variable-picker.tsx`); Floating UI `shift` + `size` (`extensions/menu-placement.ts`, `components/menu-layer.ts`)                                                                                                                                                     |
+| Chip popover                                                                                     | Base UI `Popover` parts, anchored to the chip, never taking focus (`chip-popover.tsx`)                                                                                                                                                                                                                                           |
+| Panel, forms, dialogs, table menu                                                                | shadcn `Button`, `Input`, `Select`, `Switch`, `AlertDialog`, `DropdownMenu`                                                                                                                                                                                                                                                      |
+| ⋮⋮ handle                                                                                        | `@tiptap/extension-drag-handle-react` + our `+` (`components/block-handle.tsx`)                                                                                                                                                                                                                                                  |
+| Block menu (numbering)                                                                           | Base UI `Menu` with a submenu and radio items (`components/block-menu.tsx`); target list, previews and edits in `lib/list-numbering.ts`                                                                                                                                                                                          |
+| List markers                                                                                     | `model/list-markers.ts` text, drawn as a decoration (`data-list-marker`) live and as an attribute in the static paint (`extensions/list-markers.ts`); `::before` in `styles.css`, never CSS counters                                                                                                                             |
+| Dragged-block highlight                                                                          | `@tiptap/extension-node-range` decoration helper (`extensions/block-range-highlight.ts`)                                                                                                                                                                                                                                         |
+| Format toolbar (+ Comment)                                                                       | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`, its link field `components/link-field.tsx`); Base UI `Tooltip`                                                                                                                                                                                          |
+| Review-thread highlights                                                                         | ProseMirror decorations, mapped through edits (`extensions/review-threads.ts`); anchors and quotes in `lib/threads.ts`; the static paint's equivalent mark and block attribute                                                                                                                                                   |
+| Inline-field flags                                                                               | ProseMirror decorations recomputed on each edit from the host's flagger (`extensions/text-flags.ts`); the popover on Base UI `Popover` parts, like the chip's (`components/flag-popover.tsx`)                                                                                                                                    |
+| Thread placement for hosts                                                                       | `components/comment-bridge.ts` + `lib/block-rects.ts` (rects, ResizeObserver, reveal in the scroll container)                                                                                                                                                                                                                    |
+| Placeholder                                                                                      | `Placeholder` from `@tiptap/extensions`                                                                                                                                                                                                                                                                                          |
+| Markdown paste                                                                                   | Our parser (`paste/markdown.ts`): Markdown → schema HTML → ProseMirror's clipboard parser (no Markdown dependency)                                                                                                                                                                                                               |
+| Server first paint                                                                               | `@tiptap/static-renderer` (`components/static-document.tsx`)                                                                                                                                                                                                                                                                     |
+| _Custom_ (TipTap has nothing free)                                                               | `Callout` node; `RequiredSections` (attribute, dedupe, guard, note); block moves; the root runtime and field binding (usage, drop, focus, popover, rename forwarding, tombstones, paste); single-line fields and fields that keep their lines; Home/End; the paste normalizer; the Markdown parser and the section-merging paste |
 
 ### Files
 

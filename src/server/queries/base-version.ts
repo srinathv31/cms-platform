@@ -2,9 +2,19 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { channelFieldValues, type ChannelFieldValues } from "@/domain/channel-fields";
+import {
+  channelFieldValues,
+  type ChannelFieldValues,
+} from "@/domain/channel-fields";
 import { can } from "@/domain/permissions";
-import type { Channel, JSONContent, SampleSet, Variable, VersionState, Viewer } from "@/domain/types";
+import type {
+  Channel,
+  JSONContent,
+  SampleSet,
+  Variable,
+  VersionState,
+  Viewer,
+} from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -35,7 +45,10 @@ export interface BaseVersionContent extends ChannelFieldValues {
   sampleSets: SampleSet[];
 }
 
-const Input = z.object({ templateId: z.string().min(1).max(64), versionId: z.string().min(1).max(64) });
+const Input = z.object({
+  templateId: z.string().min(1).max(64),
+  versionId: z.string().min(1).max(64),
+});
 
 export async function getBaseVersion(
   viewer: Viewer,
@@ -46,7 +59,8 @@ export async function getBaseVersion(
   },
 ): Promise<ReadResult<{ base: BaseVersionContent }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
+  if (!parsed.success)
+    return refusal(400, REQUEST_REFUSALS.templateUnavailable);
   const template = await db
     .select({ id: templates.id, teamId: templates.teamId })
     .from(templates)
@@ -77,9 +91,13 @@ export async function getBaseVersion(
 
   const draft = list.find((v) => v.id === parsed.data.versionId);
   if (!draft) return refusal(404, REQUEST_REFUSALS.noDraftToRevert);
-  if (draft.state !== "draft") return refusal(409, REQUEST_REFUSALS.noDraftToRevert);
-  const base = draft.basedOnVersionId ? list.find((v) => v.id === draft.basedOnVersionId) : undefined;
-  if (!base || base.number === null || base.round === null) return refusal(409, REQUEST_REFUSALS.noBaseVersion);
+  if (draft.state !== "draft")
+    return refusal(409, REQUEST_REFUSALS.noDraftToRevert);
+  const base = draft.basedOnVersionId
+    ? list.find((v) => v.id === draft.basedOnVersionId)
+    : undefined;
+  if (!base || base.number === null || base.round === null)
+    return refusal(409, REQUEST_REFUSALS.noBaseVersion);
 
   return {
     ok: true,

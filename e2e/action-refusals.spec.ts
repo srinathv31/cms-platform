@@ -1,7 +1,16 @@
 import { randomUUID } from "node:crypto";
 import type { Client } from "@libsql/client";
 import { openDb } from "./api/helpers";
-import { SPRING_NAME, TEAM, createSpringTravel, removeTemplate, rows, run, type Row, type SpringFixture } from "./helpers/golive";
+import {
+  SPRING_NAME,
+  TEAM,
+  createSpringTravel,
+  removeTemplate,
+  rows,
+  run,
+  type Row,
+  type SpringFixture,
+} from "./helpers/golive";
 import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
 
 // A refusal an action used to throw now shows its sentence (handoff review A3, H1). Edit threw the
@@ -35,7 +44,9 @@ test.afterAll(async () => {
 
 /** v3, In review: a copy of v2 submitted after it. */
 async function submitV3(spring: SpringFixture) {
-  const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [spring.v2Id]);
+  const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
+    spring.v2Id,
+  ]);
   const at = Date.now();
   const v3: Row = {
     ...v2,
@@ -54,14 +65,22 @@ async function submitV3(spring: SpringFixture) {
     activated_at: null,
   };
   const columns = Object.keys(v3);
-  await run(db, `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`, columns.map((c) => v3[c]));
+  await run(
+    db,
+    `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
+    columns.map((c) => v3[c]),
+  );
 }
 
-test("Edit refused because a newer version went into review shows the domain's sentence", async ({ page }) => {
+test("Edit refused because a newer version went into review shows the domain's sentence", async ({
+  page,
+}) => {
   const spring = fixture!;
   await asPersona(page, "maya");
   await page.goto(`/${TEAM}/templates/${spring.templateId}`);
-  await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: SPRING_NAME }),
+  ).toBeVisible();
   await hydrated(page);
   const edit = page.getByRole("button", { name: "Edit", exact: true });
   await expect(edit).toBeVisible();
@@ -69,9 +88,26 @@ test("Edit refused because a newer version went into review shows the domain's s
   await submitV3(spring);
   await tap(edit);
 
-  await expect(page.locator("[data-sonner-toast]").filter({ hasText: REFUSAL })).toBeVisible();
-  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Couldn't open a draft" })).toHaveCount(0);
-  await expect(edit, "the page stays as it was, and Edit can be pressed again").toBeEnabled();
-  expect(new URL(page.url()).pathname).toBe(`/${TEAM}/templates/${spring.templateId}`);
-  expect(await rows(db, "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'", [spring.templateId])).toEqual([]);
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: REFUSAL }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("[data-sonner-toast]")
+      .filter({ hasText: "Couldn't open a draft" }),
+  ).toHaveCount(0);
+  await expect(
+    edit,
+    "the page stays as it was, and Edit can be pressed again",
+  ).toBeEnabled();
+  expect(new URL(page.url()).pathname).toBe(
+    `/${TEAM}/templates/${spring.templateId}`,
+  );
+  expect(
+    await rows(
+      db,
+      "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
+      [spring.templateId],
+    ),
+  ).toEqual([]);
 });

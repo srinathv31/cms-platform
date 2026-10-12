@@ -18,7 +18,10 @@ import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { Command, CommandItem, CommandList } from "@/components/ui/command";
-import type { PickerItem, VariablePickerRender } from "../extensions/variable-picker";
+import type {
+  PickerItem,
+  VariablePickerRender,
+} from "../extensions/variable-picker";
 import { cx } from "../lib/cx";
 import { newDraft } from "../model/draft";
 import type { Variable } from "../model/types";
@@ -42,7 +45,10 @@ interface PickerState {
   mode: "list" | "create";
 }
 
-const CLOSED: Pick<PickerState, "props" | "mount" | "items" | "index" | "mode"> = {
+const CLOSED: Pick<
+  PickerState,
+  "props" | "mount" | "items" | "index" | "mode"
+> = {
   props: null,
   mount: null,
   items: [],
@@ -84,7 +90,12 @@ export function createVariablePickerController(): VariablePickerController {
       store.setState(
         props.loading
           ? { props }
-          : { props, items: props.items, index: 0, ...(queryChanged ? { mode: "list" as const } : {}) },
+          : {
+              props,
+              items: props.items,
+              index: 0,
+              ...(queryChanged ? { mode: "list" as const } : {}),
+            },
       );
     },
     onExit: () => store.setState(CLOSED),
@@ -108,11 +119,22 @@ export function createVariablePickerController(): VariablePickerController {
 }
 
 // Where the menu waits (invisible) until Suggestion's mount() places it at the caret.
-const PARKED = { position: "fixed", top: 0, left: 0, visibility: "hidden" } as const;
+const PARKED = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  visibility: "hidden",
+} as const;
 
-const HIGHLIGHT_SPRING = { type: "spring", stiffness: 560, damping: 44, mass: 0.9 } as const;
+const HIGHLIGHT_SPRING = {
+  type: "spring",
+  stiffness: 560,
+  damping: 44,
+  mass: 0.9,
+} as const;
 
-const TILE = "flex size-7 shrink-0 items-center justify-center rounded-md border border-hairline bg-surface text-text-muted";
+const TILE =
+  "flex size-7 shrink-0 items-center justify-center rounded-md border border-hairline bg-surface text-text-muted";
 
 interface PickerProps {
   controller: VariablePickerController;
@@ -121,10 +143,20 @@ interface PickerProps {
 }
 
 export function VariablePicker({ controller, editor, root }: PickerProps) {
-  const open = useStore(controller.store, (s) => s.props !== null && s.items.length > 0);
+  const open = useStore(
+    controller.store,
+    (s) => s.props !== null && s.items.length > 0,
+  );
   const session = useStore(controller.store, (s) => s.session);
   if (!open) return null;
-  return <VariablePickerPanel key={session} controller={controller} editor={editor} root={root} />;
+  return (
+    <VariablePickerPanel
+      key={session}
+      controller={controller}
+      editor={editor}
+      root={root}
+    />
+  );
 }
 
 function VariablePickerPanel({ controller, editor, root }: PickerProps) {
@@ -158,7 +190,9 @@ function VariablePickerPanel({ controller, editor, root }: PickerProps) {
       role={mode === "create" ? "dialog" : undefined}
       aria-label={mode === "create" ? "New variable" : undefined}
       // The list keeps focus in the document; the form needs real focus.
-      onMouseDown={mode === "list" ? (event) => event.preventDefault() : undefined}
+      onMouseDown={
+        mode === "list" ? (event) => event.preventDefault() : undefined
+      }
     >
       <LazyMotion features={domMax} strict>
         <m.div
@@ -171,7 +205,11 @@ function VariablePickerPanel({ controller, editor, root }: PickerProps) {
           )}
         >
           {mode === "list" ? (
-            <PickerList controller={controller} editor={editor} element={element} />
+            <PickerList
+              controller={controller}
+              editor={editor}
+              element={element}
+            />
           ) : (
             <PickerCreate controller={controller} editor={editor} root={root} />
           )}
@@ -182,7 +220,15 @@ function VariablePickerPanel({ controller, editor, root }: PickerProps) {
   );
 }
 
-function PickerList({ controller, editor, element }: { controller: VariablePickerController; editor: Editor; element: HTMLDivElement | null }) {
+function PickerList({
+  controller,
+  editor,
+  element,
+}: {
+  controller: VariablePickerController;
+  editor: Editor;
+  element: HTMLDivElement | null;
+}) {
   const { store } = controller;
   const items = useStore(store, (s) => s.items);
   const index = useStore(store, (s) => s.index);
@@ -193,7 +239,9 @@ function PickerList({ controller, editor, element }: { controller: VariablePicke
     const dom = viewDom(editor);
     if (!element || !dom) return;
     const list = element.querySelector<HTMLElement>("[cmdk-list]");
-    const option = element.querySelector<HTMLElement>('[cmdk-item][data-selected="true"]');
+    const option = element.querySelector<HTMLElement>(
+      '[cmdk-item][data-selected="true"]',
+    );
     if (list && option && list.contains(option)) keepInView(list, option);
     if (list?.id) dom.setAttribute("aria-controls", list.id);
     if (option?.id) dom.setAttribute("aria-activedescendant", option.id);
@@ -203,14 +251,25 @@ function PickerList({ controller, editor, element }: { controller: VariablePicke
     };
   }, [element, editor, index, items]);
 
-  const variables = items.filter((item): item is Extract<PickerItem, { kind: "variable" }> => item.kind === "variable");
-  const create = items.find((item): item is Extract<PickerItem, { kind: "create" }> => item.kind === "create");
-  const valueOf = (item: PickerItem | undefined) => (item ? (item.kind === "create" ? CREATE_VALUE : item.variable.key) : "");
+  const variables = items.filter(
+    (item): item is Extract<PickerItem, { kind: "variable" }> =>
+      item.kind === "variable",
+  );
+  const create = items.find(
+    (item): item is Extract<PickerItem, { kind: "create" }> =>
+      item.kind === "create",
+  );
+  const valueOf = (item: PickerItem | undefined) =>
+    item ? (item.kind === "create" ? CREATE_VALUE : item.variable.key) : "";
   const selected = valueOf(items[index]);
 
   const highlight = (value: string) =>
     value === selected ? (
-      <m.span layoutId={highlightId} transition={HIGHLIGHT_SPRING} className="absolute inset-0 -z-10 rounded-lg bg-hover" />
+      <m.span
+        layoutId={highlightId}
+        transition={HIGHLIGHT_SPRING}
+        className="absolute inset-0 -z-10 rounded-lg bg-hover"
+      />
     ) : null;
 
   return (
@@ -221,7 +280,8 @@ function PickerList({ controller, editor, element }: { controller: VariablePicke
       value={selected}
       onValueChange={(value) => {
         const next = items.findIndex((item) => valueOf(item) === value);
-        if (next >= 0 && next !== store.getState().index) store.setState({ index: next });
+        if (next >= 0 && next !== store.getState().index)
+          store.setState({ index: next });
       }}
       className="rounded-xl! bg-transparent p-0"
     >
@@ -241,8 +301,12 @@ function PickerList({ controller, editor, element }: { controller: VariablePicke
                   <span className={TILE}>
                     <Icon className="size-4" strokeWidth={1.75} aria-hidden />
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm">{item.variable.label}</span>
-                  <span className="max-w-[45%] shrink-0 truncate font-mono text-[11.5px] text-text-muted">{item.variable.key}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {item.variable.label}
+                  </span>
+                  <span className="max-w-[45%] shrink-0 truncate font-mono text-[11.5px] text-text-muted">
+                    {item.variable.key}
+                  </span>
                 </CommandItem>
               );
             })}
@@ -250,7 +314,12 @@ function PickerList({ controller, editor, element }: { controller: VariablePicke
         ) : null}
         {create ? (
           // Pinned to the bottom of the list, always in view.
-          <div className={cx("sticky bottom-0 bg-surface p-1", variables.length > 0 && "border-t border-hairline")}>
+          <div
+            className={cx(
+              "sticky bottom-0 bg-surface p-1",
+              variables.length > 0 && "border-t border-hairline",
+            )}
+          >
             <CommandItem
               value={CREATE_VALUE}
               onSelect={() => choose(store, create)}
@@ -282,24 +351,35 @@ function PickerList({ controller, editor, element }: { controller: VariablePicke
 function PickerCreate({ controller, editor, root }: PickerProps) {
   const { store } = controller;
   const query = useStore(store, (s) => s.props?.query ?? "");
-  const takenKeys = useMemo(() => new Set(root.variables.getState().variables.map((v) => v.key)), [root]);
+  const takenKeys = useMemo(
+    () => new Set(root.variables.getState().variables.map((v) => v.key)),
+    [root],
+  );
   const [initial] = useState(() => newDraft(query, takenKeys));
 
   const back = () => {
     store.setState({ mode: "list" });
-    if (!editor.isDestroyed) editor.commands.focus(undefined, { scrollIntoView: false });
+    if (!editor.isDestroyed)
+      editor.commands.focus(undefined, { scrollIntoView: false });
   };
 
   const create = (variable: Variable) => {
     const result = root.createVariable(variable);
-    if (result.ok) store.getState().props?.command({ kind: "variable", variable });
+    if (result.ok)
+      store.getState().props?.command({ kind: "variable", variable });
     return result;
   };
 
   return (
     <div className="p-3.5">
       <p className="caps-label mb-3">New variable</p>
-      <VariableForm mode="create" initial={initial} takenKeys={takenKeys} onSubmit={create} onCancel={back} />
+      <VariableForm
+        mode="create"
+        initial={initial}
+        takenKeys={takenKeys}
+        onSubmit={create}
+        onCancel={back}
+      />
     </div>
   );
 }

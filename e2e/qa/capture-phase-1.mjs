@@ -15,34 +15,55 @@ const SIZES = [
 const browser = await chromium.launch();
 
 async function open(size, persona, path) {
-  const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h }, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext({
+    viewport: { width: size.w, height: size.h },
+    deviceScaleFactor: 1,
+  });
   await ctx.addCookies([{ name: "ucomp_persona", value: persona, url: BASE }]);
   // Keep the library calm: answer template-link prefetches with an empty 204 (see e2e/phase-1.spec.ts).
   await ctx.route(/\/templates\/UC-[A-Z0-9]+\?_rsc=/, (r) =>
-    r.request().headers()["next-router-prefetch"] === "1" ? r.fulfill({ status: 204 }) : r.continue(),
+    r.request().headers()["next-router-prefetch"] === "1"
+      ? r.fulfill({ status: 204 })
+      : r.continue(),
   );
   const page = await ctx.newPage();
   const problems = [];
   page.on("console", (m) => m.type() === "error" && problems.push(m.text()));
   page.on("pageerror", (e) => problems.push(e.message));
   await page.goto(BASE + path);
-  await page.waitForFunction(() => {
-    const el = document.querySelector("button[aria-label$='profile and persona']");
-    return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps"));
-  }).catch(() => {});
+  await page
+    .waitForFunction(() => {
+      const el = document.querySelector(
+        "button[aria-label$='profile and persona']",
+      );
+      return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps"));
+    })
+    .catch(() => {});
   await page.evaluate(() => document.fonts.ready);
   return { ctx, page, problems };
 }
 
 async function liveEditor(page) {
   await page.waitForFunction(() =>
-    [...document.querySelectorAll(".ProseMirror")].some((el) => el.offsetParent !== null && "pmViewDesc" in el),
+    [...document.querySelectorAll(".ProseMirror")].some(
+      (el) => el.offsetParent !== null && "pmViewDesc" in el,
+    ),
   );
 }
 
 const SCREENS = [
-  { name: "maya-library", persona: "maya", path: "/coral-offers/library", ready: (p) => p.getByRole("link", { name: /Annual Fee Waiver/ }).waitFor() },
-  { name: "alex-library-recert", persona: "alex", path: "/coral-offers/library", ready: (p) => p.locator("[data-slot='sidebar-card']").waitFor() },
+  {
+    name: "maya-library",
+    persona: "maya",
+    path: "/coral-offers/library",
+    ready: (p) => p.getByRole("link", { name: /Annual Fee Waiver/ }).waitFor(),
+  },
+  {
+    name: "alex-library-recert",
+    persona: "alex",
+    path: "/coral-offers/library",
+    ready: (p) => p.locator("[data-slot='sidebar-card']").waitFor(),
+  },
   {
     name: "alex-settings-members",
     persona: "alex",
@@ -52,8 +73,19 @@ const SCREENS = [
       await p.getByRole("dialog").waitFor();
     },
   },
-  { name: "riley-all-library", persona: "riley", path: "/all/library", ready: (p) => p.getByRole("link", { name: /Statement Insert — Rate Change/ }).waitFor() },
-  { name: "morgan-request-access", persona: "morgan", path: "/request-access", ready: (p) => p.getByRole("heading", { name: "Request access" }).waitFor() },
+  {
+    name: "riley-all-library",
+    persona: "riley",
+    path: "/all/library",
+    ready: (p) =>
+      p.getByRole("link", { name: /Statement Insert — Rate Change/ }).waitFor(),
+  },
+  {
+    name: "morgan-request-access",
+    persona: "morgan",
+    path: "/request-access",
+    ready: (p) => p.getByRole("heading", { name: "Request access" }).waitFor(),
+  },
   {
     name: "maya-workspace-balance-transfer",
     persona: "maya",
@@ -142,17 +174,32 @@ for (const size of SIZES) {
       await s.run?.(page);
       await page.waitForTimeout(900); // let entrance motion finish
       const overflow = await page.evaluate(() => ({
-        x: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        x:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
         // elements wider than the viewport
         wide: [...document.querySelectorAll("body *")]
-          .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1 && getComputedStyle(el).position !== "fixed")
+          .filter(
+            (el) =>
+              el.getBoundingClientRect().right > window.innerWidth + 1 &&
+              getComputedStyle(el).position !== "fixed",
+          )
           .slice(0, 3)
-          .map((el) => el.tagName.toLowerCase() + "." + String(el.className).slice(0, 40)),
+          .map(
+            (el) =>
+              el.tagName.toLowerCase() +
+              "." +
+              String(el.className).slice(0, 40),
+          ),
       }));
       await page.screenshot({ path: `${OUT}/${s.name}-${size.w}.png` });
-      report.push(`${s.name} ${size.w}: ok overflowX=${overflow.x} wide=${JSON.stringify(overflow.wide)} errors=${problems.length}`);
+      report.push(
+        `${s.name} ${size.w}: ok overflowX=${overflow.x} wide=${JSON.stringify(overflow.wide)} errors=${problems.length}`,
+      );
     } catch (e) {
-      await page.screenshot({ path: `${OUT}/${s.name}-${size.w}-FAILED.png` }).catch(() => {});
+      await page
+        .screenshot({ path: `${OUT}/${s.name}-${size.w}-FAILED.png` })
+        .catch(() => {});
       report.push(`${s.name} ${size.w}: FAILED ${String(e).split("\n")[0]}`);
     }
     await ctx.close();

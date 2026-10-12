@@ -7,22 +7,67 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SampleSet, Variable } from "@/editor/model/types";
 import { listSets } from "@/editor/model/sample-sets";
 import { resolveSetValues } from "./model";
-import { SampleSetSwitcher, type SampleSetSwitcherHandle } from "./sample-set-switcher";
+import {
+  SampleSetSwitcher,
+  type SampleSetSwitcherHandle,
+} from "./sample-set-switcher";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const TODAY = "2026-10-04";
 
 const VARIABLES: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95" },
-  { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
-  { key: "offer_end_date", label: "Offer end date", type: "date", required: true, sample: "2027-03-04" },
-  { key: "home_state", label: "Home state", type: "us_state", required: true, sample: "NJ" },
-  { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "annual_fee",
+    label: "Annual fee",
+    type: "currency",
+    required: true,
+    sample: "95",
+  },
+  {
+    key: "purchase_apr",
+    label: "Purchase APR",
+    type: "percent",
+    required: true,
+    sample: "21.99",
+  },
+  {
+    key: "offer_end_date",
+    label: "Offer end date",
+    type: "date",
+    required: true,
+    sample: "2027-03-04",
+  },
+  {
+    key: "home_state",
+    label: "Home state",
+    type: "us_state",
+    required: true,
+    sample: "NJ",
+  },
+  {
+    key: "promo_code",
+    label: "Promo code",
+    type: "text",
+    required: false,
+    sample: "",
+  },
 ];
 
-const CUSTOM: SampleSet = { id: "holiday", name: "Holiday promo", values: { first_name: "Zed" } };
+const CUSTOM: SampleSet = {
+  id: "holiday",
+  name: "Holiday promo",
+  values: { first_name: "Zed" },
+};
 
 interface HostProps {
   stored?: SampleSet[];
@@ -36,7 +81,15 @@ interface HostProps {
 }
 
 /** A host that keeps the state the way the preview does: stored sets and the selected id. */
-function Host({ stored = [], selected = "typical", readOnly, noChange, onSelect, onChange, handle }: HostProps) {
+function Host({
+  stored = [],
+  selected = "typical",
+  readOnly,
+  noChange,
+  onSelect,
+  onChange,
+  handle,
+}: HostProps) {
   const [sets, setSets] = useState(stored);
   const [selectedId, setSelectedId] = useState(selected);
   return (
@@ -80,8 +133,10 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-const render = (props: HostProps = {}) => act(async () => root.render(<Host {...props} />));
-const sleep = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
+const render = (props: HostProps = {}) =>
+  act(async () => root.render(<Host {...props} />));
+const sleep = (ms: number) =>
+  act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 
 /** Waits for what Base UI does a tick later (a menu opening, the editor opening after the menu). */
 async function until(check: () => unknown) {
@@ -95,9 +150,13 @@ async function until(check: () => unknown) {
 async function click(el: Element) {
   await act(async () => {
     const init = { bubbles: true, cancelable: true, button: 0 };
-    el.dispatchEvent(new PointerEvent("pointerdown", { ...init, pointerType: "mouse" }));
+    el.dispatchEvent(
+      new PointerEvent("pointerdown", { ...init, pointerType: "mouse" }),
+    );
     el.dispatchEvent(new MouseEvent("mousedown", init));
-    el.dispatchEvent(new PointerEvent("pointerup", { ...init, pointerType: "mouse" }));
+    el.dispatchEvent(
+      new PointerEvent("pointerup", { ...init, pointerType: "mouse" }),
+    );
     el.dispatchEvent(new MouseEvent("mouseup", init));
     el.dispatchEvent(new MouseEvent("click", init));
   });
@@ -105,14 +164,19 @@ async function click(el: Element) {
 
 async function press(el: Element, key: string) {
   await act(async () => {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
   });
 }
 
 async function typeInto(el: HTMLInputElement, value: string) {
   await act(async () => {
     el.focus();
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -121,13 +185,21 @@ async function blur(el: HTMLElement) {
   await act(async () => el.blur());
 }
 
-const trigger = () => container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+const trigger = () =>
+  container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
 const menu = () => document.querySelector('[role="menu"]');
 const menuItem = (name: string) =>
-  [...document.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]')].find((el) => el.textContent?.trim() === name);
-const popup = () => document.querySelector<HTMLElement>('[data-slot="sample-set-editor"]');
+  [
+    ...document.querySelectorAll<HTMLElement>(
+      '[role="menuitem"], [role="menuitemradio"]',
+    ),
+  ].find((el) => el.textContent?.trim() === name);
+const popup = () =>
+  document.querySelector<HTMLElement>('[data-slot="sample-set-editor"]');
 function findField(label: string): HTMLInputElement {
-  const el = [...document.querySelectorAll<HTMLLabelElement>("label")].find((l) => l.textContent?.trim() === label);
+  const el = [...document.querySelectorAll<HTMLLabelElement>("label")].find(
+    (l) => l.textContent?.trim() === label,
+  );
   if (!el) throw new Error(`no field labelled "${label}"`);
   return document.getElementById(el.htmlFor) as HTMLInputElement;
 }
@@ -144,14 +216,17 @@ async function openEditorFromMenu(name = "Edit values…") {
   await until(popup);
 }
 
-const lastChange = (spy: ReturnType<typeof vi.fn>) => spy.mock.calls.at(-1)![0] as SampleSet[];
+const lastChange = (spy: ReturnType<typeof vi.fn>) =>
+  spy.mock.calls.at(-1)![0] as SampleSet[];
 const byId = (sets: SampleSet[], id: string) => sets.find((s) => s.id === id)!;
 
 describe("the menu", () => {
   it("shows the current set on the trigger and lists the sets with it checked, then Edit values… and New sample set", async () => {
     await render({ stored: [CUSTOM], selected: "long" });
     expect(trigger().textContent).toBe("Long name and maximum values");
-    expect(trigger().getAttribute("aria-label")).toBe("Sample set: Long name and maximum values");
+    expect(trigger().getAttribute("aria-label")).toBe(
+      "Sample set: Long name and maximum values",
+    );
     await openMenu();
     const radios = [...document.querySelectorAll('[role="menuitemradio"]')];
     expect(radios.map((r) => r.textContent?.trim())).toEqual([
@@ -160,14 +235,23 @@ describe("the menu", () => {
       "Minimum values",
       "Holiday promo",
     ]);
-    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false"]);
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual([
+      "false",
+      "true",
+      "false",
+      "false",
+    ]);
     expect(menuItem("Edit values…")).toBeTruthy();
     expect(menuItem("New sample set")).toBeTruthy();
   });
 
   it("is 32px tall and truncates a name too long for its room, with the whole name in its title", async () => {
-    const name = "Long name and maximum values, a second pass over the offer terms with the dates written out in full";
-    await render({ stored: [{ id: "wordy", name, values: {} }], selected: "wordy" });
+    const name =
+      "Long name and maximum values, a second pass over the offer terms with the dates written out in full";
+    await render({
+      stored: [{ id: "wordy", name, values: {} }],
+      selected: "wordy",
+    });
     // The text is whole (the accessible name and the DOM have all of it); only the paint is cut.
     expect(trigger().textContent).toBe(name);
     expect(trigger().getAttribute("aria-label")).toBe(`Sample set: ${name}`);
@@ -175,7 +259,9 @@ describe("the menu", () => {
     expect(trigger().querySelector("span")?.className).toMatch(/\btruncate\b/);
     expect(trigger().className).toContain("max-w-full");
     // One line, whatever the name: the header row's height never depends on it.
-    expect(trigger().className).not.toMatch(/\bh-auto\b|\bmin-h-8\b|\bwhitespace-normal\b/);
+    expect(trigger().className).not.toMatch(
+      /\bh-auto\b|\bmin-h-8\b|\bwhitespace-normal\b/,
+    );
   });
 
   it("selects a set", async () => {
@@ -193,7 +279,9 @@ describe("the menu", () => {
     await render({ onSelect });
     await press(trigger(), "ArrowDown");
     await until(menu);
-    const items = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+    const items = [
+      ...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
+    ];
     expect(items.length).toBe(3);
     // Esc closes it and focus returns to the trigger.
     await press(menu()!, "Escape");
@@ -206,11 +294,17 @@ describe("the values editor", () => {
   it("opens from the menu with a row per variable, in order, each with its type, label and key", async () => {
     await render();
     await openEditorFromMenu();
-    const labels = [...popup()!.querySelectorAll("label")].map((l) => l.textContent?.trim());
+    const labels = [...popup()!.querySelectorAll("label")].map((l) =>
+      l.textContent?.trim(),
+    );
     expect(labels).toEqual(VARIABLES.map((v) => v.label));
-    const keys = [...popup()!.querySelectorAll(".font-mono")].map((k) => k.textContent);
+    const keys = [...popup()!.querySelectorAll(".font-mono")].map(
+      (k) => k.textContent,
+    );
     expect(keys).toEqual(VARIABLES.map((v) => v.key));
-    expect(popup()!.querySelectorAll("svg").length).toBeGreaterThanOrEqual(VARIABLES.length);
+    expect(popup()!.querySelectorAll("svg").length).toBeGreaterThanOrEqual(
+      VARIABLES.length,
+    );
     // Every field shows a value (the generated default fills the gaps), and focus is on the first.
     expect(findField("Annual fee").value).toBe("95");
     expect(findField("Home state").value).toBe("NJ");
@@ -230,7 +324,11 @@ describe("the values editor", () => {
   });
 
   it("focuses the first empty required value when it opens", async () => {
-    await render({ stored: [{ id: "typical", name: "Typical customer", values: { annual_fee: "" } }] });
+    await render({
+      stored: [
+        { id: "typical", name: "Typical customer", values: { annual_fee: "" } },
+      ],
+    });
     await openEditorFromMenu();
     await until(() => document.activeElement === findField("Annual fee"));
   });
@@ -261,7 +359,11 @@ describe("the values editor", () => {
     await typeInto(findField("Home state"), "new york");
     await blur(findField("Home state"));
     const values = byId(lastChange(onChange), "typical").values;
-    expect(values).toMatchObject({ offer_end_date: "2027-03-05", purchase_apr: "18.5", home_state: "NY" });
+    expect(values).toMatchObject({
+      offer_end_date: "2027-03-05",
+      purchase_apr: "18.5",
+      home_state: "NY",
+    });
     expect(onChange).toHaveBeenCalledTimes(3);
   });
 
@@ -274,13 +376,17 @@ describe("the values editor", () => {
     await blur(apr);
     expect(onChange).not.toHaveBeenCalled();
     expect(apr.getAttribute("aria-invalid")).toBe("true");
-    const message = document.getElementById(apr.getAttribute("aria-describedby")!);
+    const message = document.getElementById(
+      apr.getAttribute("aria-describedby")!,
+    );
     expect(message?.textContent).toBe("Enter a percentage, like 21.99");
     // Typing again clears the message until the next blur.
     await typeInto(apr, "19");
     expect(apr.getAttribute("aria-invalid")).toBeNull();
     await blur(apr);
-    expect(byId(lastChange(onChange), "typical").values.purchase_apr).toBe("19");
+    expect(byId(lastChange(onChange), "typical").values.purchase_apr).toBe(
+      "19",
+    );
   });
 
   it("drops an invalid value when the popover closes, and shows the stored one next time", async () => {
@@ -318,10 +424,15 @@ describe("the values editor", () => {
     expect(byId(lastChange(onChange), "typical").values.first_name).toBe("");
     expect(first.value).toBe("");
     expect(first.getAttribute("aria-invalid")).toBeNull();
-    expect(document.getElementById(first.getAttribute("aria-describedby")!)?.textContent).toBe("Required, and empty");
+    expect(
+      document.getElementById(first.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe("Required, and empty");
     // The values the preview should render with keep it empty (the render route then names it as missing).
     const sets = lastChange(onChange);
-    expect(resolveSetValues(byId(sets, "typical"), VARIABLES, TODAY).first_name).toBe("");
+    expect(
+      resolveSetValues(byId(sets, "typical"), VARIABLES, TODAY).first_name,
+    ).toBe("");
   });
 
   it("doesn't call onChange when a value is left as it was", async () => {
@@ -354,18 +465,25 @@ describe("a new sample set", () => {
     const made = sets[3];
     expect(made.name).toBe("Sample set 4");
     expect(made.id).toMatch(/^set_/);
-    expect(made.values).toEqual(resolveSetValues(listSets([], VARIABLES, TODAY)[1], VARIABLES, TODAY));
+    expect(made.values).toEqual(
+      resolveSetValues(listSets([], VARIABLES, TODAY)[1], VARIABLES, TODAY),
+    );
     expect(onSelect).toHaveBeenCalledWith(made.id);
     await until(popup);
     expect(trigger().textContent).toBe("Sample set 4");
-    const name = popup()!.querySelector<HTMLInputElement>("#" + CSS.escape(popup()!.querySelector("label")!.getAttribute("for")!))!;
+    const name = popup()!.querySelector<HTMLInputElement>(
+      "#" + CSS.escape(popup()!.querySelector("label")!.getAttribute("for")!),
+    )!;
     expect(name.value).toBe("Sample set 4");
     await until(() => document.activeElement === name);
   });
 
   it("numbers the next one after the highest in use", async () => {
     const onChange = vi.fn();
-    await render({ onChange, stored: [{ id: "a", name: "Sample set 4", values: {} }] });
+    await render({
+      onChange,
+      stored: [{ id: "a", name: "Sample set 4", values: {} }],
+    });
     await openMenu();
     await click(menuItem("New sample set")!);
     expect(lastChange(onChange).at(-1)!.name).toBe("Sample set 5");
@@ -394,10 +512,16 @@ describe("a custom set", () => {
     await blur(name);
     expect(onChange).not.toHaveBeenCalled();
     expect(name.getAttribute("aria-invalid")).toBe("true");
-    expect(document.getElementById(name.getAttribute("aria-describedby")!)?.textContent).toBe("Another set has this name");
+    expect(
+      document.getElementById(name.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe("Another set has this name");
     await typeInto(name, "");
     await blur(name);
-    expect(document.getElementById(name.getAttribute("aria-describedby")!)?.textContent).toBe("Enter a name");
+    expect(
+      document.getElementById(name.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toBe("Enter a name");
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -408,8 +532,16 @@ describe("a custom set", () => {
     await openMenu();
     await click(menuItem("New sample set")!); // an untouched copy of Typical
     await until(popup);
-    await click([...popup()!.querySelectorAll("button")].find((b) => b.textContent === "Delete set")!);
-    expect(lastChange(onChange).map((s) => s.id)).toEqual(["typical", "long", "minimum"]);
+    await click(
+      [...popup()!.querySelectorAll("button")].find(
+        (b) => b.textContent === "Delete set",
+      )!,
+    );
+    expect(lastChange(onChange).map((s) => s.id)).toEqual([
+      "typical",
+      "long",
+      "minimum",
+    ]);
     expect(onSelect).toHaveBeenLastCalledWith("minimum");
     await until(() => !popup());
     expect(trigger().textContent).toBe("Minimum values");
@@ -420,14 +552,26 @@ describe("a custom set", () => {
     await render({ onChange, stored: [CUSTOM], selected: "holiday" });
     await openEditorFromMenu();
     onChange.mockClear();
-    await click([...popup()!.querySelectorAll("button")].find((b) => b.textContent === "Delete set")!);
+    await click(
+      [...popup()!.querySelectorAll("button")].find(
+        (b) => b.textContent === "Delete set",
+      )!,
+    );
     expect(onChange).not.toHaveBeenCalled();
     expect(popup()!.textContent).toContain("Delete this set and its edits?");
-    const cancel = [...popup()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel")!;
+    const cancel = [...popup()!.querySelectorAll("button")].find(
+      (b) => b.textContent === "Cancel",
+    )!;
     await click(cancel);
     expect(onChange).not.toHaveBeenCalled();
-    expect(popup()!.textContent).not.toContain("Delete this set and its edits?");
-    expect([...popup()!.querySelectorAll("button")].some((b) => b.textContent === "Delete set")).toBe(true);
+    expect(popup()!.textContent).not.toContain(
+      "Delete this set and its edits?",
+    );
+    expect(
+      [...popup()!.querySelectorAll("button")].some(
+        (b) => b.textContent === "Delete set",
+      ),
+    ).toBe(true);
   });
 
   it("is deleted after the confirm", async () => {
@@ -435,9 +579,21 @@ describe("a custom set", () => {
     const onSelect = vi.fn();
     await render({ onChange, onSelect, stored: [CUSTOM], selected: "holiday" });
     await openEditorFromMenu();
-    await click([...popup()!.querySelectorAll("button")].find((b) => b.textContent === "Delete set")!);
-    await click([...popup()!.querySelectorAll("button")].find((b) => b.textContent === "Delete")!);
-    expect(lastChange(onChange).map((s) => s.id)).toEqual(["typical", "long", "minimum"]);
+    await click(
+      [...popup()!.querySelectorAll("button")].find(
+        (b) => b.textContent === "Delete set",
+      )!,
+    );
+    await click(
+      [...popup()!.querySelectorAll("button")].find(
+        (b) => b.textContent === "Delete",
+      )!,
+    );
+    expect(lastChange(onChange).map((s) => s.id)).toEqual([
+      "typical",
+      "long",
+      "minimum",
+    ]);
     expect(onSelect).toHaveBeenLastCalledWith("minimum");
     await until(() => !popup());
   });

@@ -29,7 +29,8 @@ export type ApiChannel = "pdf" | "web" | "email" | "push" | "sms";
 export type ApiPushPlatform = "ios" | "android";
 /** An SMS's encoding: GSM-7, or UCS-2 when one character is outside GSM-7 (a value can switch it). */
 export type ApiSmsEncoding = "GSM-7" | "UCS-2";
-export type ApiVariableType = "text" | "currency" | "percent" | "date" | "number" | "us_state";
+export type ApiVariableType =
+  "text" | "currency" | "percent" | "date" | "number" | "us_state";
 /** The states a consumer can see. Drafts and versions in review never leave UCOMP. */
 export type ApiVersionState = "active" | "superseded" | "revoked";
 
@@ -251,10 +252,36 @@ export interface ApiVariable {
  * `text` is one plain sentence: "v3 adds required `annual_fee` (Currency)."
  */
 export type ApiContractChange =
-  | { kind: "added" | "removed" | "made_required" | "made_optional"; key: string; breaking: boolean; text: string }
-  | { kind: "key_renamed"; key: string; breaking: true; from: string; to: string; text: string }
-  | { kind: "type_changed"; key: string; breaking: true; from: ApiVariableType; to: ApiVariableType; text: string }
-  | { kind: "label_changed"; key: string; breaking: false; from: string; to: string; text: string };
+  | {
+      kind: "added" | "removed" | "made_required" | "made_optional";
+      key: string;
+      breaking: boolean;
+      text: string;
+    }
+  | {
+      kind: "key_renamed";
+      key: string;
+      breaking: true;
+      from: string;
+      to: string;
+      text: string;
+    }
+  | {
+      kind: "type_changed";
+      key: string;
+      breaking: true;
+      from: ApiVariableType;
+      to: ApiVariableType;
+      text: string;
+    }
+  | {
+      kind: "label_changed";
+      key: string;
+      breaking: false;
+      from: string;
+      to: string;
+      text: string;
+    };
 
 export interface ApiContractDiff {
   since: number;
@@ -314,7 +341,8 @@ export interface ApiNoticeList extends ApiPage {
   notices: ApiNotice[];
 }
 
-export type ApiNoticeKind = "new_version" | "sunset_scheduled" | "sunset_passed" | "revoked";
+export type ApiNoticeKind =
+  "new_version" | "sunset_scheduled" | "sunset_passed" | "revoked";
 
 export interface ApiNotice {
   id: string;

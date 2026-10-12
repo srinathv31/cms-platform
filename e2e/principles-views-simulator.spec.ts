@@ -64,10 +64,20 @@ test.describe("Views inside a page", () => {
       const names = await page
         .getByRole("tab")
         .filter({ visible: true })
-        .evaluateAll((tabs) => tabs.map((t) => (t.getAttribute("aria-label") ?? t.textContent ?? "").replace(/\s+/g, " ").trim()));
+        .evaluateAll((tabs) =>
+          tabs.map((t) =>
+            (t.getAttribute("aria-label") ?? t.textContent ?? "")
+              .replace(/\s+/g, " ")
+              .trim(),
+          ),
+        );
       expect(names.length, "the page has tabs").toBeGreaterThan(0);
       for (const name of names) {
-        const tab = page.getByRole("tab").filter({ visible: true }).filter({ hasText: name.replace(/\s*\d+$/, "") }).first();
+        const tab = page
+          .getByRole("tab")
+          .filter({ visible: true })
+          .filter({ hasText: name.replace(/\s*\d+$/, "") })
+          .first();
         await click(tab);
         await expect(tab).toHaveAttribute("aria-selected", "true");
         await settled(page);
@@ -78,7 +88,10 @@ test.describe("Views inside a page", () => {
 
   test("every status filter of the Library (Maya)", async ({ page }) => {
     await open(page, "/coral-offers/library", "maya");
-    const filters = page.getByRole("group", { name: "Filter by status" }).getByRole("button").filter({ visible: true });
+    const filters = page
+      .getByRole("group", { name: "Filter by status" })
+      .getByRole("button")
+      .filter({ visible: true });
     const count = await filters.count();
     expect(count, "the Library has status filters").toBeGreaterThan(0);
     for (let i = 0; i < count; i++) {
@@ -94,11 +107,26 @@ test.describe("Views inside a page", () => {
 // ── The checks themselves must be able to fail ───────────────────────────────
 
 test.describe("The checks catch what they should", () => {
-  test("a stray status word, a second primary button and a placeholder are all found", async ({ page }) => {
+  test("a stray status word, a second primary button and a placeholder are all found", async ({
+    page,
+  }) => {
     await open(page, "/coral-offers/library", "maya");
-    const clean = await page.evaluate(inspectPage, { foreign: false, allowed: ALLOWED_PLACEHOLDER, words: STATUS_WORDS });
-    expect(clean.canvasPrimary, "the Library's one primary button is seen").toHaveLength(1);
-    expect(await page.locator('main [data-slot="badge"][data-status]').filter({ visible: true }).count(), "the Library shows StatusBadges").toBeGreaterThan(0);
+    const clean = await page.evaluate(inspectPage, {
+      foreign: false,
+      allowed: ALLOWED_PLACEHOLDER,
+      words: STATUS_WORDS,
+    });
+    expect(
+      clean.canvasPrimary,
+      "the Library's one primary button is seen",
+    ).toHaveLength(1);
+    expect(
+      await page
+        .locator('main [data-slot="badge"][data-status]')
+        .filter({ visible: true })
+        .count(),
+      "the Library shows StatusBadges",
+    ).toBeGreaterThan(0);
     await page.evaluate(() => {
       const main = document.querySelector('main[data-slot="sidebar-inset"]')!;
       main.insertAdjacentHTML(
@@ -106,10 +134,20 @@ test.describe("The checks catch what they should", () => {
         '<span id="x1">Superseded</span><button id="x2" class="bg-primary">Second</button><input id="x3" placeholder="Enter a name">',
       );
     });
-    const dirty = await page.evaluate(inspectPage, { foreign: false, allowed: ALLOWED_PLACEHOLDER, words: STATUS_WORDS });
-    expect(dirty.canvasPrimary.length, "a second primary button is counted").toBe(2);
+    const dirty = await page.evaluate(inspectPage, {
+      foreign: false,
+      allowed: ALLOWED_PLACEHOLDER,
+      words: STATUS_WORDS,
+    });
+    expect(
+      dirty.canvasPrimary.length,
+      "a second primary button is counted",
+    ).toBe(2);
     expect(dirty.strayStatus.join()).toContain("Superseded");
     expect(dirty.placeholders.join()).toContain("Enter a name");
-    expect((await runAxe(page)).passes, "axe checked something").toBeGreaterThan(0);
+    expect(
+      (await runAxe(page)).passes,
+      "axe checked something",
+    ).toBeGreaterThan(0);
   });
 });

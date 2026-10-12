@@ -25,7 +25,20 @@ import {
   type UsageTone,
 } from "../golive-types";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
 
 // ── Weeks (UTC days, YYYY-MM-DD; the day arithmetic is ../dates.ts) ──────────
 
@@ -37,7 +50,8 @@ export function weekStartOf(day: string): string {
 /** Every day from `from` to `to`, both included. */
 export function dayList(from: string, to: string): string[] {
   const days: string[] = [];
-  for (let ms = dayStartMs(from), end = dayStartMs(to); ms <= end; ms += DAY_MS) days.push(utcDay(ms));
+  for (let ms = dayStartMs(from), end = dayStartMs(to); ms <= end; ms += DAY_MS)
+    days.push(utcDay(ms));
   return days;
 }
 
@@ -80,17 +94,25 @@ export function usageWindows(now: Date): UsageWindows {
     historyFrom,
     trendFrom,
     heatFrom,
-    seriesFromMs: Math.min(...[sparkFrom, historyFrom, trendFrom, heatFrom].map(dayStartMs)),
+    seriesFromMs: Math.min(
+      ...[sparkFrom, historyFrom, trendFrom, heatFrom].map(dayStartMs),
+    ),
   };
 }
 
 /** Is this render_log row usage at all? Previews and consumer-less rows never count. */
-export function countsAsUsage(row: { isPreview: boolean; consumerId: string | null }): boolean {
+export function countsAsUsage(row: {
+  isPreview: boolean;
+  consumerId: string | null;
+}): boolean {
   return !row.isPreview && row.consumerId !== null;
 }
 
 /** Which rolling window an instant falls in. */
-export function windowOf(at: Date | number, w: UsageWindows): "current" | "previous" | null {
+export function windowOf(
+  at: Date | number,
+  w: UsageWindows,
+): "current" | "previous" | null {
   const ms = typeof at === "number" ? at : at.getTime();
   if (ms > w.until) return null;
   if (ms >= w.since) return "current";
@@ -118,7 +140,11 @@ export function trendPct(current: number, previous: number): number | null {
 }
 
 /** part / whole as a percentage rounded to `decimals`; null when whole is 0. */
-export function percent(part: number, whole: number, decimals = 1): number | null {
+export function percent(
+  part: number,
+  whole: number,
+  decimals = 1,
+): number | null {
   if (whole === 0) return null;
   const f = 10 ** decimals;
   return Math.round((part / whole) * 100 * f) / f;
@@ -130,7 +156,11 @@ export function percent(part: number, whole: number, decimals = 1): number | nul
  * `weeks` Sunday-first columns ending with `today`'s week. Level 0 = no renders; 1–4 by quartiles
  * (nearest rank) of the non-zero days in range. Days after today are out of range (count 0).
  */
-export function heatmap(counts: ReadonlyMap<string, number>, today: string, weeks: number = HEATMAP_WEEKS): UsageHeatmap {
+export function heatmap(
+  counts: ReadonlyMap<string, number>,
+  today: string,
+  weeks: number = HEATMAP_WEEKS,
+): UsageHeatmap {
   const start = addDays(weekStartOf(today), -7 * (weeks - 1));
   const todayMs = dayStartMs(today);
 
@@ -146,15 +176,22 @@ export function heatmap(counts: ReadonlyMap<string, number>, today: string, week
       const count = inRange ? Math.max(0, counts.get(date) ?? 0) : 0;
       if (count > 0) nonZero.push(count);
       total += count;
-      if (count > 0 && (!busiest || count > busiest.count)) busiest = { date, count };
+      if (count > 0 && (!busiest || count > busiest.count))
+        busiest = { date, count };
       column.push({ date, count, inRange });
     }
     columns.push(column);
   }
 
   nonZero.sort((a, b) => a - b);
-  const rank = (p: number) => nonZero[Math.max(0, Math.ceil(p * nonZero.length) - 1)] ?? 0;
-  const thresholds: [number, number, number, number] = [rank(0.25), rank(0.5), rank(0.75), rank(1)];
+  const rank = (p: number) =>
+    nonZero[Math.max(0, Math.ceil(p * nonZero.length) - 1)] ?? 0;
+  const thresholds: [number, number, number, number] = [
+    rank(0.25),
+    rank(0.5),
+    rank(0.75),
+    rank(1),
+  ];
   const level = (count: number): HeatCell["level"] => {
     if (count <= 0) return 0;
     if (count <= thresholds[0]) return 1;
@@ -166,11 +203,14 @@ export function heatmap(counts: ReadonlyMap<string, number>, today: string, week
   const months: { label: string; week: number }[] = [];
   columns.forEach((column, week) => {
     const sunday = new Date(dayStartMs(column[0]!.date));
-    if (sunday.getUTCDate() <= 7) months.push({ label: MONTHS[sunday.getUTCMonth()]!, week });
+    if (sunday.getUTCDate() <= 7)
+      months.push({ label: MONTHS[sunday.getUTCMonth()]!, week });
   });
 
   return {
-    weeks: columns.map((column) => column.map((cell) => ({ ...cell, level: level(cell.count) }))),
+    weeks: columns.map((column) =>
+      column.map((cell) => ({ ...cell, level: level(cell.count) })),
+    ),
     months,
     thresholds,
     total,
@@ -200,7 +240,11 @@ export interface UsageTagInput {
  * lifecycle note already says so). Active rows get no lifecycle note. The days to a sunset are counted
  * in the business time zone (`zone`), where its day is ("sunset tomorrow": renders stop at midnight).
  */
-export function usageTags(row: UsageTagInput, now: Date, zone: string): UsageTag[] {
+export function usageTags(
+  row: UsageTagInput,
+  now: Date,
+  zone: string,
+): UsageTag[] {
   const tags: UsageTag[] = [];
   let failing = false;
 
@@ -213,8 +257,16 @@ export function usageTags(row: UsageTagInput, now: Date, zone: string): UsageTag
       failing = true;
     } else {
       const days = daysUntilSunset(row.sunsetAt, now, zone);
-      const when = days <= 0 ? "sunset today" : days === 1 ? "sunset tomorrow" : `sunset in ${days} days`;
-      tags.push({ tone: days <= NEARING_SUNSET_DAYS ? "warning" : "neutral", text: when });
+      const when =
+        days <= 0
+          ? "sunset today"
+          : days === 1
+            ? "sunset tomorrow"
+            : `sunset in ${days} days`;
+      tags.push({
+        tone: days <= NEARING_SUNSET_DAYS ? "warning" : "neutral",
+        text: when,
+      });
     }
   }
 
@@ -224,10 +276,17 @@ export function usageTags(row: UsageTagInput, now: Date, zone: string): UsageTag
   return tags;
 }
 
-const TONE_RANK: Record<UsageTone, number> = { danger: 0, warning: 1, neutral: 2, positive: 3 };
+const TONE_RANK: Record<UsageTone, number> = {
+  danger: 0,
+  warning: 1,
+  neutral: 2,
+  positive: 3,
+};
 
 function tagRank(tags: readonly UsageTag[]): number {
-  return tags.length === 0 ? 4 : Math.min(...tags.map((t) => TONE_RANK[t.tone]));
+  return tags.length === 0
+    ? 4
+    : Math.min(...tags.map((t) => TONE_RANK[t.tone]));
 }
 
 /** The consumers table's order: danger rows, then warning, then other tags, then the rest; renders desc within. */

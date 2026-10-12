@@ -92,10 +92,17 @@ interface Ghost {
 }
 
 /** The threads that get a marker, by block, in the order the blocks first appear in `threads`. */
-export function markerThreads(threads: readonly ThreadView[]): { blockId: string; threads: ThreadView[] }[] {
+export function markerThreads(
+  threads: readonly ThreadView[],
+): { blockId: string; threads: ThreadView[] }[] {
   const byBlock = new Map<string, ThreadView[]>();
   for (const thread of threads) {
-    if (thread.status !== "open" || thread.orphaned || thread.blockId === DOCUMENT_THREAD) continue;
+    if (
+      thread.status !== "open" ||
+      thread.orphaned ||
+      thread.blockId === DOCUMENT_THREAD
+    )
+      continue;
     const list = byBlock.get(thread.blockId);
     if (list) list.push(thread);
     else byBlock.set(thread.blockId, [thread]);
@@ -104,7 +111,11 @@ export function markerThreads(threads: readonly ThreadView[]): { blockId: string
 }
 
 /** The marker the arrow key moves to (null: stay). */
-export function nextMarkerIndex(key: string, current: number, count: number): number | null {
+export function nextMarkerIndex(
+  key: string,
+  current: number,
+  count: number,
+): number | null {
   if (count === 0) return null;
   let next: number;
   if (key === "ArrowDown" || key === "ArrowRight") next = current + 1;
@@ -132,13 +143,15 @@ function measureLayer(
   groups: readonly { blockId: string; threads: ThreadView[] }[],
   hover: string | null,
 ): { markers: Marker[]; ghost: Ghost | null } {
-  const center = (rect: DOMRect) => Math.round(rect.top - origin + Math.min(rect.height, LINE) / 2);
+  const center = (rect: DOMRect) =>
+    Math.round(rect.top - origin + Math.min(rect.height, LINE) / 2);
 
   const markers: Marker[] = [];
   for (const group of groups) {
     const placed: { id: string; y: number }[] = [];
     for (const thread of group.threads) {
-      const rect = handle.getThreadRect(thread.id) ?? handle.getBlockRect(thread.blockId);
+      const rect =
+        handle.getThreadRect(thread.id) ?? handle.getBlockRect(thread.blockId);
       if (rect) placed.push({ id: thread.id, y: center(rect) });
     }
     if (placed.length === 0) continue;
@@ -155,24 +168,50 @@ function measureLayer(
   const block = hover ? handle.getBlockRect(hover) : null;
   const ghost =
     hover && block
-      ? { blockId: hover, top: Math.round(block.top - origin), height: Math.round(block.height), y: center(block) }
+      ? {
+          blockId: hover,
+          top: Math.round(block.top - origin),
+          height: Math.round(block.height),
+          y: center(block),
+        }
       : null;
   return { markers, ghost };
 }
 
 const sameGhost = (a: Ghost | null, b: Ghost | null) =>
-  a === b || (a !== null && b !== null && a.blockId === b.blockId && a.top === b.top && a.height === b.height && a.y === b.y);
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.blockId === b.blockId &&
+    a.top === b.top &&
+    a.height === b.height &&
+    a.y === b.y);
 
-export function MarkerGlyph({ count, active, compact = false }: { count: number; active: boolean; compact?: boolean }) {
+export function MarkerGlyph({
+  count,
+  active,
+  compact = false,
+}: {
+  count: number;
+  active: boolean;
+  compact?: boolean;
+}) {
   return (
-    <span className={cn("relative grid place-items-center", compact ? "size-5" : "size-6")}>
+    <span
+      className={cn(
+        "relative grid place-items-center",
+        compact ? "size-5" : "size-6",
+      )}
+    >
       <MessageSquare
         aria-hidden
         strokeWidth={1.5}
         className={cn(
           "text-warning transition-colors duration-(--dur-fast)",
           compact ? "size-5" : "size-6",
-          active ? "fill-warning-border" : "fill-warning-soft group-hover/marker:fill-warning-border",
+          active
+            ? "fill-warning-border"
+            : "fill-warning-soft group-hover/marker:fill-warning-border",
         )}
       />
       <span
@@ -218,8 +257,15 @@ export function GutterMarkers({
       const handle = editor.current;
       const box = layer.current;
       if (!handle || !box) return;
-      const next = measureLayer(handle, box.getBoundingClientRect().top, groups, hover);
-      setMarkers((prev) => (sameMarkers(prev, next.markers) ? prev : next.markers));
+      const next = measureLayer(
+        handle,
+        box.getBoundingClientRect().top,
+        groups,
+        hover,
+      );
+      setMarkers((prev) =>
+        sameMarkers(prev, next.markers) ? prev : next.markers,
+      );
       setGhost((prev) => (sameGhost(prev, next.ghost) ? prev : next.ghost));
     };
     run();
@@ -264,12 +310,19 @@ export function GutterMarkers({
   }, [canRequest, blocks]);
 
   // One tab stop for the whole group: the marker of the active thread, else the one last focused, else the first.
-  const activeBlock = markers.find((m) => activeThreadId !== null && m.threadIds.includes(activeThreadId))?.blockId;
+  const activeBlock = markers.find(
+    (m) => activeThreadId !== null && m.threadIds.includes(activeThreadId),
+  )?.blockId;
   const stop =
-    activeBlock ?? (markers.some((m) => m.blockId === focused) ? focused : (markers[0]?.blockId ?? null));
+    activeBlock ??
+    (markers.some((m) => m.blockId === focused)
+      ? focused
+      : (markers[0]?.blockId ?? null));
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const from = (event.target as HTMLElement).closest<HTMLElement>("[data-marker]")?.dataset.marker;
+    const from = (event.target as HTMLElement).closest<HTMLElement>(
+      "[data-marker]",
+    )?.dataset.marker;
     const current = markers.findIndex((m) => m.blockId === from);
     if (current < 0) return;
     const next = nextMarkerIndex(event.key, current, markers.length);
@@ -305,14 +358,20 @@ export function GutterMarkers({
 
   const choose = (marker: Marker) => {
     // A block with several threads: each press goes on to the next.
-    const at = activeThreadId === null ? -1 : marker.threadIds.indexOf(activeThreadId);
+    const at =
+      activeThreadId === null ? -1 : marker.threadIds.indexOf(activeThreadId);
     const next = marker.threadIds[(at + 1) % marker.threadIds.length];
     forget();
-    refocus.current = { threadId: next, timer: window.setTimeout(() => (refocus.current = null), 1000) };
+    refocus.current = {
+      threadId: next,
+      timer: window.setTimeout(() => (refocus.current = null), 1000),
+    };
     onActivate(next);
   };
 
-  const hasMarker = ghost ? groups.some((g) => g.blockId === ghost.blockId) : false;
+  const hasMarker = ghost
+    ? groups.some((g) => g.blockId === ghost.blockId)
+    : false;
 
   return (
     <div
@@ -326,24 +385,49 @@ export function GutterMarkers({
     >
       {ghost && !hasMarker ? (
         // The strip is as tall as the block and reaches the text, so the pointer can travel from the text to the marker.
-        <div data-slot="block-comment" className="pointer-events-auto absolute inset-x-0" style={{ top: ghost.top, height: ghost.height }}>
+        <div
+          data-slot="block-comment"
+          className="pointer-events-auto absolute inset-x-0"
+          style={{ top: ghost.top, height: ghost.height }}
+        >
           <button
             type="button"
             tabIndex={-1}
             aria-label={`Comment on this ${noun}`}
             onClick={() => onRequestBlockComment?.(ghost.blockId)}
             className="absolute grid place-items-center rounded-md text-text-subtle outline-none transition-colors duration-(--dur-fast) hover:bg-hover hover:text-text-muted focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring"
-            style={{ top: ghost.y - ghost.top - size / 2, left: offset, width: size, height: size }}
+            style={{
+              top: ghost.y - ghost.top - size / 2,
+              left: offset,
+              width: size,
+              height: size,
+            }}
           >
-            <MessageSquarePlus aria-hidden strokeWidth={1.75} className={compact ? "size-3.5" : "size-4"} />
+            <MessageSquarePlus
+              aria-hidden
+              strokeWidth={1.75}
+              className={compact ? "size-3.5" : "size-4"}
+            />
           </button>
         </div>
       ) : null}
 
       {markers.length > 0 ? (
-        <div role="toolbar" aria-label={label ?? (noun === "field" ? "Comments on the message" : "Comments in the document")} aria-orientation="vertical" onKeyDown={onKeyDown}>
+        <div
+          role="toolbar"
+          aria-label={
+            label ??
+            (noun === "field"
+              ? "Comments on the message"
+              : "Comments in the document")
+          }
+          aria-orientation="vertical"
+          onKeyDown={onKeyDown}
+        >
           {markers.map((marker) => {
-            const active = activeThreadId !== null && marker.threadIds.includes(activeThreadId);
+            const active =
+              activeThreadId !== null &&
+              marker.threadIds.includes(activeThreadId);
             return (
               <button
                 key={marker.blockId}
@@ -359,9 +443,18 @@ export function GutterMarkers({
                 onFocus={() => setFocused(marker.blockId)}
                 onClick={() => choose(marker)}
                 className="group/marker pointer-events-auto absolute grid place-items-center rounded-md outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring"
-                style={{ top: marker.y - size / 2, left: offset, width: size, height: size }}
+                style={{
+                  top: marker.y - size / 2,
+                  left: offset,
+                  width: size,
+                  height: size,
+                }}
               >
-                <MarkerGlyph count={marker.count} active={active} compact={compact} />
+                <MarkerGlyph
+                  count={marker.count}
+                  active={active}
+                  compact={compact}
+                />
               </button>
             );
           })}

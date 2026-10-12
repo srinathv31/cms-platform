@@ -10,7 +10,9 @@ import { MENU_FLOATING_UI, showOnTyping } from "./menu-placement";
 
 export const slashCommandPluginKey = new PluginKey("slashCommand");
 
-export type SlashRender = NonNullable<SuggestionOptions<BlockItem, BlockItem>["render"]>;
+export type SlashRender = NonNullable<
+  SuggestionOptions<BlockItem, BlockItem>["render"]
+>;
 
 export interface SlashCommandOptions {
   items: readonly BlockItem[];

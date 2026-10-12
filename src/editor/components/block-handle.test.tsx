@@ -16,7 +16,9 @@ import { BlockHandle } from "./block-handle";
 import { createSlashMenuController } from "./slash-menu";
 import { TableMenu } from "./table-menu";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let cleanup: (() => void) | null = null;
 beforeEach(() => {
@@ -29,13 +31,22 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const p = (text: string): JSONContent => ({ type: "paragraph", content: [{ type: "text", text }] });
-const li = (text: string, ...nested: JSONContent[]): JSONContent => ({ type: "listItem", content: [p(text), ...nested] });
+const p = (text: string): JSONContent => ({
+  type: "paragraph",
+  content: [{ type: "text", text }],
+});
+const li = (text: string, ...nested: JSONContent[]): JSONContent => ({
+  type: "listItem",
+  content: [p(text), ...nested],
+});
 const DOC: JSONContent = {
   type: "doc",
   content: [
     p("Intro"),
-    { type: "orderedList", content: [li("One", { type: "orderedList", content: [li("Inner")] })] },
+    {
+      type: "orderedList",
+      content: [li("One", { type: "orderedList", content: [li("Inner")] })],
+    },
     {
       type: "table",
       content: [
@@ -43,7 +54,10 @@ const DOC: JSONContent = {
           type: "tableRow",
           content: [
             { type: "tableCell", content: [p("Plain cell")] },
-            { type: "tableCell", content: [{ type: "orderedList", content: [li("Cell item")] }] },
+            {
+              type: "tableCell",
+              content: [{ type: "orderedList", content: [li("Cell item")] }],
+            },
           ],
         },
       ],
@@ -60,7 +74,11 @@ function setup() {
   const host = document.createElement("div");
   frame.append(surface, host);
   document.body.appendChild(frame);
-  const editor = new Editor({ element: surface, extensions: editorExtensions({ store: createVariableStore([]) }), content: DOC });
+  const editor = new Editor({
+    element: surface,
+    extensions: editorExtensions({ store: createVariableStore([]) }),
+    content: DOC,
+  });
   let root: Root;
   act(() => {
     root = createRoot(host);
@@ -85,19 +103,30 @@ function caretIn(editor: Editor, text: string) {
     return at < 0;
   });
   act(() => {
-    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, at)));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, at)),
+    );
   });
 }
 
 async function altF10(editor: Editor) {
   await act(async () => {
-    editor.view.dom.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", altKey: true, bubbles: true, cancelable: true }));
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "F10",
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     await wait(20);
   });
 }
 
-const blockButton = (frame: HTMLElement) => frame.querySelector<HTMLButtonElement>('button[aria-label="Block options"]');
-const tableButton = (frame: HTMLElement) => frame.querySelector<HTMLButtonElement>('[aria-label="Table options"]');
+const blockButton = (frame: HTMLElement) =>
+  frame.querySelector<HTMLButtonElement>('button[aria-label="Block options"]');
+const tableButton = (frame: HTMLElement) =>
+  frame.querySelector<HTMLButtonElement>('[aria-label="Table options"]');
 
 describe("Alt+F10", () => {
   it("in a nested numbered list: the block's button, focused; Enter opens the menu for that list", async () => {

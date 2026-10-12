@@ -29,7 +29,11 @@ export function saveIndicatorText(status: SaveStatus, error?: string): string {
 const WIDEST = saveIndicatorText("saving");
 
 /** Quiet text beside the title: Saved, Saving…, or why it didn't save. No spinner. */
-export function SaveIndicator({ status, error, className }: SaveIndicatorProps) {
+export function SaveIndicator({
+  status,
+  error,
+  className,
+}: SaveIndicatorProps) {
   return (
     <span
       aria-live="polite"

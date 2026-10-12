@@ -38,7 +38,11 @@ async function insertRows<T extends SQLiteTable>(
 /** `seq` 1, 2, 3, … oldest first (then by id), as if each notice had been written live at its time. */
 function numberNotices(rows: Sink["consumerNotices"]) {
   return [...rows]
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .sort(
+      (a, b) =>
+        a.createdAt.getTime() - b.createdAt.getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )
     .map((row, i) => ({ ...row, seq: i + 1 }));
 }
 
@@ -74,7 +78,10 @@ async function insertAll(db: Db, s: Sink) {
  * Fills an empty, migrated database. Every timestamp is relative to `base` (the real current time
  * at reset; clock offset 0). Structure is deterministic: same ids, names and states every time.
  */
-export async function seedDatabase(db: Db, opts: { base: Date }): Promise<SeedResult> {
+export async function seedDatabase(
+  db: Db,
+  opts: { base: Date },
+): Promise<SeedResult> {
   const ctx = createContext(opts.base.getTime());
 
   seedPeople(ctx);
@@ -101,7 +108,11 @@ export async function seedDatabase(db: Db, opts: { base: Date }): Promise<SeedRe
   await insertAll(db, ctx.sink);
 
   return {
-    templates: Object.fromEntries([...ctx.templates].map(([key, t]) => [key, t.id])),
-    counts: Object.fromEntries(Object.entries(ctx.sink).map(([k, rows]) => [k, rows.length])),
+    templates: Object.fromEntries(
+      [...ctx.templates].map(([key, t]) => [key, t.id]),
+    ),
+    counts: Object.fromEntries(
+      Object.entries(ctx.sink).map(([k, rows]) => [k, rows.length]),
+    ),
   };
 }

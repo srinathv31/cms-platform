@@ -5,15 +5,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RenderError } from "@/domain/render/types";
 import { validateValues } from "@/domain/render/validate";
 import type { DocumentChannel, Variable } from "@/domain/types";
-import { renderPreview, type PreviewOutput, type RenderPreviewResult } from "./render-preview";
-import { sameOutput, usePreviewRender, VALUES_DEBOUNCE_MS, type UsePreviewRender, type UsePreviewRenderOptions } from "./use-preview-render";
+import {
+  renderPreview,
+  type PreviewOutput,
+  type RenderPreviewResult,
+} from "./render-preview";
+import {
+  sameOutput,
+  usePreviewRender,
+  VALUES_DEBOUNCE_MS,
+  type UsePreviewRender,
+  type UsePreviewRenderOptions,
+} from "./use-preview-render";
 
 vi.mock("./render-preview", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./render-preview")>()),
   renderPreview: vi.fn(),
 }));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const render = vi.mocked(renderPreview);
 
@@ -23,17 +35,27 @@ let api: UsePreviewRender;
 let flush: ReturnType<typeof vi.fn<() => Promise<void>>>;
 const session = { flush: () => flush() };
 
-const variable = (key: string, type: Variable["type"], required: boolean): Variable => ({
+const variable = (
+  key: string,
+  type: Variable["type"],
+  required: boolean,
+): Variable => ({
   key,
   label: key,
   type,
   required,
   sample: "",
 });
-const VARIABLES = [variable("first_name", "text", true), variable("purchase_apr", "percent", false)];
+const VARIABLES = [
+  variable("first_name", "text", true),
+  variable("purchase_apr", "percent", false),
+];
 
 const web = (html: string): PreviewOutput => ({ kind: "web", html });
-const err = (code: RenderError["code"], message: string): RenderPreviewResult => ({ kind: "error", error: { code, message } });
+const err = (
+  code: RenderError["code"],
+  message: string,
+): RenderPreviewResult => ({ kind: "error", error: { code, message } });
 
 const base: UsePreviewRenderOptions = {
   templateId: "UC-4F7K2Q",
@@ -159,8 +181,13 @@ describe("usePreviewRender", () => {
     render.mockImplementation(({ signal, values }) => {
       signals.push(signal!);
       return new Promise((resolve, reject) => {
-        signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
-        setTimeout(() => resolve(web(`<p>${String(values.first_name)}</p>`)), 100);
+        signal!.addEventListener("abort", () =>
+          reject(new DOMException("Aborted", "AbortError")),
+        );
+        setTimeout(
+          () => resolve(web(`<p>${String(values.first_name)}</p>`)),
+          100,
+        );
       });
     });
     await mount(base);
@@ -179,15 +206,23 @@ describe("usePreviewRender", () => {
     await settle();
 
     let finish: (r: RenderPreviewResult) => void = () => {};
-    render.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+    render.mockImplementation(
+      () => new Promise((resolve) => (finish = resolve)),
+    );
     await mount({ ...base, saveTick: 1 });
     await settle();
     expect(api.rendering).toBe(true);
     expect(api.slots.web?.output).toEqual(web("<p>one</p>"));
 
-    await act(async () => finish(err("invalid_values", "purchase_apr must be a percentage, like 21.99.")));
+    await act(async () =>
+      finish(
+        err("invalid_values", "purchase_apr must be a percentage, like 21.99."),
+      ),
+    );
     await settle();
-    expect(api.slots.web?.error?.message).toBe("purchase_apr must be a percentage, like 21.99.");
+    expect(api.slots.web?.error?.message).toBe(
+      "purchase_apr must be a percentage, like 21.99.",
+    );
     expect(api.slots.web?.output).toEqual(web("<p>one</p>"));
 
     render.mockResolvedValue(web("<p>three</p>"));
@@ -209,11 +244,20 @@ describe("usePreviewRender", () => {
   it("keeps each channel's output apart", async () => {
     await mount(base);
     await settle();
-    render.mockResolvedValue({ kind: "email", subject: "S", preheader: "P", html: "<p>mail</p>", text: "mail" });
+    render.mockResolvedValue({
+      kind: "email",
+      subject: "S",
+      preheader: "P",
+      html: "<p>mail</p>",
+      text: "mail",
+    });
     await mount({ ...base, channel: "email" });
     await settle();
     expect(api.slots.web?.output).toEqual(web("<p>one</p>"));
-    expect(api.slots.email?.output).toMatchObject({ kind: "email", subject: "S" });
+    expect(api.slots.email?.output).toMatchObject({
+      kind: "email",
+      subject: "S",
+    });
   });
 
   it("flushes again each time it is turned back on", async () => {
@@ -260,7 +304,10 @@ describe("usePreviewRender", () => {
     });
 
     it("names a value of the wrong type", async () => {
-      await mount({ ...base, values: { first_name: "Maya", purchase_apr: "twelve" } });
+      await mount({
+        ...base,
+        values: { first_name: "Maya", purchase_apr: "twelve" },
+      });
       await settle();
 
       expect(render).not.toHaveBeenCalled();
@@ -271,7 +318,10 @@ describe("usePreviewRender", () => {
     });
 
     it("lets an empty optional value through", async () => {
-      await mount({ ...base, values: { first_name: "Maya", purchase_apr: "" } });
+      await mount({
+        ...base,
+        values: { first_name: "Maya", purchase_apr: "" },
+      });
       await settle();
       expect(render).toHaveBeenCalledTimes(1);
       expect(api.slots.web?.error).toBeNull();
@@ -318,7 +368,9 @@ describe("usePreviewRender", () => {
       await mount({ ...base, variables: added });
       await settle();
       expect(render).not.toHaveBeenCalled();
-      expect(api.slots.web?.error?.message).toBe("Missing required variables: annual_fee.");
+      expect(api.slots.web?.error?.message).toBe(
+        "Missing required variables: annual_fee.",
+      );
     });
   });
 
@@ -342,7 +394,13 @@ describe("usePreviewRender", () => {
       );
       render.mockImplementation(async () => {
         order.push("render");
-        return { kind: "email", subject: "S", preheader: "", html: "<p>m</p>", text: "m" };
+        return {
+          kind: "email",
+          subject: "S",
+          preheader: "",
+          html: "<p>m</p>",
+          text: "m",
+        };
       });
 
       await mount({ ...base, channel: "email" });
@@ -372,7 +430,9 @@ describe("usePreviewRender", () => {
 
     it("does not send a request a newer one has already replaced while it waited", async () => {
       let landed: () => void = () => {};
-      flush.mockImplementationOnce(() => new Promise<void>((resolve) => (landed = resolve)));
+      flush.mockImplementationOnce(
+        () => new Promise<void>((resolve) => (landed = resolve)),
+      );
       await mount(base);
       await settle();
       await mount({ ...base, channel: "email" });
@@ -384,7 +444,12 @@ describe("usePreviewRender", () => {
     });
 
     it("shows a refusal the route still gives (a real 4xx) and does not retry it", async () => {
-      render.mockResolvedValueOnce(err("channel_not_enabled", "Version 2 doesn't render to Email. Its channels are PDF and Web."));
+      render.mockResolvedValueOnce(
+        err(
+          "channel_not_enabled",
+          "Version 2 doesn't render to Email. Its channels are PDF and Web.",
+        ),
+      );
       await mount({ ...base, channel: "email" });
       await settle(1000);
 
@@ -395,15 +460,22 @@ describe("usePreviewRender", () => {
     });
 
     it("shows a 5xx from the route as it comes", async () => {
-      render.mockResolvedValueOnce(err("render_failed", "The email couldn't be rendered. Try again."));
+      render.mockResolvedValueOnce(
+        err("render_failed", "The email couldn't be rendered. Try again."),
+      );
       await mount({ ...base, channel: "email" });
       await settle();
-      expect(api.slots.email?.error).toEqual({ code: "render_failed", message: "The email couldn't be rendered. Try again." });
+      expect(api.slots.email?.error).toEqual({
+        code: "render_failed",
+        message: "The email couldn't be rendered. Try again.",
+      });
     });
   });
 
   it("renders again on retry", async () => {
-    render.mockResolvedValueOnce(err("render_failed", "The PDF couldn't be rendered. Try again."));
+    render.mockResolvedValueOnce(
+      err("render_failed", "The PDF couldn't be rendered. Try again."),
+    );
     await mount(base);
     await settle();
     expect(api.slots.web?.error?.code).toBe("render_failed");
@@ -419,12 +491,22 @@ describe("sameOutput", () => {
   it("compares text for Web and Email, and bytes for PDF", () => {
     expect(sameOutput(web("a"), web("a"))).toBe(true);
     expect(sameOutput(web("a"), web("b"))).toBe(false);
-    const pdf = (bytes: number[], filename = "f.pdf"): PreviewOutput => ({ kind: "pdf", bytes: new Uint8Array(bytes), filename });
+    const pdf = (bytes: number[], filename = "f.pdf"): PreviewOutput => ({
+      kind: "pdf",
+      bytes: new Uint8Array(bytes),
+      filename,
+    });
     expect(sameOutput(pdf([1, 2]), pdf([1, 2]))).toBe(true);
     expect(sameOutput(pdf([1, 2]), pdf([1, 3]))).toBe(false);
     expect(sameOutput(pdf([1, 2]), pdf([1, 2, 3]))).toBe(false);
     expect(sameOutput(pdf([1]), pdf([1], "g.pdf"))).toBe(false);
-    const email = (subject: string): PreviewOutput => ({ kind: "email", subject, preheader: "", html: "h", text: "t" });
+    const email = (subject: string): PreviewOutput => ({
+      kind: "email",
+      subject,
+      preheader: "",
+      html: "h",
+      text: "t",
+    });
     expect(sameOutput(email("a"), email("a"))).toBe(true);
     expect(sameOutput(email("a"), email("b"))).toBe(false);
     expect(sameOutput(web("a"), email("a"))).toBe(false);

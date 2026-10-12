@@ -6,7 +6,10 @@ import type { SectionBody } from "./section-body";
 import { PLATFORM_SECTION_BODIES } from "./platform";
 import { TEAM_SECTION_BODIES } from "./team";
 
-const BODIES: Record<string, SectionBody> = { ...TEAM_SECTION_BODIES, ...PLATFORM_SECTION_BODIES };
+const BODIES: Record<string, SectionBody> = {
+  ...TEAM_SECTION_BODIES,
+  ...PLATFORM_SECTION_BODIES,
+};
 
 /**
  * One settings section: serif title, then the section's body from its group's registry.

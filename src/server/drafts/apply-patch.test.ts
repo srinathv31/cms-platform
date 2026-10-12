@@ -6,7 +6,15 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { DraftPatch, DraftSaveResponse, JSONContent, MembershipStatus, TeamRole, Variable, Viewer } from "@/domain/types";
+import type {
+  DraftPatch,
+  DraftSaveResponse,
+  JSONContent,
+  MembershipStatus,
+  TeamRole,
+  Variable,
+  Viewer,
+} from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { accessRefusal, applyDraftPatch } from "./apply-patch";
@@ -30,11 +38,28 @@ const para = (text: string, id?: string): JSONContent => ({
   ...(id ? { attrs: { id } } : {}),
   content: [{ type: "text", text }],
 });
-const doc = (...content: JSONContent[]): JSONContent => ({ type: "doc", content });
+const doc = (...content: JSONContent[]): JSONContent => ({
+  type: "doc",
+  content,
+});
 
-const variable = (key: string): Variable => ({ key, label: key, type: "text", required: false, sample: "x" });
+const variable = (key: string): Variable => ({
+  key,
+  label: key,
+  type: "text",
+  required: false,
+  sample: "x",
+});
 
-function viewer(userId: string, roles: TeamRole[], opts: { team?: string; status?: MembershipStatus; platform?: Viewer["platformRole"] } = {}): Viewer {
+function viewer(
+  userId: string,
+  roles: TeamRole[],
+  opts: {
+    team?: string;
+    status?: MembershipStatus;
+    platform?: Viewer["platformRole"];
+  } = {},
+): Viewer {
   const team = opts.team ?? "coral";
   return {
     userId,
@@ -43,7 +68,15 @@ function viewer(userId: string, roles: TeamRole[], opts: { team?: string; status
     title: "Tester",
     platformRole: opts.platform ?? null,
     memberships: roles.length
-      ? [{ teamId: team, teamSlug: team, teamName: team, roles, status: opts.status ?? "active" }]
+      ? [
+          {
+            teamId: team,
+            teamSlug: team,
+            teamName: team,
+            roles,
+            status: opts.status ?? "active",
+          },
+        ]
       : [],
   };
 }
@@ -62,7 +95,14 @@ async function seed() {
     })),
   );
   await db.insert(teams).values(
-    ["coral", "deposits"].map((id) => ({ id, slug: id, name: id, description: "", icon: "x", createdAt: T0 })),
+    ["coral", "deposits"].map((id) => ({
+      id,
+      slug: id,
+      name: id,
+      description: "",
+      icon: "x",
+      createdAt: T0,
+    })),
   );
   await db.insert(contentTypes).values({
     id: "ct_disclosure",
@@ -110,11 +150,22 @@ afterAll(() => {
 });
 
 beforeEach(async () => {
-  for (const table of [auditEvents, versions, templates, contentTypes, teams, users]) await db.delete(table);
+  for (const table of [
+    auditEvents,
+    versions,
+    templates,
+    contentTypes,
+    teams,
+    users,
+  ])
+    await db.delete(table);
   await seed();
 });
 
-const save = (patch: Partial<DraftPatch>, opts: { by?: Viewer; id?: string; at?: Date } = {}) =>
+const save = (
+  patch: Partial<DraftPatch>,
+  opts: { by?: Viewer; id?: string; at?: Date } = {},
+) =>
   applyDraftPatch(db, {
     viewer: opts.by ?? maya,
     versionId: opts.id ?? "v_draft",
@@ -122,7 +173,10 @@ const save = (patch: Partial<DraftPatch>, opts: { by?: Viewer; id?: string; at?:
     patch: { rev: 5, sessionKey: SESSION, ...patch },
   });
 
-const draft = () => db.query.versions.findFirst({ where: eq(versions.id, "v_draft") }).then((v) => v!);
+const draft = () =>
+  db.query.versions
+    .findFirst({ where: eq(versions.id, "v_draft") })
+    .then((v) => v!);
 const audit = () => db.select().from(auditEvents);
 const failure = (res: DraftSaveResponse) => {
   if (res.ok) throw new Error("expected a failure");
@@ -161,23 +215,37 @@ describe("applyDraftPatch: a good save", () => {
     const after = await draft();
     expect(after.variables.map((v) => v.key)).toEqual(["a", "b"]);
     expect(after.channels).toEqual(["pdf", "web"]);
-    expect(after.channelFields).toEqual({ email: { subject, preheader: doc(para("Pre", "h1")) } });
-    expect(after.sampleSets).toEqual([{ id: "s1", name: "Maya", values: { a: "1", b: 2 } }]);
+    expect(after.channelFields).toEqual({
+      email: { subject, preheader: doc(para("Pre", "h1")) },
+    });
+    expect(after.sampleSets).toEqual([
+      { id: "s1", name: "Maya", values: { a: "1", b: 2 } },
+    ]);
     expect((await draft()).name).toBe("New name");
   });
 
   it("clears the email subject with null, and keeps the fields a save doesn't name", async () => {
-    await save({ "email.subject": doc(para("Hi", "s1")), "email.preheader": doc(para("Pre", "h1")) });
+    await save({
+      "email.subject": doc(para("Hi", "s1")),
+      "email.preheader": doc(para("Pre", "h1")),
+    });
     await save({ rev: 6, "email.subject": null });
-    expect((await draft()).channelFields).toEqual({ email: { preheader: doc(para("Pre", "h1")) } });
+    expect((await draft()).channelFields).toEqual({
+      email: { preheader: doc(para("Pre", "h1")) },
+    });
     await save({ rev: 7, "email.preheader": null });
     expect((await draft()).channelFields).toEqual({});
   });
 
   it("records each channel field it changed, by id, in the session's audit row", async () => {
     await save({ "email.subject": doc(para("Hi", "s1")) });
-    const [row] = await db.select().from(auditEvents).where(eq(auditEvents.action, "draft.edited"));
-    expect((row!.details as { fields: string[] }).fields).toEqual(["email.subject"]);
+    const [row] = await db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "draft.edited"));
+    expect((row!.details as { fields: string[] }).fields).toEqual([
+      "email.subject",
+    ]);
   });
 
   it("renames the draft, trimmed, and still bumps the version's rev", async () => {
@@ -203,8 +271,12 @@ describe("applyDraftPatch: a good save", () => {
       createdAt: T0,
       updatedAt: T0,
     });
-    expect(await save({ name: "Annual fee waiver" })).toMatchObject({ ok: true });
-    const active = await db.query.versions.findFirst({ where: eq(versions.id, "v_active") });
+    expect(await save({ name: "Annual fee waiver" })).toMatchObject({
+      ok: true,
+    });
+    const active = await db.query.versions.findFirst({
+      where: eq(versions.id, "v_active"),
+    });
     expect(active).toMatchObject({ name: "Annual fee", rev: 0, updatedAt: T0 });
     expect((await draft()).name).toBe("Annual fee waiver");
   });
@@ -218,14 +290,25 @@ describe("applyDraftPatch: a good save", () => {
 
   it("takes the next save at the new rev", async () => {
     await save({ body: doc(para("One", "p1")) });
-    const res = await save({ rev: 6, body: doc(para("Two", "p1")) }, { at: T2 });
+    const res = await save(
+      { rev: 6, body: doc(para("Two", "p1")) },
+      { at: T2 },
+    );
     expect(res).toEqual({ ok: true, rev: 7, savedAt: T2.toISOString() });
   });
 });
 
 describe("applyDraftPatch: the body is stored normalized (docs/render-spec.md §3)", () => {
-  const t = (text: string, marks?: JSONContent["marks"]): JSONContent => ({ type: "text", text, ...(marks ? { marks } : {}) });
-  const node = (type: string, attrs: Record<string, unknown> | null, ...content: JSONContent[]): JSONContent => ({
+  const t = (text: string, marks?: JSONContent["marks"]): JSONContent => ({
+    type: "text",
+    text,
+    ...(marks ? { marks } : {}),
+  });
+  const node = (
+    type: string,
+    attrs: Record<string, unknown> | null,
+    ...content: JSONContent[]
+  ): JSONContent => ({
     type,
     ...(attrs ? { attrs } : {}),
     ...(content.length ? { content } : {}),
@@ -234,34 +317,96 @@ describe("applyDraftPatch: the body is stored normalized (docs/render-spec.md §
   it("tabs, heading levels, invisible characters, cell attributes, TipTap's list type, links and ragged rows", async () => {
     const res = await save({
       body: doc(
-        node("heading", { id: "h", level: 5 }, t("Fees\t20\u00AD27\u200E"), { type: "hardBreak" }),
-        node("paragraph", { id: "p" }, t("Terms", [{ type: "link", attrs: { href: " HTTPS://Coral.Example/café " } }]), t(" or "), t("here", [{ type: "link", attrs: { href: "javascript:x" } }])),
-        node("orderedList", { id: "l", start: 2, type: "a" }, node("listItem", { id: "i" }, node("paragraph", { id: "q" }, t("x")))),
+        node("heading", { id: "h", level: 5 }, t("Fees\t20\u00AD27\u200E"), {
+          type: "hardBreak",
+        }),
+        node(
+          "paragraph",
+          { id: "p" },
+          t("Terms", [
+            { type: "link", attrs: { href: " HTTPS://Coral.Example/café " } },
+          ]),
+          t(" or "),
+          t("here", [{ type: "link", attrs: { href: "javascript:x" } }]),
+        ),
+        node(
+          "orderedList",
+          { id: "l", start: 2, type: "a" },
+          node("listItem", { id: "i" }, node("paragraph", { id: "q" }, t("x"))),
+        ),
         node(
           "table",
           { id: "t" },
-          node("tableRow", null, node("tableCell", { align: "center", colwidth: [90] }, node("paragraph", { id: "a" }, t("a"))), node("tableCell", null, node("paragraph", { id: "b" }, t("b")))),
-          node("tableRow", null, node("tableCell", null, node("paragraph", { id: "c" }, t("c")))),
+          node(
+            "tableRow",
+            null,
+            node(
+              "tableCell",
+              { align: "center", colwidth: [90] },
+              node("paragraph", { id: "a" }, t("a")),
+            ),
+            node("tableCell", null, node("paragraph", { id: "b" }, t("b"))),
+          ),
+          node(
+            "tableRow",
+            null,
+            node("tableCell", null, node("paragraph", { id: "c" }, t("c"))),
+          ),
         ),
       ),
     });
     expect(res.ok).toBe(true);
     const [heading, paragraph, list, table] = (await draft()).body.content!;
     // A hard break at the end stays: the editor shows the line after it.
-    expect(heading).toEqual(node("heading", { id: "h", level: 3, requiredKey: null }, t("Fees 2027"), { type: "hardBreak" }));
+    expect(heading).toEqual(
+      node(
+        "heading",
+        { id: "h", level: 3, requiredKey: null },
+        t("Fees 2027"),
+        { type: "hardBreak" },
+      ),
+    );
     // (Giving ids round-trips through the schema: adjacent plain runs merge, the link's defaults are written.)
-    expect(paragraph.content?.map((run) => [run.text, run.marks?.map((m) => m.attrs?.href)])).toEqual([
+    expect(
+      paragraph.content?.map((run) => [
+        run.text,
+        run.marks?.map((m) => m.attrs?.href),
+      ]),
+    ).toEqual([
       ["Terms", ["https://Coral.Example/caf%C3%A9"]],
       [" or here", undefined],
     ]);
-    expect(list.attrs).toEqual({ id: "l", start: 2, markerFormat: null, markerDelimiter: null });
-    expect(table.content![0].content![0].attrs).toEqual({ colspan: 1, rowspan: 1 });
+    expect(list.attrs).toEqual({
+      id: "l",
+      start: 2,
+      markerFormat: null,
+      markerDelimiter: null,
+    });
+    expect(table.content![0].content![0].attrs).toEqual({
+      colspan: 1,
+      rowspan: 1,
+    });
     expect(table.content![1].content).toHaveLength(2);
   });
 
   it("content a cell can't hold stays in the cell as paragraphs", async () => {
     const res = await save({
-      body: doc(node("table", { id: "t" }, node("tableRow", null, node("tableCell", null, node("heading", { level: 2 }, t("Fee")), node("callout", null, node("paragraph", null, t("Note"))))))),
+      body: doc(
+        node(
+          "table",
+          { id: "t" },
+          node(
+            "tableRow",
+            null,
+            node(
+              "tableCell",
+              null,
+              node("heading", { level: 2 }, t("Fee")),
+              node("callout", null, node("paragraph", null, t("Note"))),
+            ),
+          ),
+        ),
+      ),
     });
     expect(res.ok).toBe(true);
     const cell = (await draft()).body.content![0].content![0].content![0];
@@ -272,31 +417,83 @@ describe("applyDraftPatch: the body is stored normalized (docs/render-spec.md §
   });
 
   it("the email fields: one line, no marks", async () => {
-    const res = await save({ "email.subject": doc(node("paragraph", null, t("Your\tAPR", [{ type: "bold" }]), { type: "hardBreak" }, t("changes"))) });
+    const res = await save({
+      "email.subject": doc(
+        node(
+          "paragraph",
+          null,
+          t("Your\tAPR", [{ type: "bold" }]),
+          { type: "hardBreak" },
+          t("changes"),
+        ),
+      ),
+    });
     expect(res.ok).toBe(true);
-    expect((await draft()).channelFields.email?.subject).toEqual(doc(node("paragraph", null, t("Your APR"), t(" "), t("changes"))));
+    expect((await draft()).channelFields.email?.subject).toEqual(
+      doc(node("paragraph", null, t("Your APR"), t(" "), t("changes"))),
+    );
   });
 });
 
 describe("applyDraftPatch: a document the check refuses is not saved, and says why", () => {
-  const item = (text: string, ...more: JSONContent[]): JSONContent => ({ type: "listItem", content: [para(text), ...more] });
+  const item = (text: string, ...more: JSONContent[]): JSONContent => ({
+    type: "listItem",
+    content: [para(text), ...more],
+  });
   const deep = (levels: number): JSONContent => {
     let list: JSONContent = { type: "bulletList", content: [item("deepest")] };
-    for (let level = 1; level < levels; level++) list = { type: "bulletList", content: [item(`level ${level}`, list)] };
+    for (let level = 1; level < levels; level++)
+      list = { type: "bulletList", content: [item(`level ${level}`, list)] };
     return list;
   };
   const row = (n: number, attrs?: Record<string, unknown>): JSONContent => ({
     type: "tableRow",
-    content: Array.from({ length: n }, () => ({ type: "tableCell", ...(attrs ? { attrs } : {}), content: [para("x")] })),
+    content: Array.from({ length: n }, () => ({
+      type: "tableCell",
+      ...(attrs ? { attrs } : {}),
+      content: [para("x")],
+    })),
   });
 
   it.each<[string, JSONContent, string]>([
-    ["a list start of 10000", doc({ type: "orderedList", attrs: { start: 10000 }, content: [item("x")] }), "A numbered list can start at 0 to 9999."],
-    ["an unknown numbering style", doc({ type: "orderedList", attrs: { markerFormat: "greek" }, content: [item("x")] }), "This list's numbering style isn't one Stencil knows."],
+    [
+      "a list start of 10000",
+      doc({
+        type: "orderedList",
+        attrs: { start: 10000 },
+        content: [item("x")],
+      }),
+      "A numbered list can start at 0 to 9999.",
+    ],
+    [
+      "an unknown numbering style",
+      doc({
+        type: "orderedList",
+        attrs: { markerFormat: "greek" },
+        content: [item("x")],
+      }),
+      "This list's numbering style isn't one Stencil knows.",
+    ],
     ["lists ten deep", doc(deep(10)), "Lists can nest at most 9 levels deep."],
-    ["a colspan of 0", doc({ type: "table", content: [row(2, { colspan: 0 })] }), "This table's cells don't line up into rows and columns."],
-    ["a heading of level 9", doc({ type: "heading", attrs: { level: 9 }, content: [{ type: "text", text: "x" }] }), "Headings can only be levels 1 to 3."],
-    ["an unknown node", doc({ type: "iframe", attrs: { src: "https://example.com" } }), "This document has content Stencil doesn't support."],
+    [
+      "a colspan of 0",
+      doc({ type: "table", content: [row(2, { colspan: 0 })] }),
+      "This table's cells don't line up into rows and columns.",
+    ],
+    [
+      "a heading of level 9",
+      doc({
+        type: "heading",
+        attrs: { level: 9 },
+        content: [{ type: "text", text: "x" }],
+      }),
+      "Headings can only be levels 1 to 3.",
+    ],
+    [
+      "an unknown node",
+      doc({ type: "iframe", attrs: { src: "https://example.com" } }),
+      "This document has content Stencil doesn't support.",
+    ],
   ])("refuses %s", async (_, body, message) => {
     const before = await draft();
     const res = failure(await save({ body }));
@@ -305,8 +502,18 @@ describe("applyDraftPatch: a document the check refuses is not saved, and says w
   });
 
   it("refuses an email subject that isn't one line", async () => {
-    const res = failure(await save({ "email.subject": doc(para("a"), { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "b" }] }) }));
-    expect(res.reason).toBe("The email subject and preheader can hold only one line of text and variables.");
+    const res = failure(
+      await save({
+        "email.subject": doc(para("a"), {
+          type: "heading",
+          attrs: { level: 2 },
+          content: [{ type: "text", text: "b" }],
+        }),
+      }),
+    );
+    expect(res.reason).toBe(
+      "The email subject and preheader can hold only one line of text and variables.",
+    );
   });
 });
 
@@ -323,7 +530,9 @@ describe("applyDraftPatch: refusals change nothing", () => {
   }
 
   it("version_gone for an unknown version", async () => {
-    const res = await expectUntouched(() => save({ body: doc(para("x")) }, { id: "v_missing" }));
+    const res = await expectUntouched(() =>
+      save({ body: doc(para("x")) }, { id: "v_missing" }),
+    );
     expect(res.code).toBe("version_gone");
   });
 
@@ -335,19 +544,38 @@ describe("applyDraftPatch: refusals change nothing", () => {
       viewer("dee", ["author"], { status: "lapsed" }),
       viewer("dee", ["author"], { status: "suspended" }),
     ]) {
-      const res = await expectUntouched(() => save({ body: doc(para("x")) }, { by: who }));
-      expect(res).toMatchObject({ code: "generic", reason: "You don't have access to do this." });
+      const res = await expectUntouched(() =>
+        save({ body: doc(para("x")) }, { by: who }),
+      );
+      expect(res).toMatchObject({
+        code: "generic",
+        reason: "You don't have access to do this.",
+      });
     }
   });
 
   it("the permission refusal for an author of another team", async () => {
-    const res = await expectUntouched(() => save({ body: doc(para("x")) }, { by: viewer("dee", ["author"], { team: "deposits" }) }));
+    const res = await expectUntouched(() =>
+      save(
+        { body: doc(para("x")) },
+        { by: viewer("dee", ["author"], { team: "deposits" }) },
+      ),
+    );
     expect(res.code).toBe("generic");
   });
 
   it("version_not_draft once the version has left draft", async () => {
-    for (const state of ["in_review", "changes_requested", "active", "superseded", "revoked"] as const) {
-      await db.update(versions).set({ state, number: 1 }).where(eq(versions.id, "v_draft"));
+    for (const state of [
+      "in_review",
+      "changes_requested",
+      "active",
+      "superseded",
+      "revoked",
+    ] as const) {
+      await db
+        .update(versions)
+        .set({ state, number: 1 })
+        .where(eq(versions.id, "v_draft"));
       const res = await expectUntouched(() => save({ body: doc(para("x")) }));
       expect(res.code).toBe("version_not_draft");
     }
@@ -355,14 +583,22 @@ describe("applyDraftPatch: refusals change nothing", () => {
 
   it("draft_changed carries the current rev, for a stale rev and for a rev from the future", async () => {
     for (const rev of [4, 0, 6, 99]) {
-      const res = await expectUntouched(() => save({ rev, body: doc(para("x")) }));
+      const res = await expectUntouched(() =>
+        save({ rev, body: doc(para("x")) }),
+      );
       expect(res).toMatchObject({ code: "draft_changed", rev: 5 });
     }
   });
 
   it("checks the permission before the state and the state before the rev", async () => {
-    await db.update(versions).set({ state: "active", number: 1 }).where(eq(versions.id, "v_draft"));
-    const asViewer = await save({ rev: 0, body: doc(para("x")) }, { by: viewer("sam", ["viewer"]) });
+    await db
+      .update(versions)
+      .set({ state: "active", number: 1 })
+      .where(eq(versions.id, "v_draft"));
+    const asViewer = await save(
+      { rev: 0, body: doc(para("x")) },
+      { by: viewer("sam", ["viewer"]) },
+    );
     expect(failure(asViewer).code).toBe("generic");
     const asAuthor = await save({ rev: 0, body: doc(para("x")) });
     expect(failure(asAuthor).code).toBe("version_not_draft");
@@ -376,29 +612,43 @@ describe("applyDraftPatch: refusals change nothing", () => {
   });
 
   it("invalid_input for a body the editor schema doesn't know", async () => {
-    const res = await expectUntouched(() => save({ body: doc({ type: "iframe", attrs: { src: "https://example.com" } }) }));
+    const res = await expectUntouched(() =>
+      save({
+        body: doc({ type: "iframe", attrs: { src: "https://example.com" } }),
+      }),
+    );
     expect(res.code).toBe("invalid_input");
   });
 
   it("channel_unavailable for a channel the content type doesn't allow", async () => {
-    const res = await expectUntouched(() => save({ channels: ["pdf", "email"] }));
+    const res = await expectUntouched(() =>
+      save({ channels: ["pdf", "email"] }),
+    );
     expect(res.code).toBe("channel_unavailable");
   });
 
   it("no_channels for no channels at all, which the parse refuses too: the draft keeps its own", async () => {
     const res = await expectUntouched(() => save({ channels: [] }));
-    expect(res).toMatchObject({ code: "no_channels", reason: "Turn on at least one channel." });
+    expect(res).toMatchObject({
+      code: "no_channels",
+      reason: "Turn on at least one channel.",
+    });
   });
 
   it("does not leave half a save behind when the name is the bad part", async () => {
-    await expectUntouched(() => save({ body: doc(para("Changed", "p1")), name: " " }));
+    await expectUntouched(() =>
+      save({ body: doc(para("Changed", "p1")), name: " " }),
+    );
   });
 });
 
 describe("accessRefusal: who may save, before the body is read", () => {
   it("is null for an author of the draft's team, whatever the draft's state", async () => {
     expect(await accessRefusal(db, maya, "v_draft")).toBeNull();
-    await db.update(versions).set({ state: "active", number: 1 }).where(eq(versions.id, "v_draft"));
+    await db
+      .update(versions)
+      .set({ state: "active", number: 1 })
+      .where(eq(versions.id, "v_draft"));
     expect(await accessRefusal(db, maya, "v_draft")).toBeNull(); // version_not_draft is the save's to answer
   });
 
@@ -413,8 +663,12 @@ describe("accessRefusal: who may save, before the body is read", () => {
     ];
     for (const [who, id] of cases) {
       const refused = await accessRefusal(db, who, id);
-      expect(refused, `${who.userId} ${id}`).toEqual(await save({ body: doc(para("x")) }, { by: who, id }));
-      expect(refused?.code).toBe(id === "v_missing" ? "version_gone" : "generic");
+      expect(refused, `${who.userId} ${id}`).toEqual(
+        await save({ body: doc(para("x")) }, { by: who, id }),
+      );
+      expect(refused?.code).toBe(
+        id === "v_missing" ? "version_gone" : "generic",
+      );
     }
   });
 });
@@ -439,22 +693,36 @@ describe("applyDraftPatch: the audit row", () => {
   it("merges later saves of the same session into that row", async () => {
     await save({ body: doc(para("a", "p1")) }, { at: T1 });
     await save({ rev: 6, variables: [variable("x")] }, { at: T2 });
-    await save({ rev: 7, body: doc(para("b", "p1")) }, { at: new Date(T2.getTime() + 1000) });
+    await save(
+      { rev: 7, body: doc(para("b", "p1")) },
+      { at: new Date(T2.getTime() + 1000) },
+    );
 
     const rows = await audit();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       at: new Date(T2.getTime() + 1000),
-      details: { saves: 3, fields: ["body", "variables"], since: T1.toISOString() },
+      details: {
+        saves: 3,
+        fields: ["body", "variables"],
+        since: T1.toISOString(),
+      },
     });
   });
 
   it("starts a new row for a new session", async () => {
     await save({ body: doc(para("a", "p1")) });
-    await save({ rev: 6, body: doc(para("b", "p1")), sessionKey: OTHER_SESSION }, { at: T2 });
+    await save(
+      { rev: 6, body: doc(para("b", "p1")), sessionKey: OTHER_SESSION },
+      { at: T2 },
+    );
     const rows = await audit();
-    expect(rows.map((r) => r.sessionKey).sort()).toEqual([OTHER_SESSION, SESSION].sort());
-    expect(rows.every((r) => (r.details as { saves: number }).saves === 1)).toBe(true);
+    expect(rows.map((r) => r.sessionKey).sort()).toEqual(
+      [OTHER_SESSION, SESSION].sort(),
+    );
+    expect(
+      rows.every((r) => (r.details as { saves: number }).saves === 1),
+    ).toBe(true);
   });
 
   it("keeps sessions of other drafts apart, even with the same key", async () => {
@@ -509,7 +777,10 @@ describe("applyDraftPatch: the audit row", () => {
       sessionKey: SESSION,
     });
     await save({ body: doc(para("a", "p1")) });
-    const rows = await db.select().from(auditEvents).where(and(eq(auditEvents.action, "draft.edited")));
+    const rows = await db
+      .select()
+      .from(auditEvents)
+      .where(and(eq(auditEvents.action, "draft.edited")));
     expect(rows).toHaveLength(1);
     expect((await audit()).find((r) => r.id === "ae_other")?.at).toEqual(T0);
   });
@@ -544,7 +815,10 @@ describe("applyDraftPatch: the writers", () => {
   it("adds each person whose save lands, once, in the order they first wrote", async () => {
     await save({ body: doc(para("Maya's", "p1")) });
     expect((await draft()).writers).toEqual(["maya"]);
-    await save({ rev: 6, sessionKey: OTHER_SESSION, body: doc(para("Dee's", "p1")) }, { by: dee, at: T2 });
+    await save(
+      { rev: 6, sessionKey: OTHER_SESSION, body: doc(para("Dee's", "p1")) },
+      { by: dee, at: T2 },
+    );
     expect((await draft()).writers).toEqual(["maya", "dee"]);
     await save({ rev: 7, body: doc(para("Maya's again", "p1")) }, { at: T2 });
     expect((await draft()).writers).toEqual(["maya", "dee"]);
@@ -556,8 +830,17 @@ describe("applyDraftPatch: the writers", () => {
   });
 
   it("leaves them alone when the save is refused", async () => {
-    expect(failure(await save({ rev: 4, body: doc(para("x")) }, { by: dee })).code).toBe("draft_changed");
-    expect(failure(await save({ body: doc(para("x")) }, { by: viewer("jordan", ["approver"]) })).code).toBe("generic");
+    expect(
+      failure(await save({ rev: 4, body: doc(para("x")) }, { by: dee })).code,
+    ).toBe("draft_changed");
+    expect(
+      failure(
+        await save(
+          { body: doc(para("x")) },
+          { by: viewer("jordan", ["approver"]) },
+        ),
+      ).code,
+    ).toBe("generic");
     expect((await draft()).writers).toEqual(["maya"]);
   });
 });
@@ -582,10 +865,16 @@ describe("applyDraftPatch: a save whose response was lost", () => {
 
     const rows = await audit();
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.details).toMatchObject({ saves: 2, rev: 7, fields: ["body", "name"] });
+    expect(rows[0]?.details).toMatchObject({
+      saves: 2,
+      rev: 7,
+      fields: ["body", "name"],
+    });
 
     // And the client, now told rev 7, is back in step.
-    expect(await save({ rev: 7, body: doc(para("third", "p1")) })).toMatchObject({ ok: true, rev: 8 });
+    expect(
+      await save({ rev: 7, body: doc(para("third", "p1")) }),
+    ).toMatchObject({ ok: true, rev: 8 });
   });
 
   it("takes it again when several responses in a row were lost", async () => {
@@ -599,7 +888,10 @@ describe("applyDraftPatch: a save whose response was lost", () => {
   it("is still a conflict when another session wrote in between", async () => {
     const other = OTHER_SESSION;
     await save({ body: doc(para("mine", "p1")) }); // rev 6, ack lost
-    await save({ rev: 6, sessionKey: other, body: doc(para("theirs", "p1")) }, { at: T2 }); // rev 7
+    await save(
+      { rev: 6, sessionKey: other, body: doc(para("theirs", "p1")) },
+      { at: T2 },
+    ); // rev 7
 
     for (const rev of [5, 6]) {
       const res = await save({ rev, body: doc(para("mine again", "p1")) });
@@ -611,13 +903,21 @@ describe("applyDraftPatch: a save whose response was lost", () => {
 
   it("is still a conflict when another tab of the same person wrote in between", async () => {
     await save({ body: doc(para("tab one", "p1")) });
-    await save({ rev: 6, sessionKey: OTHER_SESSION, body: doc(para("tab two", "p1")) }, { at: T2 });
-    expect(failure(await save({ body: doc(para("tab one again", "p1")) })).code).toBe("draft_changed");
+    await save(
+      { rev: 6, sessionKey: OTHER_SESSION, body: doc(para("tab two", "p1")) },
+      { at: T2 },
+    );
+    expect(
+      failure(await save({ body: doc(para("tab one again", "p1")) })).code,
+    ).toBe("draft_changed");
   });
 
   it("is a conflict for another person who borrows the session key", async () => {
     await save({ body: doc(para("maya", "p1")) });
-    const res = await save({ body: doc(para("dee", "p1")) }, { by: viewer("dee", ["author"]) });
+    const res = await save(
+      { body: doc(para("dee", "p1")) },
+      { by: viewer("dee", ["author"]) },
+    );
     expect(failure(res)).toMatchObject({ code: "draft_changed", rev: 6 });
     expect((await draft()).body).toEqual(doc(para("maya", "p1")));
   });
@@ -625,7 +925,9 @@ describe("applyDraftPatch: a save whose response was lost", () => {
   it("is a conflict when a write that left no audit trail bumped the rev", async () => {
     await save({ body: doc(para("mine", "p1")) });
     await db.update(versions).set({ rev: 7 }).where(eq(versions.id, "v_draft"));
-    expect(failure(await save({ body: doc(para("again", "p1")) }))).toMatchObject({ code: "draft_changed", rev: 7 });
+    expect(
+      failure(await save({ body: doc(para("again", "p1")) })),
+    ).toMatchObject({ code: "draft_changed", rev: 7 });
   });
 
   it("is a conflict when the session's row has no rev (written before this existed)", async () => {
@@ -640,13 +942,17 @@ describe("applyDraftPatch: a save whose response was lost", () => {
       details: { saves: 15 },
       sessionKey: SESSION,
     });
-    expect(failure(await save({ rev: 4, body: doc(para("x", "p1")) }))).toMatchObject({ code: "draft_changed", rev: 5 });
+    expect(
+      failure(await save({ rev: 4, body: doc(para("x", "p1")) })),
+    ).toMatchObject({ code: "draft_changed", rev: 5 });
     expect((await audit())[0]?.details).toEqual({ saves: 15 });
   });
 
   it("is a conflict for a rev from the future, even from the session that wrote the current one", async () => {
     await save({ body: doc(para("mine", "p1")) });
-    expect(failure(await save({ rev: 9, body: doc(para("x", "p1")) }))).toMatchObject({ code: "draft_changed", rev: 6 });
+    expect(
+      failure(await save({ rev: 9, body: doc(para("x", "p1")) })),
+    ).toMatchObject({ code: "draft_changed", rev: 6 });
   });
 
   it("still refuses a resend that is invalid, and changes nothing", async () => {
@@ -660,13 +966,21 @@ describe("applyDraftPatch: a save whose response was lost", () => {
 
   it("still answers version_not_draft first once the version has left draft", async () => {
     await save({ body: doc(para("mine", "p1")) });
-    await db.update(versions).set({ state: "in_review", number: 1 }).where(eq(versions.id, "v_draft"));
-    expect(failure(await save({ body: doc(para("again", "p1")) })).code).toBe("version_not_draft");
+    await db
+      .update(versions)
+      .set({ state: "in_review", number: 1 })
+      .where(eq(versions.id, "v_draft"));
+    expect(failure(await save({ body: doc(para("again", "p1")) })).code).toBe(
+      "version_not_draft",
+    );
   });
 
   it("lets only one of two resends through", async () => {
     await save({ body: doc(para("mine", "p1")) });
-    const results = await Promise.all([save({ body: doc(para("x", "p1")) }), save({ body: doc(para("y", "p1")) })]);
+    const results = await Promise.all([
+      save({ body: doc(para("x", "p1")) }),
+      save({ body: doc(para("y", "p1")) }),
+    ]);
     // Both are behind rev 6 and the session owns it, so both are legitimate; they serialize one after the other.
     expect(results.every((r) => r.ok)).toBe(true);
     expect((await draft()).rev).toBe(8);
@@ -681,7 +995,10 @@ describe("applyDraftPatch: two saves at once", () => {
     ]);
     const wins = results.filter((r) => r.ok);
     expect(wins).toHaveLength(1);
-    expect(failure(results.find((r) => !r.ok)!)).toMatchObject({ code: "draft_changed", rev: 6 });
+    expect(failure(results.find((r) => !r.ok)!)).toMatchObject({
+      code: "draft_changed",
+      rev: 6,
+    });
     expect((await draft()).rev).toBe(6);
     expect((await audit())[0]?.details).toMatchObject({ saves: 1 });
   });

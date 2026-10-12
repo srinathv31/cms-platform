@@ -1,6 +1,16 @@
 import "server-only";
 import { cache } from "react";
-import { and, desc, eq, gte, inArray, isNotNull, lte, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lte,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { daysUntilSunset, sunsetDay } from "@/domain/business-zone";
 import { addDays, dayStartMs } from "@/domain/dates";
 import { compactCount } from "@/domain/numbers";
@@ -30,11 +40,23 @@ import type { PushPlatform } from "@/domain/messages/push";
 import { ALL_SPACE, can } from "@/domain/permissions";
 import type { RenderErrorCode } from "@/domain/render/types";
 import { isReleased } from "@/domain/rounds";
-import { CHANNELS, type Channel, type RevokeRecord, type VersionState } from "@/domain/types";
+import {
+  CHANNELS,
+  type Channel,
+  type RevokeRecord,
+  type VersionState,
+} from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
-import { consumers, contentTypes, renderLog, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  consumers,
+  contentTypes,
+  renderLog,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { requireTemplate } from "./review-shared";
 import { requireSpace } from "./spaces";
 import { currentName } from "./template-name";
@@ -59,14 +81,20 @@ const num = (v: unknown) => Number(v ?? 0);
 const UNKNOWN_CONSUMER: RenderErrorCode = "unknown_consumer";
 
 /** The rows that are usage, up to the demo clock, optionally for some templates only. */
-function usageWhere(w: UsageWindows, templateIds: readonly string[] | null, from?: number): SQL {
+function usageWhere(
+  w: UsageWindows,
+  templateIds: readonly string[] | null,
+  from?: number,
+): SQL {
   return and(
     eq(renderLog.isPreview, false),
     isNotNull(renderLog.consumerId),
     sql`coalesce(${renderLog.errorCode}, '') <> ${UNKNOWN_CONSUMER}`,
     lte(renderLog.at, new Date(w.until)),
     from === undefined ? undefined : gte(renderLog.at, new Date(from)),
-    templateIds === null ? undefined : inArray(renderLog.templateId, [...templateIds]),
+    templateIds === null
+      ? undefined
+      : inArray(renderLog.templateId, [...templateIds]),
   )!;
 }
 
@@ -81,9 +109,13 @@ interface VersionInfo {
   revokedAt: Date | null;
 }
 
-const versionKey = (templateId: string, number: number) => `${templateId}#${number}`;
+const versionKey = (templateId: string, number: number) =>
+  `${templateId}#${number}`;
 
-function revokedAtOf(state: VersionState, revoke: RevokeRecord | null): Date | null {
+function revokedAtOf(
+  state: VersionState,
+  revoke: RevokeRecord | null,
+): Date | null {
   if (state !== "revoked" || !revoke) return null;
   return new Date(revoke.confirmedAt ?? revoke.startedAt);
 }
@@ -93,7 +125,9 @@ function revokedAtOf(state: VersionState, revoke: RevokeRecord | null): Date | n
  * else its latest round (`headOf` in domain/rounds.ts), which is the row a consumer's number means. A
  * number's sent-back rounds never stand in for the version consumers render.
  */
-async function loadVersions(templateIds: readonly string[]): Promise<Map<string, VersionInfo>> {
+async function loadVersions(
+  templateIds: readonly string[],
+): Promise<Map<string, VersionInfo>> {
   if (templateIds.length === 0) return new Map();
   const rows = await db
     .select({
@@ -106,10 +140,17 @@ async function loadVersions(templateIds: readonly string[]): Promise<Map<string,
       revoke: versions.revoke,
     })
     .from(versions)
-    .where(and(inArray(versions.templateId, [...templateIds]), isNotNull(versions.number)));
+    .where(
+      and(
+        inArray(versions.templateId, [...templateIds]),
+        isNotNull(versions.number),
+      ),
+    );
   // The head last, so it is the one the map keeps for its number.
   const headsLast = rows.sort(
-    (a, b) => Number(isReleased(a.state)) - Number(isReleased(b.state)) || (a.round ?? 0) - (b.round ?? 0),
+    (a, b) =>
+      Number(isReleased(a.state)) - Number(isReleased(b.state)) ||
+      (a.round ?? 0) - (b.round ?? 0),
   );
   return new Map(
     headsLast.map((r) => [
@@ -127,7 +168,9 @@ async function loadVersions(templateIds: readonly string[]): Promise<Map<string,
 }
 
 async function loadConsumerNames(): Promise<Map<string, string>> {
-  const rows = await db.select({ id: consumers.id, name: consumers.name }).from(consumers);
+  const rows = await db
+    .select({ id: consumers.id, name: consumers.name })
+    .from(consumers);
   return new Map(rows.map((r) => [r.id, r.name]));
 }
 
@@ -146,7 +189,11 @@ interface Cell {
 }
 
 /** Per template × consumer × version × channel (× platform, for a push): the two rolling windows and the last render. */
-async function loadCells(w: UsageWindows, templateIds: readonly string[] | null, from?: number): Promise<Cell[]> {
+async function loadCells(
+  w: UsageWindows,
+  templateIds: readonly string[] | null,
+  from?: number,
+): Promise<Cell[]> {
   const current = sql`${renderLog.at} >= ${w.since}`;
   const rows = await db
     .select({
@@ -162,7 +209,13 @@ async function loadCells(w: UsageWindows, templateIds: readonly string[] | null,
     })
     .from(renderLog)
     .where(usageWhere(w, templateIds, from))
-    .groupBy(renderLog.templateId, renderLog.consumerId, renderLog.versionNumber, renderLog.channel, renderLog.platform);
+    .groupBy(
+      renderLog.templateId,
+      renderLog.consumerId,
+      renderLog.versionNumber,
+      renderLog.channel,
+      renderLog.platform,
+    );
   return rows
     .filter((r) => r.versionNumber !== null)
     .map((r) => ({
@@ -179,7 +232,10 @@ async function loadCells(w: UsageWindows, templateIds: readonly string[] | null,
 }
 
 /** Renders (attempts) per day for each template × consumer × version, over the sparkline days. */
-async function loadSparks(w: UsageWindows, templateIds: readonly string[] | null): Promise<Map<string, Map<string, number>>> {
+async function loadSparks(
+  w: UsageWindows,
+  templateIds: readonly string[] | null,
+): Promise<Map<string, Map<string, number>>> {
   const rows = await db
     .select({
       day,
@@ -190,7 +246,12 @@ async function loadSparks(w: UsageWindows, templateIds: readonly string[] | null
     })
     .from(renderLog)
     .where(usageWhere(w, templateIds, dayStartMs(w.sparkFrom)))
-    .groupBy(day, renderLog.templateId, renderLog.consumerId, renderLog.versionNumber);
+    .groupBy(
+      day,
+      renderLog.templateId,
+      renderLog.consumerId,
+      renderLog.versionNumber,
+    );
   const sparks = new Map<string, Map<string, number>>();
   for (const r of rows) {
     const key = rowKey(r.templateId, r.consumerId!, r.versionNumber ?? 0);
@@ -201,7 +262,11 @@ async function loadSparks(w: UsageWindows, templateIds: readonly string[] | null
   return sparks;
 }
 
-const rowKey = (templateId: string, consumerId: string, versionNumber: number) => `${templateId}#${consumerId}#${versionNumber}`;
+const rowKey = (
+  templateId: string,
+  consumerId: string,
+  versionNumber: number,
+) => `${templateId}#${consumerId}#${versionNumber}`;
 
 interface TemplateInfo {
   id: string;
@@ -223,10 +288,27 @@ function buildRows(
     sparks: ReadonlyMap<string, ReadonlyMap<string, number>>;
   },
 ): UsageRow[] {
-  const grouped = new Map<string, { templateId: string; consumerId: string; versionNumber: number; ok: number; err: number; lastAt: number }>();
+  const grouped = new Map<
+    string,
+    {
+      templateId: string;
+      consumerId: string;
+      versionNumber: number;
+      ok: number;
+      err: number;
+      lastAt: number;
+    }
+  >();
   for (const c of cells) {
     const key = rowKey(c.templateId, c.consumerId, c.versionNumber);
-    const g = grouped.get(key) ?? { templateId: c.templateId, consumerId: c.consumerId, versionNumber: c.versionNumber, ok: 0, err: 0, lastAt: 0 };
+    const g = grouped.get(key) ?? {
+      templateId: c.templateId,
+      consumerId: c.consumerId,
+      versionNumber: c.versionNumber,
+      ok: 0,
+      err: 0,
+      lastAt: 0,
+    };
     g.ok += c.ok30;
     g.err += c.err30;
     g.lastAt = Math.max(g.lastAt, c.lastAt);
@@ -244,7 +326,11 @@ function buildRows(
     const state = version?.state ?? "superseded";
     const spark = ctx.sparks.get(key);
     rows.push({
-      consumer: { id: g.consumerId, name: ctx.consumerNames.get(g.consumerId) ?? consumerLabel(g.consumerId) },
+      consumer: {
+        id: g.consumerId,
+        name:
+          ctx.consumerNames.get(g.consumerId) ?? consumerLabel(g.consumerId),
+      },
       template,
       versionNumber: g.versionNumber,
       versionState: state,
@@ -252,11 +338,19 @@ function buildRows(
       errors30d: g.err,
       lastRenderAt: new Date(g.lastAt).toISOString(),
       tags: usageTags(
-        { versionNumber: g.versionNumber, state, sunsetAt: version?.sunsetAt ?? null, revokedAt: version?.revokedAt ?? null, errors30d: g.err },
+        {
+          versionNumber: g.versionNumber,
+          state,
+          sunsetAt: version?.sunsetAt ?? null,
+          revokedAt: version?.revokedAt ?? null,
+          errors30d: g.err,
+        },
         ctx.now,
         ctx.zone,
       ),
-      sunsetDay: version?.sunsetAt ? sunsetDay(version.sunsetAt, ctx.zone) : null,
+      sunsetDay: version?.sunsetAt
+        ? sunsetDay(version.sunsetAt, ctx.zone)
+        : null,
       sunsetPassed: version ? sunsetPassed(version, ctx.now) : false,
       spark: sparkDays.map((d) => spark?.get(d) ?? 0),
     });
@@ -264,296 +358,516 @@ function buildRows(
   return rows.sort(compareUsageRows);
 }
 
-const emptyChannels = (): Record<Channel, number> => ({ pdf: 0, web: 0, email: 0, push: 0, sms: 0 });
+const emptyChannels = (): Record<Channel, number> => ({
+  pdf: 0,
+  web: 0,
+  email: 0,
+  push: 0,
+  sms: 0,
+});
 
 function trendWeeks(w: UsageWindows): string[] {
-  return Array.from({ length: TREND_WEEKS }, (_, i) => addDays(w.trendFrom, i * 7));
+  return Array.from({ length: TREND_WEEKS }, (_, i) =>
+    addDays(w.trendFrom, i * 7),
+  );
 }
 
 // ── The dashboard ────────────────────────────────────────────
 
 /** /[team]/usage. A team space = that team's templates; "all" = every team the viewer can see. */
-export const getUsageDashboard = cache(async (spaceSlug: string): Promise<UsageDashboard> => {
-  const space = await requireSpace(spaceSlug);
-  const nowDate = await now();
-  const zone = await getBusinessZone();
-  const w = usageWindows(nowDate);
+export const getUsageDashboard = cache(
+  async (spaceSlug: string): Promise<UsageDashboard> => {
+    const space = await requireSpace(spaceSlug);
+    const nowDate = await now();
+    const zone = await getBusinessZone();
+    const w = usageWindows(nowDate);
 
-  const templateRows = await db
-    .select({ id: templates.id, name: currentName(templates.id), teamId: teams.id, teamSlug: teams.slug })
-    .from(templates)
-    .innerJoin(teams, eq(teams.id, templates.teamId))
-    .where(space.isAll ? undefined : eq(teams.slug, spaceSlug));
-  const visible = templateRows.filter((t) => can(space.viewer, "template.view", { teamId: t.teamId }).ok);
-  const templateMap = new Map<string, TemplateInfo>(visible.map((t) => [t.id, { id: t.id, name: t.name, teamSlug: t.teamSlug }]));
-  const ids = [...templateMap.keys()];
-  // Every template counts in "all" when the viewer sees every team: skip the IN list then.
-  const filter = space.isAll && visible.length === templateRows.length ? null : ids;
+    const templateRows = await db
+      .select({
+        id: templates.id,
+        name: currentName(templates.id),
+        teamId: teams.id,
+        teamSlug: teams.slug,
+      })
+      .from(templates)
+      .innerJoin(teams, eq(teams.id, templates.teamId))
+      .where(space.isAll ? undefined : eq(teams.slug, spaceSlug));
+    const visible = templateRows.filter(
+      (t) => can(space.viewer, "template.view", { teamId: t.teamId }).ok,
+    );
+    const templateMap = new Map<string, TemplateInfo>(
+      visible.map((t) => [
+        t.id,
+        { id: t.id, name: t.name, teamSlug: t.teamSlug },
+      ]),
+    );
+    const ids = [...templateMap.keys()];
+    // Every template counts in "all" when the viewer sees every team: skip the IN list then.
+    const filter =
+      space.isAll && visible.length === templateRows.length ? null : ids;
 
-  const [versionMap, consumerNames, cells, sparks, series] = await Promise.all([
-    loadVersions(ids),
-    loadConsumerNames(),
-    ids.length ? loadCells(w, filter, w.previousSince) : Promise.resolve([]),
-    ids.length ? loadSparks(w, filter) : Promise.resolve(new Map<string, Map<string, number>>()),
-    ids.length ? loadDailySeries(w, filter) : Promise.resolve([]),
-  ]);
+    const [versionMap, consumerNames, cells, sparks, series] =
+      await Promise.all([
+        loadVersions(ids),
+        loadConsumerNames(),
+        ids.length
+          ? loadCells(w, filter, w.previousSince)
+          : Promise.resolve([]),
+        ids.length
+          ? loadSparks(w, filter)
+          : Promise.resolve(new Map<string, Map<string, number>>()),
+        ids.length ? loadDailySeries(w, filter) : Promise.resolve([]),
+      ]);
 
-  const rows = buildRows(cells, { now: nowDate, zone, w, templates: templateMap, versions: versionMap, consumerNames, sparks });
+    const rows = buildRows(cells, {
+      now: nowDate,
+      zone,
+      w,
+      templates: templateMap,
+      versions: versionMap,
+      consumerNames,
+      sparks,
+    });
 
-  // Stats.
-  let ok = 0;
-  let errors = 0;
-  let previous = 0;
-  const byChannel = emptyChannels();
-  for (const c of cells) {
-    ok += c.ok30;
-    errors += c.err30;
-    previous += c.prev;
-    byChannel[c.channel] += c.ok30 + c.err30;
-  }
-  const attempts = ok + errors;
-
-  const activeTemplates = new Set([...versionMap.values()].filter((v) => v.state === "active").map((v) => v.templateId)).size;
-  const nearing = [...versionMap.values()]
-    .filter(
-      (v) =>
-        v.state === "superseded" &&
-        v.sunsetAt !== null &&
-        !sunsetPassed(v, nowDate) &&
-        daysUntilSunset(v.sunsetAt, nowDate, zone) <= NEARING_SUNSET_DAYS,
-    )
-    .sort((a, b) => a.sunsetAt!.getTime() - b.sunsetAt!.getTime());
-  const soonest = nearing[0];
-
-  // Consumers.
-  const consumerTotals = new Map<string, number>();
-  for (const r of rows) consumerTotals.set(r.consumer.id, (consumerTotals.get(r.consumer.id) ?? 0) + r.renders30d);
-  const byConsumer = [...consumerTotals]
-    .map(([id, renders]) => ({ consumer: { id, name: consumerNames.get(id) ?? consumerLabel(id) }, renders, share: attempts ? renders / attempts : 0 }))
-    .sort((a, b) => b.renders - a.renders || a.consumer.name.localeCompare(b.consumer.name));
-
-  // Templates and versions.
-  const templateTotals = new Map<string, number>();
-  const otherVersions = new Map<string, { template: { id: string; name: string }; versionNumber: number; renders: number }>();
-  let onActive = 0;
-  for (const r of rows) {
-    templateTotals.set(r.template.id, (templateTotals.get(r.template.id) ?? 0) + r.renders30d);
-    if (r.versionState === "active") {
-      onActive += r.renders30d;
-    } else if (r.renders30d > 0) {
-      const key = versionKey(r.template.id, r.versionNumber);
-      const o = otherVersions.get(key) ?? { template: { id: r.template.id, name: r.template.name }, versionNumber: r.versionNumber, renders: 0 };
-      o.renders += r.renders30d;
-      otherVersions.set(key, o);
+    // Stats.
+    let ok = 0;
+    let errors = 0;
+    let previous = 0;
+    const byChannel = emptyChannels();
+    for (const c of cells) {
+      ok += c.ok30;
+      errors += c.err30;
+      previous += c.prev;
+      byChannel[c.channel] += c.ok30 + c.err30;
     }
-  }
-  const byTemplate = [...templateTotals]
-    .filter(([, renders]) => renders > 0)
-    .map(([id, renders]) => ({ template: templateMap.get(id)!, renders, share: attempts ? renders / attempts : 0 }))
-    .sort((a, b) => b.renders - a.renders || a.template.name.localeCompare(b.template.name));
+    const attempts = ok + errors;
 
-  // Series.
-  const rendersByDay = new Map<string, number>();
-  const errByDay = new Map<string, number>();
-  const weekly = new Map(trendWeeks(w).map((weekStart) => [weekStart, { weekStart, count: 0, errors: 0, channels: emptyChannels() }]));
-  for (const s of series) {
-    rendersByDay.set(s.day, (rendersByDay.get(s.day) ?? 0) + s.count);
-    if (s.outcome === "error") errByDay.set(s.day, (errByDay.get(s.day) ?? 0) + s.count);
-    const week = weekly.get(weekStartOf(s.day));
-    if (!week) continue;
-    week.count += s.count;
-    week.channels[s.channel] += s.count;
-    if (s.outcome === "error") week.errors += s.count;
-  }
+    const activeTemplates = new Set(
+      [...versionMap.values()]
+        .filter((v) => v.state === "active")
+        .map((v) => v.templateId),
+    ).size;
+    const nearing = [...versionMap.values()]
+      .filter(
+        (v) =>
+          v.state === "superseded" &&
+          v.sunsetAt !== null &&
+          !sunsetPassed(v, nowDate) &&
+          daysUntilSunset(v.sunsetAt, nowDate, zone) <= NEARING_SUNSET_DAYS,
+      )
+      .sort((a, b) => a.sunsetAt!.getTime() - b.sunsetAt!.getTime());
+    const soonest = nearing[0];
 
-  return {
-    space: { slug: space.slug, name: space.name, isAll: space.slug === ALL_SPACE },
-    today: w.today,
-    stats: {
-      renders: { value: attempts, display: compactCount(attempts), previous, trendPct: trendPct(attempts, previous) },
-      activeTemplates: { value: activeTemplates, display: compactCount(activeTemplates) },
-      consumers: { value: consumerTotals.size, display: compactCount(consumerTotals.size) },
-      nearingSunset: {
-        value: nearing.length,
-        display: compactCount(nearing.length),
-        soonest: soonest
-          ? {
-              templateName: templateMap.get(soonest.templateId)!.name,
-              versionNumber: soonest.number,
-              daysAway: daysUntilSunset(soonest.sunsetAt!, nowDate, zone),
-            }
-          : null,
+    // Consumers.
+    const consumerTotals = new Map<string, number>();
+    for (const r of rows)
+      consumerTotals.set(
+        r.consumer.id,
+        (consumerTotals.get(r.consumer.id) ?? 0) + r.renders30d,
+      );
+    const byConsumer = [...consumerTotals]
+      .map(([id, renders]) => ({
+        consumer: { id, name: consumerNames.get(id) ?? consumerLabel(id) },
+        renders,
+        share: attempts ? renders / attempts : 0,
+      }))
+      .sort(
+        (a, b) =>
+          b.renders - a.renders ||
+          a.consumer.name.localeCompare(b.consumer.name),
+      );
+
+    // Templates and versions.
+    const templateTotals = new Map<string, number>();
+    const otherVersions = new Map<
+      string,
+      {
+        template: { id: string; name: string };
+        versionNumber: number;
+        renders: number;
+      }
+    >();
+    let onActive = 0;
+    for (const r of rows) {
+      templateTotals.set(
+        r.template.id,
+        (templateTotals.get(r.template.id) ?? 0) + r.renders30d,
+      );
+      if (r.versionState === "active") {
+        onActive += r.renders30d;
+      } else if (r.renders30d > 0) {
+        const key = versionKey(r.template.id, r.versionNumber);
+        const o = otherVersions.get(key) ?? {
+          template: { id: r.template.id, name: r.template.name },
+          versionNumber: r.versionNumber,
+          renders: 0,
+        };
+        o.renders += r.renders30d;
+        otherVersions.set(key, o);
+      }
+    }
+    const byTemplate = [...templateTotals]
+      .filter(([, renders]) => renders > 0)
+      .map(([id, renders]) => ({
+        template: templateMap.get(id)!,
+        renders,
+        share: attempts ? renders / attempts : 0,
+      }))
+      .sort(
+        (a, b) =>
+          b.renders - a.renders ||
+          a.template.name.localeCompare(b.template.name),
+      );
+
+    // Series.
+    const rendersByDay = new Map<string, number>();
+    const errByDay = new Map<string, number>();
+    const weekly = new Map(
+      trendWeeks(w).map((weekStart) => [
+        weekStart,
+        { weekStart, count: 0, errors: 0, channels: emptyChannels() },
+      ]),
+    );
+    for (const s of series) {
+      rendersByDay.set(s.day, (rendersByDay.get(s.day) ?? 0) + s.count);
+      if (s.outcome === "error")
+        errByDay.set(s.day, (errByDay.get(s.day) ?? 0) + s.count);
+      const week = weekly.get(weekStartOf(s.day));
+      if (!week) continue;
+      week.count += s.count;
+      week.channels[s.channel] += s.count;
+      if (s.outcome === "error") week.errors += s.count;
+    }
+
+    return {
+      space: {
+        slug: space.slug,
+        name: space.name,
+        isAll: space.slug === ALL_SPACE,
       },
-    },
-    success: { ok, errors, pct: percent(ok, attempts) },
-    heatmap: heatmap(rendersByDay, w.today),
-    byConsumer,
-    rows,
-    byChannel,
-    onActive: {
-      active: onActive,
-      other: attempts - onActive,
-      pct: percent(onActive, attempts),
-      otherVersions: [...otherVersions.values()].sort((a, b) => b.renders - a.renders),
-    },
-    byTemplate,
-    weekly: [...weekly.values()],
-    daily: dayList(w.historyFrom, w.today).map((date) => ({ date, count: rendersByDay.get(date) ?? 0, errors: errByDay.get(date) ?? 0 })),
-  };
-});
+      today: w.today,
+      stats: {
+        renders: {
+          value: attempts,
+          display: compactCount(attempts),
+          previous,
+          trendPct: trendPct(attempts, previous),
+        },
+        activeTemplates: {
+          value: activeTemplates,
+          display: compactCount(activeTemplates),
+        },
+        consumers: {
+          value: consumerTotals.size,
+          display: compactCount(consumerTotals.size),
+        },
+        nearingSunset: {
+          value: nearing.length,
+          display: compactCount(nearing.length),
+          soonest: soonest
+            ? {
+                templateName: templateMap.get(soonest.templateId)!.name,
+                versionNumber: soonest.number,
+                daysAway: daysUntilSunset(soonest.sunsetAt!, nowDate, zone),
+              }
+            : null,
+        },
+      },
+      success: { ok, errors, pct: percent(ok, attempts) },
+      heatmap: heatmap(rendersByDay, w.today),
+      byConsumer,
+      rows,
+      byChannel,
+      onActive: {
+        active: onActive,
+        other: attempts - onActive,
+        pct: percent(onActive, attempts),
+        otherVersions: [...otherVersions.values()].sort(
+          (a, b) => b.renders - a.renders,
+        ),
+      },
+      byTemplate,
+      weekly: [...weekly.values()],
+      daily: dayList(w.historyFrom, w.today).map((date) => ({
+        date,
+        count: rendersByDay.get(date) ?? 0,
+        errors: errByDay.get(date) ?? 0,
+      })),
+    };
+  },
+);
 
 /** Per day × channel × outcome, from the earliest series day to now. */
-async function loadDailySeries(w: UsageWindows, templateIds: readonly string[] | null) {
+async function loadDailySeries(
+  w: UsageWindows,
+  templateIds: readonly string[] | null,
+) {
   const rows = await db
-    .select({ day, channel: renderLog.channel, outcome: renderLog.outcome, count: sql<number>`count(*)` })
+    .select({
+      day,
+      channel: renderLog.channel,
+      outcome: renderLog.outcome,
+      count: sql<number>`count(*)`,
+    })
     .from(renderLog)
     .where(usageWhere(w, templateIds, w.seriesFromMs))
     .groupBy(day, renderLog.channel, renderLog.outcome);
-  return rows.map((r) => ({ day: r.day, channel: r.channel, outcome: r.outcome, count: num(r.count) }));
+  return rows.map((r) => ({
+    day: r.day,
+    channel: r.channel,
+    outcome: r.outcome,
+    count: num(r.count),
+  }));
 }
 
 // ── One template ─────────────────────────────────────────────
 
 /** The per-template Usage tab: the same sources, one template, every released version. */
-export const getTemplateUsage = cache(async (spaceSlug: string, templateId: string): Promise<TemplateUsageData> => {
-  const { template } = await requireTemplate(spaceSlug, templateId);
-  const nowDate = await now();
-  const zone = await getBusinessZone();
-  const w = usageWindows(nowDate);
-  const info: TemplateInfo = { id: template.id, name: template.name, teamSlug: template.teamSlug };
-  const ids = [template.id];
-
-  const [versionMap, consumerNames, cells, sparks, series, errorRows, [contentType]] = await Promise.all([
-    loadVersions(ids),
-    loadConsumerNames(),
-    // All time: a version's consumers include those that stopped rendering it.
-    loadCells(w, ids),
-    loadSparks(w, ids),
-    db
-      .select({ day, versionNumber: renderLog.versionNumber, outcome: renderLog.outcome, count: sql<number>`count(*)` })
-      .from(renderLog)
-      .where(usageWhere(w, ids, w.seriesFromMs))
-      .groupBy(day, renderLog.versionNumber, renderLog.outcome),
-    db
-      .select({
-        at: renderLog.at,
-        consumerId: renderLog.consumerId,
-        versionNumber: renderLog.versionNumber,
-        channel: renderLog.channel,
-        platform: renderLog.platform,
-        code: renderLog.errorCode,
-      })
-      .from(renderLog)
-      .where(and(usageWhere(w, ids), isError))
-      .orderBy(desc(renderLog.at))
-      .limit(10),
-    db.select({ allowedChannels: contentTypes.allowedChannels }).from(contentTypes).where(eq(contentTypes.id, template.contentTypeId)).limit(1),
-  ]);
-
-  const rows = buildRows(cells, { now: nowDate, zone, w, templates: new Map([[info.id, info]]), versions: versionMap, consumerNames, sparks });
-
-  let ok = 0;
-  let errors = 0;
-  let previous = 0;
-  const byChannel = emptyChannels();
-  const pushByPlatform = { ios: 0, android: 0, unrecorded: 0 };
-  for (const c of cells) {
-    ok += c.ok30;
-    errors += c.err30;
-    previous += c.prev;
-    const renders = c.ok30 + c.err30;
-    byChannel[c.channel] += renders;
-    if (c.channel === "push") pushByPlatform[c.platform ?? "unrecorded"] += renders;
-  }
-  const attempts = ok + errors;
-  const allowed = contentType?.allowedChannels ?? [];
-
-  // Released versions, newest first, each with every consumer that ever rendered it.
-  const released = [...versionMap.values()].filter((v) => isReleased(v.state)).sort((a, b) => b.number - a.number);
-  const versionsOut: TemplateUsageVersion[] = released.map((v) => {
-    const byConsumer = new Map<string, { id: string; name: string; renders30d: number; errors30d: number; lastRenderAt: number }>();
-    for (const c of cells) {
-      if (c.versionNumber !== v.number) continue;
-      const e = byConsumer.get(c.consumerId) ?? { id: c.consumerId, name: consumerNames.get(c.consumerId) ?? consumerLabel(c.consumerId), renders30d: 0, errors30d: 0, lastRenderAt: 0 };
-      e.renders30d += c.ok30 + c.err30;
-      e.errors30d += c.err30;
-      e.lastRenderAt = Math.max(e.lastRenderAt, c.lastAt);
-      byConsumer.set(c.consumerId, e);
-    }
-    const list = [...byConsumer.values()]
-      .sort((a, b) => b.renders30d - a.renders30d || b.lastRenderAt - a.lastRenderAt || a.name.localeCompare(b.name))
-      .map((e) => ({ ...e, lastRenderAt: new Date(e.lastRenderAt).toISOString() }));
-    const errors30d = list.reduce((sum, e) => sum + e.errors30d, 0);
-    return {
-      number: v.number,
-      state: v.state,
-      activatedAt: v.activatedAt?.toISOString() ?? null,
-      sunsetAt: v.sunsetAt?.toISOString() ?? null,
-      sunsetPassed: sunsetPassed(v, nowDate),
-      revokedAt: v.revokedAt?.toISOString() ?? null,
-      consumers: list,
-      tags: usageTags({ versionNumber: v.number, state: v.state, sunsetAt: v.sunsetAt, revokedAt: v.revokedAt, errors30d }, nowDate, zone),
+export const getTemplateUsage = cache(
+  async (spaceSlug: string, templateId: string): Promise<TemplateUsageData> => {
+    const { template } = await requireTemplate(spaceSlug, templateId);
+    const nowDate = await now();
+    const zone = await getBusinessZone();
+    const w = usageWindows(nowDate);
+    const info: TemplateInfo = {
+      id: template.id,
+      name: template.name,
+      teamSlug: template.teamSlug,
     };
-  });
+    const ids = [template.id];
 
-  // "N% still on vX".
-  const rendersByVersion = new Map<number, number>();
-  for (const c of cells) rendersByVersion.set(c.versionNumber, (rendersByVersion.get(c.versionNumber) ?? 0) + c.ok30 + c.err30);
-  const stillOn = [...rendersByVersion]
-    .map(([number, renders]) => ({ number, renders, state: versionMap.get(versionKey(template.id, number))?.state ?? "superseded" }))
-    .filter((v) => v.state !== "active" && v.renders > 0)
-    .map((v) => ({ versionNumber: v.number, state: v.state, renders: v.renders, pct: percent(v.renders, attempts, 0) ?? 0 }))
-    .sort((a, b) => b.renders - a.renders);
+    const [
+      versionMap,
+      consumerNames,
+      cells,
+      sparks,
+      series,
+      errorRows,
+      [contentType],
+    ] = await Promise.all([
+      loadVersions(ids),
+      loadConsumerNames(),
+      // All time: a version's consumers include those that stopped rendering it.
+      loadCells(w, ids),
+      loadSparks(w, ids),
+      db
+        .select({
+          day,
+          versionNumber: renderLog.versionNumber,
+          outcome: renderLog.outcome,
+          count: sql<number>`count(*)`,
+        })
+        .from(renderLog)
+        .where(usageWhere(w, ids, w.seriesFromMs))
+        .groupBy(day, renderLog.versionNumber, renderLog.outcome),
+      db
+        .select({
+          at: renderLog.at,
+          consumerId: renderLog.consumerId,
+          versionNumber: renderLog.versionNumber,
+          channel: renderLog.channel,
+          platform: renderLog.platform,
+          code: renderLog.errorCode,
+        })
+        .from(renderLog)
+        .where(and(usageWhere(w, ids), isError))
+        .orderBy(desc(renderLog.at))
+        .limit(10),
+      db
+        .select({ allowedChannels: contentTypes.allowedChannels })
+        .from(contentTypes)
+        .where(eq(contentTypes.id, template.contentTypeId))
+        .limit(1),
+    ]);
 
-  // Series: daily (with errors) and weekly by version.
-  const rendersByDay = new Map<string, number>();
-  const errByDay = new Map<string, number>();
-  const weeks = trendWeeks(w);
-  const weekly = new Map(weeks.map((weekStart) => [weekStart, { weekStart, count: 0, byVersion: {} as Record<number, number> }]));
-  const seriesVersions = new Set<number>();
-  for (const s of series) {
-    const count = num(s.count);
-    if (s.outcome === "error") errByDay.set(s.day, (errByDay.get(s.day) ?? 0) + count);
-    rendersByDay.set(s.day, (rendersByDay.get(s.day) ?? 0) + count);
-    const week = weekly.get(weekStartOf(s.day));
-    if (!week || s.versionNumber === null) continue;
-    seriesVersions.add(s.versionNumber);
-    week.count += count;
-    week.byVersion[s.versionNumber] = (week.byVersion[s.versionNumber] ?? 0) + count;
-  }
-  const weeklyVersions = [...seriesVersions].sort((a, b) => a - b);
-  for (const week of weekly.values()) for (const n of weeklyVersions) week.byVersion[n] ??= 0;
+    const rows = buildRows(cells, {
+      now: nowDate,
+      zone,
+      w,
+      templates: new Map([[info.id, info]]),
+      versions: versionMap,
+      consumerNames,
+      sparks,
+    });
 
-  const consumersActive = new Set(rows.map((r) => r.consumer.id)).size;
-  return {
-    template: info,
-    today: w.today,
-    stats: {
-      renders: { value: attempts, display: compactCount(attempts), previous, trendPct: trendPct(attempts, previous) },
-      consumers: { value: consumersActive, display: compactCount(consumersActive) },
-      errors: { value: errors, display: compactCount(errors) },
-    },
-    daily: dayList(w.historyFrom, w.today).map((date) => ({ date, count: rendersByDay.get(date) ?? 0, errors: errByDay.get(date) ?? 0 })),
-    versions: versionsOut,
-    recentErrors: errorRows.map((e) => {
-      const code = (e.code ?? "render_failed") as RenderErrorCode;
+    let ok = 0;
+    let errors = 0;
+    let previous = 0;
+    const byChannel = emptyChannels();
+    const pushByPlatform = { ios: 0, android: 0, unrecorded: 0 };
+    for (const c of cells) {
+      ok += c.ok30;
+      errors += c.err30;
+      previous += c.prev;
+      const renders = c.ok30 + c.err30;
+      byChannel[c.channel] += renders;
+      if (c.channel === "push")
+        pushByPlatform[c.platform ?? "unrecorded"] += renders;
+    }
+    const attempts = ok + errors;
+    const allowed = contentType?.allowedChannels ?? [];
+
+    // Released versions, newest first, each with every consumer that ever rendered it.
+    const released = [...versionMap.values()]
+      .filter((v) => isReleased(v.state))
+      .sort((a, b) => b.number - a.number);
+    const versionsOut: TemplateUsageVersion[] = released.map((v) => {
+      const byConsumer = new Map<
+        string,
+        {
+          id: string;
+          name: string;
+          renders30d: number;
+          errors30d: number;
+          lastRenderAt: number;
+        }
+      >();
+      for (const c of cells) {
+        if (c.versionNumber !== v.number) continue;
+        const e = byConsumer.get(c.consumerId) ?? {
+          id: c.consumerId,
+          name: consumerNames.get(c.consumerId) ?? consumerLabel(c.consumerId),
+          renders30d: 0,
+          errors30d: 0,
+          lastRenderAt: 0,
+        };
+        e.renders30d += c.ok30 + c.err30;
+        e.errors30d += c.err30;
+        e.lastRenderAt = Math.max(e.lastRenderAt, c.lastAt);
+        byConsumer.set(c.consumerId, e);
+      }
+      const list = [...byConsumer.values()]
+        .sort(
+          (a, b) =>
+            b.renders30d - a.renders30d ||
+            b.lastRenderAt - a.lastRenderAt ||
+            a.name.localeCompare(b.name),
+        )
+        .map((e) => ({
+          ...e,
+          lastRenderAt: new Date(e.lastRenderAt).toISOString(),
+        }));
+      const errors30d = list.reduce((sum, e) => sum + e.errors30d, 0);
       return {
-        at: e.at.toISOString(),
-        consumer: { id: e.consumerId!, name: consumerNames.get(e.consumerId!) ?? consumerLabel(e.consumerId!) },
-        versionNumber: e.versionNumber,
-        channel: e.channel,
-        platform: e.platform,
-        code,
-        text: errorText(code),
+        number: v.number,
+        state: v.state,
+        activatedAt: v.activatedAt?.toISOString() ?? null,
+        sunsetAt: v.sunsetAt?.toISOString() ?? null,
+        sunsetPassed: sunsetPassed(v, nowDate),
+        revokedAt: v.revokedAt?.toISOString() ?? null,
+        consumers: list,
+        tags: usageTags(
+          {
+            versionNumber: v.number,
+            state: v.state,
+            sunsetAt: v.sunsetAt,
+            revokedAt: v.revokedAt,
+            errors30d,
+          },
+          nowDate,
+          zone,
+        ),
       };
-    }),
-    success: { ok, errors, pct: percent(ok, attempts) },
-    channels: CHANNELS.filter((c) => allowed.includes(c)),
-    byChannel,
-    pushByPlatform,
-    stillOn,
-    weeklyVersions,
-    weekly: [...weekly.values()],
-    rows,
-  };
-});
+    });
+
+    // "N% still on vX".
+    const rendersByVersion = new Map<number, number>();
+    for (const c of cells)
+      rendersByVersion.set(
+        c.versionNumber,
+        (rendersByVersion.get(c.versionNumber) ?? 0) + c.ok30 + c.err30,
+      );
+    const stillOn = [...rendersByVersion]
+      .map(([number, renders]) => ({
+        number,
+        renders,
+        state:
+          versionMap.get(versionKey(template.id, number))?.state ??
+          "superseded",
+      }))
+      .filter((v) => v.state !== "active" && v.renders > 0)
+      .map((v) => ({
+        versionNumber: v.number,
+        state: v.state,
+        renders: v.renders,
+        pct: percent(v.renders, attempts, 0) ?? 0,
+      }))
+      .sort((a, b) => b.renders - a.renders);
+
+    // Series: daily (with errors) and weekly by version.
+    const rendersByDay = new Map<string, number>();
+    const errByDay = new Map<string, number>();
+    const weeks = trendWeeks(w);
+    const weekly = new Map(
+      weeks.map((weekStart) => [
+        weekStart,
+        { weekStart, count: 0, byVersion: {} as Record<number, number> },
+      ]),
+    );
+    const seriesVersions = new Set<number>();
+    for (const s of series) {
+      const count = num(s.count);
+      if (s.outcome === "error")
+        errByDay.set(s.day, (errByDay.get(s.day) ?? 0) + count);
+      rendersByDay.set(s.day, (rendersByDay.get(s.day) ?? 0) + count);
+      const week = weekly.get(weekStartOf(s.day));
+      if (!week || s.versionNumber === null) continue;
+      seriesVersions.add(s.versionNumber);
+      week.count += count;
+      week.byVersion[s.versionNumber] =
+        (week.byVersion[s.versionNumber] ?? 0) + count;
+    }
+    const weeklyVersions = [...seriesVersions].sort((a, b) => a - b);
+    for (const week of weekly.values())
+      for (const n of weeklyVersions) week.byVersion[n] ??= 0;
+
+    const consumersActive = new Set(rows.map((r) => r.consumer.id)).size;
+    return {
+      template: info,
+      today: w.today,
+      stats: {
+        renders: {
+          value: attempts,
+          display: compactCount(attempts),
+          previous,
+          trendPct: trendPct(attempts, previous),
+        },
+        consumers: {
+          value: consumersActive,
+          display: compactCount(consumersActive),
+        },
+        errors: { value: errors, display: compactCount(errors) },
+      },
+      daily: dayList(w.historyFrom, w.today).map((date) => ({
+        date,
+        count: rendersByDay.get(date) ?? 0,
+        errors: errByDay.get(date) ?? 0,
+      })),
+      versions: versionsOut,
+      recentErrors: errorRows.map((e) => {
+        const code = (e.code ?? "render_failed") as RenderErrorCode;
+        return {
+          at: e.at.toISOString(),
+          consumer: {
+            id: e.consumerId!,
+            name:
+              consumerNames.get(e.consumerId!) ?? consumerLabel(e.consumerId!),
+          },
+          versionNumber: e.versionNumber,
+          channel: e.channel,
+          platform: e.platform,
+          code,
+          text: errorText(code),
+        };
+      }),
+      success: { ok, errors, pct: percent(ok, attempts) },
+      channels: CHANNELS.filter((c) => allowed.includes(c)),
+      byChannel,
+      pushByPlatform,
+      stillOn,
+      weeklyVersions,
+      weekly: [...weekly.values()],
+      rows,
+    };
+  },
+);

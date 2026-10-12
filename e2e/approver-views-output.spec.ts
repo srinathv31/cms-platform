@@ -2,7 +2,13 @@ import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { removeTemplate, rowsOf } from "./helpers/cleanup";
-import { channelControl, expectViewed, phoneControl, reviewPreview, reviewTabs } from "./helpers/review";
+import {
+  channelControl,
+  expectViewed,
+  phoneControl,
+  reviewPreview,
+  reviewTabs,
+} from "./helpers/review";
 import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
 
 // An approver views every output before approving (decision 0037). Approve waits until each output of the
@@ -30,10 +36,26 @@ import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
 test.use({ trace: "off" });
 
 const TEAM = "coral-offers";
-const DOCUMENT = { id: "UC-E2EVD1", from: "Cash Back Welcome Bonus — Terms", name: "Viewed outputs — Terms" };
-const ALERT = { id: "UC-E2EVA1", from: "Card Used Abroad", name: "Viewed outputs — Alert" };
-const REFUSED = { id: "UC-E2EVD2", from: DOCUMENT.from, name: "Viewed outputs — Refused PDF" };
-const UNDRAWABLE = { id: "UC-E2EVD3", from: DOCUMENT.from, name: "Viewed outputs — Undrawable PDF" };
+const DOCUMENT = {
+  id: "UC-E2EVD1",
+  from: "Cash Back Welcome Bonus — Terms",
+  name: "Viewed outputs — Terms",
+};
+const ALERT = {
+  id: "UC-E2EVA1",
+  from: "Card Used Abroad",
+  name: "Viewed outputs — Alert",
+};
+const REFUSED = {
+  id: "UC-E2EVD2",
+  from: DOCUMENT.from,
+  name: "Viewed outputs — Refused PDF",
+};
+const UNDRAWABLE = {
+  id: "UC-E2EVD3",
+  from: DOCUMENT.from,
+  name: "Viewed outputs — Undrawable PDF",
+};
 
 let db: Client;
 const made: string[] = [];
@@ -41,7 +63,8 @@ const made: string[] = [];
 test.beforeAll(async () => {
   db = openDb();
   // A run that died half way leaves its copies: start clean.
-  for (const id of [DOCUMENT.id, ALERT.id, REFUSED.id, UNDRAWABLE.id]) await removeTemplate(db, id);
+  for (const id of [DOCUMENT.id, ALERT.id, REFUSED.id, UNDRAWABLE.id])
+    await removeTemplate(db, id);
 });
 
 test.afterAll(async () => {
@@ -53,16 +76,29 @@ test.afterAll(async () => {
   }
 });
 
-async function insert(table: "templates" | "versions", row: Record<string, InValue>) {
+async function insert(
+  table: "templates" | "versions",
+  row: Record<string, InValue>,
+) {
   const columns = Object.keys(row);
-  await rowsOf(db, `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`, columns.map((c) => row[c]));
+  await rowsOf(
+    db,
+    `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
+    columns.map((c) => row[c]),
+  );
 }
 
 /** A seeded round in review, copied as the first version of a template of its own, waiting on its first stage. */
 async function copyInReview(copy: { id: string; from: string; name: string }) {
-  const [version] = await rowsOf(db, "SELECT * FROM versions WHERE name = ? AND state = 'in_review'", [copy.from]);
+  const [version] = await rowsOf(
+    db,
+    "SELECT * FROM versions WHERE name = ? AND state = 'in_review'",
+    [copy.from],
+  );
   expect(version, `the seed has ${copy.from} in review`).toBeTruthy();
-  const [template] = await rowsOf(db, "SELECT * FROM templates WHERE id = ?", [version!.template_id]);
+  const [template] = await rowsOf(db, "SELECT * FROM templates WHERE id = ?", [
+    version!.template_id,
+  ]);
   await insert("templates", { ...template!, id: copy.id });
   made.push(copy.id);
   await insert("versions", {
@@ -81,19 +117,30 @@ async function copyInReview(copy: { id: string; from: string; name: string }) {
   });
 }
 
-const decision = (page: Page) => page.locator('aside[aria-label="Decision"]').filter({ visible: true });
-const approveButton = (page: Page) => decision(page).getByRole("button", { name: "Approve", exact: true });
-const requestButton = (page: Page) => decision(page).getByRole("button", { name: "Request changes", exact: true });
-const stageLine = (page: Page) => decision(page).locator('[data-step="current"]');
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
-const segment = (group: Locator, name: string) => group.getByRole("button", { name, exact: true });
+const decision = (page: Page) =>
+  page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+const approveButton = (page: Page) =>
+  decision(page).getByRole("button", { name: "Approve", exact: true });
+const requestButton = (page: Page) =>
+  decision(page).getByRole("button", { name: "Request changes", exact: true });
+const stageLine = (page: Page) =>
+  decision(page).locator('[data-step="current"]');
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
+const segment = (group: Locator, name: string) =>
+  group.getByRole("button", { name, exact: true });
 
 /** Approve is greyed (focusable, `aria-disabled`), its reason the stage's line and its description. */
 async function expectApproveWaits(page: Page, reason: string) {
   await expect(approveButton(page)).toBeDisabled();
   await expect(approveButton(page)).toHaveAccessibleDescription(reason);
   await expect(stageLine(page)).toContainText(reason);
-  await expect(requestButton(page), "Request changes never waits on the outputs").toBeEnabled();
+  await expect(
+    requestButton(page),
+    "Request changes never waits on the outputs",
+  ).toBeEnabled();
 }
 
 async function openReview(page: Page, id: string) {
@@ -114,33 +161,49 @@ async function approve(page: Page) {
 }
 
 async function auditedOutputs(templateId: string): Promise<unknown> {
-  const [row] = await rowsOf(db, "SELECT details FROM audit_events WHERE template_id = ? AND action = 'version.activated'", [templateId]);
+  const [row] = await rowsOf(
+    db,
+    "SELECT details FROM audit_events WHERE template_id = ? AND action = 'version.activated'",
+    [templateId],
+  );
   return JSON.parse(String(row!.details)).outputsViewed;
 }
 
-test("a document: Approve waits until PDF and Web have rendered on screen, and the approval records them", async ({ page }) => {
+test("a document: Approve waits until PDF and Web have rendered on screen, and the approval records them", async ({
+  page,
+}) => {
   await copyInReview(DOCUMENT);
   await openReview(page, DOCUMENT.id);
 
   await test.step("1.1 Jordan arrives on the Document view: Approve waits on both outputs", async () => {
-    await expect(reviewTabs(page).getByRole("tab", { name: "Document" })).toHaveAttribute("aria-selected", "true");
+    await expect(
+      reviewTabs(page).getByRole("tab", { name: "Document" }),
+    ).toHaveAttribute("aria-selected", "true");
     await expectApproveWaits(page, "Preview PDF and Web first.");
   });
 
   await test.step("1.2 The Preview opens on PDF: once drawn it is checked, and Web alone is left", async () => {
-    await tap(reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }));
+    await tap(
+      reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }),
+    );
     const pdf = segment(channelControl(page), "PDF");
     const web = segment(channelControl(page), "Web");
     await expect(pdf).toHaveAttribute("aria-pressed", "true");
     const widthBefore = (await web.boundingBox())!.width;
     await expectViewed(pdf);
     await expect(pdf).toHaveAccessibleDescription("Viewed");
-    await expect(web, "picked, never shown: not viewed").not.toHaveAttribute("data-done", "");
+    await expect(web, "picked, never shown: not viewed").not.toHaveAttribute(
+      "data-done",
+      "",
+    );
     await expectApproveWaits(page, "Preview Web first.");
 
     await tap(web);
     await expectViewed(web);
-    expect((await web.boundingBox())!.width, "the check had its room before it appeared").toBe(widthBefore);
+    expect(
+      (await web.boundingBox())!.width,
+      "the check had its room before it appeared",
+    ).toBe(widthBefore);
     await expect(approveButton(page)).toBeEnabled();
     await expect(stageLine(page)).toContainText("Waiting for a decision");
   });
@@ -157,12 +220,19 @@ test("a document: Approve waits until PDF and Web have rendered on screen, and t
   });
 });
 
-test("an alert: Push counts on each phone, then SMS; the controls check off what was viewed", async ({ page }) => {
+test("an alert: Push counts on each phone, then SMS; the controls check off what was viewed", async ({
+  page,
+}) => {
   await copyInReview(ALERT);
   await openReview(page, ALERT.id);
-  await expectApproveWaits(page, "Preview Push (iPhone, Android) and SMS first.");
+  await expectApproveWaits(
+    page,
+    "Preview Push (iPhone, Android) and SMS first.",
+  );
 
-  await tap(reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }));
+  await tap(
+    reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }),
+  );
   const push = segment(channelControl(page), "Push");
   const sms = segment(channelControl(page), "SMS");
   const iphone = segment(phoneControl(page), "iPhone");
@@ -189,17 +259,27 @@ test("an alert: Push counts on each phone, then SMS; the controls check off what
     await tap(android);
     await expectViewed(android);
     await expectViewed(push);
-    expect((await android.boundingBox())!.width, "nothing moves as the check appears").toBe(widthBefore);
+    expect(
+      (await android.boundingBox())!.width,
+      "nothing moves as the check appears",
+    ).toBe(widthBefore);
     await expect(approveButton(page)).toBeEnabled();
   });
 
   await test.step("2.4 He approves: v1 is Active, and the audit row records all three outputs", async () => {
     await approve(page);
-    expect(await auditedOutputs(ALERT.id)).toEqual(["push.ios", "push.android", "sms"]);
+    expect(await auditedOutputs(ALERT.id)).toEqual([
+      "push.ios",
+      "push.android",
+      "sms",
+    ]);
   });
 });
 
-test("an output the route refuses can't be previewed: Approve says it can't be shown and to request changes", async ({ page, problems }) => {
+test("an output the route refuses can't be previewed: Approve says it can't be shown and to request changes", async ({
+  page,
+  problems,
+}) => {
   await copyInReview(REFUSED);
   await page.route(`**/api/templates/${REFUSED.id}/preview`, async (route) => {
     const asked = route.request().postDataJSON() as { channel?: string };
@@ -210,25 +290,37 @@ test("an output the route refuses can't be previewed: Approve says it can't be s
       body: JSON.stringify({
         error: {
           code: "render_failed",
-          message: "The PDF couldn't be rendered. Its font can't show these characters: U+1F600 (\u{1F600}).",
+          message:
+            "The PDF couldn't be rendered. Its font can't show these characters: U+1F600 (\u{1F600}).",
           details: { reason: "glyphs", characters: ["U+1F600"] },
         },
       }),
     });
   });
   await openReview(page, REFUSED.id);
-  const reasonBefore = await test.step("3.1 Approve waits on both outputs, in one line", async () => {
-    await expectApproveWaits(page, "Preview PDF and Web first.");
-    return (await stageLine(page).boundingBox())!;
-  });
+  const reasonBefore =
+    await test.step("3.1 Approve waits on both outputs, in one line", async () => {
+      await expectApproveWaits(page, "Preview PDF and Web first.");
+      return (await stageLine(page).boundingBox())!;
+    });
 
   await test.step("3.2 The Preview opens on PDF and shows the route's error: Approve now says to request changes", async () => {
-    await tap(reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }));
-    await expect(reviewPreview(page).getByRole("alert")).toContainText("Its font can't show these characters");
+    await tap(
+      reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }),
+    );
+    await expect(reviewPreview(page).getByRole("alert")).toContainText(
+      "Its font can't show these characters",
+    );
     await expectApproveWaits(page, "The PDF can't be shown. Request changes.");
     const after = (await stageLine(page).boundingBox())!;
-    expect([after.x, after.y, after.height], "the stage's line didn't move or grow").toEqual([reasonBefore.x, reasonBefore.y, reasonBefore.height]);
-    await expect(segment(channelControl(page), "PDF"), "never shown: not viewed").not.toHaveAttribute("data-done", "");
+    expect(
+      [after.x, after.y, after.height],
+      "the stage's line didn't move or grow",
+    ).toEqual([reasonBefore.x, reasonBefore.y, reasonBefore.height]);
+    await expect(
+      segment(channelControl(page), "PDF"),
+      "never shown: not viewed",
+    ).not.toHaveAttribute("data-done", "");
   });
 
   await test.step("3.3 Web renders, and Approve still says the PDF can't be shown", async () => {
@@ -238,38 +330,62 @@ test("an output the route refuses can't be previewed: Approve says it can't be s
   });
 
   // The route's refusal is a 500, which Chrome logs: the console errors this test expects.
-  const refusals = problems.filter((p) => /status of 500/.test(p) && p.includes(`/api/templates/${REFUSED.id}/preview`));
+  const refusals = problems.filter(
+    (p) =>
+      /status of 500/.test(p) &&
+      p.includes(`/api/templates/${REFUSED.id}/preview`),
+  );
   expect(refusals.length).toBeGreaterThan(0);
   for (const refused of refusals) problems.splice(problems.indexOf(refused), 1);
 });
 
-test("a PDF pdf.js can't open counts as viewed once the approver downloads it from the viewer", async ({ page }) => {
+test("a PDF pdf.js can't open counts as viewed once the approver downloads it from the viewer", async ({
+  page,
+}) => {
   await copyInReview(UNDRAWABLE);
   // Valid response, bytes pdf.js can't open: the viewer falls back to offering the file.
-  await page.route(`**/api/templates/${UNDRAWABLE.id}/preview`, async (route) => {
-    const asked = route.request().postDataJSON() as { channel?: string };
-    if (asked.channel !== "pdf") return route.continue();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/pdf",
-      headers: { "content-disposition": `inline; filename="${UNDRAWABLE.id}-v1.pdf"` },
-      body: "this is not a PDF",
-    });
-  });
+  await page.route(
+    `**/api/templates/${UNDRAWABLE.id}/preview`,
+    async (route) => {
+      const asked = route.request().postDataJSON() as { channel?: string };
+      if (asked.channel !== "pdf") return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        headers: {
+          "content-disposition": `inline; filename="${UNDRAWABLE.id}-v1.pdf"`,
+        },
+        body: "this is not a PDF",
+      });
+    },
+  );
   await openReview(page, UNDRAWABLE.id);
 
   await test.step("4.1 The Preview opens on PDF: the viewer offers the file, and the PDF is not viewed yet", async () => {
-    await tap(reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }));
-    const fallback = reviewPreview(page).getByRole("region", { name: "PDF preview" }).getByRole("button", { name: "Download PDF" });
+    await tap(
+      reviewTabs(page).getByRole("tab", { name: "Preview", exact: true }),
+    );
+    const fallback = reviewPreview(page)
+      .getByRole("region", { name: "PDF preview" })
+      .getByRole("button", { name: "Download PDF" });
     await expect(fallback).toBeVisible({ timeout: 30_000 });
-    await expect(segment(channelControl(page), "PDF")).not.toHaveAttribute("data-done", "");
+    await expect(segment(channelControl(page), "PDF")).not.toHaveAttribute(
+      "data-done",
+      "",
+    );
     await expectApproveWaits(page, "Preview PDF and Web first.");
   });
 
   await test.step("4.2 He downloads the file from the viewer: the PDF is viewed", async () => {
     const download = page.waitForEvent("download");
-    await tap(reviewPreview(page).getByRole("region", { name: "PDF preview" }).getByRole("button", { name: "Download PDF" }));
-    expect((await download).suggestedFilename()).toBe(`${UNDRAWABLE.id}-v1.pdf`);
+    await tap(
+      reviewPreview(page)
+        .getByRole("region", { name: "PDF preview" })
+        .getByRole("button", { name: "Download PDF" }),
+    );
+    expect((await download).suggestedFilename()).toBe(
+      `${UNDRAWABLE.id}-v1.pdf`,
+    );
     await expectViewed(segment(channelControl(page), "PDF"));
     await expectApproveWaits(page, "Preview Web first.");
   });

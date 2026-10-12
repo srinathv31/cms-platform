@@ -62,11 +62,22 @@ export function ReviewWorkspace({
   const views = useReviewView(version);
   const { view, previewVisited, channels } = views;
   const changes = useReviewChanges(data);
-  const { sets, selectedSet, setSetId, values, seen, onSeen, switcher } = usePreviewSets(version, today);
-  const comments = useReviewComments({ threads: data.threads, version, showDocument: views.showDocument });
+  const { sets, selectedSet, setSetId, values, seen, onSeen, switcher } =
+    usePreviewSets(version, today);
+  const comments = useReviewComments({
+    threads: data.threads,
+    version,
+    showDocument: views.showDocument,
+  });
   const goLive = useGoLive(version.state);
   const outputs = useViewedOutputs(viewer.id, version.id, version.round);
-  const decision = useReviewDecision({ data, team, goLive, viewed: outputs.viewed, cannotShow: outputs.failed });
+  const decision = useReviewDecision({
+    data,
+    team,
+    goLive,
+    viewed: outputs.viewed,
+    cannotShow: outputs.failed,
+  });
   const { rename } = changes;
   const canComment = can.comment.ok;
 
@@ -117,7 +128,11 @@ export function ReviewWorkspace({
       />
 
       <div data-slot="tab-bar" className={RV.tabs}>
-        <ViewTabs value={view} onChange={pickView} previewMounted={previewVisited} />
+        <ViewTabs
+          value={view}
+          onChange={pickView}
+          previewMounted={previewVisited}
+        />
         <div className="ml-auto min-w-0 pt-1.5">{tools}</div>
       </div>
 
@@ -141,7 +156,9 @@ export function ReviewWorkspace({
           onThreadClick={comments.onThreadClick}
           onActivate={comments.activate}
           onRequestComment={canComment ? comments.requestComment : undefined}
-          onRequestBlockComment={canComment ? comments.requestBlockComment : undefined}
+          onRequestBlockComment={
+            canComment ? comments.requestBlockComment : undefined
+          }
         />
       </Activity>
       {previewVisited ? (
@@ -191,15 +208,28 @@ export function ReviewWorkspace({
         requestRef={decision.requestButton}
         regionRef={decision.decisionRegion}
       >
-        {version.submitNote ? <SubmitNote author={version.submittedBy} note={version.submitNote} /> : null}
-        {rename ? <NameSection className={version.submitNote ? "mt-8" : undefined} change={rename} /> : null}
+        {version.submitNote ? (
+          <SubmitNote author={version.submittedBy} note={version.submitNote} />
+        ) : null}
+        {rename ? (
+          <NameSection
+            className={version.submitNote ? "mt-8" : undefined}
+            change={rename}
+          />
+        ) : null}
         <ContractSection
           className={version.submitNote || rename ? "mt-8" : undefined}
           changes={version.contractChanges}
           lines={version.contractLines}
           first={version.number === 1}
         />
-        <CommentsSection comments={comments} data={data} view={view} viewer={viewer} nowIso={nowIso} />
+        <CommentsSection
+          comments={comments}
+          data={data}
+          view={view}
+          viewer={viewer}
+          nowIso={nowIso}
+        />
       </DecisionRail>
 
       <ApproveDialog
@@ -224,7 +254,12 @@ export function ReviewWorkspace({
       />
 
       {goLive.playing ? (
-        <GoLive versionNumber={version.number} slotRef={goLive.slotRef} onFlip={goLive.flip} onDone={goLive.done} />
+        <GoLive
+          versionNumber={version.number}
+          slotRef={goLive.slotRef}
+          onFlip={goLive.flip}
+          onDone={goLive.done}
+        />
       ) : null}
     </>
   );

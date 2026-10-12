@@ -13,7 +13,13 @@ import type { ContractChange } from "@/domain/types";
 const MONO = "rounded-md px-1 py-px font-mono text-[12.5px] text-text";
 
 /** "adds required `annual_fee`" → the key in Geist Mono, on a chip (`surface`: the chip's own background, for the tinted dialog box). */
-export function WithKeys({ text, surface = "bg-surface-sunken" }: { text: string; surface?: string }) {
+export function WithKeys({
+  text,
+  surface = "bg-surface-sunken",
+}: {
+  text: string;
+  surface?: string;
+}) {
   return (
     <>
       {codeSegments(text).map((part, i) =>
@@ -29,7 +35,15 @@ export function WithKeys({ text, surface = "bg-surface-sunken" }: { text: string
   );
 }
 
-export function SectionLabel({ children, right, id }: { children: ReactNode; right?: ReactNode; id?: string }) {
+export function SectionLabel({
+  children,
+  right,
+  id,
+}: {
+  children: ReactNode;
+  right?: ReactNode;
+  id?: string;
+}) {
   return (
     <div className="flex h-6 items-center justify-between gap-3">
       <h2 id={id} className="caps-label">
@@ -44,14 +58,24 @@ export function SectionLabel({ children, right, id }: { children: ReactNode; rig
 export function SubmitNote({ author, note }: { author: Person; note: string }) {
   return (
     <figure className="rounded-xl border border-hairline bg-surface-tinted px-3 py-2.5">
-      <figcaption className="text-[12px] leading-4 text-text-subtle">Note from {author.name}</figcaption>
-      <p className="mt-1 text-[14px] leading-5 [overflow-wrap:anywhere] text-text">{note}</p>
+      <figcaption className="text-[12px] leading-4 text-text-subtle">
+        Note from {author.name}
+      </figcaption>
+      <p className="mt-1 text-[14px] leading-5 [overflow-wrap:anywhere] text-text">
+        {note}
+      </p>
     </figure>
   );
 }
 
 /** The rename the version brings: its name against the one customers get today, which they keep seeing until it goes live. */
-export function NameSection({ change, className }: { change: NameChange; className?: string }) {
+export function NameSection({
+  change,
+  className,
+}: {
+  change: NameChange;
+  className?: string;
+}) {
   return (
     <section aria-labelledby="review-name" className={className}>
       <SectionLabel id="review-name">Name</SectionLabel>
@@ -79,20 +103,35 @@ export function ContractSection({
   const breaking = changes.some((change) => change.breaking);
   return (
     <section aria-labelledby="review-contract" className={className}>
-      <SectionLabel id="review-contract" right={breaking ? <BreakingBadge /> : null}>
+      <SectionLabel
+        id="review-contract"
+        right={breaking ? <BreakingBadge /> : null}
+      >
         Contract changes
       </SectionLabel>
       {lines.length === 0 ? (
-        <p className="mt-3 text-[14px] leading-6 text-text-subtle">{first ? "First version." : "No contract changes."}</p>
+        <p className="mt-3 text-[14px] leading-6 text-text-subtle">
+          {first ? "First version." : "No contract changes."}
+        </p>
       ) : (
         <ul className="mt-3 flex flex-col gap-2.5">
           {lines.map((line, i) => (
-            <li key={i} className="grid grid-cols-[1.25rem_1fr] gap-x-3 text-[14px] leading-6">
+            <li
+              key={i}
+              className="grid grid-cols-[1.25rem_1fr] gap-x-3 text-[14px] leading-6"
+            >
               <span className="grid h-6 place-items-center">
                 {changes[i]?.breaking ? (
-                  <TriangleAlert aria-label="Breaking" strokeWidth={1.75} className="size-4 text-warning-text" />
+                  <TriangleAlert
+                    aria-label="Breaking"
+                    strokeWidth={1.75}
+                    className="size-4 text-warning-text"
+                  />
                 ) : (
-                  <span aria-hidden className="size-1.5 rounded-full bg-text-subtle" />
+                  <span
+                    aria-hidden
+                    className="size-1.5 rounded-full bg-text-subtle"
+                  />
                 )}
               </span>
               <span className="text-text">

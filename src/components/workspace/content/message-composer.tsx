@@ -1,8 +1,18 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from "react";
-import { findSet, resolveSetValues } from "@/components/preview/sample-sets/model";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
+import {
+  findSet,
+  resolveSetValues,
+} from "@/components/preview/sample-sets/model";
 import { createRedlineHandle } from "@/components/redline/dom-handle";
 import {
   channelFieldsHeading,
@@ -16,7 +26,10 @@ import {
   type ChannelFieldsPatch,
 } from "@/domain/channel-fields";
 import { messageFieldFlags } from "@/domain/messages/flags";
-import { truncationWarnings, type TruncationWarnings } from "@/domain/messages/truncation";
+import {
+  truncationWarnings,
+  type TruncationWarnings,
+} from "@/domain/messages/truncation";
 import type { MessageTypeRules } from "@/domain/platform-config/limits";
 import type { Channel, JSONContent } from "@/domain/types";
 import { useContractState } from "@/editor/components/editor-root";
@@ -24,8 +37,15 @@ import { InlineVariableField } from "@/editor/components/inline-variable-field";
 import { listSets } from "@/editor/model/sample-sets";
 import type { DocumentEditorHandle, TextFlagger } from "@/editor/types";
 import { cn } from "@/lib/utils";
-import { useLiveFields, useLiveSampleSets, type LiveDraft } from "../session/live-draft";
-import { usePreviewState, useWorkspaceSession } from "../session/workspace-session";
+import {
+  useLiveFields,
+  useLiveSampleSets,
+  type LiveDraft,
+} from "../session/live-draft";
+import {
+  usePreviewState,
+  useWorkspaceSession,
+} from "../session/workspace-session";
 import { FieldLabel, LockedFooter } from "./field-chrome";
 import { usePushContent, usePushFit } from "./push-fit";
 import { smsMeta, smsMetaSegments } from "./sms-meta";
@@ -91,7 +111,8 @@ export function MessageComposer({
   // The selected sample set's values, as the preview resolves them.
   const sampleValues = useMemo(() => {
     const sets = listSets(stored, variables, today);
-    const selected = findSet(sets, setId) ?? findSet(sets, "typical") ?? sets[0];
+    const selected =
+      findSet(sets, setId) ?? findSet(sets, "typical") ?? sets[0];
     return selected ? resolveSetValues(selected, variables, today) : {};
   }, [stored, variables, today, setId]);
 
@@ -100,14 +121,33 @@ export function MessageComposer({
 
   // The push as the selected set resolves it, for the phones the cuts are measured on: from the push's
   // own fields, so an SMS keystroke doesn't redraw those phones.
-  const pushContent = usePushContent({ on: pushOn, fields: live, variables, values: sampleValues, rules, appName });
+  const pushContent = usePushContent({
+    on: pushOn,
+    fields: live,
+    variables,
+    values: sampleValues,
+    rules,
+    appName,
+  });
   const { fits, probe } = usePushFit(pushContent);
   const warnings: TruncationWarnings = pushContent
     ? truncationWarnings(fits, pushContent)
     : { title: null, subtitle: null, body: null };
 
   const meta = useMemo(
-    () => (smsOn ? smsMetaSegments(smsMeta({ fields: live, variables, values: sampleValues, sampleSets: stored, today, rules })) : []),
+    () =>
+      smsOn
+        ? smsMetaSegments(
+            smsMeta({
+              fields: live,
+              variables,
+              values: sampleValues,
+              sampleSets: stored,
+              today,
+              rules,
+            }),
+          )
+        : [],
     [smsOn, live, variables, sampleValues, stored, today, rules],
   );
 
@@ -122,11 +162,17 @@ export function MessageComposer({
     const handle: DocumentEditorHandle = {
       ...createRedlineHandle({
         root: () => root.current,
-        anchor: (el, id) => el?.querySelector<HTMLElement>(`[data-field="${id.replace(/["\\]/g, "\\$&")}"]`) ?? null,
+        anchor: (el, id) =>
+          el?.querySelector<HTMLElement>(
+            `[data-field="${id.replace(/["\\]/g, "\\$&")}"]`,
+          ) ?? null,
         blockOfThread: (id) => latestThreadField.current(id),
       }),
       focus: () => {
-        const first = [...(root.current?.querySelectorAll<HTMLElement>(".ProseMirror") ?? [])].find((el) => el.getClientRects().length > 0);
+        const first = [
+          ...(root.current?.querySelectorAll<HTMLElement>(".ProseMirror") ??
+            []),
+        ].find((el) => el.getClientRects().length > 0);
         first?.focus({ preventScroll: true });
       },
     };
@@ -146,9 +192,20 @@ export function MessageComposer({
   const [message] = channelFieldsOf("sms");
 
   return (
-    <div ref={root} data-slot="message-composer" className="flex flex-col gap-12 pt-1">
+    <div
+      ref={root}
+      data-slot="message-composer"
+      className="flex flex-col gap-12 pt-1"
+    >
       <Section heading={channelFieldsHeading("push")} hidden={!pushOn}>
-        <ComposerField field={title!} value={values[title!.id]} hidden={!pushOn} editable={editable} onField={onField} warning={warnings.title} />
+        <ComposerField
+          field={title!}
+          value={values[title!.id]}
+          hidden={!pushOn}
+          editable={editable}
+          onField={onField}
+          warning={warnings.title}
+        />
         <ComposerField
           field={subtitle!}
           value={values[subtitle!.id]}
@@ -157,7 +214,14 @@ export function MessageComposer({
           onField={onField}
           warning={warnings.subtitle}
         />
-        <ComposerField field={body!} value={values[body!.id]} hidden={!pushOn} editable={editable} onField={onField} warning={warnings.body} />
+        <ComposerField
+          field={body!}
+          value={values[body!.id]}
+          hidden={!pushOn}
+          editable={editable}
+          onField={onField}
+          warning={warnings.body}
+        />
         {probe}
       </Section>
 
@@ -168,20 +232,33 @@ export function MessageComposer({
           hidden={!smsOn}
           editable={editable}
           onField={onField}
-          footer={rules.smsFooter ? <LockedFooter text={rules.smsFooter} /> : undefined}
+          footer={
+            rules.smsFooter ? (
+              <LockedFooter text={rules.smsFooter} />
+            ) : undefined
+          }
           meta={
             // One line, the same height whatever it says: a measurement, so the numbers are tabular.
-            <p data-slot="sms-meta" className="ml-auto min-h-5 text-right text-[13px] leading-5 tabular-nums text-text-muted">
+            <p
+              data-slot="sms-meta"
+              className="ml-auto min-h-5 text-right text-[13px] leading-5 tabular-nums text-text-muted"
+            >
               {meta.map((segment, i) => (
                 <span key={i}>
                   {i > 0 ? <span aria-hidden> · </span> : null}
                   <span className={cn(segment.over && "text-warning-text")}>
                     {segment.over && i === meta.length - 1 ? (
-                      <TriangleAlert aria-hidden strokeWidth={1.75} className="mr-1 inline size-3.5 -translate-y-px" />
+                      <TriangleAlert
+                        aria-hidden
+                        strokeWidth={1.75}
+                        className="mr-1 inline size-3.5 -translate-y-px"
+                      />
                     ) : null}
                     {segment.text}
                   </span>
-                  {i < meta.length - 1 ? <span className="sr-only">,</span> : null}
+                  {i < meta.length - 1 ? (
+                    <span className="sr-only">,</span>
+                  ) : null}
                 </span>
               ))}
             </p>
@@ -193,11 +270,26 @@ export function MessageComposer({
 }
 
 /** A channel's section: its heading in the display face, like a document's section heading. */
-function Section({ heading, hidden, children }: { heading: string; hidden: boolean; children: React.ReactNode }) {
+function Section({
+  heading,
+  hidden,
+  children,
+}: {
+  heading: string;
+  hidden: boolean;
+  children: React.ReactNode;
+}) {
   const id = useId();
   return (
-    <section aria-labelledby={id} hidden={hidden} className="flex flex-col gap-6">
-      <h2 id={id} className="font-display text-[1.5rem] leading-[1.35] font-normal tracking-[-0.005em] text-text">
+    <section
+      aria-labelledby={id}
+      hidden={hidden}
+      className="flex flex-col gap-6"
+    >
+      <h2
+        id={id}
+        className="font-display text-[1.5rem] leading-[1.35] font-normal tracking-[-0.005em] text-text"
+      >
         {heading}
       </h2>
       {children}
@@ -228,7 +320,10 @@ function ComposerField({
   footer?: React.ReactNode;
   meta?: React.ReactNode;
 }) {
-  const onChange = useCallback((doc: JSONContent) => onField(field, doc), [onField, field]);
+  const onChange = useCallback(
+    (doc: JSONContent) => onField(field, doc),
+    [onField, field],
+  );
   const flags = useMemo<TextFlagger | undefined>(() => {
     if (field.channel !== "sms" && !field.refusesShorteners) return undefined;
     return (text) =>
@@ -236,7 +331,9 @@ function ComposerField({
         from: flag.index,
         to: flag.index + flag.length,
         message: flag.message,
-        ...(flag.replacement === undefined ? {} : { replacement: flag.replacement }),
+        ...(flag.replacement === undefined
+          ? {}
+          : { replacement: flag.replacement }),
       }));
   }, [field]);
 
@@ -259,8 +356,15 @@ function ComposerField({
       {warning || meta ? (
         <div className="mt-2 flex items-start gap-4">
           {warning ? (
-            <p data-slot="cut-warning" className="flex min-w-0 items-start gap-1.5 text-[13px] leading-5 text-warning-text">
-              <TriangleAlert aria-hidden strokeWidth={1.75} className="mt-0.5 size-3.5 shrink-0" />
+            <p
+              data-slot="cut-warning"
+              className="flex min-w-0 items-start gap-1.5 text-[13px] leading-5 text-warning-text"
+            >
+              <TriangleAlert
+                aria-hidden
+                strokeWidth={1.75}
+                className="mt-0.5 size-3.5 shrink-0"
+              />
               {warning}
             </p>
           ) : null}

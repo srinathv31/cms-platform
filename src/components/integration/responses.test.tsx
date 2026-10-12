@@ -8,9 +8,15 @@ import { Responses } from "./responses";
 // document channel answers it (Push and SMS are JSON already).
 
 const names = (channels: Channel[]) =>
-  [...renderToStaticMarkup(<Responses responses={[...RESPONSE_FORMATS]} errors={[]} channels={channels} />).matchAll(/<span class="w-14[^"]*">([^<]+)<\/span>/g)].map(
-    (m) => m[1],
-  );
+  [
+    ...renderToStaticMarkup(
+      <Responses
+        responses={[...RESPONSE_FORMATS]}
+        errors={[]}
+        channels={channels}
+      />,
+    ).matchAll(/<span class="w-14[^"]*">([^<]+)<\/span>/g),
+  ].map((m) => m[1]);
 
 describe("Responses", () => {
   it("lists a document's channels and the base64 opt-in", () => {

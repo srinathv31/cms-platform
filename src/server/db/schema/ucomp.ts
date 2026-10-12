@@ -47,7 +47,9 @@ export const users = sqliteTable("users", {
   initials: text("initials").notNull(),
   avatarHue: integer("avatar_hue").notNull(), // 0–360, rendered through tokens
   title: text("title").notNull(),
-  isPersona: integer("is_persona", { mode: "boolean" }).notNull().default(false),
+  isPersona: integer("is_persona", { mode: "boolean" })
+    .notNull()
+    .default(false),
   platformRole: text("platform_role").$type<PlatformRole>(),
   lastActiveAt: ts("last_active_at"),
 });
@@ -72,9 +74,16 @@ export const memberships = sqliteTable(
   "memberships",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id),
-    teamId: text("team_id").notNull().references(() => teams.id),
-    status: text("status").$type<MembershipStatus>().notNull().default("active"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id),
+    status: text("status")
+      .$type<MembershipStatus>()
+      .notNull()
+      .default("active"),
     addedAt: ts("added_at").notNull(),
     addedBy: text("added_by").references(() => users.id),
     statusChangedAt: ts("status_changed_at"),
@@ -128,12 +137,16 @@ export const templates = sqliteTable(
   "templates",
   {
     id: text("id").primaryKey(), // "UC-4F7K2Q" — stable, consumer-facing
-    teamId: text("team_id").notNull().references(() => teams.id),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id),
     contentTypeId: text("content_type_id")
       .notNull()
       .references(() => contentTypes.id),
     // No name here: each version carries its own (`versions.name`), so a rename goes through review.
-    createdBy: text("created_by").notNull().references(() => users.id),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id),
     createdAt: ts("created_at").notNull(),
     starterKey: text("starter_key"),
   },
@@ -159,7 +172,9 @@ export const versions = sqliteTable(
     body: json<JSONContent>("body").notNull(), // TipTap JSON; variable nodes hold only their key
     // Each channel's own short fields (src/domain/channel-fields.ts), by channel and then field key:
     // { "email": { "subject": <doc>, "preheader": <doc> } }. A field with no value is absent.
-    channelFields: json<ChannelFields>("channel_fields").notNull().default(sql`'{}'`),
+    channelFields: json<ChannelFields>("channel_fields")
+      .notNull()
+      .default(sql`'{}'`),
     channels: json<Channel[]>("channels").notNull(),
     // The content type's SMS footer as it stood when this version was submitted, frozen with it (decision
     // 0035): render, review, Compare and Coral print this one, so a later footer change reaches only versions
@@ -176,11 +191,15 @@ export const versions = sqliteTable(
     // A position in `stages`: the stage the version waits on, or the one that decided it last.
     currentStage: integer("current_stage").notNull().default(0),
     rev: integer("rev").notNull().default(0), // autosave ordering
-    createdBy: text("created_by").notNull().references(() => users.id),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id),
     // User ids of everyone who wrote this version (maker-checker: none of them may decide it). Whoever
     // started the draft, everyone whose autosave landed, the submitter, and, for a draft a change
     // request opened, the writers of the version sent back. A draft from the Active version starts afresh.
-    writers: json<string[]>("writers").notNull().default(sql`'[]'`),
+    writers: json<string[]>("writers")
+      .notNull()
+      .default(sql`'[]'`),
     createdAt: ts("created_at").notNull(),
     updatedAt: ts("updated_at").notNull(),
     submittedBy: text("submitted_by").references(() => users.id),
@@ -196,7 +215,11 @@ export const versions = sqliteTable(
   (t) => [
     index("versions_template").on(t.templateId),
     // One row per round of a number. Drafts (no number, no round) don't collide: NULLs stay distinct.
-    uniqueIndex("versions_template_number_round").on(t.templateId, t.number, t.round),
+    uniqueIndex("versions_template_number_round").on(
+      t.templateId,
+      t.number,
+      t.round,
+    ),
     // At most one released row per number: a number's rounds before it were sent back.
     uniqueIndex("versions_one_released")
       .on(t.templateId, t.number)
@@ -222,8 +245,12 @@ export const approvals = sqliteTable("approvals", {
   // The stage's position in the version's own `stages`, and its name there.
   stagePosition: integer("stage_position").notNull(),
   stageName: text("stage_name").notNull(),
-  actorId: text("actor_id").notNull().references(() => users.id),
-  decision: text("decision").$type<"approved" | "changes_requested">().notNull(),
+  actorId: text("actor_id")
+    .notNull()
+    .references(() => users.id),
+  decision: text("decision")
+    .$type<"approved" | "changes_requested">()
+    .notNull(),
   reason: text("reason"),
   sampleSetsSeen: json<string[]>("sample_sets_seen"),
   decidedAt: ts("decided_at").notNull(),
@@ -242,7 +269,10 @@ export const commentThreads = sqliteTable(
       .references(() => versions.id),
     blockId: text("block_id").notNull(),
     quote: text("quote"),
-    status: text("status").$type<"open" | "resolved">().notNull().default("open"),
+    status: text("status")
+      .$type<"open" | "resolved">()
+      .notNull()
+      .default("open"),
     resolvedBy: text("resolved_by").references(() => users.id),
     resolvedAt: ts("resolved_at"),
     createdAt: ts("created_at").notNull(),
@@ -255,9 +285,14 @@ export const comments = sqliteTable("comments", {
   threadId: text("thread_id")
     .notNull()
     .references(() => commentThreads.id, { onDelete: "cascade" }),
-  authorId: text("author_id").notNull().references(() => users.id),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => users.id),
   body: text("body").notNull(),
-  kind: text("kind").$type<"comment" | "change_request">().notNull().default("comment"),
+  kind: text("kind")
+    .$type<"comment" | "change_request">()
+    .notNull()
+    .default("comment"),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -268,7 +303,9 @@ export const uploads = sqliteTable("uploads", {
   mime: text("mime").notNull(),
   size: integer("size").notNull(),
   path: text("path").notNull(), // under ./data/uploads (stands in for Azure Blob)
-  createdBy: text("created_by").notNull().references(() => users.id),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -293,7 +330,9 @@ export const renderLog = sqliteTable(
     channel: text("channel").$type<Channel>().notNull(),
     /** Which phone a push was for ("ios" or "android"); null for every other channel, and for pushes logged before it was kept. A setting of the request, never a value. */
     platform: text("platform").$type<PushPlatform>(),
-    isPreview: integer("is_preview", { mode: "boolean" }).notNull().default(false),
+    isPreview: integer("is_preview", { mode: "boolean" })
+      .notNull()
+      .default(false),
     correlationId: text("correlation_id").notNull(),
     outcome: text("outcome").$type<"ok" | "error">().notNull(),
     errorCode: text("error_code"),
@@ -328,7 +367,10 @@ export const consumerNotices = sqliteTable(
     payload: json<Record<string, unknown>>("payload").notNull(),
     createdAt: ts("created_at").notNull(),
   },
-  (t) => [uniqueIndex("consumer_notices_seq").on(t.seq), index("consumer_notices_consumer_seq").on(t.consumerId, t.seq)],
+  (t) => [
+    uniqueIndex("consumer_notices_seq").on(t.seq),
+    index("consumer_notices_consumer_seq").on(t.consumerId, t.seq),
+  ],
 );
 
 // ── Audit, notifications, access ──────────────────────────────
@@ -383,13 +425,19 @@ export const accessRequests = sqliteTable(
       .references(() => teams.id),
     role: text("role").$type<TeamRole>().notNull(),
     reason: text("reason").notNull(),
-    status: text("status").$type<"pending" | "approved" | "denied">().notNull().default("pending"),
+    status: text("status")
+      .$type<"pending" | "approved" | "denied">()
+      .notNull()
+      .default("pending"),
     decidedBy: text("decided_by").references(() => users.id),
     decidedAt: ts("decided_at"),
     decisionNote: text("decision_note"),
     createdAt: ts("created_at").notNull(),
   },
-  (t) => [index("access_requests_team_status").on(t.teamId, t.status), index("access_requests_user").on(t.userId)],
+  (t) => [
+    index("access_requests_team_status").on(t.teamId, t.status),
+    index("access_requests_user").on(t.userId),
+  ],
 );
 
 export const recertifications = sqliteTable("recertifications", {

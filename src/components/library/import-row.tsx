@@ -1,13 +1,26 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition, type DragEvent, type Ref } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type DragEvent,
+  type Ref,
+} from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { FileUp } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { IMPORT_ACCEPT } from "@/domain/import-types";
 import { cn } from "@/lib/utils";
-import { IMPORT_FAILED, precheckImport, precheckImportBytes, uploadImport } from "./upload-import";
+import {
+  IMPORT_FAILED,
+  precheckImport,
+  precheckImportBytes,
+  uploadImport,
+} from "./upload-import";
 
 /**
  * "Import a file": the dashed row under the starter cards (docs/decisions/prototype-log.md, 3 and 4). A
@@ -131,14 +144,26 @@ export function ImportRow({
           "flex h-14 w-full items-center gap-3 rounded-2xl border border-dashed border-hairline px-4 text-left outline-none transition-colors",
           "hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring data-[dragging]:bg-hover",
           busy && "cursor-default bg-selected hover:bg-selected",
-          !busy && (locked || unavailable) && "cursor-default hover:bg-transparent",
+          !busy &&
+            (locked || unavailable) &&
+            "cursor-default hover:bg-transparent",
         )}
       >
         {/* Greyed when it can't be used; the reason beside it stays readable. */}
-        <span className={cn("flex min-w-0 items-center gap-3", !busy && (locked || unavailable) && "opacity-50")}>
+        <span
+          className={cn(
+            "flex min-w-0 items-center gap-3",
+            !busy && (locked || unavailable) && "opacity-50",
+          )}
+        >
           <span className="grid size-5 shrink-0 place-items-center text-text-muted">
             {busy ? (
-              <Spinner aria-hidden role={undefined} aria-label={undefined} className="size-4" />
+              <Spinner
+                aria-hidden
+                role={undefined}
+                aria-label={undefined}
+                className="size-4"
+              />
             ) : (
               <FileUp aria-hidden strokeWidth={1.75} className="size-[18px]" />
             )}
@@ -148,7 +173,10 @@ export function ImportRow({
           </span>
         </span>
         {unavailable ? (
-          <span id={reasonId} className="ml-auto shrink-0 text-[13px] leading-5 text-text-muted">
+          <span
+            id={reasonId}
+            className="ml-auto shrink-0 text-[13px] leading-5 text-text-muted"
+          >
             {unavailable}
           </span>
         ) : null}
@@ -169,7 +197,10 @@ export function ImportRow({
         }}
       />
       {/* Always in the layout (empty until a file is refused), so the refusal never moves what is above or below it. */}
-      <p role="alert" className="mt-2 min-h-5 px-1 text-[13px] leading-5 text-danger-text">
+      <p
+        role="alert"
+        className="mt-2 min-h-5 px-1 text-[13px] leading-5 text-danger-text"
+      >
         {refusal}
       </p>
     </div>

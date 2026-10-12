@@ -18,8 +18,18 @@ export function PhoneSkeleton({
   className?: string;
 }) {
   return (
-    <PhoneFrame platform={settings.platform} width={settings.width} appearance={settings.appearance} caption={null} fit={fit} className={className}>
-      <div data-slot="skeleton" className="absolute inset-0 animate-pulse bg-(--device-bg)" />
+    <PhoneFrame
+      platform={settings.platform}
+      width={settings.width}
+      appearance={settings.appearance}
+      caption={null}
+      fit={fit}
+      className={className}
+    >
+      <div
+        data-slot="skeleton"
+        className="absolute inset-0 animate-pulse bg-(--device-bg)"
+      />
     </PhoneFrame>
   );
 }

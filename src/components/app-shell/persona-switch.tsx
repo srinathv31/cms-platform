@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useTransition } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useTransition,
+} from "react";
 import { m } from "motion/react";
 import { ease } from "@/components/motion/presets";
 import { switchPersona } from "@/server/actions/persona";
@@ -19,7 +25,11 @@ const PersonaSwitchContext = createContext<PersonaSwitchValue>({
  * Owns the persona-switch transition so the profile menu can trigger it
  * and the canvas can crossfade while it runs.
  */
-export function PersonaSwitchProvider({ children }: { children: React.ReactNode }) {
+export function PersonaSwitchProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [pending, startTransition] = useTransition();
 
   const switchTo = useCallback((personaId: string) => {
@@ -31,7 +41,11 @@ export function PersonaSwitchProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const value = useMemo(() => ({ pending, switchTo }), [pending, switchTo]);
-  return <PersonaSwitchContext.Provider value={value}>{children}</PersonaSwitchContext.Provider>;
+  return (
+    <PersonaSwitchContext.Provider value={value}>
+      {children}
+    </PersonaSwitchContext.Provider>
+  );
 }
 
 export function usePersonaSwitch() {

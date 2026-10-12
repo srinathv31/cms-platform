@@ -22,10 +22,19 @@ import type { ActionResult, VersionStage } from "@/domain/review-types";
 import { compareRounds, nextRound } from "@/domain/rounds";
 import type { Viewer } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
-import { commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  commentThreads,
+  comments,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { writeEffects } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { anchorIdsOf, loadChain, stageApproverIds } from "@/server/queries/review-shared";
+import {
+  anchorIdsOf,
+  loadChain,
+  stageApproverIds,
+} from "@/server/queries/review-shared";
 import { permit, refuse, serverAction } from "./kit";
 
 // Review comments: start a thread on a block or a channel field (or on the whole version), reply, resolve, reopen. The rules
@@ -50,9 +59,17 @@ type Reader = Pick<Db, "select">;
  * What a thread's or a version's template is, and what on it takes comments right now. `name` is the
  * name of the version the comment is about (the name is versioned): its notifications call it that.
  */
-async function loadTemplate(reader: Reader, templateId: string, name: string): Promise<CommentTemplate | undefined> {
+async function loadTemplate(
+  reader: Reader,
+  templateId: string,
+  name: string,
+): Promise<CommentTemplate | undefined> {
   const template = await reader
-    .select({ id: templates.id, teamId: templates.teamId, contentTypeId: templates.contentTypeId })
+    .select({
+      id: templates.id,
+      teamId: templates.teamId,
+      contentTypeId: templates.contentTypeId,
+    })
     .from(templates)
     .where(eq(templates.id, templateId))
     .limit(1)
@@ -70,7 +87,9 @@ async function loadTemplate(reader: Reader, templateId: string, name: string): P
       .from(versions)
       .where(eq(versions.templateId, templateId))
   ).sort((a, b) => compareRounds(b, a));
-  const review = list.find((v) => v.state === "in_review" && v.number !== null && v.round !== null);
+  const review = list.find(
+    (v) => v.state === "in_review" && v.number !== null && v.round !== null,
+  );
   return {
     ...template,
     name,
@@ -79,7 +98,11 @@ async function loadTemplate(reader: Reader, templateId: string, name: string): P
       ? {
           number: review.number!,
           round: review.round!,
-          stageApproverIds: await namedOnStage(reader, template.contentTypeId, review),
+          stageApproverIds: await namedOnStage(
+            reader,
+            template.contentTypeId,
+            review,
+          ),
         }
       : null,
     next: nextRound(list),
@@ -92,11 +115,17 @@ async function namedOnStage(
   contentTypeId: string,
   version: { stages: VersionStage[] | null; currentStage: number },
 ): Promise<string[]> {
-  return stageApproverIds(currentStageOf(version, await loadChain(reader, contentTypeId)));
+  return stageApproverIds(
+    currentStageOf(version, await loadChain(reader, contentTypeId)),
+  );
 }
 
 /** The version a new thread goes on, with its template and what a thread on it can anchor to (its fields and blocks). */
-async function loadVersion(reader: Reader, templateId: string, versionId: string) {
+async function loadVersion(
+  reader: Reader,
+  templateId: string,
+  versionId: string,
+) {
   const row = await reader
     .select({
       id: versions.id,
@@ -128,17 +157,27 @@ async function loadVersion(reader: Reader, templateId: string, versionId: string
     state: row.state,
     createdBy: row.createdBy,
     submittedBy: row.submittedBy,
-    stageApproverIds: row.state === "in_review" ? await namedOnStage(reader, row.contentTypeId, row) : [],
+    stageApproverIds:
+      row.state === "in_review"
+        ? await namedOnStage(reader, row.contentTypeId, row)
+        : [],
   };
   return {
-    template: { id: row.templateId, name: row.templateName, teamId: row.teamId },
+    template: {
+      id: row.templateId,
+      name: row.templateName,
+      teamId: row.teamId,
+    },
     version,
     blockIds: anchorIdsOf(row),
   };
 }
 
 /** A thread, the version it began on, and its template. */
-async function loadThread(reader: Reader, threadId: string): Promise<{ template: CommentTemplate; thread: CommentThread } | undefined> {
+async function loadThread(
+  reader: Reader,
+  threadId: string,
+): Promise<{ template: CommentTemplate; thread: CommentThread } | undefined> {
   const row = await reader
     .select({
       id: commentThreads.id,
@@ -180,8 +219,19 @@ async function loadThread(reader: Reader, threadId: string): Promise<{ template:
   };
 }
 
-function effectContext(viewer: Viewer, template: { id: string; teamId: string }, versionId: string, at: Date) {
-  return { at, actorId: viewer.userId, teamId: template.teamId, templateId: template.id, versionId };
+function effectContext(
+  viewer: Viewer,
+  template: { id: string; teamId: string },
+  versionId: string,
+  at: Date,
+) {
+  return {
+    at,
+    actorId: viewer.userId,
+    teamId: template.teamId,
+    templateId: template.id,
+    versionId,
+  };
 }
 
 /** The pages that show threads: the template workspace (margin) and the review screens. */
@@ -218,7 +268,12 @@ export async function addComment(input: {
     authorize: async ({ viewer, input }) => {
       const found = await loadVersion(db, input.templateId, input.versionId);
       if (!found) refuse(REASONS.generic);
-      permit(canComment(viewer, { teamId: found.template.teamId, version: found.version }));
+      permit(
+        canComment(viewer, {
+          teamId: found.template.teamId,
+          version: found.version,
+        }),
+      );
     },
     transaction: async (tx, { viewer, input, now: at }) => {
       const facts = await loadVersion(tx, input.templateId, input.versionId);
@@ -237,7 +292,11 @@ export async function addComment(input: {
 
       await tx.insert(commentThreads).values(outcome.thread);
       await tx.insert(comments).values(outcome.comment);
-      await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.version.id, at));
+      await writeEffects(
+        tx,
+        outcome.effects,
+        effectContext(viewer, facts.template, facts.version.id, at),
+      );
       return { ok: true, threadId: outcome.thread.id };
     },
     after: refreshThreads,
@@ -250,7 +309,13 @@ const ThreadInput = z.object({ threadId: z.string().min(1).max(64) });
 const ReplyInput = ThreadInput.extend({ body: z.string() });
 
 /** The thread the input names, and the rule asked of it; an unknown thread is refused like a forbidden one. */
-async function authorizeThread({ viewer, input }: { viewer: Viewer; input: { threadId: string } }) {
+async function authorizeThread({
+  viewer,
+  input,
+}: {
+  viewer: Viewer;
+  input: { threadId: string };
+}) {
   const found = await loadThread(db, input.threadId);
   if (!found) refuse(REASONS.generic);
   permit(canActOnThread(viewer, found));
@@ -260,7 +325,10 @@ async function authorizeThread({ viewer, input }: { viewer: Viewer; input: { thr
  * Adds a reply to a thread (open or resolved; a reply doesn't reopen it). Everyone who has written in the
  * thread, and the author of the version it started on, is notified (never the one replying).
  */
-export async function reply(input: { threadId: string; body: string }): Promise<ActionResult> {
+export async function reply(input: {
+  threadId: string;
+  body: string;
+}): Promise<ActionResult> {
   return serverAction(input, {
     input: ReplyInput,
     authorize: authorizeThread,
@@ -282,7 +350,11 @@ export async function reply(input: { threadId: string; body: string }): Promise<
       if (!outcome.ok) refuse(outcome);
 
       await tx.insert(comments).values(outcome.comment);
-      await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
+      await writeEffects(
+        tx,
+        outcome.effects,
+        effectContext(viewer, facts.template, facts.thread.origin.id, at),
+      );
       return { ok: true };
     },
     after: refreshThreads,
@@ -293,12 +365,16 @@ export async function reply(input: { threadId: string; body: string }): Promise<
  * Resolves an open thread. Compare-and-set on the status: a second click (or a second person) finds it
  * resolved already and writes nothing; that still answers ok, since the thread is what was asked.
  */
-export async function resolveThread(input: { threadId: string }): Promise<ActionResult> {
+export async function resolveThread(input: {
+  threadId: string;
+}): Promise<ActionResult> {
   return setStatus(input, resolveTransition);
 }
 
 /** Reopens a resolved thread (compare-and-set, as `resolveThread`). */
-export async function reopenThread(input: { threadId: string }): Promise<ActionResult> {
+export async function reopenThread(input: {
+  threadId: string;
+}): Promise<ActionResult> {
   return setStatus(input, reopenTransition);
 }
 
@@ -313,17 +389,30 @@ async function setStatus(
     transaction: async (tx, { viewer, input, now: at }) => {
       const facts = await loadThread(tx, input.threadId);
       if (!facts) refuse(REQUEST_REFUSALS.threadGone);
-      const outcome: ThreadStatusResult = transition({ viewer, ...facts, now: at });
+      const outcome: ThreadStatusResult = transition({
+        viewer,
+        ...facts,
+        now: at,
+      });
       if (!outcome.ok) refuse(outcome);
       if (!outcome.changes) return { ok: true };
 
       const [row] = await tx
         .update(commentThreads)
         .set(outcome.changes)
-        .where(and(eq(commentThreads.id, facts.thread.id), eq(commentThreads.status, facts.thread.status)))
+        .where(
+          and(
+            eq(commentThreads.id, facts.thread.id),
+            eq(commentThreads.status, facts.thread.status),
+          ),
+        )
         .returning({ id: commentThreads.id });
       if (!row) return { ok: true };
-      await writeEffects(tx, outcome.effects, effectContext(viewer, facts.template, facts.thread.origin.id, at));
+      await writeEffects(
+        tx,
+        outcome.effects,
+        effectContext(viewer, facts.template, facts.thread.origin.id, at),
+      );
       wrote = true;
       return { ok: true };
     },

@@ -20,16 +20,32 @@
 // the field's own (an SMS's locked footer). `size="md"` is the main column's larger field.
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { useStore } from "zustand";
 import { cx } from "../lib/cx";
-import { captureHistory, restoreHistory, type HistoryCarry } from "../lib/history-carry";
+import {
+  captureHistory,
+  restoreHistory,
+  type HistoryCarry,
+} from "../lib/history-carry";
 import { useHydrated } from "../lib/use-hydrated";
 import type { CharacterRules } from "../model/characters";
 import type { FieldLines } from "../model/normalize";
 import { NODE, type JSONContent, type Variable } from "../model/types";
 import { inlineFieldExtensions } from "../schema";
-import { REFRESH_FLAGS, createFlaggerSource, textFlagsKey } from "../extensions/text-flags";
+import {
+  REFRESH_FLAGS,
+  createFlaggerSource,
+  textFlagsKey,
+} from "../extensions/text-flags";
 import { createChipPopoverStore } from "../state/chip-popover";
 import { createFlagPopoverStore } from "../state/flag-popover";
 import type { InlineVariableFieldProps, TextFlagger } from "../types";
@@ -38,7 +54,10 @@ import { FlagPopover } from "./flag-popover";
 import { FOCUS_WITHIN_RING } from "./classes";
 import { useEditorRoot } from "./editor-root";
 import { VariableChipView } from "./variable-chip";
-import { VariablePicker, createVariablePickerController } from "./variable-picker";
+import {
+  VariablePicker,
+  createVariablePickerController,
+} from "./variable-picker";
 import "../styles.css";
 
 const BOX =
@@ -50,7 +69,10 @@ const SIZE = {
   md: "min-h-11 px-3 py-2.5 text-[15px] leading-6",
 } as const;
 
-const EMPTY_FIELD: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
+const EMPTY_FIELD: JSONContent = {
+  type: "doc",
+  content: [{ type: "paragraph" }],
+};
 
 export function InlineVariableField({
   label,
@@ -76,10 +98,14 @@ export function InlineVariableField({
   const latestRef = useRef<JSONContent | null>(null);
 
   useState(() => {
-    if (!root.isCommitted()) root.registerField({ id: fieldId, label, kind: "inline" }, initial);
+    if (!root.isCommitted())
+      root.registerField({ id: fieldId, label, kind: "inline" }, initial);
   });
   useLayoutEffect(() => {
-    root.registerField({ id: fieldId, label, kind: "inline" }, latestRef.current ?? initial);
+    root.registerField(
+      { id: fieldId, label, kind: "inline" },
+      latestRef.current ?? initial,
+    );
     return () => root.unregisterField(fieldId);
   }, [root, fieldId, label, initial]);
   // After every (re-)registration above, and whenever it changes: a hidden field is no target for insert, undo or redo.
@@ -88,7 +114,12 @@ export function InlineVariableField({
   }, [root, fieldId, label, initial, hidden]);
 
   return (
-    <div id={id} hidden={hidden} className={cx(BOX, SIZE[size], FOCUS_WITHIN_RING, className)} data-read-only={readOnly ? "" : undefined}>
+    <div
+      id={id}
+      hidden={hidden}
+      className={cx(BOX, SIZE[size], FOCUS_WITHIN_RING, className)}
+      data-read-only={readOnly ? "" : undefined}
+    >
       {hydrated ? (
         <LiveField
           label={label}
@@ -102,7 +133,12 @@ export function InlineVariableField({
           flags={flags}
         />
       ) : (
-        <StaticField label={label} lines={mode} value={initial} variables={variables} />
+        <StaticField
+          label={label}
+          lines={mode}
+          value={initial}
+          variables={variables}
+        />
       )}
       {footer}
     </div>
@@ -204,18 +240,29 @@ function LiveField({
   });
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed || editor.isEditable === !readOnly) return;
+    if (!editor || editor.isDestroyed || editor.isEditable === !readOnly)
+      return;
     editor.setEditable(!readOnly, false);
   }, [editor, readOnly]);
 
   // A new flagger: flag the text again now, rather than at the next edit.
   useLayoutEffect(() => {
     if (!flagger.set(flags ?? null)) return;
-    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(textFlagsKey, REFRESH_FLAGS));
+    if (editor && !editor.isDestroyed)
+      editor.view.dispatch(
+        editor.state.tr.setMeta(textFlagsKey, REFRESH_FLAGS),
+      );
   }, [editor, flagger, flags]);
 
   if (!editor || editor.isDestroyed) {
-    return <StaticField label={label} lines={lines} value={snapshot} variables={variables} />;
+    return (
+      <StaticField
+        label={label}
+        lines={lines}
+        value={snapshot}
+        variables={variables}
+      />
+    );
   }
 
   return (
@@ -223,7 +270,9 @@ function LiveField({
       <EditorContent editor={editor} />
       <ChipPopover editor={editor} root={root} chip={chip} />
       <FlagPopover editor={editor} store={flagPopover} />
-      {readOnly ? null : <VariablePicker controller={picker} editor={editor} root={root} />}
+      {readOnly ? null : (
+        <VariablePicker controller={picker} editor={editor} root={root} />
+      )}
     </>
   );
 }
@@ -243,12 +292,24 @@ function StaticField({
   const byKey = new Map(variables.map((v) => [v.key, v]));
   const inline = value.content?.[0]?.content ?? [];
   return (
-    <div className="ucomp-field-input" role="textbox" aria-label={label} aria-multiline={lines === "lines" ? "true" : undefined} aria-readonly="true">
+    <div
+      className="ucomp-field-input"
+      role="textbox"
+      aria-label={label}
+      aria-multiline={lines === "lines" ? "true" : undefined}
+      aria-readonly="true"
+    >
       <p>
         {inline.map((node, i) => {
           if (node.type === NODE.variable) {
             const key = (node.attrs?.key as string | undefined) ?? null;
-            return <VariableChipView key={i} variableKey={key} variable={key ? byKey.get(key) : undefined} />;
+            return (
+              <VariableChipView
+                key={i}
+                variableKey={key}
+                variable={key ? byKey.get(key) : undefined}
+              />
+            );
           }
           if (node.type === "hardBreak") return <br key={i} />;
           return node.type === "text" ? <span key={i}>{node.text}</span> : null;

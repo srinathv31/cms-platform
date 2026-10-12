@@ -5,7 +5,11 @@ import type { DeviceClock } from "@/components/device";
 import type { Variable } from "@/editor/model/types";
 import { assertNever } from "@/domain/assert-never";
 import { PUSH_PLATFORMS, type PushPlatform } from "@/domain/messages/push";
-import { channelOutputs, outputKey, type OutputKey } from "@/domain/review-outputs";
+import {
+  channelOutputs,
+  outputKey,
+  type OutputKey,
+} from "@/domain/review-outputs";
 import type { Channel } from "@/domain/types";
 import { duration, ease } from "@/components/motion/presets";
 import type { PreviewDevice } from "@/components/workspace/session/session-store";
@@ -102,10 +106,21 @@ export function PreviewPane({
 }: PreviewPaneProps) {
   const messageChannel = channel === "push" || channel === "sms";
   // A channel is checked once all its outputs are viewed (Push: on both phones); Push's phones each on their own.
-  const viewedChannels = viewed ? channels.filter((c) => channelOutputs(c).every((key) => viewed.includes(key))) : undefined;
-  const viewedPhones = viewed && channel === "push" ? PUSH_PLATFORMS.filter((p) => viewed.includes(outputKey("push", p))) : undefined;
+  const viewedChannels = viewed
+    ? channels.filter((c) =>
+        channelOutputs(c).every((key) => viewed.includes(key)),
+      )
+    : undefined;
+  const viewedPhones =
+    viewed && channel === "push"
+      ? PUSH_PLATFORMS.filter((p) => viewed.includes(outputKey("push", p)))
+      : undefined;
   const output = messageChannel ? null : (slot?.output ?? null);
-  const error = messageChannel ? (message && !message.ok ? message.error : null) : (slot?.error ?? null);
+  const error = messageChannel
+    ? message && !message.ok
+      ? message.error
+      : null
+    : (slot?.error ?? null);
   // The address the web frame shows: the team's own domain (the email's sender domain).
   const host = sender.address.split("@")[1] ?? "";
 
@@ -122,7 +137,12 @@ export function PreviewPane({
         data-slot="preview-controls"
         className="@container/controls flex h-8 shrink-0 items-center justify-between gap-3"
       >
-        <ChannelTabs channels={channels} value={channel} onChange={onChannel} viewed={viewedChannels} />
+        <ChannelTabs
+          channels={channels}
+          value={channel}
+          onChange={onChannel}
+          viewed={viewedChannels}
+        />
         <ChannelControl
           channel={channel}
           output={error ? null : output}
@@ -151,7 +171,12 @@ export function PreviewPane({
         >
           {error ? (
             // A message renders in the browser, with no request: trying it again gives the same answer.
-            <OutputError error={error} variables={variables} onEditValues={onEditValues} onRetry={messageChannel ? undefined : onRetry} />
+            <OutputError
+              error={error}
+              variables={variables}
+              onEditValues={onEditValues}
+              onRetry={messageChannel ? undefined : onRetry}
+            />
           ) : (
             <Output
               channel={channel}
@@ -249,7 +274,12 @@ function Output({
       ) : null;
     case "sms":
       return message?.ok && message.output.kind === "sms" ? (
-        <SmsOutput output={message.output} settings={phone.settings} senders={senders} clock={clock} />
+        <SmsOutput
+          output={message.output}
+          settings={phone.settings}
+          senders={senders}
+          clock={clock}
+        />
       ) : null;
     default:
       return assertNever(channel, "channel");
@@ -287,7 +317,14 @@ function ChannelControl({
       return null;
     case "push":
     case "sms":
-      return <PhoneControls channel={channel} view={phone} onChange={onPhone} viewed={viewedPhones} />;
+      return (
+        <PhoneControls
+          channel={channel}
+          view={phone}
+          onChange={onPhone}
+          viewed={viewedPhones}
+        />
+      );
     default:
       return assertNever(channel, "channel");
   }

@@ -45,7 +45,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     keywords: ["paragraph", "plain", "body", "p"],
     shortcut: ["Mod", "Alt", "0"],
     // Listed on a plain line too (Notion does); choosing it there is a harmless no-op.
-    isAvailable: (editor) => editor.isActive("paragraph") || editor.can().setParagraph(),
+    isAvailable: (editor) =>
+      editor.isActive("paragraph") || editor.can().setParagraph(),
     apply: (chain) => chain.setParagraph(),
   },
   ...([1, 2, 3] as const).map<BlockItem>((level) => ({
@@ -54,7 +55,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     keywords: ["heading", "title", "section", `h${level}`],
     shortcut: ["Mod", "Alt", String(level)],
     // The schema keeps headings out of a cell's own paragraphs, but a list item in a cell could take one.
-    isAvailable: (editor) => !inTable(editor) && editor.can().setHeading({ level }),
+    isAvailable: (editor) =>
+      !inTable(editor) && editor.can().setHeading({ level }),
     apply: (chain) => chain.setHeading({ level }),
   })),
   {
@@ -62,7 +64,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     label: "Bulleted list",
     keywords: ["bullet", "unordered", "ul", "list", "-"],
     shortcut: ["Mod", "Shift", "8"],
-    isAvailable: (editor) => !editor.isActive("bulletList") && editor.can().toggleBulletList(),
+    isAvailable: (editor) =>
+      !editor.isActive("bulletList") && editor.can().toggleBulletList(),
     apply: (chain) => chain.toggleBulletList(),
   },
   {
@@ -70,7 +73,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     label: "Numbered list",
     keywords: ["numbered", "ordered", "ol", "list", "1."],
     shortcut: ["Mod", "Shift", "7"],
-    isAvailable: (editor) => !editor.isActive("orderedList") && editor.can().toggleOrderedList(),
+    isAvailable: (editor) =>
+      !editor.isActive("orderedList") && editor.can().toggleOrderedList(),
     apply: (chain) => chain.toggleOrderedList(),
   },
   {
@@ -78,7 +82,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     label: "Table",
     keywords: ["table", "grid", "rows", "columns", "fees"],
     isAvailable: (editor) => !inTable(editor) && !editor.isActive("callout"),
-    apply: (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
+    apply: (chain) =>
+      chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
   },
   {
     id: "callout",
@@ -93,7 +98,8 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
     keywords: ["divider", "rule", "line", "separator", "hr"],
     markdown: "---",
     // Table cells hold paragraphs and lists only: a rule there would split the table.
-    isAvailable: (editor) => !inTable(editor) && editor.can().setHorizontalRule(),
+    isAvailable: (editor) =>
+      !inTable(editor) && editor.can().setHorizontalRule(),
     apply: (chain) => chain.setHorizontalRule(),
   },
 ];
@@ -102,7 +108,11 @@ export const BLOCK_ITEMS: readonly BlockItem[] = [
  * Filters by label words and keywords (prefix match), best matches first:
  * label starts with the query, then a label word does, then a keyword does.
  */
-export function filterBlockItems(items: readonly BlockItem[], query: string, editor: Editor): BlockItem[] {
+export function filterBlockItems(
+  items: readonly BlockItem[],
+  query: string,
+  editor: Editor,
+): BlockItem[] {
   const q = query.trim().toLowerCase();
   const available = items.filter((item) => safeAvailable(item, editor));
   if (!q) return available;

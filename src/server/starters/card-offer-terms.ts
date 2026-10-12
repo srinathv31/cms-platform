@@ -15,7 +15,10 @@ export function cardOfferTermsVariables(kit: VariableKit): Variable[] {
 export function cardOfferTermsBody(scope: string): JSONContent {
   return disclosure(scope, {
     offer: [
-      p("intro", "Spend $2,000 on purchases in your first 3 months and earn a $200 statement credit."),
+      p(
+        "intro",
+        "Spend $2,000 on purchases in your first 3 months and earn a $200 statement credit.",
+      ),
       ul("how_it_works", [
         "Purchases must post to your account within 3 months of the account opening date.",
         "Cash advances, balance transfers, fees and interest don't count toward the spend requirement.",
@@ -39,8 +42,14 @@ export function cardOfferTermsBody(scope: string): JSONContent {
       ),
     ],
     legal: [
-      p("state_terms", "State-specific terms for {home_state} residents are in your cardmember agreement."),
-      callout("tax_callout", "The statement credit may be taxable. Talk to a tax advisor about your situation."),
+      p(
+        "state_terms",
+        "State-specific terms for {home_state} residents are in your cardmember agreement.",
+      ),
+      callout(
+        "tax_callout",
+        "The statement credit may be taxable. Talk to a tax advisor about your situation.",
+      ),
       p("issuer", "Coral Bank, N.A. Member FDIC. Credit approval required."),
     ],
   });

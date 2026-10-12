@@ -47,17 +47,33 @@ test.afterAll(() => {
 });
 
 /** Breaks one stored value until the returned function (or afterEach) puts back exactly what was there. */
-async function breakValue(table: "versions" | "settings" | "sim_customers", keyColumn: "id" | "key", key: string, column: string) {
-  const [before] = await rowsOf(db, `SELECT ${column} FROM ${table} WHERE ${keyColumn} = ?`, [key]);
+async function breakValue(
+  table: "versions" | "settings" | "sim_customers",
+  keyColumn: "id" | "key",
+  key: string,
+  column: string,
+) {
+  const [before] = await rowsOf(
+    db,
+    `SELECT ${column} FROM ${table} WHERE ${keyColumn} = ?`,
+    [key],
+  );
   if (!before) throw new Error(`${table} row ${key} doesn't exist.`);
   let restored = false;
   const restore = async () => {
     if (restored) return;
     restored = true;
-    await rowsOf(db, `UPDATE ${table} SET ${column} = ? WHERE ${keyColumn} = ?`, [before[column] as InValue, key]);
+    await rowsOf(
+      db,
+      `UPDATE ${table} SET ${column} = ? WHERE ${keyColumn} = ?`,
+      [before[column] as InValue, key],
+    );
   };
   restores.push(restore);
-  await rowsOf(db, `UPDATE ${table} SET ${column} = ? WHERE ${keyColumn} = ?`, [BROKEN, key]);
+  await rowsOf(db, `UPDATE ${table} SET ${column} = ? WHERE ${keyColumn} = ?`, [
+    BROKEN,
+    key,
+  ]);
   return restore;
 }
 
@@ -67,8 +83,15 @@ async function versionOf(name: string, state: string) {
     "SELECT v.id, v.template_id, v.number FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.state = ?",
     [name, state],
   );
-  if (!row) throw new Error(`This spec needs the fresh seed (npm run db:reset): no ${state} version of ${name}.`);
-  return { id: String(row.id), templateId: String(row.template_id), number: Number(row.number) };
+  if (!row)
+    throw new Error(
+      `This spec needs the fresh seed (npm run db:reset): no ${state} version of ${name}.`,
+    );
+  return {
+    id: String(row.id),
+    templateId: String(row.template_id),
+    number: Number(row.number),
+  };
 }
 
 /** Visible primary (black, filled) buttons and links in the canvas: the screen's one primary rule. */
@@ -81,7 +104,11 @@ function primaryButtons(page: Page) {
     probe.remove();
     const main = document.querySelector("main");
     return [...(main?.querySelectorAll("button, a[href]") ?? [])]
-      .filter((el) => (el as HTMLElement).checkVisibility() && getComputedStyle(el).backgroundColor === primary)
+      .filter(
+        (el) =>
+          (el as HTMLElement).checkVisibility() &&
+          getComputedStyle(el).backgroundColor === primary,
+      )
       .map((el) => el.textContent?.trim() ?? "");
   });
 }
@@ -92,13 +119,22 @@ function primaryButtons(page: Page) {
  */
 async function settle(page: Page, frame: boolean) {
   if (frame) {
-    await expect(page.getByRole("navigation", { name: "Sidebar" }).getByRole("link", { name: "Library" })).toBeVisible();
+    await expect(
+      page
+        .getByRole("navigation", { name: "Sidebar" })
+        .getByRole("link", { name: "Library" }),
+    ).toBeVisible();
     await page.waitForFunction(() => {
-      const el = document.querySelector("button[aria-label$='profile and persona']");
+      const el = document.querySelector(
+        "button[aria-label$='profile and persona']",
+      );
       return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps"));
     });
     await page.waitForFunction(
-      () => ![...document.querySelectorAll('[data-slot="skeleton"]')].some((el) => (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true })),
+      () =>
+        ![...document.querySelectorAll('[data-slot="skeleton"]')].some((el) =>
+          (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true }),
+        ),
     );
   }
   // Let the streamed sections' view transitions and the fonts finish.
@@ -107,10 +143,16 @@ async function settle(page: Page, frame: boolean) {
 
 /** No serious or critical axe violation, as in helpers/principles.ts. */
 async function expectNoSeriousViolations(page: Page) {
-  const axe = await new AxeBuilder({ page }).exclude("nextjs-portal").exclude("[data-base-ui-focus-guard]").analyze();
+  const axe = await new AxeBuilder({ page })
+    .exclude("nextjs-portal")
+    .exclude("[data-base-ui-focus-guard]")
+    .analyze();
   const serious = axe.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")
-    .map((v) => `${v.id}: ${v.help} (${v.nodes.map((n) => `${n.target.join(" ")} ${n.failureSummary ?? ""}`).join(" | ")})`);
+    .map(
+      (v) =>
+        `${v.id}: ${v.help} (${v.nodes.map((n) => `${n.target.join(" ")} ${n.failureSummary ?? ""}`).join(" | ")})`,
+    );
   expect(serious, "axe serious/critical violations").toEqual([]);
 }
 
@@ -118,107 +160,177 @@ async function expectNoSeriousViolations(page: Page) {
 async function expectDigestOnly(page: Page) {
   await expect(page.getByText(/^Error ID \S+$/)).toBeVisible();
   const text = await page.locator("body").innerText();
-  expect(text, "the server's message stays on the server").not.toMatch(/JSON|SyntaxError|Unexpected|at \w+ \(/);
+  expect(text, "the server's message stays on the server").not.toMatch(
+    /JSON|SyntaxError|Unexpected|at \w+ \(/,
+  );
 }
 
 /** The error's sentence, its actions and its digest, and nothing of the server's message. */
-async function expectErrorScreen(page: Page, sentence: string, { frame }: { frame: boolean }) {
+async function expectErrorScreen(
+  page: Page,
+  sentence: string,
+  { frame }: { frame: boolean },
+) {
   await expect(page.getByText(sentence, { exact: true })).toBeVisible();
   await settle(page, frame);
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   // A Base UI Button rendered as a link has the button role.
-  await expect(page.getByRole("button", { name: "Back to library" })).toHaveAttribute("href", `/${TEAM}/library`);
+  await expect(
+    page.getByRole("button", { name: "Back to library" }),
+  ).toHaveAttribute("href", `/${TEAM}/library`);
   await expectDigestOnly(page);
   await expectNoSeriousViolations(page);
 }
 
-test("a tab that fails keeps the workspace header, the tab bar and the frame", async ({ page }) => {
+test("a tab that fails keeps the workspace header, the tab bar and the frame", async ({
+  page,
+}) => {
   const v = await versionOf(BALANCE, "active");
   const restore = await breakValue("versions", "id", v.id, "body");
 
   await page.goto(`/${TEAM}/templates/${v.templateId}`);
   await expectErrorScreen(page, "This tab didn't load.", { frame: true });
-  await expect(page.getByRole("heading", { level: 1, name: BALANCE })).toBeVisible();
-  await expect(page.locator('[data-slot="tab-bar"]').getByRole("link", { name: "Versions" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: BALANCE }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('[data-slot="tab-bar"]')
+      .getByRole("link", { name: "Versions" }),
+  ).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
   // The tab bar keeps the workspace's black button (Edit, for Maya on an Active template), so Try again is outline.
   expect(await primaryButtons(page)).toEqual(["Edit"]);
   // Its actions act on the tab that didn't load, so they stay but are greyed, each with the reason at the control.
   const bar = page.locator('[data-slot="tab-bar"]');
-  const action = (name: string) => bar.getByRole("button", { name, exact: true });
+  const action = (name: string) =>
+    bar.getByRole("button", { name, exact: true });
   for (const name of ["Edit", "Preview"]) {
     await expect(action(name)).toBeVisible();
     await expect(action(name)).toBeDisabled();
     await expect(action(name)).toHaveAttribute("data-disabled", "");
-    await expect(action(name)).toHaveAccessibleDescription("Unavailable until this tab loads.");
+    await expect(action(name)).toHaveAccessibleDescription(
+      "Unavailable until this tab loads.",
+    );
   }
 
   await restore();
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.locator(".ProseMirror").filter({ visible: true })).toBeVisible();
+  await expect(
+    page.locator(".ProseMirror").filter({ visible: true }),
+  ).toBeVisible();
   await expect(page.getByText("This tab didn't load.")).toHaveCount(0);
   // And live again.
-  for (const name of ["Edit", "Preview"]) await expect(action(name)).toBeEnabled();
+  for (const name of ["Edit", "Preview"])
+    await expect(action(name)).toBeEnabled();
 });
 
-test("a page that fails keeps the sidebar and the top bar", async ({ page }) => {
+test("a page that fails keeps the sidebar and the top bar", async ({
+  page,
+}) => {
   const v = await versionOf(CASH_BACK, "in_review");
   const restore = await breakValue("versions", "id", v.id, "body");
 
   await page.goto(`/${TEAM}/review/${v.templateId}/${v.number}`);
   await expectErrorScreen(page, "This page didn't load", { frame: true });
-  await expect(page.getByRole("heading", { level: 1, name: "This page didn't load" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "This page didn't load" }),
+  ).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /profile and persona$/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /profile and persona$/ }),
+  ).toBeVisible();
   expect(await primaryButtons(page)).toEqual(["Try again"]);
 
   await restore();
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: CASH_BACK })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: CASH_BACK }),
+  ).toBeVisible();
   await expect(page.getByText("This page didn't load")).toHaveCount(0);
 });
 
-test("a page of the simulator that fails keeps Coral's frame and goes back to /sim", async ({ page }) => {
-  const [customer] = await rowsOf(db, "SELECT id FROM sim_customers ORDER BY id LIMIT 1");
-  if (!customer) throw new Error("This spec needs the fresh seed (npm run db:reset): Coral has no customers.");
-  const restore = await breakValue("sim_customers", "id", String(customer.id), "statement");
+test("a page of the simulator that fails keeps Coral's frame and goes back to /sim", async ({
+  page,
+}) => {
+  const [customer] = await rowsOf(
+    db,
+    "SELECT id FROM sim_customers ORDER BY id LIMIT 1",
+  );
+  if (!customer)
+    throw new Error(
+      "This spec needs the fresh seed (npm run db:reset): Coral has no customers.",
+    );
+  const restore = await breakValue(
+    "sim_customers",
+    "id",
+    String(customer.id),
+    "statement",
+  );
 
   await page.goto("/sim/customers");
-  await expect(page.getByRole("heading", { level: 1, name: "This page didn't load" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "This page didn't load" }),
+  ).toBeVisible();
   await settle(page, false);
   // Coral's frame stays: the strip back to Stencil, its label, its nav. Not Stencil's global error page.
-  await expect(page.getByText("Coral — simulated", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Customers", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Back to library" })).toHaveCount(0);
+  await expect(
+    page.getByText("Coral — simulated", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Customers", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Back to library" }),
+  ).toHaveCount(0);
   // Back goes to Coral's home (a link: Coral draws its own buttons), not to a Stencil space's Library.
-  await expect(page.getByRole("link", { name: "Back to offers" })).toHaveAttribute("href", "/sim");
+  await expect(
+    page.getByRole("link", { name: "Back to offers" }),
+  ).toHaveAttribute("href", "/sim");
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   await expectDigestOnly(page);
   await expectNoSeriousViolations(page);
 
   await page.getByRole("link", { name: "Back to offers" }).click();
   await expect(page).toHaveURL(/\/sim$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Offers" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Offers" }),
+  ).toBeVisible();
 
   // Try again brings the page back once the value is.
   await page.goto("/sim/customers");
-  await expect(page.getByRole("heading", { level: 1, name: "This page didn't load" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "This page didn't load" }),
+  ).toBeVisible();
   await restore();
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Customers" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Customers" }),
+  ).toBeVisible();
   await expect(page.getByText("This page didn't load")).toHaveCount(0);
 });
 
-test("when the frame itself fails, the global error page replaces it", async ({ page }) => {
-  const restore = await breakValue("settings", "key", "clock_offset_days", "value");
+test("when the frame itself fails, the global error page replaces it", async ({
+  page,
+}) => {
+  const restore = await breakValue(
+    "settings",
+    "key",
+    "clock_offset_days",
+    "value",
+  );
 
   await page.goto(`/${TEAM}/library`);
   await expectErrorScreen(page, "This page didn't load", { frame: false });
-  await expect(page.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Sidebar" })).toHaveCount(
+    0,
+  );
   expect(await primaryButtons(page)).toEqual(["Try again"]);
 
   await restore();
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Library" }),
+  ).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
 });

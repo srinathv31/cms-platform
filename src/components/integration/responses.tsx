@@ -3,7 +3,10 @@ import { CHANNEL_LABELS } from "@/domain/render/errors";
 import { isDocumentChannel, type Channel } from "@/domain/types";
 import { CodeBlock } from "./code-block";
 
-const NAME: Readonly<Record<Channel | "base64", string>> = { ...CHANNEL_LABELS, base64: "Base64" };
+const NAME: Readonly<Record<Channel | "base64", string>> = {
+  ...CHANNEL_LABELS,
+  base64: "Base64",
+};
 
 /**
  * What comes back on a 200 for each enabled channel (and the base64 opt-in, which only a document channel
@@ -18,18 +21,33 @@ export function Responses({
   errors: IntegrationPanelData["errors"];
   channels: readonly Channel[];
 }) {
-  const shown = responses.filter((r) => (r.channel === "base64" ? channels.some(isDocumentChannel) : channels.includes(r.channel)));
+  const shown = responses.filter((r) =>
+    r.channel === "base64"
+      ? channels.some(isDocumentChannel)
+      : channels.includes(r.channel),
+  );
   return (
     <div className="flex flex-col gap-5">
       <ul aria-label="Response formats" className="flex flex-col">
         {shown.map((r) => (
-          <li key={r.channel} className="flex gap-4 border-b border-hairline py-3 first:pt-0 last:border-b-0">
-            <span className="w-14 shrink-0 text-[13px] font-medium leading-5 text-text">{NAME[r.channel]}</span>
+          <li
+            key={r.channel}
+            className="flex gap-4 border-b border-hairline py-3 first:pt-0 last:border-b-0"
+          >
+            <span className="w-14 shrink-0 text-[13px] font-medium leading-5 text-text">
+              {NAME[r.channel]}
+            </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <span className="break-all font-mono text-[12.5px] leading-5 text-text-muted">{r.contentType}</span>
+              <span className="break-all font-mono text-[12.5px] leading-5 text-text-muted">
+                {r.contentType}
+              </span>
               <p className="text-[13px] leading-5 text-text">{r.body}</p>
               {r.example ? (
-                <CodeBlock label={`${NAME[r.channel]} example`} maxHeightClass="max-h-48" className="mt-1.5">
+                <CodeBlock
+                  label={`${NAME[r.channel]} example`}
+                  maxHeightClass="max-h-48"
+                  className="mt-1.5"
+                >
                   {r.example}
                 </CodeBlock>
               ) : null}
@@ -37,7 +55,10 @@ export function Responses({
           </li>
         ))}
       </ul>
-      <table aria-label="Errors" className="w-full table-fixed border-collapse text-[13px]">
+      <table
+        aria-label="Errors"
+        className="w-full table-fixed border-collapse text-[13px]"
+      >
         <colgroup>
           <col className="w-[3.25rem]" />
           <col className="w-[10.5rem]" />
@@ -46,7 +67,11 @@ export function Responses({
         <thead>
           <tr className="border-b border-hairline text-left">
             {(["Status", "Code", "When"] as const).map((h) => (
-              <th key={h} scope="col" className="caps-label h-8 pr-3 text-left font-medium last:pr-0">
+              <th
+                key={h}
+                scope="col"
+                className="caps-label h-8 pr-3 text-left font-medium last:pr-0"
+              >
                 {h}
               </th>
             ))}
@@ -54,9 +79,16 @@ export function Responses({
         </thead>
         <tbody>
           {errors.map((e) => (
-            <tr key={e.code} className="border-b border-hairline align-top last:border-b-0">
-              <td className="py-2.5 pr-3 font-mono text-[12.5px] leading-5 text-text">{e.status}</td>
-              <td className="py-2.5 pr-3 break-all font-mono text-[12.5px] leading-5 text-text">{e.code}</td>
+            <tr
+              key={e.code}
+              className="border-b border-hairline align-top last:border-b-0"
+            >
+              <td className="py-2.5 pr-3 font-mono text-[12.5px] leading-5 text-text">
+                {e.status}
+              </td>
+              <td className="py-2.5 pr-3 break-all font-mono text-[12.5px] leading-5 text-text">
+                {e.code}
+              </td>
               <td className="py-2.5 leading-5 text-text-muted">{e.when}</td>
             </tr>
           ))}

@@ -17,13 +17,24 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/server/actions/comments", () => actions);
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const MAYA: Person = { id: "maya", name: "Maya Chen", initials: "MC", hue: 28 };
-const JORDAN: Person = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 212 };
+const JORDAN: Person = {
+  id: "jordan",
+  name: "Jordan Ellis",
+  initials: "JE",
+  hue: 212,
+};
 const NOW = "2027-02-18T15:00:00Z";
 
-function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}): ThreadView {
+function thread(
+  id: string,
+  blockId: string,
+  patch: Partial<ThreadView> = {},
+): ThreadView {
   return {
     id,
     blockId,
@@ -32,7 +43,15 @@ function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}): T
     originVersionNumber: 1,
     originRound: 1,
     originLabel: "v1",
-    comments: [{ id: `c-${id}`, author: JORDAN, body: `Comment ${id}`, kind: "comment", createdAt: "2027-02-18T13:00:00Z" }],
+    comments: [
+      {
+        id: `c-${id}`,
+        author: JORDAN,
+        body: `Comment ${id}`,
+        kind: "comment",
+        createdAt: "2027-02-18T13:00:00Z",
+      },
+    ],
     orphaned: false,
     ...patch,
   };
@@ -40,13 +59,29 @@ function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}): T
 
 const THREADS: ThreadView[] = [
   thread("doc", DOCUMENT_THREAD, {
-    comments: [{ id: "c-doc", author: JORDAN, body: "Two things to fix.", kind: "change_request", createdAt: "2027-02-16T13:00:00Z" }],
+    comments: [
+      {
+        id: "c-doc",
+        author: JORDAN,
+        body: "Two things to fix.",
+        kind: "change_request",
+        createdAt: "2027-02-16T13:00:00Z",
+      },
+    ],
   }),
   thread("spend", "b2", { quote: "$4,000 on purchases" }),
   thread("apr", "b5", { quote: null }),
   thread("gone", "b99", { orphaned: true, quote: "old wording" }),
-  thread("old-1", "b3", { status: "resolved", resolvedBy: JORDAN, resolvedAt: "2027-02-17T09:00:00Z" }),
-  thread("old-2", "b4", { status: "resolved", resolvedBy: MAYA, resolvedAt: "2027-02-17T10:00:00Z" }),
+  thread("old-1", "b3", {
+    status: "resolved",
+    resolvedBy: JORDAN,
+    resolvedAt: "2027-02-17T09:00:00Z",
+  }),
+  thread("old-2", "b4", {
+    status: "resolved",
+    resolvedBy: MAYA,
+    resolvedAt: "2027-02-17T10:00:00Z",
+  }),
 ];
 
 let root: Root;
@@ -80,11 +115,18 @@ const base: Omit<ThreadListProps, "threads"> = {
 };
 
 /** The thread cards in the order they are on screen. */
-const order = () => Array.from(container.querySelectorAll<HTMLElement>("[data-thread]")).map((el) => el.dataset.thread);
-const card = (id: string) => container.querySelector<HTMLElement>(`[data-thread="${id}"]`)!;
+const order = () =>
+  Array.from(container.querySelectorAll<HTMLElement>("[data-thread]")).map(
+    (el) => el.dataset.thread,
+  );
+const card = (id: string) =>
+  container.querySelector<HTMLElement>(`[data-thread="${id}"]`)!;
 const button = (within: ParentNode, name: RegExp | string) =>
   Array.from(within.querySelectorAll<HTMLElement>("button")).find((b) =>
-    typeof name === "string" ? b.textContent?.trim() === name : name.test(b.textContent ?? "") || name.test(b.getAttribute("aria-label") ?? ""),
+    typeof name === "string"
+      ? b.textContent?.trim() === name
+      : name.test(b.textContent ?? "") ||
+        name.test(b.getAttribute("aria-label") ?? ""),
   )!;
 const click = (el: HTMLElement) => act(() => el.click());
 const flush = () => act(() => Promise.resolve());
@@ -103,14 +145,18 @@ function deferred<T>() {
 }
 
 describe("ThreadList: what is listed, and in what order", () => {
-  beforeEach(() => act(() => root.render(<ThreadList {...base} threads={THREADS} />)));
+  beforeEach(() =>
+    act(() => root.render(<ThreadList {...base} threads={THREADS} />)),
+  );
 
   it("lists the change request first, then open threads in document order, then orphaned ones", () => {
     expect(order()).toEqual(["doc", "spend", "apr", "gone"]);
   });
 
   it("labels the orphaned ones quietly, apart from the rest", () => {
-    const section = container.querySelector('[aria-label="Comments on removed content"]')!;
+    const section = container.querySelector(
+      '[aria-label="Comments on removed content"]',
+    )!;
     expect(section.textContent).toContain("On removed content");
     expect(section.querySelector('[data-thread="gone"]')).toBeTruthy();
   });
@@ -138,7 +184,14 @@ describe("ThreadList: what is listed, and in what order", () => {
       root.render(
         <ThreadList
           {...base}
-          threads={[{ ...THREADS[0], originVersionNumber: 3, originRound: 1, originLabel: "v3 · Round 1" }]}
+          threads={[
+            {
+              ...THREADS[0],
+              originVersionNumber: 3,
+              originRound: 1,
+              originLabel: "v3 · Round 1",
+            },
+          ]}
         />,
       ),
     );
@@ -146,7 +199,14 @@ describe("ThreadList: what is listed, and in what order", () => {
   });
 
   it("is quiet when nothing is open", () => {
-    act(() => root.render(<ThreadList {...base} threads={THREADS.filter((t) => t.status === "resolved")} />));
+    act(() =>
+      root.render(
+        <ThreadList
+          {...base}
+          threads={THREADS.filter((t) => t.status === "resolved")}
+        />,
+      ),
+    );
     expect(container.textContent).toContain("No open comments.");
     expect(container.textContent).toContain("Resolved (2)");
   });
@@ -155,7 +215,16 @@ describe("ThreadList: what is listed, and in what order", () => {
 describe("ThreadList: choosing and composing", () => {
   it("activates a thread when its card is clicked, and shows the active one selected", () => {
     const onActivate = vi.fn();
-    act(() => root.render(<ThreadList {...base} threads={THREADS} onActivate={onActivate} activeThreadId="apr" />));
+    act(() =>
+      root.render(
+        <ThreadList
+          {...base}
+          threads={THREADS}
+          onActivate={onActivate}
+          activeThreadId="apr"
+        />,
+      ),
+    );
     expect(card("apr").hasAttribute("data-active")).toBe(true);
     expect(card("spend").hasAttribute("data-active")).toBe(false);
     click(card("spend"));
@@ -164,27 +233,49 @@ describe("ThreadList: choosing and composing", () => {
 
   it("selects a thread when focus arrives in its card (the keyboard path)", () => {
     const onActivate = vi.fn();
-    act(() => root.render(<ThreadList {...base} threads={THREADS} onActivate={onActivate} />));
+    act(() =>
+      root.render(
+        <ThreadList {...base} threads={THREADS} onActivate={onActivate} />,
+      ),
+    );
     act(() => button(card("apr"), /Reply/).focus());
     expect(onActivate).toHaveBeenCalledWith("apr");
   });
 
   it("puts the composer above every thread", () => {
-    act(() => root.render(<ThreadList {...base} threads={THREADS} composer={{ blockId: "b2", quote: "bonus points" }} />));
+    act(() =>
+      root.render(
+        <ThreadList
+          {...base}
+          threads={THREADS}
+          composer={{ blockId: "b2", quote: "bonus points" }}
+        />,
+      ),
+    );
     const list = container.querySelector('[data-slot="thread-list"]')!;
     expect(list.firstElementChild?.hasAttribute("data-compose")).toBe(true);
     expect(list.firstElementChild?.textContent).toContain("bonus points");
   });
 
   it("offers no reply, resolve or reopen to someone who can't comment", () => {
-    act(() => root.render(<ThreadList {...base} canComment={false} threads={THREADS} />));
+    act(() =>
+      root.render(
+        <ThreadList {...base} canComment={false} threads={THREADS} />,
+      ),
+    );
     expect(button(container, "Resolve")).toBeUndefined();
     expect(container.querySelector('button[aria-label^="Reply"]')).toBeNull();
   });
 });
 
 /** A host that does what the page does: it owns the server's list and the optimistic layer, and replaces the list when the server answers. */
-function Host({ initial, onList }: { initial: ThreadView[]; onList?: (apply: (next: ThreadView[]) => void) => void }) {
+function Host({
+  initial,
+  onList,
+}: {
+  initial: ThreadView[];
+  onList?: (apply: (next: ThreadView[]) => void) => void;
+}) {
   const [server, setServer] = useState(initial);
   onList?.(setServer);
   const review = useReviewThreads(server);
@@ -206,7 +297,11 @@ describe("ThreadList: changes show at once, and the server's answer settles them
     const answer = deferred<{ ok: true }>();
     actions.resolveThread.mockReturnValue(answer.promise);
     let setServer!: (next: ThreadView[]) => void;
-    act(() => root.render(<Host initial={THREADS} onList={(apply) => (setServer = apply)} />));
+    act(() =>
+      root.render(
+        <Host initial={THREADS} onList={(apply) => (setServer = apply)} />,
+      ),
+    );
     expect(order()).toContain("spend");
 
     click(button(card("spend"), "Resolve"));
@@ -218,7 +313,18 @@ describe("ThreadList: changes show at once, and the server's answer settles them
 
     // The server confirms (refresh() brings the new list, then the action returns).
     await act(async () => {
-      setServer(THREADS.map((t) => (t.id === "spend" ? { ...t, status: "resolved" as const, resolvedBy: MAYA, resolvedAt: NOW } : t)));
+      setServer(
+        THREADS.map((t) =>
+          t.id === "spend"
+            ? {
+                ...t,
+                status: "resolved" as const,
+                resolvedBy: MAYA,
+                resolvedAt: NOW,
+              }
+            : t,
+        ),
+      );
       answer.resolve({ ok: true });
     });
     expect(order()).not.toContain("spend");
@@ -226,13 +332,19 @@ describe("ThreadList: changes show at once, and the server's answer settles them
   });
 
   it("puts a refused resolve back and says why, at the card", async () => {
-    actions.resolveThread.mockResolvedValue({ ok: false, code: "generic", reason: "Only authors and approvers on this team can comment." });
+    actions.resolveThread.mockResolvedValue({
+      ok: false,
+      code: "generic",
+      reason: "Only authors and approvers on this team can comment.",
+    });
     act(() => root.render(<Host initial={THREADS} />));
     click(button(card("spend"), "Resolve"));
     await flush();
     await flush();
     expect(order()).toContain("spend");
-    expect(card("spend").querySelector('[role="alert"]')?.textContent).toBe("Only authors and approvers on this team can comment.");
+    expect(card("spend").querySelector('[role="alert"]')?.textContent).toBe(
+      "Only authors and approvers on this team can comment.",
+    );
   });
 
   it("reopens a resolved thread at once, into the open list", async () => {
@@ -256,7 +368,10 @@ describe("ThreadList: changes show at once, and the server's answer settles them
     click(button(card("spend"), /Reply/));
     const field = card("spend").querySelector("textarea")!;
     act(() => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Added the variable.");
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )!.set!.call(field, "Added the variable.");
       field.dispatchEvent(new Event("input", { bubbles: true }));
     });
     click(button(card("spend"), "Reply"));
@@ -264,18 +379,28 @@ describe("ThreadList: changes show at once, and the server's answer settles them
     expect(card("spend").textContent).toContain("Added the variable.");
     expect(card("spend").textContent).toContain("Maya Chen");
     expect(card("spend").textContent).toContain("just now");
-    expect(actions.reply).toHaveBeenCalledWith({ threadId: "spend", body: "Added the variable." });
+    expect(actions.reply).toHaveBeenCalledWith({
+      threadId: "spend",
+      body: "Added the variable.",
+    });
     await act(async () => answer.resolve({ ok: true }));
   });
 
   it("takes a refused reply back out of the card, and brings the field back with its text and the reason", async () => {
-    const answer = deferred<{ ok: false; code: "comments_closed"; reason: string }>();
+    const answer = deferred<{
+      ok: false;
+      code: "comments_closed";
+      reason: string;
+    }>();
     actions.reply.mockReturnValue(answer.promise);
     act(() => root.render(<Host initial={THREADS} />));
     click(button(card("spend"), /Reply/));
     const field = card("spend").querySelector("textarea")!;
     act(() => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Too late?");
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )!.set!.call(field, "Too late?");
       field.dispatchEvent(new Event("input", { bubbles: true }));
     });
     click(button(card("spend"), "Reply"));
@@ -285,11 +410,15 @@ describe("ThreadList: changes show at once, and the server's answer settles them
 
     // The version was approved meanwhile: the server refuses, and the list is the server's again.
     const closed = "Only a draft or a version in review takes comments.";
-    await act(async () => answer.resolve({ ok: false, code: "comments_closed", reason: closed }));
+    await act(async () =>
+      answer.resolve({ ok: false, code: "comments_closed", reason: closed }),
+    );
     await flush();
     expect(card("spend").querySelectorAll("time")).toHaveLength(1);
     expect(card("spend").querySelector("textarea")?.value).toBe("Too late?");
-    expect(card("spend").querySelector('[role="alert"]')?.textContent).toBe(closed);
+    expect(card("spend").querySelector('[role="alert"]')?.textContent).toBe(
+      closed,
+    );
   });
 });
 
@@ -299,7 +428,12 @@ describe("ThreadList: a new thread", () => {
     const review = useReviewThreads(THREADS);
     return (
       <>
-        <button data-open onClick={() => review.openComposer({ blockId: "b2", quote: "bonus points" })}>
+        <button
+          data-open
+          onClick={() =>
+            review.openComposer({ blockId: "b2", quote: "bonus points" })
+          }
+        >
           open
         </button>
         <ThreadList
@@ -319,7 +453,10 @@ describe("ThreadList: a new thread", () => {
   }
   const type = (el: HTMLTextAreaElement, value: string) =>
     act(() => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )!.set!.call(el, value);
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
   const compose = () => container.querySelector<HTMLElement>("[data-compose]")!;
@@ -344,7 +481,9 @@ describe("ThreadList: a new thread", () => {
     });
     // On its way: the composer is out of sight and the thread is in the list, in the viewer's name.
     expect(compose().hidden).toBe(true);
-    const created = container.querySelector<HTMLElement>('[data-thread^="optimistic-thread"]')!;
+    const created = container.querySelector<HTMLElement>(
+      '[data-thread^="optimistic-thread"]',
+    )!;
     expect(created.textContent).toContain("Name the bonus.");
     expect(created.textContent).toContain("Maya Chen");
     // It can't be replied to or resolved until the server has it.
@@ -356,7 +495,11 @@ describe("ThreadList: a new thread", () => {
   });
 
   it("brings the composer back with its text and the reason when the post is refused", async () => {
-    actions.addComment.mockResolvedValue({ ok: false, code: "block_gone", reason: "That block isn't in this version any more." });
+    actions.addComment.mockResolvedValue({
+      ok: false,
+      code: "block_gone",
+      reason: "That block isn't in this version any more.",
+    });
     act(() => root.render(<ComposerHost onClosed={() => {}} />));
     click(container.querySelector<HTMLElement>("[data-open]")!);
     type(compose().querySelector("textarea")!, "Name the bonus.");
@@ -365,8 +508,12 @@ describe("ThreadList: a new thread", () => {
     await flush();
     expect(compose().hidden).toBe(false);
     expect(compose().querySelector("textarea")!.value).toBe("Name the bonus.");
-    expect(compose().querySelector('[role="alert"]')?.textContent).toBe("That block isn't in this version any more.");
-    expect(container.querySelector('[data-thread^="optimistic-thread"]')).toBeNull();
+    expect(compose().querySelector('[role="alert"]')?.textContent).toBe(
+      "That block isn't in this version any more.",
+    );
+    expect(
+      container.querySelector('[data-thread^="optimistic-thread"]'),
+    ).toBeNull();
   });
 
   it("leaves a thread that nobody wrote anything in unposted", () => {
@@ -383,7 +530,15 @@ describe("ThreadList: a new thread", () => {
     expect(container.querySelector("[data-compose]")).toBeNull();
     click(container.querySelector<HTMLElement>("[data-open]")!);
     act(() => {
-      compose().querySelector("textarea")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      compose()
+        .querySelector("textarea")!
+        .dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Escape",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
     });
     expect(container.querySelector("[data-compose]")).toBeNull();
     expect(onClosed).toHaveBeenCalledTimes(2);
@@ -401,16 +556,27 @@ const press = (el: HTMLElement) =>
   });
 const typeInto = (el: HTMLTextAreaElement, value: string) =>
   act(() => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 const esc = (el: HTMLElement) =>
   act(() => {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   });
 /** Animation frames, for the focus a list returns after a host has had its turn. */
-const frames = () => act(async () => void (await vi.advanceTimersByTimeAsync(80)));
-const replyOf = (id: string) => card(id).querySelector<HTMLElement>('[data-slot="reply"]')!;
+const frames = () =>
+  act(async () => void (await vi.advanceTimersByTimeAsync(80)));
+const replyOf = (id: string) =>
+  card(id).querySelector<HTMLElement>('[data-slot="reply"]')!;
 const OPEN = THREADS.filter((t) => t.status === "open");
 
 /** The page: the server's list in state (so a test can send the refreshed one), the shared hook, and a button that opens the composer. */
@@ -421,7 +587,10 @@ function Page({
   withOpener = true,
 }: {
   initial?: ThreadView[];
-  onList?: (set: (next: ThreadView[]) => void, review: ReturnType<typeof useReviewThreads>) => void;
+  onList?: (
+    set: (next: ThreadView[]) => void,
+    review: ReturnType<typeof useReviewThreads>,
+  ) => void;
   onClose?: (outcome?: string) => void;
   withOpener?: boolean;
 }) {
@@ -431,7 +600,12 @@ function Page({
   return (
     <>
       {withOpener ? (
-        <button data-opener onClick={() => review.openComposer({ blockId: "b2", quote: "bonus points" })}>
+        <button
+          data-opener
+          onClick={() =>
+            review.openComposer({ blockId: "b2", quote: "bonus points" })
+          }
+        >
           opener
         </button>
       ) : null}
@@ -446,7 +620,11 @@ function Page({
           review.closeComposer();
           onClose?.(outcome);
         }}
-        blockText={(blockId) => (blockId === "b5" ? "Annual percentage rate for purchases, set by the prime rate and a margin." : null)}
+        blockText={(blockId) =>
+          blockId === "b5"
+            ? "Annual percentage rate for purchases, set by the prime rate and a margin."
+            : null
+        }
       />
     </>
   );
@@ -459,7 +637,16 @@ describe("ThreadList: focus never falls to the page", () => {
 
   /** The server's list after it resolved a thread. */
   const resolvedIn = (list: ThreadView[], id: string) =>
-    list.map((t) => (t.id === id ? { ...t, status: "resolved" as const, resolvedBy: MAYA, resolvedAt: NOW } : t));
+    list.map((t) =>
+      t.id === id
+        ? {
+            ...t,
+            status: "resolved" as const,
+            resolvedBy: MAYA,
+            resolvedAt: NOW,
+          }
+        : t,
+    );
 
   it("after Resolve, moves to the next open card's Reply, and stays there when the server answers", async () => {
     const answer = deferred<{ ok: true }>();
@@ -482,7 +669,9 @@ describe("ThreadList: focus never falls to the page", () => {
   it("after resolving the last open card of several, moves to the one before it", async () => {
     const answer = deferred<{ ok: true }>();
     actions.resolveThread.mockReturnValue(answer.promise);
-    act(() => root.render(<Page initial={OPEN.filter((t) => t.id !== "gone")} />));
+    act(() =>
+      root.render(<Page initial={OPEN.filter((t) => t.id !== "gone")} />),
+    );
     press(button(card("apr"), "Resolve"));
     await flush();
     expect(order()).not.toContain("apr");
@@ -496,7 +685,9 @@ describe("ThreadList: focus never falls to the page", () => {
     act(() => root.render(<Page initial={[THREADS[1]]} />));
     press(button(card("spend"), "Resolve"));
     await flush();
-    const toggle = container.querySelector<HTMLElement>('[data-slot="resolved-toggle"]')!;
+    const toggle = container.querySelector<HTMLElement>(
+      '[data-slot="resolved-toggle"]',
+    )!;
     expect(toggle.textContent).toContain("Resolved (1)");
     expect(document.activeElement).toBe(toggle);
     await act(async () => answer.resolve({ ok: true }));
@@ -533,11 +724,23 @@ describe("ThreadList: focus never falls to the page", () => {
     let send!: (next: ThreadView[]) => void;
     act(() => root.render(<Page onList={(set) => (send = set)} />));
     press(container.querySelector<HTMLElement>("[data-opener]")!);
-    typeInto(container.querySelector<HTMLElement>("[data-compose]")!.querySelector("textarea")!, "Name the bonus.");
-    press(button(container.querySelector<HTMLElement>("[data-compose]")!, "Comment"));
+    typeInto(
+      container
+        .querySelector<HTMLElement>("[data-compose]")!
+        .querySelector("textarea")!,
+      "Name the bonus.",
+    );
+    press(
+      button(
+        container.querySelector<HTMLElement>("[data-compose]")!,
+        "Comment",
+      ),
+    );
     await flush();
     // On its way the card shows under a temporary id; nothing is focused yet.
-    expect(container.querySelector('[data-thread^="optimistic-thread"]')).toBeTruthy();
+    expect(
+      container.querySelector('[data-thread^="optimistic-thread"]'),
+    ).toBeTruthy();
 
     // The server answers: the composer closes, and its list (with the thread under its real id) arrives with it.
     const created = thread("th_1", "b2", { quote: "bonus points" });
@@ -556,13 +759,25 @@ describe("ThreadList: focus never falls to the page", () => {
     let send!: (next: ThreadView[]) => void;
     act(() => root.render(<Page onList={(set) => (send = set)} />));
     press(container.querySelector<HTMLElement>("[data-opener]")!);
-    typeInto(container.querySelector<HTMLElement>("[data-compose]")!.querySelector("textarea")!, "Name the bonus.");
-    press(button(container.querySelector<HTMLElement>("[data-compose]")!, "Comment"));
+    typeInto(
+      container
+        .querySelector<HTMLElement>("[data-compose]")!
+        .querySelector("textarea")!,
+      "Name the bonus.",
+    );
+    press(
+      button(
+        container.querySelector<HTMLElement>("[data-compose]")!,
+        "Comment",
+      ),
+    );
     await flush();
     await flush();
     expect(container.querySelector("[data-compose]")).toBeNull();
     expect(document.activeElement).toBe(document.body);
-    await act(async () => send([...THREADS, thread("th_2", "b2", { quote: "bonus points" })]));
+    await act(async () =>
+      send([...THREADS, thread("th_2", "b2", { quote: "bonus points" })]),
+    );
     expect(document.activeElement).toBe(card("th_2"));
   });
 
@@ -570,7 +785,9 @@ describe("ThreadList: focus never falls to the page", () => {
     act(() => root.render(<Page />));
     const opener = container.querySelector<HTMLElement>("[data-opener]")!;
     press(opener);
-    const field = container.querySelector<HTMLElement>("[data-compose] textarea")!;
+    const field = container.querySelector<HTMLElement>(
+      "[data-compose] textarea",
+    )!;
     expect(document.activeElement).toBe(field);
     esc(field);
     await frames();
@@ -584,9 +801,13 @@ describe("ThreadList: focus never falls to the page", () => {
     // The opener goes (a selection's Comment button closes with the box).
     act(() => root.render(<Page withOpener={false} initial={THREADS} />));
     expect(container.querySelector("[data-opener]")).toBeNull();
-    press(button(container.querySelector<HTMLElement>("[data-compose]")!, "Cancel"));
+    press(
+      button(container.querySelector<HTMLElement>("[data-compose]")!, "Cancel"),
+    );
     await frames();
-    expect(document.activeElement).toBe(container.querySelector('[data-slot="thread-list"]'));
+    expect(document.activeElement).toBe(
+      container.querySelector('[data-slot="thread-list"]'),
+    );
   });
 
   it("leaves the caret to the host when the box came from the document", async () => {
@@ -599,10 +820,21 @@ describe("ThreadList: focus never falls to the page", () => {
       const review = useReviewThreads(THREADS);
       return (
         <>
-          <button data-open onClick={() => review.openComposer({ blockId: "b2", quote: "bonus points" })}>
+          <button
+            data-open
+            onClick={() =>
+              review.openComposer({ blockId: "b2", quote: "bonus points" })
+            }
+          >
             open
           </button>
-          <ThreadList {...base} threads={review.threads} composer={review.composer} onComposerClose={review.closeComposer} onMutate={review.mutate} />
+          <ThreadList
+            {...base}
+            threads={review.threads}
+            composer={review.composer}
+            onComposerClose={review.closeComposer}
+            onMutate={review.mutate}
+          />
         </>
       );
     }
@@ -619,7 +851,9 @@ describe("ThreadList: focus never falls to the page", () => {
   it("doesn't take focus back from where the person went in the meantime", async () => {
     act(() => root.render(<Page />));
     press(container.querySelector<HTMLElement>("[data-opener]")!);
-    const field = container.querySelector<HTMLElement>("[data-compose] textarea")!;
+    const field = container.querySelector<HTMLElement>(
+      "[data-compose] textarea",
+    )!;
     const elsewhere = document.createElement("button");
     document.body.append(elsewhere);
     esc(field);
@@ -653,9 +887,24 @@ describe("ThreadList: what was typed isn't lost", () => {
       const review = useReviewThreads(THREADS);
       return (
         <>
-          <button data-a onClick={() => review.openComposer({ blockId: "b2", quote: "bonus points" })}>a</button>
-          <button data-b onClick={() => review.openComposer({ blockId: "b5" })}>b</button>
-          <ThreadList {...base} threads={review.threads} composer={review.composer} onComposerClose={review.closeComposer} onMutate={review.mutate} />
+          <button
+            data-a
+            onClick={() =>
+              review.openComposer({ blockId: "b2", quote: "bonus points" })
+            }
+          >
+            a
+          </button>
+          <button data-b onClick={() => review.openComposer({ blockId: "b5" })}>
+            b
+          </button>
+          <ThreadList
+            {...base}
+            threads={review.threads}
+            composer={review.composer}
+            onComposerClose={review.closeComposer}
+            onMutate={review.mutate}
+          />
         </>
       );
     }
@@ -705,7 +954,11 @@ describe("ThreadList: what was typed isn't lost", () => {
 });
 
 describe("ThreadList: the document changes under the threads", () => {
-  const para = (id: string) => ({ type: "paragraph", attrs: { id }, content: [{ type: "text", text: "x" }] });
+  const para = (id: string) => ({
+    type: "paragraph",
+    attrs: { id },
+    content: [{ type: "text", text: "x" }],
+  });
   const docOf = (...ids: string[]) => ({ type: "doc", content: ids.map(para) });
 
   it("moves a thread to On removed content when its block is deleted, and back when it returns", () => {
@@ -719,18 +972,28 @@ describe("ThreadList: the document changes under the threads", () => {
         />,
       ),
     );
-    expect(container.querySelector('[aria-label="Comments on removed content"] [data-thread="spend"]')).toBeNull();
+    expect(
+      container.querySelector(
+        '[aria-label="Comments on removed content"] [data-thread="spend"]',
+      ),
+    ).toBeNull();
     expect(order()).toEqual(["doc", "spend", "apr", "gone"]);
 
     // The author deletes the block "spend" is about (b2). The others stay.
     act(() => review.trackDocument(docOf("b5")));
-    const removed = container.querySelector('[aria-label="Comments on removed content"]')!;
+    const removed = container.querySelector(
+      '[aria-label="Comments on removed content"]',
+    )!;
     expect(removed.querySelector('[data-thread="spend"]')).toBeTruthy();
     expect(order()).toEqual(["doc", "apr", "spend", "gone"]);
 
     // Undo brings it back: the thread returns to the document's order, and "gone" (b99) stays where it was.
     act(() => review.trackDocument(docOf("b2", "b5")));
-    expect(container.querySelector('[aria-label="Comments on removed content"] [data-thread="spend"]')).toBeNull();
+    expect(
+      container.querySelector(
+        '[aria-label="Comments on removed content"] [data-thread="spend"]',
+      ),
+    ).toBeNull();
     expect(order()).toEqual(["doc", "spend", "apr", "gone"]);
   });
 });
@@ -738,18 +1001,28 @@ describe("ThreadList: the document changes under the threads", () => {
 describe("ThreadList: a card about a whole block says what block", () => {
   it("shows the start of the block's text where a quote would be, quieter and on one line", () => {
     act(() => root.render(<Page />));
-    const snippet = card("apr").querySelector<HTMLElement>('[data-slot="block-snippet"]')!;
-    expect(snippet.textContent).toBe("Annual percentage rate for purchases, set by the prime rate and a margin.");
+    const snippet = card("apr").querySelector<HTMLElement>(
+      '[data-slot="block-snippet"]',
+    )!;
+    expect(snippet.textContent).toBe(
+      "Annual percentage rate for purchases, set by the prime rate and a margin.",
+    );
     expect(snippet.querySelector("span")!.className).toContain("truncate");
     expect(card("apr").querySelector('[data-slot="quote"]')).toBeNull();
   });
 
   it("leaves a quoted card on its quote, and the change request and orphaned ones without a line", () => {
     act(() => root.render(<Page />));
-    expect(card("spend").querySelector('[data-slot="quote"]')?.textContent).toBe("$4,000 on purchases");
-    expect(card("spend").querySelector('[data-slot="block-snippet"]')).toBeNull();
+    expect(
+      card("spend").querySelector('[data-slot="quote"]')?.textContent,
+    ).toBe("$4,000 on purchases");
+    expect(
+      card("spend").querySelector('[data-slot="block-snippet"]'),
+    ).toBeNull();
     expect(card("doc").querySelector('[data-slot="block-snippet"]')).toBeNull();
-    expect(card("gone").querySelector('[data-slot="block-snippet"]')).toBeNull();
+    expect(
+      card("gone").querySelector('[data-slot="block-snippet"]'),
+    ).toBeNull();
   });
 
   it("shows it in the composer too, when the comment is about the whole block", () => {
@@ -757,33 +1030,73 @@ describe("ThreadList: a card about a whole block says what block", () => {
       const review = useReviewThreads(THREADS);
       return (
         <>
-          <button data-open onClick={() => review.openComposer({ blockId: "b5" })}>open</button>
-          <ThreadList {...base} threads={review.threads} composer={review.composer} onComposerClose={review.closeComposer} onMutate={review.mutate} blockText={() => "Annual percentage rate"} />
+          <button
+            data-open
+            onClick={() => review.openComposer({ blockId: "b5" })}
+          >
+            open
+          </button>
+          <ThreadList
+            {...base}
+            threads={review.threads}
+            composer={review.composer}
+            onComposerClose={review.closeComposer}
+            onMutate={review.mutate}
+            blockText={() => "Annual percentage rate"}
+          />
         </>
       );
     }
     act(() => root.render(<Block />));
     click(container.querySelector<HTMLElement>("[data-open]")!);
-    expect(container.querySelector("[data-compose] [data-slot='block-snippet']")?.textContent).toBe("Annual percentage rate");
+    expect(
+      container.querySelector("[data-compose] [data-slot='block-snippet']")
+        ?.textContent,
+    ).toBe("Annual percentage rate");
   });
 });
 
 describe("ThreadList: a thread on a document's email subject", () => {
   const SUBJECT_TEXT: Partial<ChannelFieldValues> = {
-    "email.subject": { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Your terms are ready" }] }] },
+    "email.subject": {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Your terms are ready" }],
+        },
+      ],
+    },
   };
   const onSubject = thread("subject", "email.subject", {
-    comments: [{ id: "c-s", author: JORDAN, body: "Is this a promise?", kind: "comment", createdAt: "2027-02-18T13:00:00Z" }],
+    comments: [
+      {
+        id: "c-s",
+        author: JORDAN,
+        body: "Is this a promise?",
+        kind: "comment",
+        createdAt: "2027-02-18T13:00:00Z",
+      },
+    ],
   });
 
   /** The page's side: the server's list, the shared hook, the field's text for the card, and a button that opens the composer on the subject. */
-  function SubjectPage({ initial = [onSubject], onList }: { initial?: ThreadView[]; onList?: (apply: (next: ThreadView[]) => void) => void }) {
+  function SubjectPage({
+    initial = [onSubject],
+    onList,
+  }: {
+    initial?: ThreadView[];
+    onList?: (apply: (next: ThreadView[]) => void) => void;
+  }) {
     const [server, setServer] = useState(initial);
     onList?.(setServer);
     const review = useReviewThreads(server);
     return (
       <>
-        <button data-open onClick={() => review.openComposer({ blockId: "email.subject" })}>
+        <button
+          data-open
+          onClick={() => review.openComposer({ blockId: "email.subject" })}
+        >
           open
         </button>
         <ThreadList
@@ -802,8 +1115,12 @@ describe("ThreadList: a thread on a document's email subject", () => {
 
   it("names the card by its field, and quotes the subject as typed where a quote would be", () => {
     act(() => root.render(<SubjectPage />));
-    expect(card("subject").getAttribute("aria-label")).toBe("Comment on the email subject");
-    expect(card("subject").querySelector('[data-slot="block-snippet"]')?.textContent).toBe("Email subject: Your terms are ready");
+    expect(card("subject").getAttribute("aria-label")).toBe(
+      "Comment on the email subject",
+    );
+    expect(
+      card("subject").querySelector('[data-slot="block-snippet"]')?.textContent,
+    ).toBe("Email subject: Your terms are ready");
     expect(order()).toEqual(["subject"]);
   });
 
@@ -813,7 +1130,9 @@ describe("ThreadList: a thread on a document's email subject", () => {
     act(() => root.render(<SubjectPage initial={[]} />));
     click(container.querySelector<HTMLElement>("[data-open]")!);
     const box = container.querySelector<HTMLElement>("[data-compose]")!;
-    expect(box.querySelector('[data-slot="block-snippet"]')?.textContent).toBe("Email subject: Your terms are ready");
+    expect(box.querySelector('[data-slot="block-snippet"]')?.textContent).toBe(
+      "Email subject: Your terms are ready",
+    );
     typeInto(box.querySelector("textarea")!, "Say what changed.");
     click(button(box, "Comment"));
     await flush();
@@ -824,8 +1143,12 @@ describe("ThreadList: a thread on a document's email subject", () => {
       quote: null,
       body: "Say what changed.",
     });
-    const created = container.querySelector<HTMLElement>('[data-thread^="optimistic-thread"]')!;
-    expect(created.getAttribute("aria-label")).toBe("Comment on the email subject");
+    const created = container.querySelector<HTMLElement>(
+      '[data-thread^="optimistic-thread"]',
+    )!;
+    expect(created.getAttribute("aria-label")).toBe(
+      "Comment on the email subject",
+    );
     expect(created.textContent).toContain("Say what changed.");
     await act(async () => answer.resolve({ ok: true, threadId: "th_subject" }));
   });
@@ -836,7 +1159,9 @@ describe("ThreadList: a thread on a document's email subject", () => {
     actions.resolveThread.mockReturnValue(resolving.promise);
     actions.reopenThread.mockReturnValue(reopening.promise);
     let setServer!: (next: ThreadView[]) => void;
-    act(() => root.render(<SubjectPage onList={(apply) => (setServer = apply)} />));
+    act(() =>
+      root.render(<SubjectPage onList={(apply) => (setServer = apply)} />),
+    );
     click(button(card("subject"), "Resolve"));
     await flush();
     expect(actions.resolveThread).toHaveBeenCalledWith({ threadId: "subject" });
@@ -844,7 +1169,14 @@ describe("ThreadList: a thread on a document's email subject", () => {
     expect(container.textContent).toContain("Resolved (1)");
     // The server confirms: its list has the thread resolved.
     await act(async () => {
-      setServer([{ ...onSubject, status: "resolved" as const, resolvedBy: MAYA, resolvedAt: NOW }]);
+      setServer([
+        {
+          ...onSubject,
+          status: "resolved" as const,
+          resolvedBy: MAYA,
+          resolvedAt: NOW,
+        },
+      ]);
       resolving.resolve({ ok: true });
     });
     click(button(container, /Resolved \(1\)/));

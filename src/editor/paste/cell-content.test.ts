@@ -12,15 +12,38 @@ import { baseExtensions } from "../schema";
 import { normalizePastedHtml } from "./normalize-html";
 
 const t = (text: string): JSONContent => ({ type: "text", text });
-const p = (text = ""): JSONContent => (text ? { type: "paragraph", content: [t(text)] } : { type: "paragraph" });
-const h = (level: number, text: string): JSONContent => ({ type: "heading", attrs: { level }, content: [t(text)] });
-const li = (...content: JSONContent[]): JSONContent => ({ type: "listItem", content });
-const ul = (...items: JSONContent[]): JSONContent => ({ type: "bulletList", content: items });
-const ol = (...items: JSONContent[]): JSONContent => ({ type: "orderedList", content: items });
-const callout = (...content: JSONContent[]): JSONContent => ({ type: "callout", content });
+const p = (text = ""): JSONContent =>
+  text ? { type: "paragraph", content: [t(text)] } : { type: "paragraph" };
+const h = (level: number, text: string): JSONContent => ({
+  type: "heading",
+  attrs: { level },
+  content: [t(text)],
+});
+const li = (...content: JSONContent[]): JSONContent => ({
+  type: "listItem",
+  content,
+});
+const ul = (...items: JSONContent[]): JSONContent => ({
+  type: "bulletList",
+  content: items,
+});
+const ol = (...items: JSONContent[]): JSONContent => ({
+  type: "orderedList",
+  content: items,
+});
+const callout = (...content: JSONContent[]): JSONContent => ({
+  type: "callout",
+  content,
+});
 const rule: JSONContent = { type: "horizontalRule" };
-const td = (...content: JSONContent[]): JSONContent => ({ type: "tableCell", content });
-const table = (...rows: JSONContent[][]): JSONContent => ({ type: "table", content: rows.map((cells) => ({ type: "tableRow", content: cells })) });
+const td = (...content: JSONContent[]): JSONContent => ({
+  type: "tableCell",
+  content,
+});
+const table = (...rows: JSONContent[][]): JSONContent => ({
+  type: "table",
+  content: rows.map((cells) => ({ type: "tableRow", content: cells })),
+});
 
 /**
  * Blocks as a short outline: `p:text` (`[br]` for a hard break), `ul[…]` / `ol[…]` of `li(…)`, and
@@ -44,19 +67,54 @@ function firstCell(doc: JSONContent): JSONContent[] {
   return found?.content?.[0]?.content?.[0]?.content ?? [];
 }
 
-const CASES: { name: string; html: string; json: JSONContent[]; want: string[] }[] = [
-  { name: "paragraphs and lists stay", html: "<p>a</p><ul><li><p>b</p></li></ul>", json: [p("a"), ul(li(p("b")))], want: ["p:a", "ul[li(p:b)]"] },
-  { name: "a heading becomes a paragraph", html: "<h2>Fees</h2>", json: [h(2, "Fees")], want: ["p:Fees"] },
-  { name: "a rule becomes an empty paragraph", html: "<p>a</p><hr>", json: [p("a"), rule], want: ["p:a", "p:"] },
-  { name: "a callout gives its paragraphs", html: "<div data-callout><p>one</p><p>two</p></div>", json: [callout(p("one"), p("two"))], want: ["p:one", "p:two"] },
+const CASES: {
+  name: string;
+  html: string;
+  json: JSONContent[];
+  want: string[];
+}[] = [
+  {
+    name: "paragraphs and lists stay",
+    html: "<p>a</p><ul><li><p>b</p></li></ul>",
+    json: [p("a"), ul(li(p("b")))],
+    want: ["p:a", "ul[li(p:b)]"],
+  },
+  {
+    name: "a heading becomes a paragraph",
+    html: "<h2>Fees</h2>",
+    json: [h(2, "Fees")],
+    want: ["p:Fees"],
+  },
+  {
+    name: "a rule becomes an empty paragraph",
+    html: "<p>a</p><hr>",
+    json: [p("a"), rule],
+    want: ["p:a", "p:"],
+  },
+  {
+    name: "a callout gives its paragraphs",
+    html: "<div data-callout><p>one</p><p>two</p></div>",
+    json: [callout(p("one"), p("two"))],
+    want: ["p:one", "p:two"],
+  },
   {
     name: "a table gives its cells' content, in reading order",
     html: "<table><tr><td>x</td><td>y</td></tr><tr><td>z</td><td>w</td></tr></table>",
     json: [table([td(p("x")), td(p("y"))], [td(p("z")), td(p("w"))])],
     want: ["p:x", "p:y", "p:z", "p:w"],
   },
-  { name: "a heading in a list item", html: "<ul><li><p>a</p><h3>b</h3></li></ul>", json: [ul(li(p("a"), h(3, "b")))], want: ["ul[li(p:a, p:b)]"] },
-  { name: "a rule in a list item", html: "<ol><li><p>a</p><hr></li></ol>", json: [ol(li(p("a"), rule))], want: ["ol[li(p:a, p:)]"] },
+  {
+    name: "a heading in a list item",
+    html: "<ul><li><p>a</p><h3>b</h3></li></ul>",
+    json: [ul(li(p("a"), h(3, "b")))],
+    want: ["ul[li(p:a, p:b)]"],
+  },
+  {
+    name: "a rule in a list item",
+    html: "<ol><li><p>a</p><hr></li></ol>",
+    json: [ol(li(p("a"), rule))],
+    want: ["ol[li(p:a, p:)]"],
+  },
   {
     name: "a callout in a list item",
     html: "<ul><li><p>a</p><div data-callout><p>c</p></div></li></ul>",
@@ -81,15 +139,22 @@ const schema = getSchema(baseExtensions());
 
 /** Clipboard HTML of a one-row table whose first cell holds `inner`, cleaned and parsed by the schema (no JSON normalization). */
 function fromHtml(inner: string): JSONContent {
-  const cleaned = normalizePastedHtml(`<table><tr><td>${inner}</td><td>other</td></tr></table>`);
+  const cleaned = normalizePastedHtml(
+    `<table><tr><td>${inner}</td><td>other</td></tr></table>`,
+  );
   const container = document.createElement("div");
   container.innerHTML = cleaned;
-  return PMDOMParser.fromSchema(schema).parse(container).toJSON() as JSONContent;
+  return PMDOMParser.fromSchema(schema)
+    .parse(container)
+    .toJSON() as JSONContent;
 }
 
 /** The same table as stored JSON, normalized at save. */
 function fromJson(content: JSONContent[]): JSONContent {
-  return normalizeDocument({ type: "doc", content: [table([td(...content), td(p("other"))])] });
+  return normalizeDocument({
+    type: "doc",
+    content: [table([td(...content), td(p("other"))])],
+  });
 }
 
 describe("what a table cell holds, from the clipboard's HTML and from the JSON", () => {

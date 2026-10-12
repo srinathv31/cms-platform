@@ -8,9 +8,18 @@ import { getViewer } from "@/server/viewer";
 // or 404 (src/server/api/reads.ts). Anyone who can see the template. Request-time only: it reads the
 // persona cookie first.
 
-export async function GET(request: NextRequest, ctx: RouteContext<"/api/templates/[templateId]/compare">) {
+export async function GET(
+  request: NextRequest,
+  ctx: RouteContext<"/api/templates/[templateId]/compare">,
+) {
   const viewer = await getViewer();
   const { templateId } = await ctx.params;
   const query = request.nextUrl.searchParams;
-  return readResponse(await loadVersionsToCompare(viewer, { templateId, from: query.get("from"), to: query.get("to") }));
+  return readResponse(
+    await loadVersionsToCompare(viewer, {
+      templateId,
+      from: query.get("from"),
+      to: query.get("to"),
+    }),
+  );
 }

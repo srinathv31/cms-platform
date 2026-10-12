@@ -4,7 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PaletteResults } from "@/domain/import-types";
 import { normalizePaletteQuery } from "@/domain/palette";
 import type { Refused } from "@/domain/refusals";
-import { emptyPaletteCache, nearestAnswer, paletteAskKey, withAnswer, type PaletteAsk } from "./palette-cache";
+import {
+  emptyPaletteCache,
+  nearestAnswer,
+  paletteAskKey,
+  withAnswer,
+  type PaletteAsk,
+} from "./palette-cache";
 
 // The palette's side of GET /api/palette/{space}: nothing is asked until the palette opens. Each
 // opening asks once for what it shows, at once for the resting list and after a pause in typing for a
@@ -15,7 +21,9 @@ import { emptyPaletteCache, nearestAnswer, paletteAskKey, withAnswer, type Palet
 export const SEARCH_PAUSE_MS = 150;
 
 /** `/api/palette/coral-offers?q=cash&template=UC-4F7K2Q` */
-export function paletteUrl(ask: Pick<PaletteAsk, "space" | "current" | "query">): string {
+export function paletteUrl(
+  ask: Pick<PaletteAsk, "space" | "current" | "query">,
+): string {
   const params = new URLSearchParams();
   if (ask.query) params.set("q", ask.query);
   if (ask.current) params.set("template", ask.current);
@@ -26,9 +34,14 @@ export function paletteUrl(ask: Pick<PaletteAsk, "space" | "current" | "query">)
 /** The route's answer. Throws when it is a refusal or not an answer at all (no network, an error page). */
 async function readPalette(ask: PaletteAsk): Promise<PaletteResults> {
   const url = paletteUrl(ask);
-  const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
-  const body = (await response.json()) as ({ ok: true } & PaletteResults) | Refused;
-  if (body.ok !== true) throw new Error(`GET ${url} answered ${response.status}.`);
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  const body = (await response.json()) as
+    ({ ok: true } & PaletteResults) | Refused;
+  if (body.ok !== true)
+    throw new Error(`GET ${url} answered ${response.status}.`);
   return {
     viewerId: body.viewerId,
     space: body.space,
@@ -62,7 +75,10 @@ export function usePaletteResults({
   open: boolean;
 }): PaletteView {
   const normalized = normalizePaletteQuery(query);
-  const ask = useMemo<PaletteAsk>(() => ({ viewerId, space, current, query: normalized }), [viewerId, space, current, normalized]);
+  const ask = useMemo<PaletteAsk>(
+    () => ({ viewerId, space, current, query: normalized }),
+    [viewerId, space, current, normalized],
+  );
   const key = paletteAskKey(ask);
   const [cache, setCache] = useState(() => emptyPaletteCache(viewerId));
   const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
@@ -84,9 +100,12 @@ export function usePaletteResults({
         readPalette(ask)
           .then((results) => {
             // Read for somebody else (the persona changed while it was asked): never kept, never shown.
-            if (results.viewerId !== ask.viewerId) throw new Error("Answered for another viewer.");
+            if (results.viewerId !== ask.viewerId)
+              throw new Error("Answered for another viewer.");
             setCache((now) => withAnswer(now, ask, results));
-            setFailed((now) => (now.has(key) ? new Set([...now].filter((k) => k !== key)) : now));
+            setFailed((now) =>
+              now.has(key) ? new Set([...now].filter((k) => k !== key)) : now,
+            );
           })
           .catch(() => {
             asked.current.delete(key); // the next opening asks again
@@ -99,5 +118,9 @@ export function usePaletteResults({
   }, [open, ask, key]);
 
   const near = nearestAnswer(cache, ask);
-  return { results: near?.results ?? null, exact: near?.exact ?? false, failed: failed.has(key) && !near?.exact };
+  return {
+    results: near?.results ?? null,
+    exact: near?.exact ?? false,
+    failed: failed.has(key) && !near?.exact,
+  };
 }

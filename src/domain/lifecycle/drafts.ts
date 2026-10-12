@@ -9,7 +9,12 @@
 
 import { refuse, type Refusal } from "../refusals";
 import { compareRounds, type RoundRow } from "../rounds";
-import { contentTypeFamily, familyOf, type Channel, type ChannelFamily } from "../types";
+import {
+  contentTypeFamily,
+  familyOf,
+  type Channel,
+  type ChannelFamily,
+} from "../types";
 import { REFUSALS } from "./refusals";
 import {
   LifecycleError,
@@ -32,7 +37,9 @@ export const BLANK_STARTER_KEY = "blank";
  * The channels a new template starts with, by its content type's family: a document renders PDF and Web
  * (Email is a deliberate opt-in, as in the seed); a message (an Alert) renders Push and SMS.
  */
-export const DEFAULT_CHANNELS: { readonly [F in ChannelFamily]: readonly Channel[] } = {
+export const DEFAULT_CHANNELS: {
+  readonly [F in ChannelFamily]: readonly Channel[];
+} = {
   document: ["pdf", "web"],
   message: ["push", "sms"],
 };
@@ -42,9 +49,13 @@ export const DEFAULT_CHANNELS: { readonly [F in ChannelFamily]: readonly Channel
  * its content type allows: the wanted ones the type allows; else the family's defaults it allows; else
  * the first channel it allows. A content type is one family, so these never mix.
  */
-export function newTemplateChannels(wanted: readonly Channel[] | undefined, allowed: readonly Channel[]): Channel[] {
+export function newTemplateChannels(
+  wanted: readonly Channel[] | undefined,
+  allowed: readonly Channel[],
+): Channel[] {
   const family = contentTypeFamily(allowed);
-  const fits = (channels: readonly Channel[]) => channels.filter((c) => allowed.includes(c));
+  const fits = (channels: readonly Channel[]) =>
+    channels.filter((c) => allowed.includes(c));
   const fromStarter = fits(wanted ?? []);
   if (fromStarter.length > 0) return fromStarter;
   const defaults = fits(DEFAULT_CHANNELS[family]);
@@ -56,9 +67,13 @@ export function newTemplateChannels(wanted: readonly Channel[] | undefined, allo
  * off the last one, so only a crafted save sends none), and every one is a channel its content type allows,
  * which keeps a template in its content type's family.
  */
-export function draftChannelsRefusal(channels: readonly Channel[], allowed: readonly Channel[]): Refusal | null {
+export function draftChannelsRefusal(
+  channels: readonly Channel[],
+  allowed: readonly Channel[],
+): Refusal | null {
   if (channels.length === 0) return REFUSALS.noChannels;
-  if (!channels.every((channel) => allowed.includes(channel))) return REFUSALS.channelNotAllowed;
+  if (!channels.every((channel) => allowed.includes(channel)))
+    return REFUSALS.channelNotAllowed;
   return null;
 }
 
@@ -94,12 +109,18 @@ export function newTemplateContentType<T extends NewTemplateType>(
   const [contentType] = contentTypes
     .filter((type) => familyOf(type.allowedChannels) === family)
     .sort((a, b) => a.name.localeCompare(b.name));
-  return contentType ? { ok: true, contentType } : refuse(REFUSALS.noContentType(family));
+  return contentType
+    ? { ok: true, contentType }
+    : refuse(REFUSALS.noContentType(family));
 }
 
 /** The template's first name: Blank is untitled (renamed at once), an example keeps its own name. */
-export function initialTemplateName(starter: Pick<StarterContent, "key" | "name">): string {
-  return starter.key === BLANK_STARTER_KEY ? UNTITLED_TEMPLATE_NAME : starter.name;
+export function initialTemplateName(
+  starter: Pick<StarterContent, "key" | "name">,
+): string {
+  return starter.key === BLANK_STARTER_KEY
+    ? UNTITLED_TEMPLATE_NAME
+    : starter.name;
 }
 
 /** A new template and its first draft, from a starter. Block ids in the body are kept as given. */
@@ -114,7 +135,11 @@ export function createDraft(input: {
 
   return {
     changes: {
-      template: { starterKey: isBlank ? null : starter.key, createdBy, createdAt: now },
+      template: {
+        starterKey: isBlank ? null : starter.key,
+        createdBy,
+        createdAt: now,
+      },
       draft: {
         state: "draft",
         number: null,
@@ -164,18 +189,27 @@ export type DraftStartPlan =
   | { kind: "create"; from: string }
   | ({ kind: "blocked" } & Refusal);
 
-export function planDraftStart(versions: readonly (RoundRow & { id: string })[]): DraftStartPlan {
+export function planDraftStart(
+  versions: readonly (RoundRow & { id: string })[],
+): DraftStartPlan {
   const open = versions.find((v) => v.state === "draft");
   if (open) return { kind: "open", versionId: open.id };
 
   const latest = versions
     .filter((v) => v.state !== "changes_requested")
     .reduce<(typeof versions)[number] | undefined>(
-      (best, v) => (best === undefined || compareRounds(v, best) > 0 ? v : best),
+      (best, v) =>
+        best === undefined || compareRounds(v, best) > 0 ? v : best,
       undefined,
     );
-  if (latest?.state === "active" || latest?.state === "revoked") return { kind: "create", from: latest.id };
-  return { kind: "blocked", ...(latest?.state === "in_review" ? REFUSALS.newerInReview : REFUSALS.notEditable) };
+  if (latest?.state === "active" || latest?.state === "revoked")
+    return { kind: "create", from: latest.id };
+  return {
+    kind: "blocked",
+    ...(latest?.state === "in_review"
+      ? REFUSALS.newerInReview
+      : REFUSALS.notEditable),
+  };
 }
 
 /**
@@ -193,12 +227,20 @@ export function editLatest(input: {
 }): LifecycleResult<{ draft: DraftFields }> {
   const { from, createdBy, now } = input;
   if (from.state !== "active" && from.state !== "revoked") {
-    throw new LifecycleError(`Only an Active or Revoked version can be edited, not ${from.state}.`);
+    throw new LifecycleError(
+      `Only an Active or Revoked version can be edited, not ${from.state}.`,
+    );
   }
 
   return {
     changes: { draft: copyToDraft(from, createdBy, now, [createdBy]) },
-    effects: [{ kind: "audit", action: "draft.started", details: { basedOn: from.number } }],
+    effects: [
+      {
+        kind: "audit",
+        action: "draft.started",
+        details: { basedOn: from.number },
+      },
+    ],
   };
 }
 
@@ -208,7 +250,10 @@ export function editLatest(input: {
  * The version's writers with `userId` among them: unchanged when they already are, otherwise added at
  * the end. Autosave calls it for each person whose save lands; submit for the submitter.
  */
-export function withWriter(writers: readonly string[], userId: string): string[] {
+export function withWriter(
+  writers: readonly string[],
+  userId: string,
+): string[] {
   return writers.includes(userId) ? [...writers] : [...writers, userId];
 }
 
@@ -219,7 +264,12 @@ export function withWriter(writers: readonly string[], userId: string): string[]
  * with every block id (so comment threads and the redline keep their anchors), variables, channels,
  * channel fields and sample sets. Contract changes are worked out at submit, so none are recorded here.
  */
-export function copyToDraft(version: VersionSnapshot, createdBy: string, now: Date, writers: readonly string[]): DraftFields {
+export function copyToDraft(
+  version: VersionSnapshot,
+  createdBy: string,
+  now: Date,
+  writers: readonly string[],
+): DraftFields {
   return {
     state: "draft",
     number: null,
@@ -243,5 +293,7 @@ export function copyToDraft(version: VersionSnapshot, createdBy: string, now: Da
 
 /** A deep copy, so a draft never shares objects with the version (or starter) it came from. */
 function clone<T>(value: T): T {
-  return value === null || value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
+  return value === null || value === undefined
+    ? value
+    : (JSON.parse(JSON.stringify(value)) as T);
 }

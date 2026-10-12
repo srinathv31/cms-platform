@@ -1,7 +1,12 @@
 import { Suspense } from "react";
 import { Stream } from "@/components/primitives/stream";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
-import { EditButton, PreviewToggle, RailToggle, SubmitButton } from "./workspace-actions";
+import {
+  EditButton,
+  PreviewToggle,
+  RailToggle,
+  SubmitButton,
+} from "./workspace-actions";
 import { WS } from "./workspace-grid";
 import { WorkspaceTabs, WorkspaceTabsSkeleton } from "./workspace-tabs";
 
@@ -47,7 +52,11 @@ async function TemplateActions({ params }: { params: Params }) {
   return (
     <>
       <PreviewToggle />
-      {t.canSubmit ? <SubmitButton templateId={t.id} /> : t.canStartDraft ? <EditButton templateId={t.id} /> : null}
+      {t.canSubmit ? (
+        <SubmitButton templateId={t.id} />
+      ) : t.canStartDraft ? (
+        <EditButton templateId={t.id} />
+      ) : null}
     </>
   );
 }

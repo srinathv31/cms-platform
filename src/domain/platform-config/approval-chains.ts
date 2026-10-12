@@ -4,7 +4,13 @@
 // reaches it. A stage some in-review version still needs (the one it waits on, or one ahead of it) can't
 // be removed.
 
-import type { AccessEffect, ApproverFacts, Named, Ok, Refused } from "../access-types";
+import type {
+  AccessEffect,
+  ApproverFacts,
+  Named,
+  Ok,
+  Refused,
+} from "../access-types";
 import { ROLE_LABEL } from "../access/roles";
 import { refuse, type Refusal } from "../refusals";
 import { versionsNeeding } from "../approval-chain";
@@ -15,7 +21,10 @@ import { STAGE_NAME_MAX } from "./limits";
 import { PLATFORM_REFUSALS } from "./refusals";
 
 /** "Approver role", or the named person's name. */
-export function ruleLabel(rule: ApproverRule, people: readonly Named[]): string {
+export function ruleLabel(
+  rule: ApproverRule,
+  people: readonly Named[],
+): string {
   if (rule.kind === "team_role") return `${ROLE_LABEL[rule.role]} role`;
   return people.find((p) => p.id === rule.userId)?.name ?? rule.userId;
 }
@@ -53,7 +62,9 @@ export function describeChainChange(input: {
   waiting?: Readonly<Record<string, number>>;
 }): ChainChange {
   const current = [...input.current].sort((a, b) => a.position - b.position);
-  const nextIds = new Set(input.next.map((s) => s.id).filter((id): id is string => !!id));
+  const nextIds = new Set(
+    input.next.map((s) => s.id).filter((id): id is string => !!id),
+  );
   const byId = new Map(current.map((s, index) => [s.id, { stage: s, index }]));
 
   const now: ChainCardStage[] = current.map((s) => ({
@@ -63,21 +74,35 @@ export function describeChainChange(input: {
     change: nextIds.has(s.id) ? null : "removed",
   }));
   const keptBefore = current.filter((s) => nextIds.has(s.id)).map((s) => s.id);
-  const keptAfter = input.next.filter((s) => s.id && byId.has(s.id)).map((s) => s.id!);
+  const keptAfter = input.next
+    .filter((s) => s.id && byId.has(s.id))
+    .map((s) => s.id!);
   const after: ChainCardStage[] = input.next.map((s) => {
     const was = s.id ? byId.get(s.id)?.stage : undefined;
     const label = ruleLabel(s.rule, input.people);
     let change: ChainCardStage["change"] = null;
     if (!was) change = "added";
-    else if (was.name !== s.name.trim() || ruleLabel(was.rule, input.people) !== label) change = "renamed";
-    else if (keptBefore.indexOf(was.id) !== keptAfter.indexOf(was.id)) change = "moved";
-    return { id: was ? was.id : null, name: s.name.trim(), ruleLabel: label, change };
+    else if (
+      was.name !== s.name.trim() ||
+      ruleLabel(was.rule, input.people) !== label
+    )
+      change = "renamed";
+    else if (keptBefore.indexOf(was.id) !== keptAfter.indexOf(was.id))
+      change = "moved";
+    return {
+      id: was ? was.id : null,
+      name: s.name.trim(),
+      ruleLabel: label,
+      change,
+    };
   });
 
   const lines: string[] = [];
   const type = input.contentTypeName;
   for (const s of after.filter((a) => a.change === "added")) {
-    lines.push(`${type} submissions will also wait on ${s.name} (${s.ruleLabel}).`);
+    lines.push(
+      `${type} submissions will also wait on ${s.name} (${s.ruleLabel}).`,
+    );
   }
   for (const s of now.filter((n) => n.change === "removed")) {
     const count = input.waiting?.[s.id!] ?? 0;
@@ -87,16 +112,28 @@ export function describeChainChange(input: {
         : `${type} submissions will no longer wait on ${s.name}.`,
     );
   }
-  const namedNow = new Set(current.flatMap((s) => (s.rule.kind === "user" ? [s.rule.userId] : [])));
+  const namedNow = new Set(
+    current.flatMap((s) => (s.rule.kind === "user" ? [s.rule.userId] : [])),
+  );
   const announced = new Set<string>();
   for (const s of input.next) {
     // A person newly named on two stages gets the line once.
-    if (s.rule.kind !== "user" || namedNow.has(s.rule.userId) || announced.has(s.rule.userId)) continue;
+    if (
+      s.rule.kind !== "user" ||
+      namedNow.has(s.rule.userId) ||
+      announced.has(s.rule.userId)
+    )
+      continue;
     announced.add(s.rule.userId);
     const person = ruleLabel(s.rule, input.people);
-    lines.push(`${person} will review ${type} submissions from every team, including teams they aren't a member of.`);
+    lines.push(
+      `${person} will review ${type} submissions from every team, including teams they aren't a member of.`,
+    );
   }
-  const changed = after.some((a) => a.change !== null) || now.some((n) => n.change !== null) || after.length !== now.length;
+  const changed =
+    after.some((a) => a.change !== null) ||
+    now.some((n) => n.change !== null) ||
+    after.length !== now.length;
   return { now, after, lines: changed ? lines : [], changed };
 }
 
@@ -113,7 +150,8 @@ export interface StageProblem extends Refusal {
  * whenever, so `validateChain` checks it for every named person on every save.
  */
 export function cannotApprove(person: ApproverFacts): Refusal | null {
-  if (person.platformRole === "auditor") return PLATFORM_REFUSALS.auditorCantApprove(person.name);
+  if (person.platformRole === "auditor")
+    return PLATFORM_REFUSALS.auditorCantApprove(person.name);
   if (!person.activeTeamRole) {
     return person.platformRole === "platform_admin"
       ? PLATFORM_REFUSALS.adminWithoutTeamRole(person.name)
@@ -129,7 +167,10 @@ export function cannotApprove(person: ApproverFacts): Refusal | null {
  * named the actor on stays theirs when the actor saves the chain. The chain picker offers only the
  * people this returns null for.
  */
-export function approverProblem(person: ApproverFacts, actorId: string): Refusal | null {
+export function approverProblem(
+  person: ApproverFacts,
+  actorId: string,
+): Refusal | null {
   if (person.id === actorId) return PLATFORM_REFUSALS.nameYourself;
   return cannotApprove(person);
 }
@@ -156,7 +197,9 @@ export function validateChain(input: {
   const names = new Set<string>();
   const namedOn = new Map<string, number>();
   const actorsStages = new Set(
-    input.current.flatMap((s) => (s.rule.kind === "user" && s.rule.userId === input.actorId ? [s.id] : [])),
+    input.current.flatMap((s) =>
+      s.rule.kind === "user" && s.rule.userId === input.actorId ? [s.id] : [],
+    ),
   );
   input.stages.forEach((stage, index) => {
     const name = stage.name.trim();
@@ -169,11 +212,19 @@ export function validateChain(input: {
           ? PLATFORM_REFUSALS.stageDuplicate(name)
           : null;
     if (name) names.add(key);
-    if (nameReason) problems.push({ stage: index, field: "name", ...nameReason });
+    if (nameReason)
+      problems.push({ stage: index, field: "name", ...nameReason });
 
     const keptByActor = stage.id !== undefined && actorsStages.has(stage.id);
-    const reviewerReason = reviewerProblem(stage.rule, input, keptByActor, namedOn, index);
-    if (reviewerReason) problems.push({ stage: index, field: "reviewer", ...reviewerReason });
+    const reviewerReason = reviewerProblem(
+      stage.rule,
+      input,
+      keptByActor,
+      namedOn,
+      index,
+    );
+    if (reviewerReason)
+      problems.push({ stage: index, field: "reviewer", ...reviewerReason });
   });
   return problems;
 }
@@ -186,16 +237,22 @@ function reviewerProblem(
   index: number,
 ): Refusal | null {
   if (rule.kind === "team_role") {
-    if (!(TEAM_ROLES as readonly string[]).includes(rule.role)) return PLATFORM_REFUSALS.pickRole;
-    return rule.role === "approver" ? null : PLATFORM_REFUSALS.roleCantApprove(rule.role);
+    if (!(TEAM_ROLES as readonly string[]).includes(rule.role))
+      return PLATFORM_REFUSALS.pickRole;
+    return rule.role === "approver"
+      ? null
+      : PLATFORM_REFUSALS.roleCantApprove(rule.role);
   }
   const person = people.find((p) => p.id === rule.userId);
   if (!person) return PLATFORM_REFUSALS.pickPerson;
   // A stage that already named the actor stays theirs; every other naming of them is them naming themselves.
-  const cannot = keptByActor ? cannotApprove(person) : approverProblem(person, actorId);
+  const cannot = keptByActor
+    ? cannotApprove(person)
+    : approverProblem(person, actorId);
   if (cannot) return cannot;
   const earlier = namedOn.get(person.id);
-  if (earlier !== undefined) return PLATFORM_REFUSALS.personTwice(person.name, earlier + 1);
+  if (earlier !== undefined)
+    return PLATFORM_REFUSALS.personTwice(person.name, earlier + 1);
   namedOn.set(person.id, index);
   return null;
 }
@@ -206,9 +263,13 @@ function reviewerProblem(
  * stays (`waiting`, from `versionsNeeding`). The chain editor shows it at the stage's Remove;
  * `saveApprovalChain` refuses with it.
  */
-export function removeStageRefusal(stage: { name: string; waiting: number }, remaining: number): Refusal | null {
+export function removeStageRefusal(
+  stage: { name: string; waiting: number },
+  remaining: number,
+): Refusal | null {
   if (remaining < 1) return PLATFORM_REFUSALS.oneStage;
-  if (stage.waiting > 0) return PLATFORM_REFUSALS.stageWaiting(stage.waiting, stage.name);
+  if (stage.waiting > 0)
+    return PLATFORM_REFUSALS.stageWaiting(stage.waiting, stage.name);
   return null;
 }
 
@@ -224,7 +285,11 @@ export function saveApprovalChain(input: {
   contentType: { id: string; name: string };
   current: ApprovalStage[];
   next: StageInput[];
-  inReview: { versionId: string; stages: VersionStage[] | null; currentStage: number }[];
+  inReview: {
+    versionId: string;
+    stages: VersionStage[] | null;
+    currentStage: number;
+  }[];
   people: ApproverFacts[];
   actor: Named;
   now: Date;
@@ -241,16 +306,25 @@ export function saveApprovalChain(input: {
   const currentIds = new Set(current.map((s) => s.id));
   const ids = new Set<string>();
   for (const s of input.next) {
-    if (s.id !== undefined && (!currentIds.has(s.id) || ids.has(s.id))) return refuse(PLATFORM_REFUSALS.stageGone);
+    if (s.id !== undefined && (!currentIds.has(s.id) || ids.has(s.id)))
+      return refuse(PLATFORM_REFUSALS.stageGone);
     if (s.id) ids.add(s.id);
   }
-  const problem = validateChain({ stages: input.next, current, actorId: input.actor.id, people })[0];
+  const problem = validateChain({
+    stages: input.next,
+    current,
+    actorId: input.actor.id,
+    people,
+  })[0];
   if (problem) return refuse(problem);
 
   const needing = versionsNeeding(input.inReview, current);
   for (const s of current) {
     if (ids.has(s.id)) continue;
-    const refusal = removeStageRefusal({ name: s.name, waiting: needing[s.id] ?? 0 }, input.next.length);
+    const refusal = removeStageRefusal(
+      { name: s.name, waiting: needing[s.id] ?? 0 },
+      input.next.length,
+    );
     if (refusal) return refuse(refusal);
   }
 
@@ -258,10 +332,18 @@ export function saveApprovalChain(input: {
     id: s.id ?? null,
     position,
     name: s.name.trim(),
-    rule: s.rule.kind === "user" ? { kind: "user" as const, userId: s.rule.userId } : { kind: "team_role" as const, role: s.rule.role },
+    rule:
+      s.rule.kind === "user"
+        ? { kind: "user" as const, userId: s.rule.userId }
+        : { kind: "team_role" as const, role: s.rule.role },
   }));
 
-  const change = describeChainChange({ contentTypeName: contentType.name, current, next: input.next, people });
+  const change = describeChainChange({
+    contentTypeName: contentType.name,
+    current,
+    next: input.next,
+    people,
+  });
   if (!change.changed) return { ok: true, stages, effects: [] };
 
   const chainText = (list: { name: string; rule: ApproverRule }[]) =>
@@ -270,13 +352,18 @@ export function saveApprovalChain(input: {
     ok: true,
     stages,
     effects: [
-      configChanged("approval_chains", null, `Set ${contentType.name} approval chain: ${chainText(stages)}`, {
-        contentTypeId: contentType.id,
-        contentTypeName: contentType.name,
-        before: current.map((s) => s.name),
-        after: stages.map((s) => s.name),
-        stages: stages.map((s) => ({ name: s.name, rule: s.rule })),
-      }),
+      configChanged(
+        "approval_chains",
+        null,
+        `Set ${contentType.name} approval chain: ${chainText(stages)}`,
+        {
+          contentTypeId: contentType.id,
+          contentTypeName: contentType.name,
+          before: current.map((s) => s.name),
+          after: stages.map((s) => s.name),
+          stages: stages.map((s) => ({ name: s.name, rule: s.rule })),
+        },
+      ),
     ],
   };
 }

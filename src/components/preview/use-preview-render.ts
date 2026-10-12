@@ -81,14 +81,18 @@ export function usePreviewRender({
   saveTick,
   session,
 }: UsePreviewRenderOptions): UsePreviewRender {
-  const [slots, setSlots] = useState<Partial<Record<DocumentChannel, PreviewSlot>>>({});
+  const [slots, setSlots] = useState<
+    Partial<Record<DocumentChannel, PreviewSlot>>
+  >({});
   const [pending, setPending] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   // The values as one string: a stable dependency, and what "the values changed" compares. The
   // variables the same way, cut down to what validation reads.
   const valuesKey = JSON.stringify(values);
-  const variablesKey = JSON.stringify(variables.map(({ key, type, required }) => ({ key, type, required })));
+  const variablesKey = JSON.stringify(
+    variables.map(({ key, type, required }) => ({ key, type, required })),
+  );
 
   const last = useRef<{ key: string; rest: string } | null>(null);
 
@@ -100,8 +104,18 @@ export function usePreviewRender({
     const target: DocumentChannel = channel;
 
     // Is it only the values that changed since the last render? Those wait a moment for more typing.
-    const rest = JSON.stringify([templateId, version, round, channel, saveTick, attempt]);
-    const valuesOnly = last.current !== null && last.current.rest === rest && last.current.key !== valuesKey;
+    const rest = JSON.stringify([
+      templateId,
+      version,
+      round,
+      channel,
+      saveTick,
+      attempt,
+    ]);
+    const valuesOnly =
+      last.current !== null &&
+      last.current.rest === rest &&
+      last.current.key !== valuesKey;
     last.current = { key: valuesKey, rest };
 
     const controller = new AbortController();
@@ -111,9 +125,18 @@ export function usePreviewRender({
       const sending = JSON.parse(valuesKey) as VariableValues;
 
       // The route would refuse these values: say so here, in its words, and send nothing.
-      const checked = validateValues(JSON.parse(variablesKey) as Variable[], sending);
+      const checked = validateValues(
+        JSON.parse(variablesKey) as Variable[],
+        sending,
+      );
       if (!checked.ok) {
-        setSlots((all) => ({ ...all, [target]: { output: all[target]?.output ?? null, error: checked.error } }));
+        setSlots((all) => ({
+          ...all,
+          [target]: {
+            output: all[target]?.output ?? null,
+            error: checked.error,
+          },
+        }));
         setPending(false);
         return;
       }
@@ -125,32 +148,66 @@ export function usePreviewRender({
         await session.flush();
         if (signal.aborted) return;
 
-        const result = await renderPreview({ templateId, version, round, channel: target, values: sending, signal });
+        const result = await renderPreview({
+          templateId,
+          version,
+          round,
+          channel: target,
+          values: sending,
+          signal,
+        });
 
         if (result.kind === "error") {
-          setSlots((all) => ({ ...all, [target]: { output: all[target]?.output ?? null, error: result.error } }));
+          setSlots((all) => ({
+            ...all,
+            [target]: {
+              output: all[target]?.output ?? null,
+              error: result.error,
+            },
+          }));
         } else {
           setSlots((all) => {
             const before = all[target];
             // The same output again keeps the object, so nothing downstream reloads for nothing.
-            const output = before?.output && sameOutput(before.output, result) ? before.output : result;
+            const output =
+              before?.output && sameOutput(before.output, result)
+                ? before.output
+                : result;
             return { ...all, [target]: { output, error: null } };
           });
         }
         setPending(false);
       } catch (error) {
         // An abort is a newer render replacing this one: it owns `pending` now.
-        if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
+        if (
+          signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        )
+          return;
         setPending(false);
       }
     }
 
-    const timer = setTimeout(() => void run(), valuesOnly ? VALUES_DEBOUNCE_MS : 0);
+    const timer = setTimeout(
+      () => void run(),
+      valuesOnly ? VALUES_DEBOUNCE_MS : 0,
+    );
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [enabled, templateId, version, round, channel, valuesKey, variablesKey, saveTick, attempt, session]);
+  }, [
+    enabled,
+    templateId,
+    version,
+    round,
+    channel,
+    valuesKey,
+    variablesKey,
+    saveTick,
+    attempt,
+    session,
+  ]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { slots, rendering: enabled && channel !== null && pending, retry };
@@ -168,7 +225,11 @@ export function sameOutput(a: PreviewOutput, b: PreviewOutput): boolean {
       return a.html === (b as typeof a).html;
     case "email": {
       const other = b as typeof a;
-      return a.subject === other.subject && a.preheader === other.preheader && a.html === other.html;
+      return (
+        a.subject === other.subject &&
+        a.preheader === other.preheader &&
+        a.html === other.html
+      );
     }
     default:
       return assertNever(a, "preview output");

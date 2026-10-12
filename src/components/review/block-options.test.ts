@@ -2,12 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { JSONContent, Variable } from "@/domain/types";
 import { blockOptions, commentOptions, fieldOptions } from "./block-options";
 
-const variables = [{ key: "first_name", label: "First name", type: "text", required: true }] as unknown as Variable[];
+const variables = [
+  { key: "first_name", label: "First name", type: "text", required: true },
+] as unknown as Variable[];
 
 const body: JSONContent = {
   type: "doc",
   content: [
-    { type: "heading", attrs: { id: "h1", level: 2 }, content: [{ type: "text", text: "Offer details" }] },
+    {
+      type: "heading",
+      attrs: { id: "h1", level: 2 },
+      content: [{ type: "text", text: "Offer details" }],
+    },
     {
       type: "paragraph",
       attrs: { id: "p1" },
@@ -23,11 +29,31 @@ const body: JSONContent = {
       type: "bulletList",
       attrs: { id: "l1" },
       content: [
-        { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Triple points" }] }] },
-        { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Double points" }] }] },
+        {
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Triple points" }],
+            },
+          ],
+        },
+        {
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Double points" }],
+            },
+          ],
+        },
       ],
     },
-    { type: "paragraph", attrs: { id: "long" }, content: [{ type: "text", text: "word ".repeat(40) }] },
+    {
+      type: "paragraph",
+      attrs: { id: "long" },
+      content: [{ type: "text", text: "word ".repeat(40) }],
+    },
     {
       type: "table",
       attrs: { id: "t1" },
@@ -35,15 +61,47 @@ const body: JSONContent = {
         {
           type: "tableRow",
           content: [
-            { type: "tableHeader", content: [{ type: "paragraph", content: [{ type: "text", text: "Rate or fee" }] }] },
-            { type: "tableHeader", content: [{ type: "paragraph", content: [{ type: "text", text: "What you pay" }] }] },
+            {
+              type: "tableHeader",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Rate or fee" }],
+                },
+              ],
+            },
+            {
+              type: "tableHeader",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "What you pay" }],
+                },
+              ],
+            },
           ],
         },
         {
           type: "tableRow",
           content: [
-            { type: "tableCell", content: [{ type: "paragraph", content: [{ type: "text", text: "Annual fee" }] }] },
-            { type: "tableCell", content: [{ type: "paragraph", content: [{ type: "variable", attrs: { key: "first_name" } }] }] },
+            {
+              type: "tableCell",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Annual fee" }],
+                },
+              ],
+            },
+            {
+              type: "tableCell",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "variable", attrs: { key: "first_name" } }],
+                },
+              ],
+            },
           ],
         },
       ],
@@ -54,11 +112,30 @@ const body: JSONContent = {
       content: [
         {
           type: "listItem",
-          content: [{ type: "paragraph", content: [{ type: "text", text: "Purchases must post to your account within 30 days of the offer start date." }] }],
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "text",
+                  text: "Purchases must post to your account within 30 days of the offer start date.",
+                },
+              ],
+            },
+          ],
         },
       ],
     },
-    { type: "table", attrs: { id: "t-empty" }, content: [{ type: "tableRow", content: [{ type: "tableCell", content: [{ type: "paragraph" }] }] }] },
+    {
+      type: "table",
+      attrs: { id: "t-empty" },
+      content: [
+        {
+          type: "tableRow",
+          content: [{ type: "tableCell", content: [{ type: "paragraph" }] }],
+        },
+      ],
+    },
   ],
 };
 
@@ -66,11 +143,25 @@ describe("blockOptions", () => {
   const options = blockOptions(body, variables);
 
   it("names each block in reading order, skipping dividers and empty blocks", () => {
-    expect(options.map((o) => o.id)).toEqual(["h1", "p1", "l1", "long", "t1", "l2"]);
+    expect(options.map((o) => o.id)).toEqual([
+      "h1",
+      "p1",
+      "l1",
+      "long",
+      "t1",
+      "l2",
+    ]);
   });
 
   it("marks headings", () => {
-    expect(options.map((o) => o.heading)).toEqual([true, false, false, false, false, false]);
+    expect(options.map((o) => o.heading)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it("reads a variable as its label", () => {
@@ -81,7 +172,9 @@ describe("blockOptions", () => {
     expect(options[2].label).toBe("List: Triple points");
     expect(options[4].label).toBe("Table: Rate or fee, What you pay");
     // The first item, cut short with the kind kept.
-    expect(options[5].label).toBe("List: Purchases must post to your account within 30…");
+    expect(options[5].label).toBe(
+      "List: Purchases must post to your account within 30…",
+    );
     expect(options[5].label.length).toBeLessThanOrEqual(56);
   });
 
@@ -101,7 +194,11 @@ describe("blockOptions", () => {
 
 describe("commentOptions", () => {
   it("lists a document's email subject and preheader before its blocks, when Email is on", () => {
-    expect(commentOptions("document", body, ["pdf", "email"], variables).map((o) => o.id)).toEqual([
+    expect(
+      commentOptions("document", body, ["pdf", "email"], variables).map(
+        (o) => o.id,
+      ),
+    ).toEqual([
       "email.subject",
       "email.preheader",
       "h1",
@@ -111,12 +208,22 @@ describe("commentOptions", () => {
       "t1",
       "l2",
     ]);
-    expect(commentOptions("document", body, ["email"], variables).slice(0, 2).map((o) => o.label)).toEqual(["Email subject", "Email preheader"]);
+    expect(
+      commentOptions("document", body, ["email"], variables)
+        .slice(0, 2)
+        .map((o) => o.label),
+    ).toEqual(["Email subject", "Email preheader"]);
   });
 
   it("lists only the blocks of a document without Email, and only the fields of a message", () => {
-    expect(commentOptions("document", body, ["pdf", "web"], variables).map((o) => o.id)).toEqual(blockOptions(body, variables).map((o) => o.id));
-    expect(commentOptions("message", { type: "doc" }, ["push"], []).map((o) => o.id)).toEqual(["push.title", "push.subtitle", "push.body"]);
+    expect(
+      commentOptions("document", body, ["pdf", "web"], variables).map(
+        (o) => o.id,
+      ),
+    ).toEqual(blockOptions(body, variables).map((o) => o.id));
+    expect(
+      commentOptions("message", { type: "doc" }, ["push"], []).map((o) => o.id),
+    ).toEqual(["push.title", "push.subtitle", "push.body"]);
   });
 });
 

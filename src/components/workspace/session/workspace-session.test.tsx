@@ -11,12 +11,19 @@ import type { DraftBinding, WorkspaceSession } from "./session-store";
 //   - A rename there saves (handoff review I1): the header binds the session, not only the Content tab.
 //   - A save the server refuses for good holds the page still and offers Reload (I6).
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ team: "coral-offers", templateId: "UC-ABC123" }) }));
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), dismiss: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ team: "coral-offers", templateId: "UC-ABC123" }),
+}));
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), { error: vi.fn(), dismiss: vi.fn() }),
+}));
 
-const { WorkspaceSessionProvider, BindDraft, useWorkspaceSession } = await import("./workspace-session");
+const { WorkspaceSessionProvider, BindDraft, useWorkspaceSession } =
+  await import("./workspace-session");
 const { NameField } = await import("../name-field");
 const { SaveStatus, SaveStopped } = await import("../save-status");
 
@@ -34,7 +41,9 @@ function GrabSession() {
 }
 
 /** The header of a draft, as the layout renders it on any tab. */
-const header = (draft: DraftBinding | null = { versionId: "v_draft", rev: 4 }) => (
+const header = (
+  draft: DraftBinding | null = { versionId: "v_draft", rev: 4 },
+) => (
   <WorkspaceSessionProvider>
     <GrabSession />
     <BindDraft draft={draft} />
@@ -45,28 +54,54 @@ const header = (draft: DraftBinding | null = { versionId: "v_draft", rev: 4 }) =
 );
 
 const reply = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-const saved = (rev: number) => reply(200, { ok: true, rev, savedAt: "2026-10-04T10:00:00.000Z" });
-const conflict = () => reply(409, { ok: false, code: "draft_changed", rev: 9, reason: "This draft changed. Try again." });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+const saved = (rev: number) =>
+  reply(200, { ok: true, rev, savedAt: "2026-10-04T10:00:00.000Z" });
+const conflict = () =>
+  reply(409, {
+    ok: false,
+    code: "draft_changed",
+    rev: 9,
+    reason: "This draft changed. Try again.",
+  });
 
 const sent = (index: number) => {
   const [url, init] = fetchMock.mock.calls[index]!;
-  return { url: String(url), patch: JSON.parse(init!.body as string) as DraftPatch };
+  return {
+    url: String(url),
+    patch: JSON.parse(init!.body as string) as DraftPatch,
+  };
 };
 
-const nameField = () => container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Template name"]')!;
-const statusText = () => container.querySelector('[aria-live="polite"]')?.textContent;
-const stoppedText = () => container.querySelector('[data-slot="save-stopped"] [role="alert"]')?.textContent ?? null;
-const reloadButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Reload") ?? null;
+const nameField = () =>
+  container.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="Template name"]',
+  )!;
+const statusText = () =>
+  container.querySelector('[aria-live="polite"]')?.textContent;
+const stoppedText = () =>
+  container.querySelector('[data-slot="save-stopped"] [role="alert"]')
+    ?.textContent ?? null;
+const reloadButton = () =>
+  [...container.querySelectorAll("button")].find(
+    (b) => b.textContent?.trim() === "Reload",
+  ) ?? null;
 
 async function rename(value: string) {
   await act(async () => {
     const el = nameField();
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
-const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
+const wait = (ms: number) =>
+  act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -133,12 +168,15 @@ describe("a save the server refuses for good (I6)", () => {
     await stopOnConflict();
     expect(session.getStatus()).toEqual({
       status: "error",
-      error: "Your latest changes can't be saved — this draft changed elsewhere.",
+      error:
+        "Your latest changes can't be saved — this draft changed elsewhere.",
       stopped: true,
     });
     // The status stays short; the line under it says why, plainly, beside Reload.
     expect(statusText()).toBe("Not saved.");
-    expect(stoppedText()).toBe("Your latest changes can't be saved — this draft changed elsewhere.");
+    expect(stoppedText()).toBe(
+      "Your latest changes can't be saved — this draft changed elsewhere.",
+    );
     expect(session.getInert()).toBe(true);
     expect(nameField().readOnly).toBe(true);
     expect(reloadButton()).not.toBeNull();

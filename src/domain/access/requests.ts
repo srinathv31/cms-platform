@@ -56,26 +56,51 @@ export function requestAccess(input: {
   const problem = validateAccessReason(input.reason);
   if (problem) return refuse(problem);
   const reason = input.reason.trim();
-  if (input.requests.some((r) => r.teamId === team.id && r.userId === requester.id && r.status === "pending")) {
+  if (
+    input.requests.some(
+      (r) =>
+        r.teamId === team.id &&
+        r.userId === requester.id &&
+        r.status === "pending",
+    )
+  ) {
     return refuse(ACCESS_REFUSALS.pending(team.name));
   }
-  const current = input.memberships.find((m) => m.teamId === team.id && m.userId === requester.id);
-  if (current?.status === "active" && current.roles.includes(role)) return refuse(ACCESS_REFUSALS.hasRole(role, team.name));
+  const current = input.memberships.find(
+    (m) => m.teamId === team.id && m.userId === requester.id,
+  );
+  if (current?.status === "active" && current.roles.includes(role))
+    return refuse(ACCESS_REFUSALS.hasRole(role, team.name));
 
   return {
     ok: true,
-    request: { userId: requester.id, teamId: team.id, role, reason, createdAt: now },
+    request: {
+      userId: requester.id,
+      teamId: team.id,
+      role,
+      reason,
+      createdAt: now,
+    },
     effects: [
       {
         kind: "audit",
         action: "access.requested",
         teamId: team.id,
-        details: { userId: requester.id, userName: requester.name, role, reason },
+        details: {
+          userId: requester.id,
+          userName: requester.name,
+          role,
+          reason,
+        },
       },
       {
         kind: "notification",
         notification: "access_requested",
-        to: { kind: "team_admins", teamId: team.id, exceptUserIds: [requester.id] },
+        to: {
+          kind: "team_admins",
+          teamId: team.id,
+          exceptUserIds: [requester.id],
+        },
         teamId: team.id,
         title: `${requester.name} asked for ${ROLE_LABEL[role]} access to ${team.name}.`,
         body: reason,
@@ -96,7 +121,10 @@ export interface RequestDecisionFields {
  * Why `actor` can't decide the request at all, or null: nobody decides their own, and a request is
  * decided once. The access requests read model asks it for every row's Approve and Deny.
  */
-export function requestDecisionRefusal(request: Pick<AccessRequestFacts, "userId" | "status">, actor: Named): Refusal | null {
+export function requestDecisionRefusal(
+  request: Pick<AccessRequestFacts, "userId" | "status">,
+  actor: Named,
+): Refusal | null {
   if (actor.id === request.userId) return REASONS.ownRequest;
   if (request.status !== "pending") return ACCESS_REFUSALS.decided;
   return null;
@@ -106,7 +134,10 @@ export function requestDecisionRefusal(request: Pick<AccessRequestFacts, "userId
  * The first reason a decision's note can't be sent, or null: a denial needs one (the requester reads
  * it), and a note stays under DECISION_NOTE_MAX. The Deny strip runs it as the admin types.
  */
-export function validateDecisionNote(decision: "approve" | "deny", note: string | null | undefined): Refusal | null {
+export function validateDecisionNote(
+  decision: "approve" | "deny",
+  note: string | null | undefined,
+): Refusal | null {
   const trimmed = (note ?? "").trim();
   if (trimmed.length > DECISION_NOTE_MAX) return ACCESS_REFUSALS.noteTooLong;
   if (decision === "deny" && !trimmed) return ACCESS_REFUSALS.denyNote;
@@ -128,9 +159,17 @@ export function decideAccessRequest(input: {
   now: Date;
   /** The requester's membership on the request's team, if any (any status). */
   membership: MembershipFacts | null;
-}): Ok<{ request: RequestDecisionFields; membership: MembershipChange | null; effects: AccessEffect[] }> | Refused {
+}):
+  | Ok<{
+      request: RequestDecisionFields;
+      membership: MembershipChange | null;
+      effects: AccessEffect[];
+    }>
+  | Refused {
   const { request, requester, team, actor, decision, now, membership } = input;
-  const refusal = requestDecisionRefusal(request, actor) ?? validateDecisionNote(decision, input.note);
+  const refusal =
+    requestDecisionRefusal(request, actor) ??
+    validateDecisionNote(decision, input.note);
   if (refusal) return refuse(refusal);
   const note = (input.note ?? "").trim();
 
@@ -152,7 +191,13 @@ export function decideAccessRequest(input: {
           kind: "audit",
           action: "access.denied",
           teamId: team.id,
-          details: { requestId: request.id, userId: requester.id, userName: requester.name, role, note },
+          details: {
+            requestId: request.id,
+            userId: requester.id,
+            userName: requester.name,
+            role,
+            note,
+          },
         },
         {
           kind: "notification",
@@ -171,7 +216,16 @@ export function decideAccessRequest(input: {
   let roles: TeamRole[];
   if (!membership) {
     roles = [role];
-    change = { kind: "insert", membership: { userId: requester.id, teamId: team.id, roles, addedAt: now, addedBy: actor.id } };
+    change = {
+      kind: "insert",
+      membership: {
+        userId: requester.id,
+        teamId: team.id,
+        roles,
+        addedAt: now,
+        addedBy: actor.id,
+      },
+    };
   } else if (membership.status === "active") {
     roles = sortRoles([...membership.roles, role]);
     change = { kind: "update", membershipId: membership.id, set: { roles } };
@@ -193,7 +247,14 @@ export function decideAccessRequest(input: {
         kind: "audit",
         action: "access.granted",
         teamId: team.id,
-        details: { requestId: request.id, userId: requester.id, userName: requester.name, role, roles, note: note || null },
+        details: {
+          requestId: request.id,
+          userId: requester.id,
+          userName: requester.name,
+          role,
+          roles,
+          note: note || null,
+        },
       },
       {
         kind: "notification",

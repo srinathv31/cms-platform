@@ -4,7 +4,13 @@
 // import). Creating variables for keys the list doesn't have is the caller's job (the editor does
 // it in field-binding.ts).
 
-import { Fragment, Slice, type Node as PMNode, type NodeType, type Schema } from "@tiptap/pm/model";
+import {
+  Fragment,
+  Slice,
+  type Node as PMNode,
+  type NodeType,
+  type Schema,
+} from "@tiptap/pm/model";
 import { LINE_BREAKS } from "../model/characters";
 import { NODE, type JSONContent } from "../model/types";
 import { isValidKey } from "../model/variables";
@@ -16,7 +22,9 @@ export function chipsFromText(slice: Slice, schema: Schema): Slice {
   const type = schema.nodes[NODE.variable];
   if (!type) return slice;
   const content = mapFragment(slice.content, type, true);
-  return content === slice.content ? slice : new Slice(content, slice.openStart, slice.openEnd);
+  return content === slice.content
+    ? slice
+    : new Slice(content, slice.openStart, slice.openEnd);
 }
 
 /**
@@ -49,7 +57,8 @@ export function variableKeys(doc: JSONContent): string[] {
   const keys = new Set<string>();
   const walk = (node: JSONContent) => {
     const key = node.attrs?.key;
-    if (node.type === NODE.variable && typeof key === "string" && key) keys.add(key);
+    if (node.type === NODE.variable && typeof key === "string" && key)
+      keys.add(key);
     node.content?.forEach(walk);
   };
   walk(doc);
@@ -59,14 +68,21 @@ export function variableKeys(doc: JSONContent): string[] {
 function splitJSONText(node: JSONContent): JSONContent[] | null {
   const text = node.text ?? "";
   const parts: JSONContent[] = [];
-  const piece = (value: string): JSONContent => (node.marks?.length ? { type: "text", text: value, marks: node.marks } : { type: "text", text: value });
+  const piece = (value: string): JSONContent =>
+    node.marks?.length
+      ? { type: "text", text: value, marks: node.marks }
+      : { type: "text", text: value };
   let last = 0;
   for (const match of text.matchAll(TOKEN)) {
     const key = match[1];
     if (!isValidKey(key)) continue;
     const at = match.index ?? 0;
     if (at > last) parts.push(piece(text.slice(last, at)));
-    parts.push(node.marks?.length ? { type: NODE.variable, attrs: { key }, marks: node.marks } : { type: NODE.variable, attrs: { key } });
+    parts.push(
+      node.marks?.length
+        ? { type: NODE.variable, attrs: { key }, marks: node.marks }
+        : { type: NODE.variable, attrs: { key } },
+    );
     last = at + match[0].length;
   }
   if (!parts.length) return null;
@@ -74,7 +90,11 @@ function splitJSONText(node: JSONContent): JSONContent[] | null {
   return parts;
 }
 
-function mapFragment(fragment: Fragment, type: NodeType, allowsChip: boolean): Fragment {
+function mapFragment(
+  fragment: Fragment,
+  type: NodeType,
+  allowsChip: boolean,
+): Fragment {
   let changed = false;
   const out: PMNode[] = [];
   fragment.forEach((node) => {
@@ -92,7 +112,11 @@ function mapFragment(fragment: Fragment, type: NodeType, allowsChip: boolean): F
       out.push(node);
       return;
     }
-    const inner = mapFragment(node.content, type, node.type.contentMatch.matchType(type) !== null);
+    const inner = mapFragment(
+      node.content,
+      type,
+      node.type.contentMatch.matchType(type) !== null,
+    );
     if (inner !== node.content) {
       out.push(node.copy(inner));
       changed = true;
@@ -112,12 +136,14 @@ function splitText(node: PMNode, type: NodeType): PMNode[] | null {
     const key = match[1];
     if (!isValidKey(key)) continue;
     const at = match.index ?? 0;
-    if (at > last) parts.push(node.type.schema.text(text.slice(last, at), node.marks));
+    if (at > last)
+      parts.push(node.type.schema.text(text.slice(last, at), node.marks));
     parts.push(type.create({ key }, null, node.marks));
     last = at + match[0].length;
   }
   if (!parts.length) return null;
-  if (last < text.length) parts.push(node.type.schema.text(text.slice(last), node.marks));
+  if (last < text.length)
+    parts.push(node.type.schema.text(text.slice(last), node.marks));
   return parts;
 }
 

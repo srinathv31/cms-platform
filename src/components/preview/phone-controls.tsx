@@ -13,7 +13,11 @@ import {
 } from "@/components/device";
 import { Segmented } from "@/components/primitives/segmented";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { PUSH_PLATFORMS } from "@/domain/messages/push";
 import { PLATFORM_LABELS } from "@/domain/render/errors";
 import { cn } from "@/lib/utils";
@@ -33,12 +37,18 @@ const WIDTHS: readonly DeviceWidth[] = ["compact", "standard", "large"];
 
 /** The screens in the platform's words: Banner on iPhone, Heads-up on Android. */
 function screenOptions(platform: DevicePlatform) {
-  return SCREENS.map((value) => ({ value, label: pushScreenLabel(platform, value) }));
+  return SCREENS.map((value) => ({
+    value,
+    label: pushScreenLabel(platform, value),
+  }));
 }
 
 /** The widths in the platform's own sizes: 375pt · 402pt · 440pt, or 360dp · 412dp · 448dp. */
 function widthOptions(platform: DevicePlatform) {
-  return WIDTHS.map((value) => ({ value, label: `${SCREEN_SIZES[platform][value].width}${SIZE_UNIT[platform]}` }));
+  return WIDTHS.map((value) => ({
+    value,
+    label: `${SCREEN_SIZES[platform][value].width}${SIZE_UNIT[platform]}`,
+  }));
 }
 
 export interface PhoneView {
@@ -63,13 +73,18 @@ export function PhoneControls({
    */
   viewed?: readonly DevicePlatform[];
 }) {
-  const set = (patch: Partial<DeviceSettings>) => onChange({ settings: { ...view.settings, ...patch } });
+  const set = (patch: Partial<DeviceSettings>) =>
+    onChange({ settings: { ...view.settings, ...patch } });
   return (
     <div className="flex shrink-0 items-center gap-2">
       <Segmented
         label="Phone"
         value={view.settings.platform}
-        options={PUSH_PLATFORMS.map((value) => ({ value, label: PLATFORM_LABELS[value], done: viewed ? viewed.includes(value) : undefined }))}
+        options={PUSH_PLATFORMS.map((value) => ({
+          value,
+          label: PLATFORM_LABELS[value],
+          done: viewed ? viewed.includes(value) : undefined,
+        }))}
         onChange={(platform) => set({ platform })}
         doneLabel="Viewed"
       />
@@ -89,12 +104,21 @@ function DeviceOptions({
   onChange: (next: Partial<PhoneView>) => void;
 }) {
   const { settings, screen } = view;
-  const set = (patch: Partial<DeviceSettings>) => onChange({ settings: { ...settings, ...patch } });
+  const set = (patch: Partial<DeviceSettings>) =>
+    onChange({ settings: { ...settings, ...patch } });
   const sms = channel === "sms";
   return (
     <Popover>
       <PopoverTrigger
-        render={<Button variant="outline" size="icon" aria-label="Device options" title="Device options" className="bg-surface" />}
+        render={
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Device options"
+            title="Device options"
+            className="bg-surface"
+          />
+        }
       >
         <SlidersHorizontal strokeWidth={1.75} />
       </PopoverTrigger>
@@ -103,11 +127,19 @@ function DeviceOptions({
         align="end"
         sideOffset={8}
         aria-label="Device options"
-        className={cn("w-auto rounded-xl border border-hairline bg-popover p-3 shadow-pop ring-0", ROW_GAP)}
+        className={cn(
+          "w-auto rounded-xl border border-hairline bg-popover p-3 shadow-pop ring-0",
+          ROW_GAP,
+        )}
       >
         <Row label="Screen" blocked={sms ? "Push only" : null}>
           {(blocked) => (
-            <Segmented label="Screen" value={screen} options={screenOptions(settings.platform)} onChange={blocked((next) => onChange({ screen: next }))} />
+            <Segmented
+              label="Screen"
+              value={screen}
+              options={screenOptions(settings.platform)}
+              onChange={blocked((next) => onChange({ screen: next }))}
+            />
           )}
         </Row>
         <Row label="Appearance">
@@ -123,7 +155,10 @@ function DeviceOptions({
             />
           )}
         </Row>
-        <Row label="Previews" blocked={sms || screen !== "lock" ? "Lock screen only" : null}>
+        <Row
+          label="Previews"
+          blocked={sms || screen !== "lock" ? "Lock screen only" : null}
+        >
           {(blocked) => (
             <Segmented
               label="Previews"
@@ -132,7 +167,9 @@ function DeviceOptions({
                 { value: "shown", label: "Shown" },
                 { value: "hidden", label: "Hidden" },
               ]}
-              onChange={blocked((value) => set({ previewsHidden: value === "hidden" }))}
+              onChange={blocked((value) =>
+                set({ previewsHidden: value === "hidden" }),
+              )}
             />
           )}
         </Row>
@@ -152,7 +189,12 @@ function DeviceOptions({
         </Row>
         <Row label="Width">
           {() => (
-            <Segmented label="Width" value={settings.width} options={widthOptions(settings.platform)} onChange={(width) => set({ width })} />
+            <Segmented
+              label="Width"
+              value={settings.width}
+              options={widthOptions(settings.platform)}
+              onChange={(width) => set({ width })}
+            />
           )}
         </Row>
       </PopoverContent>
@@ -172,10 +214,13 @@ function Row({
 }: {
   label: string;
   blocked?: string | null;
-  children: (blocked: <T>(onChange: (value: T) => void) => (value: T) => void) => ReactNode;
+  children: (
+    blocked: <T>(onChange: (value: T) => void) => (value: T) => void,
+  ) => ReactNode;
 }) {
   const reasonId = useId();
-  const guard = <T,>(onChange: (value: T) => void) => (blocked ? () => {} : onChange);
+  const guard = <T,>(onChange: (value: T) => void) =>
+    blocked ? () => {} : onChange;
   return (
     <div className="grid grid-cols-[5.5rem_auto] items-center gap-x-3">
       <span className="text-[13px] leading-5 text-text-muted">{label}</span>
@@ -184,13 +229,21 @@ function Row({
           role="group"
           aria-disabled={blocked ? true : undefined}
           aria-describedby={blocked ? reasonId : undefined}
-          className={cn("w-fit", blocked && "opacity-50 [&_button]:cursor-default [&_button]:hover:bg-transparent [&_button[aria-pressed=true]]:hover:bg-selected")}
+          className={cn(
+            "w-fit",
+            blocked &&
+              "opacity-50 [&_button]:cursor-default [&_button]:hover:bg-transparent [&_button[aria-pressed=true]]:hover:bg-selected",
+          )}
         >
           {children(guard)}
         </div>
         {/* Out of flow, in the gap under the control (ROW_GAP), so a row that turns blocked moves nothing. */}
         {blocked ? (
-          <span id={reasonId} data-slot="row-reason" className="absolute top-full left-0 mt-0.5 text-[12px] leading-4 whitespace-nowrap text-text-subtle">
+          <span
+            id={reasonId}
+            data-slot="row-reason"
+            className="absolute top-full left-0 mt-0.5 text-[12px] leading-4 whitespace-nowrap text-text-subtle"
+          >
             {blocked}
           </span>
         ) : null}

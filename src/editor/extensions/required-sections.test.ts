@@ -56,7 +56,11 @@ describe("required-section guard: edits that only damage a heading are rejected"
 
   it("selecting the heading block and pressing Delete", () => {
     const editor = mount();
-    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, blockPos(editor, 5))));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(
+        NodeSelection.create(editor.state.doc, blockPos(editor, 5)),
+      ),
+    );
     expect(press(editor, "Delete")).toBe(true);
     expect(blocks(editor)).toEqual(blocks(mount()));
     expect(noted(editor)).toBe("Legal notices");
@@ -66,13 +70,19 @@ describe("required-section guard: edits that only damage a heading are rejected"
     const editor = mount();
     caret(editor, 6);
     press(editor, "Backspace");
-    expect(blocks(editor).slice(5)).toEqual(["h2*:Legal notices", "p:Legal body"]);
+    expect(blocks(editor).slice(5)).toEqual([
+      "h2*:Legal notices",
+      "p:Legal body",
+    ]);
     await flush();
     expect(noted(editor)).toBe("Legal notices");
   });
 
   it("Backspace at the start of an empty line below just removes that line", () => {
-    const editor = mount({ type: "doc", content: [h2("Offer details", "offer_details"), p(), p("Body")] });
+    const editor = mount({
+      type: "doc",
+      content: [h2("Offer details", "offer_details"), p(), p("Body")],
+    });
     caret(editor, 1);
     press(editor, "Backspace");
     expect(blocks(editor)).toEqual(["h2*:Offer details", "p:Body"]);
@@ -82,11 +92,17 @@ describe("required-section guard: edits that only damage a heading are rejected"
     const editor = mount();
     caret(editor, 5, "Legal notices".length);
     press(editor, "Delete");
-    expect(blocks(editor).slice(5)).toEqual(["h2*:Legal notices", "p:Legal body"]);
+    expect(blocks(editor).slice(5)).toEqual([
+      "h2*:Legal notices",
+      "p:Legal body",
+    ]);
   });
 
   it("Backspace at the heading's start removes an empty line above, and nothing else", () => {
-    const editor = mount({ type: "doc", content: [p("Intro"), p(), h2("Offer details", "offer_details")] });
+    const editor = mount({
+      type: "doc",
+      content: [p("Intro"), p(), h2("Offer details", "offer_details")],
+    });
     caret(editor, 2);
     press(editor, "Backspace");
     expect(blocks(editor)).toEqual(["p:Intro", "h2*:Offer details"]);
@@ -129,7 +145,9 @@ describe("required-section guard: edits that only damage a heading are rejected"
     editor.commands.toggleItalic();
     editor.commands.toggleUnderline();
     editor.commands.setLink({ href: "https://example.com" });
-    expect(editor.state.doc.child(3).toJSON()).toEqual(mount().state.doc.child(3).toJSON());
+    expect(editor.state.doc.child(3).toJSON()).toEqual(
+      mount().state.doc.child(3).toJSON(),
+    );
     await flush();
     expect(noted(editor)).toBe("Rates and fees");
   });
@@ -146,11 +164,15 @@ describe("required-section guard: edits that only damage a heading are rejected"
   it("a copy of a required heading pastes as a plain heading", () => {
     const editor = mount();
     caret(editor, 6, "Legal body".length);
-    editor.view.pasteHTML('<p>Copied</p><h2 data-required="legal_notices">Legal notices</h2><p>More</p>');
+    editor.view.pasteHTML(
+      '<p>Copied</p><h2 data-required="legal_notices">Legal notices</h2><p>More</p>',
+    );
     const out = blocks(editor);
     expect(out.filter((b) => b === "h2*:Legal notices")).toHaveLength(1);
     expect(out).toContain("h2:Legal notices");
-    expect(out.indexOf("h2*:Legal notices")).toBeLessThan(out.indexOf("h2:Legal notices"));
+    expect(out.indexOf("h2*:Legal notices")).toBeLessThan(
+      out.indexOf("h2:Legal notices"),
+    );
   });
 });
 
@@ -159,7 +181,12 @@ describe("required-section guard: range operations keep the headings and apply t
     const editor = mount();
     editor.commands.selectAll();
     press(editor, "Backspace");
-    expect(blocks(editor)).toEqual(["p:", "h2*:Offer details", "h2*:Rates and fees", "h2*:Legal notices"]);
+    expect(blocks(editor)).toEqual([
+      "p:",
+      "h2*:Offer details",
+      "h2*:Rates and fees",
+      "h2*:Legal notices",
+    ]);
     expect(editor.state.selection.from).toBe(1);
     expect(noted(editor)).toBe("Offer details");
     editor.commands.undo();
@@ -167,10 +194,22 @@ describe("required-section guard: range operations keep the headings and apply t
   });
 
   it("select-all on a document that starts with a section puts the caret in its body", () => {
-    const editor = mount({ type: "doc", content: [h2("Offer details", "offer_details"), p("A"), h2("Legal notices", "legal_notices"), p("B")] });
+    const editor = mount({
+      type: "doc",
+      content: [
+        h2("Offer details", "offer_details"),
+        p("A"),
+        h2("Legal notices", "legal_notices"),
+        p("B"),
+      ],
+    });
     editor.commands.selectAll();
     press(editor, "Delete");
-    expect(blocks(editor)).toEqual(["h2*:Offer details", "p:", "h2*:Legal notices"]);
+    expect(blocks(editor)).toEqual([
+      "h2*:Offer details",
+      "p:",
+      "h2*:Legal notices",
+    ]);
     expect(editor.state.selection.$from.parent.type.name).toBe("paragraph");
     expect(editor.state.selection.from).toBe(blockPos(editor, 1) + 1);
   });
@@ -179,36 +218,69 @@ describe("required-section guard: range operations keep the headings and apply t
     const editor = mount();
     editor.commands.selectAll();
     type(editor, "x");
-    expect(blocks(editor)).toEqual(["p:x", "h2*:Offer details", "h2*:Rates and fees", "h2*:Legal notices"]);
+    expect(blocks(editor)).toEqual([
+      "p:x",
+      "h2*:Offer details",
+      "h2*:Rates and fees",
+      "h2*:Legal notices",
+    ]);
   });
 
   it("a selection across one heading deletes the text on both sides", () => {
     const editor = mount();
     select(editor, blockPos(editor, 2) + 1 + 5, blockPos(editor, 4) + 1 + 5);
     press(editor, "Delete");
-    expect(blocks(editor).slice(1, 5)).toEqual(["h2*:Offer details", "p:Offer", "h2*:Rates and fees", "p: body"]);
+    expect(blocks(editor).slice(1, 5)).toEqual([
+      "h2*:Offer details",
+      "p:Offer",
+      "h2*:Rates and fees",
+      "p: body",
+    ]);
   });
 
   it("cut copies everything selected and keeps the heading", () => {
     const editor = mount();
-    select(editor, blockPos(editor, 2) + 1, blockPos(editor, 4) + 1 + "Rates body".length);
+    select(
+      editor,
+      blockPos(editor, 2) + 1,
+      blockPos(editor, 4) + 1 + "Rates body".length,
+    );
     const data = new Map<string, string>();
     const event = {
-      clipboardData: { clearData: () => data.clear(), setData: (t: string, v: string) => data.set(t, v) },
+      clipboardData: {
+        clearData: () => data.clear(),
+        setData: (t: string, v: string) => data.set(t, v),
+      },
       preventDefault: () => {},
     } as unknown as ClipboardEvent;
-    const handled = editor.view.someProp("handleDOMEvents", (handlers) => handlers.cut?.(editor.view, event));
+    const handled = editor.view.someProp("handleDOMEvents", (handlers) =>
+      handlers.cut?.(editor.view, event),
+    );
     expect(handled).toBe(true);
     expect(data.get("text/plain")).toContain("Rates and fees");
     // The fully selected paragraph after the heading goes with its text.
-    expect(blocks(editor).slice(1, 5)).toEqual(["h2*:Offer details", "p:", "h2*:Rates and fees", "h2*:Legal notices"]);
+    expect(blocks(editor).slice(1, 5)).toEqual([
+      "h2*:Offer details",
+      "p:",
+      "h2*:Rates and fees",
+      "h2*:Legal notices",
+    ]);
   });
 
   it("paste over a selection across a heading inserts the paste and keeps the heading", () => {
     const editor = mount();
-    select(editor, blockPos(editor, 2) + 1, blockPos(editor, 4) + 1 + "Rates body".length);
+    select(
+      editor,
+      blockPos(editor, 2) + 1,
+      blockPos(editor, 4) + 1 + "Rates body".length,
+    );
     editor.view.pasteText("Pasted");
-    expect(blocks(editor).slice(1, 5)).toEqual(["h2*:Offer details", "p:Pasted", "h2*:Rates and fees", "h2*:Legal notices"]);
+    expect(blocks(editor).slice(1, 5)).toEqual([
+      "h2*:Offer details",
+      "p:Pasted",
+      "h2*:Rates and fees",
+      "h2*:Legal notices",
+    ]);
   });
 
   it("paste into a heading is refused", () => {
@@ -230,9 +302,13 @@ describe("the note", () => {
     type(editor, "x");
     caret(editor, 3, 2);
     type(editor, "x");
-    expect(editor.view.dom.querySelectorAll("[data-required-note]")).toHaveLength(1);
+    expect(
+      editor.view.dom.querySelectorAll("[data-required-note]"),
+    ).toHaveLength(1);
     expect(noted(editor)).toBe("Rates and fees");
-    const live = editor.view.dom.parentElement?.querySelector('[role="status"][aria-live="polite"]');
+    const live = editor.view.dom.parentElement?.querySelector(
+      '[role="status"][aria-live="polite"]',
+    );
     await vi.advanceTimersByTimeAsync(50);
     expect(live?.textContent).toBe("Required for disclosures");
     await vi.advanceTimersByTimeAsync(1000);

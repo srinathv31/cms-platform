@@ -5,9 +5,14 @@ import type { SimRead } from "./types";
 // refusal also sets the HTTP status the read chose. Never cached: it is Coral's own rows and Stencil's
 // answer of the moment.
 
-const HEADERS = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
+const HEADERS = {
+  "Cache-Control": "private, no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
-export function simReadResponse<T extends object>(result: SimRead<T>): Response {
+export function simReadResponse<T extends object>(
+  result: SimRead<T>,
+): Response {
   if (result.ok) return Response.json(result, { headers: HEADERS });
   const { status, ...body } = result;
   return Response.json(body, { status, headers: HEADERS });

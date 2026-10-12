@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { createAutosave, type SaveFields, type SaveStatus } from "./autosave-scheduler";
+import {
+  createAutosave,
+  type SaveFields,
+  type SaveStatus,
+} from "./autosave-scheduler";
 import { newSessionKey } from "./session-key";
 import { createFetchSend } from "./save-transport";
 
@@ -32,7 +36,11 @@ export interface DraftAutosave {
  * While anything typed isn't saved, closing or reloading the page asks first (`beforeunload`).
  * The scheduling lives in `autosave-scheduler.ts`; this is the React and browser wiring.
  */
-export function useDraftAutosave({ versionId, initialRev, disabled = false }: UseDraftAutosaveOptions): DraftAutosave {
+export function useDraftAutosave({
+  versionId,
+  initialRev,
+  disabled = false,
+}: UseDraftAutosaveOptions): DraftAutosave {
   const [autosave] = useState(() =>
     createAutosave({
       initialRev,
@@ -43,7 +51,11 @@ export function useDraftAutosave({ versionId, initialRev, disabled = false }: Us
     }),
   );
 
-  const state = useSyncExternalStore(autosave.subscribe, autosave.getState, autosave.getState);
+  const state = useSyncExternalStore(
+    autosave.subscribe,
+    autosave.getState,
+    autosave.getState,
+  );
   const unsaved = state.status !== "saved";
 
   useEffect(() => {

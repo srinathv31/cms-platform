@@ -17,7 +17,11 @@ export interface SubmittableContent {
   channelFields?: ChannelFields;
 }
 
-export function trySubmit(content: SubmittableContent, rules: MessageTypeRules, now: Date): SubmitResult {
+export function trySubmit(
+  content: SubmittableContent,
+  rules: MessageTypeRules,
+  now: Date,
+): SubmitResult {
   return submit({
     draft: {
       state: "draft",
@@ -37,7 +41,14 @@ export function trySubmit(content: SubmittableContent, rules: MessageTypeRules, 
     submitterName: "Maya Chen",
     templateId: "UC-TEST01",
     templateName: "Test",
-    chain: [{ id: "st_team", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } }],
+    chain: [
+      {
+        id: "st_team",
+        position: 0,
+        name: "Team approver",
+        rule: { kind: "team_role", role: "approver" },
+      },
+    ],
     messageRules: rules,
   });
 }

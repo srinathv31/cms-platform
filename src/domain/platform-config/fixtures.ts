@@ -9,4 +9,9 @@ export const SECTIONS: RequiredSection[] = [
   { key: "rates_and_fees", title: "Rates and fees" },
   { key: "legal_notices", title: "Legal notices" },
 ];
-export const disclosure = { id: "ct_disclosure", name: "Disclosure", requiredSections: SECTIONS, allowedChannels: ["pdf", "web", "email"] as Channel[] };
+export const disclosure = {
+  id: "ct_disclosure",
+  name: "Disclosure",
+  requiredSections: SECTIONS,
+  allowedChannels: ["pdf", "web", "email"] as Channel[],
+};

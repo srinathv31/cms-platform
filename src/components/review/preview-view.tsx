@@ -4,12 +4,27 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { renderMessagePreview } from "@/components/preview/message-preview";
 import type { PhoneView } from "@/components/preview/phone-controls";
 import { PreviewPane } from "@/components/preview/preview-pane";
-import { phoneClock, phoneSenders, recipientOf, senderOf } from "@/components/preview/preview-sender";
+import {
+  phoneClock,
+  phoneSenders,
+  recipientOf,
+  senderOf,
+} from "@/components/preview/preview-sender";
 import { usePreviewRender } from "@/components/preview/use-preview-render";
-import { INITIAL_PHONE, type PreviewDevice } from "@/components/workspace/session/session-store";
+import {
+  INITIAL_PHONE,
+  type PreviewDevice,
+} from "@/components/workspace/session/session-store";
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
-import { outputCannotBeShown, outputKey, type OutputKey } from "@/domain/review-outputs";
+import type {
+  MessageTypeRules,
+  TeamSenders,
+} from "@/domain/platform-config/limits";
+import {
+  outputCannotBeShown,
+  outputKey,
+  type OutputKey,
+} from "@/domain/review-outputs";
 import type { VariableValues } from "@/editor/model/types";
 import { isDocumentChannel, type Channel, type Variable } from "@/domain/types";
 import { RV } from "./review-grid";
@@ -95,7 +110,10 @@ export function PreviewView({
 }) {
   const [picked, setPicked] = useState<Channel>(channels[0] ?? "pdf");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
-  const [phone, setPhone] = useState<PhoneView>({ settings: INITIAL_PHONE, screen: "lock" });
+  const [phone, setPhone] = useState<PhoneView>({
+    settings: INITIAL_PHONE,
+    screen: "lock",
+  });
   const channel = channels.includes(picked) ? picked : (channels[0] ?? "pdf");
 
   const { slots, rendering, retry } = usePreviewRender({
@@ -114,9 +132,25 @@ export function PreviewView({
   const platform = phone.settings.platform;
   const message = useMemo(() => {
     if (!enabled || isDocumentChannel(channel)) return null;
-    const target = channel === "push" ? ({ channel, platform } as const) : ({ channel } as const);
-    return renderMessagePreview(target, { fields: channelFields, variables, values, rules: messageRules });
-  }, [enabled, channel, platform, channelFields, variables, values, messageRules]);
+    const target =
+      channel === "push"
+        ? ({ channel, platform } as const)
+        : ({ channel } as const);
+    return renderMessagePreview(target, {
+      fields: channelFields,
+      variables,
+      values,
+      rules: messageRules,
+    });
+  }, [
+    enabled,
+    channel,
+    platform,
+    channelFields,
+    variables,
+    values,
+    messageRules,
+  ]);
 
   const rendered = message ? message.ok : Boolean(slot?.output) && !slot?.error;
   useEffect(() => {
@@ -133,7 +167,11 @@ export function PreviewView({
   const onPdfShown = useCallback(() => onViewed("pdf"), [onViewed]);
 
   // An output the render refuses for a reason of the version's own can't be viewed by looking again.
-  const error = message ? (message.ok ? null : message.error) : (slot?.error ?? null);
+  const error = message
+    ? message.ok
+      ? null
+      : message.error
+    : (slot?.error ?? null);
   const cannotShow = !rendered && error !== null && outputCannotBeShown(error);
   useEffect(() => {
     if (enabled) onFailed(output, cannotShow);

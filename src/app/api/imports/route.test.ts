@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IMPORT_LIMITS, IMPORT_REFUSALS, JUST_IMPORTED_COOKIE, type ImportResponse } from "@/domain/import-types";
+import {
+  IMPORT_LIMITS,
+  IMPORT_REFUSALS,
+  JUST_IMPORTED_COOKIE,
+  type ImportResponse,
+} from "@/domain/import-types";
 import { REASONS } from "@/domain/permissions";
 import { refuse } from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";
@@ -26,12 +31,28 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const viewer = { userId: "maya" } as Viewer;
 
-function requestOf(body: BodyInit, headers: Record<string, string> = {}, team: string | null = "coral-offers") {
-  const url = team === null ? "http://localhost/api/imports" : `http://localhost/api/imports?team=${team}`;
-  return new Request(url, { method: "POST", headers, body, duplex: "half" } as RequestInit) as NextRequest;
+function requestOf(
+  body: BodyInit,
+  headers: Record<string, string> = {},
+  team: string | null = "coral-offers",
+) {
+  const url =
+    team === null
+      ? "http://localhost/api/imports"
+      : `http://localhost/api/imports?team=${team}`;
+  return new Request(url, {
+    method: "POST",
+    headers,
+    body,
+    duplex: "half",
+  } as RequestInit) as NextRequest;
 }
 
-function post(form: FormData | string, headers: Record<string, string> = {}, team: string | null = "coral-offers") {
+function post(
+  form: FormData | string,
+  headers: Record<string, string> = {},
+  team: string | null = "coral-offers",
+) {
   return POST(requestOf(form, headers, team));
 }
 
@@ -54,12 +75,18 @@ function chunkedBody(megabytes: number) {
   return { stream, pulled };
 }
 
-const answerWith = (response: ImportResponse) => vi.mocked(importTemplate).mockResolvedValue(response);
+const answerWith = (response: ImportResponse) =>
+  vi.mocked(importTemplate).mockResolvedValue(response);
 
 beforeEach(() => {
   vi.mocked(getViewer).mockReset().mockResolvedValue(viewer);
   vi.mocked(importTemplate).mockReset();
-  vi.mocked(importPermission).mockReset().mockResolvedValue({ ok: true, team: { id: "coral-offers", slug: "coral-offers" } as never });
+  vi.mocked(importPermission)
+    .mockReset()
+    .mockResolvedValue({
+      ok: true,
+      team: { id: "coral-offers", slug: "coral-offers" } as never,
+    });
   jar.set.mockReset();
   vi.mocked(cookies).mockClear();
   vi.mocked(revalidatePath).mockReset();
@@ -67,12 +94,22 @@ beforeEach(() => {
 
 describe("POST /api/imports", () => {
   it("200: passes the viewer, the team and the file's name and bytes; sets both one-shot cookies; refreshes the Library", async () => {
-    answerWith({ ok: true, templateId: "UC-4F7K2Q", href: "/coral-offers/templates/UC-4F7K2Q" });
-    const res = await post(formWith(new File(["hello"], "notes.txt", { type: "text/plain" })));
+    answerWith({
+      ok: true,
+      templateId: "UC-4F7K2Q",
+      href: "/coral-offers/templates/UC-4F7K2Q",
+    });
+    const res = await post(
+      formWith(new File(["hello"], "notes.txt", { type: "text/plain" })),
+    );
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
-    expect(await res.json()).toEqual({ ok: true, templateId: "UC-4F7K2Q", href: "/coral-offers/templates/UC-4F7K2Q" });
+    expect(await res.json()).toEqual({
+      ok: true,
+      templateId: "UC-4F7K2Q",
+      href: "/coral-offers/templates/UC-4F7K2Q",
+    });
 
     const [who, input] = vi.mocked(importTemplate).mock.calls[0]!;
     expect(who).toBe(viewer);
@@ -82,7 +119,11 @@ describe("POST /api/imports", () => {
 
     const cookie = { path: "/", sameSite: "lax", maxAge: 60 };
     expect(jar.set).toHaveBeenCalledWith("ucomp_created", "UC-4F7K2Q", cookie);
-    expect(jar.set).toHaveBeenCalledWith(JUST_IMPORTED_COOKIE, "UC-4F7K2Q", cookie);
+    expect(jar.set).toHaveBeenCalledWith(
+      JUST_IMPORTED_COOKIE,
+      "UC-4F7K2Q",
+      cookie,
+    );
     expect(revalidatePath).toHaveBeenCalledWith("/[team]/library", "page");
   });
 
@@ -98,25 +139,33 @@ describe("POST /api/imports", () => {
     ["pdfNoText", 400],
     ["pdfLocked", 400],
     ["pdfPages", 400],
-  ] as const)("%s becomes %i, with the body unchanged and no cookies", async (name, status) => {
-    const body: ImportResponse = refuse(IMPORT_REFUSALS[name]);
-    answerWith(body);
-    const res = await post(formWith(new File(["x"], "x.txt")));
-    expect(res.status).toBe(status);
-    expect(await res.json()).toEqual(body);
-    expect(jar.set).not.toHaveBeenCalled();
-    expect(revalidatePath).not.toHaveBeenCalled();
-  });
+  ] as const)(
+    "%s becomes %i, with the body unchanged and no cookies",
+    async (name, status) => {
+      const body: ImportResponse = refuse(IMPORT_REFUSALS[name]);
+      answerWith(body);
+      const res = await post(formWith(new File(["x"], "x.txt")));
+      expect(res.status).toBe(status);
+      expect(await res.json()).toEqual(body);
+      expect(jar.set).not.toHaveBeenCalled();
+      expect(revalidatePath).not.toHaveBeenCalled();
+    },
+  );
 
   it("content becomes 400 with the document check's sentence after the file's own", async () => {
-    const body = refuse(IMPORT_REFUSALS.content("This table's cells don't line up into rows and columns."));
+    const body = refuse(
+      IMPORT_REFUSALS.content(
+        "This table's cells don't line up into rows and columns.",
+      ),
+    );
     answerWith(body);
     const res = await post(formWith(new File(["x"], "x.txt")));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
       ok: false,
       code: "import_content",
-      reason: "This file can't be imported as it is. This table's cells don't line up into rows and columns.",
+      reason:
+        "This file can't be imported as it is. This table's cells don't line up into rows and columns.",
     });
   });
 
@@ -124,7 +173,11 @@ describe("POST /api/imports", () => {
     answerWith(refuse(REASONS.generic));
     const res = await post(formWith(new File(["x"], "x.txt")));
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ ok: false, code: "generic", reason: "You don't have access to do this." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: "generic",
+      reason: "You don't have access to do this.",
+    });
   });
 
   it("the team comes from the query; a missing one is passed on as empty (the permission check refuses it)", async () => {
@@ -137,41 +190,71 @@ describe("POST /api/imports", () => {
   it("a missing file is passed on as null (the import answers unreadable)", async () => {
     answerWith(refuse(IMPORT_REFUSALS.unreadable));
     await post(formWith(null));
-    expect(vi.mocked(importTemplate).mock.calls[0]![1]).toEqual({ teamSlug: "coral-offers", file: null });
+    expect(vi.mocked(importTemplate).mock.calls[0]![1]).toEqual({
+      teamSlug: "coral-offers",
+      file: null,
+    });
   });
 
   it("403 before a byte of the body is read, when the viewer can't create on the team", async () => {
     vi.mocked(importPermission).mockResolvedValue(refuse(REASONS.generic));
     const { stream, pulled } = chunkedBody(64);
-    const request = requestOf(stream, { "Content-Type": "multipart/form-data; boundary=zzz" });
+    const request = requestOf(stream, {
+      "Content-Type": "multipart/form-data; boundary=zzz",
+    });
     const res = await POST(request);
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ ok: false, code: "generic", reason: "You don't have access to do this." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: "generic",
+      reason: "You don't have access to do this.",
+    });
     expect(request.bodyUsed).toBe(false);
     expect(pulled.mb).toBeLessThanOrEqual(1); // at most what the stream queued up front
     expect(importTemplate).not.toHaveBeenCalled();
   });
 
   it("413 when Content-Length says the body is too large, before reading it", async () => {
-    const res = await post("x", { "Content-Length": String(IMPORT_LIMITS.maxBytes + 128 * 1024), "Content-Type": "text/plain" });
+    const res = await post("x", {
+      "Content-Length": String(IMPORT_LIMITS.maxBytes + 128 * 1024),
+      "Content-Type": "text/plain",
+    });
     expect(res.status).toBe(413);
-    expect(await res.json()).toEqual({ ok: false, code: "import_too_large", reason: "This file is larger than 10 MB." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: "import_too_large",
+      reason: "This file is larger than 10 MB.",
+    });
     expect(importTemplate).not.toHaveBeenCalled();
   });
 
   it("413 for a chunked body with no Content-Length, as soon as it passes the limit: the rest is never read", async () => {
     const { stream, pulled } = chunkedBody(64);
-    const res = await POST(requestOf(stream, { "Content-Type": "multipart/form-data; boundary=zzz" }));
+    const res = await POST(
+      requestOf(stream, {
+        "Content-Type": "multipart/form-data; boundary=zzz",
+      }),
+    );
     expect(res.status).toBe(413);
-    expect(await res.json()).toEqual({ ok: false, code: "import_too_large", reason: "This file is larger than 10 MB." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: "import_too_large",
+      reason: "This file is larger than 10 MB.",
+    });
     expect(pulled.mb).toBeLessThan(13);
     expect(importTemplate).not.toHaveBeenCalled();
   });
 
   it("400 unreadable for a body that isn't form data", async () => {
-    const res = await post("not a form", { "Content-Type": "multipart/form-data; boundary=zzz" });
+    const res = await post("not a form", {
+      "Content-Type": "multipart/form-data; boundary=zzz",
+    });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ ok: false, code: "import_unreadable", reason: "Couldn't read this file." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: "import_unreadable",
+      reason: "Couldn't read this file.",
+    });
     expect(importTemplate).not.toHaveBeenCalled();
   });
 });

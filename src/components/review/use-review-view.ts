@@ -17,13 +17,16 @@ import type { ReviewView } from "./view-tabs";
  * Preview belong to `PreviewView` (preview-view.tsx): whatever needs to know them gets a callback prop from it,
  * not a copy of its state.
  */
-export function useReviewView(version: Pick<ReviewScreenData["version"], "channels">) {
+export function useReviewView(
+  version: Pick<ReviewScreenData["version"], "channels">,
+) {
   const [view, setView] = useState<ReviewView>("document");
   // The output is built the first time it is looked at, then kept (its last render stays up).
   const [previewVisited, setPreviewVisited] = useState(false);
 
   /** The outputs the Preview offers: the version's channels, never none. */
-  const channels: Channel[] = version.channels.length > 0 ? version.channels : ["pdf"];
+  const channels: Channel[] =
+    version.channels.length > 0 ? version.channels : ["pdf"];
 
   const showDocument = useCallback(() => setView("document"), []);
   /** A tab was pressed. */

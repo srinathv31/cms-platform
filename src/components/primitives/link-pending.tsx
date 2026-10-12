@@ -14,11 +14,28 @@ const PENDING =
 export function LinkPending({ className }: { className?: string }) {
   const { pending } = useLinkStatus();
   const state = pending ? `${PENDING} fade-in fade-out-40` : "opacity-0";
-  return <span aria-hidden data-slot="link-pending" className={cn("size-1.5 shrink-0 rounded-full bg-text-muted", state, className)} />;
+  return (
+    <span
+      aria-hidden
+      data-slot="link-pending"
+      className={cn(
+        "size-1.5 shrink-0 rounded-full bg-text-muted",
+        state,
+        className,
+      )}
+    />
+  );
 }
 
 /** The link's label text, dimmed instead: 1 → 0.55, pulsing to 0.35. Opacity only, so its box never moves. */
 export function LinkPendingLabel({ children }: { children: React.ReactNode }) {
   const { pending } = useLinkStatus();
-  return <span data-slot="link-pending-label" className={cn(pending && `${PENDING} opacity-55 fade-out-35`)}>{children}</span>;
+  return (
+    <span
+      data-slot="link-pending-label"
+      className={cn(pending && `${PENDING} opacity-55 fade-out-35`)}
+    >
+      {children}
+    </span>
+  );
 }

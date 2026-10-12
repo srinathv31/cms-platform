@@ -4,7 +4,8 @@ import type { JSONContent } from "../types";
 import type { Bag, Cx } from "./context";
 
 /** Words, runs of whitespace, runs of punctuation. A word may hold ' ’ . , - between letters or digits. */
-export const TOKEN = /[\p{L}\p{N}]+(?:['’.,-][\p{L}\p{N}]+)*|\s+|[^\p{L}\p{N}\s]+/gu;
+export const TOKEN =
+  /[\p{L}\p{N}]+(?:['’.,-][\p{L}\p{N}]+)*|\s+|[^\p{L}\p{N}\s]+/gu;
 export const WORDISH = /[\p{L}\p{N}]/u;
 
 /**
@@ -22,7 +23,9 @@ function bag(cx: Cx, node: JSONContent): Bag {
   };
   const walk = (x: JSONContent) => {
     if (x.type === "text") {
-      for (const piece of (typeof x.text === "string" ? x.text : "").match(TOKEN) ?? []) {
+      for (const piece of (typeof x.text === "string" ? x.text : "").match(
+        TOKEN,
+      ) ?? []) {
         if (WORDISH.test(piece)) add(piece.toLowerCase());
       }
     } else if (x.type === "variable") {
@@ -42,7 +45,8 @@ function dice(a: Bag, b: Bag): number {
   if (a.size + b.size === 0) return 1;
   const [small, large] = a.counts.size <= b.counts.size ? [a, b] : [b, a];
   let shared = 0;
-  for (const [token, count] of small.counts) shared += Math.min(count, large.counts.get(token) ?? 0);
+  for (const [token, count] of small.counts)
+    shared += Math.min(count, large.counts.get(token) ?? 0);
   return (2 * shared) / (a.size + b.size);
 }
 
@@ -57,6 +61,7 @@ export function rowSimilarity(cx: Cx, a: JSONContent, b: JSONContent): number {
   const width = Math.max(ac.length, bc.length);
   if (width === 0) return 1;
   let sum = 0;
-  for (let k = 0; k < Math.min(ac.length, bc.length); k++) sum += dice(bag(cx, ac[k]), bag(cx, bc[k]));
+  for (let k = 0; k < Math.min(ac.length, bc.length); k++)
+    sum += dice(bag(cx, ac[k]), bag(cx, bc[k]));
   return sum / width;
 }

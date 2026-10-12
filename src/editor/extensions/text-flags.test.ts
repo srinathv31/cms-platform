@@ -11,18 +11,42 @@ import { createFlagPopoverStore } from "../state/flag-popover";
 import { createVariableStore } from "../state/variable-store";
 import { destroyEditors, mountEditor, text } from "../testing/editor";
 import type { TextFlagger } from "../types";
-import { REFRESH_FLAGS, applyFlagFix, fieldText, flagAt, flagsOf, textFlagsKey } from "./text-flags";
+import {
+  REFRESH_FLAGS,
+  applyFlagFix,
+  fieldText,
+  flagAt,
+  flagsOf,
+  textFlagsKey,
+} from "./text-flags";
 
 afterEach(destroyEditors);
 
-const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
-const field = (...content: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content }] });
+const chip = (key: string): JSONContent => ({
+  type: "variable",
+  attrs: { key },
+});
+const field = (...content: JSONContent[]): JSONContent => ({
+  type: "doc",
+  content: [{ type: "paragraph", content }],
+});
 
 /** Flags every curly apostrophe, with ' as its fix, and every "bit.ly" with no fix. */
 const flagger: TextFlagger = (value) => {
   const flags = [];
-  for (const match of value.matchAll(/’/g)) flags.push({ from: match.index, to: match.index + 1, message: "’ isn't in the SMS character set.", replacement: "'" });
-  for (const match of value.matchAll(/bit\.ly/g)) flags.push({ from: match.index, to: match.index + 6, message: "bit.ly is a public link shortener." });
+  for (const match of value.matchAll(/’/g))
+    flags.push({
+      from: match.index,
+      to: match.index + 1,
+      message: "’ isn't in the SMS character set.",
+      replacement: "'",
+    });
+  for (const match of value.matchAll(/bit\.ly/g))
+    flags.push({
+      from: match.index,
+      to: match.index + 6,
+      message: "bit.ly is a public link shortener.",
+    });
   return flags;
 };
 
@@ -31,18 +55,37 @@ function setup(content: JSONContent, flags: TextFlagger | null = flagger) {
   let current = flags;
   const editor = mountEditor(content, {
     extensions: inlineFieldExtensions(
-      { store: createVariableStore([]), textFlags: { flagger: () => current, store } },
+      {
+        store: createVariableStore([]),
+        textFlags: { flagger: () => current, store },
+      },
       "lines",
     ),
   }) as Editor;
-  return { editor, store, setFlagger: (next: TextFlagger | null) => (current = next) };
+  return {
+    editor,
+    store,
+    setFlagger: (next: TextFlagger | null) => (current = next),
+  };
 }
 
-const flagged = (editor: Editor) => [...editor.view.dom.querySelectorAll(".ucomp-flag")].map((el) => el.textContent);
+const flagged = (editor: Editor) =>
+  [...editor.view.dom.querySelectorAll(".ucomp-flag")].map(
+    (el) => el.textContent,
+  );
 
 describe("fieldText", () => {
   it("reads chips as a space and hard breaks as a line break, with each character's position", () => {
-    const { editor } = setup(field(text("Hi "), chip("first_name"), text(", it’s"), { type: "hardBreak" }, text("ok")), null);
+    const { editor } = setup(
+      field(
+        text("Hi "),
+        chip("first_name"),
+        text(", it’s"),
+        { type: "hardBreak" },
+        text("ok"),
+      ),
+      null,
+    );
     const { text: value, starts } = fieldText(editor.state.doc);
     expect(value).toBe("Hi  , it’s\nok");
     // One paragraph: character i sits at position i + 1.
@@ -52,11 +95,22 @@ describe("fieldText", () => {
 
 describe("decorations", () => {
   it("underlines each flag where it sits, past chips and line breaks", () => {
-    const { editor } = setup(field(chip("first_name"), text(" it’s at bit.ly/x"), { type: "hardBreak" }, text("don’t")));
+    const { editor } = setup(
+      field(
+        chip("first_name"),
+        text(" it’s at bit.ly/x"),
+        { type: "hardBreak" },
+        text("don’t"),
+      ),
+    );
     expect(flagged(editor)).toEqual(["’", "bit.ly", "’"]);
     const flags = flagsOf(editor.state);
-    expect(editor.state.doc.textBetween(flags[0]!.from, flags[0]!.to)).toBe("’");
-    expect(editor.state.doc.textBetween(flags[2]!.from, flags[2]!.to)).toBe("’");
+    expect(editor.state.doc.textBetween(flags[0]!.from, flags[0]!.to)).toBe(
+      "’",
+    );
+    expect(editor.state.doc.textBetween(flags[2]!.from, flags[2]!.to)).toBe(
+      "’",
+    );
   });
 
   it("follows typing: a new flag is drawn, a fixed one goes", () => {
@@ -69,13 +123,31 @@ describe("decorations", () => {
   });
 
   it("marks a flag on text that draws nothing, so it still shows", () => {
-    const zeroWidth: TextFlagger = (value) => (value.includes("\u200B") ? [{ from: value.indexOf("\u200B"), to: value.indexOf("\u200B") + 1, message: "x", replacement: "" }] : []);
+    const zeroWidth: TextFlagger = (value) =>
+      value.includes("\u200B")
+        ? [
+            {
+              from: value.indexOf("\u200B"),
+              to: value.indexOf("\u200B") + 1,
+              message: "x",
+              replacement: "",
+            },
+          ]
+        : [];
     const { editor } = setup(field(text("a\u200Bb")), zeroWidth);
-    expect(editor.view.dom.querySelector(".ucomp-flag")?.hasAttribute("data-invisible")).toBe(true);
+    expect(
+      editor.view.dom
+        .querySelector(".ucomp-flag")
+        ?.hasAttribute("data-invisible"),
+    ).toBe(true);
   });
 
   it("drops a flag outside the text", () => {
-    const wild: TextFlagger = () => [{ from: 3, to: 99, message: "x" }, { from: -1, to: 1, message: "y" }, { from: 2, to: 2, message: "z" }];
+    const wild: TextFlagger = () => [
+      { from: 3, to: 99, message: "x" },
+      { from: -1, to: 1, message: "y" },
+      { from: 2, to: 2, message: "z" },
+    ];
     const { editor } = setup(field(text("abc")), wild);
     expect(flagsOf(editor.state)).toEqual([]);
   });
@@ -101,7 +173,17 @@ describe("the fix", () => {
   });
 
   it("an empty replacement removes the text", () => {
-    const remove: TextFlagger = (value) => (value.includes("\u200B") ? [{ from: value.indexOf("\u200B"), to: value.indexOf("\u200B") + 1, message: "x", replacement: "" }] : []);
+    const remove: TextFlagger = (value) =>
+      value.includes("\u200B")
+        ? [
+            {
+              from: value.indexOf("\u200B"),
+              to: value.indexOf("\u200B") + 1,
+              message: "x",
+              replacement: "",
+            },
+          ]
+        : [];
     const { editor } = setup(field(text("pay\u200Bnow")), remove);
     expect(applyFlagFix(editor.view, 0)).toBe(true);
     expect(editor.state.doc.textContent).toBe("paynow");
@@ -120,7 +202,12 @@ describe("the popover", () => {
   it("opens when the caret is moved onto a flag, and closes when it leaves", () => {
     const { editor, store } = setup(field(text("ab’cd")));
     editor.view.focus();
-    const at = (pos: number) => editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos)));
+    const at = (pos: number) =>
+      editor.view.dispatch(
+        editor.state.tr.setSelection(
+          TextSelection.create(editor.state.doc, pos),
+        ),
+      );
     at(1);
     expect(store.getState().index).toBeNull();
     at(4); // just after ’
@@ -131,7 +218,9 @@ describe("the popover", () => {
 
   it("says its sentence in a polite live region, since it never takes focus", () => {
     const { editor, store } = setup(field(text("ab’cd")));
-    const live = editor.view.dom.parentElement?.querySelector('[role="status"][aria-live="polite"]');
+    const live = editor.view.dom.parentElement?.querySelector(
+      '[role="status"][aria-live="polite"]',
+    );
     expect(live?.textContent).toBe("");
     store.getState().open(0);
     expect(live?.textContent).toBe("’ isn't in the SMS character set.");

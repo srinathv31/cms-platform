@@ -19,7 +19,12 @@ async function Queue({ params }: { params: TeamParams }) {
   const space = await requireSpaceFromParams(params);
   const queue = await getReviewQueue(space.slug);
   const nowDate = await now();
-  return <ReviewQueueTabs tabs={queueTabs(queue, space.slug, nowDate)} showTeam={space.isAll} />;
+  return (
+    <ReviewQueueTabs
+      tabs={queueTabs(queue, space.slug, nowDate)}
+      showTeam={space.isAll}
+    />
+  );
 }
 
 /** The review queue page: /{team}/review. The title is static; the list streams in under its skeleton. */

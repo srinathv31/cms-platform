@@ -40,7 +40,10 @@ export type Reader = Pick<Db, "select"> | Pick<Tx, "select">;
  * Memberships (any status) with their roles and the member's last sign-in, optionally narrowed
  * (`eq(memberships.teamId, …)`, `eq(memberships.userId, …)`). Ordered by id.
  */
-export async function loadMembershipFacts(r: Reader, where?: SQL): Promise<MembershipFacts[]> {
+export async function loadMembershipFacts(
+  r: Reader,
+  where?: SQL,
+): Promise<MembershipFacts[]> {
   const rows = await r
     .select({
       id: memberships.id,
@@ -62,14 +65,26 @@ export async function loadMembershipFacts(r: Reader, where?: SQL): Promise<Membe
   const roleRows = await r
     .select()
     .from(membershipRoles)
-    .where(inArray(membershipRoles.membershipId, rows.map((m) => m.id)));
+    .where(
+      inArray(
+        membershipRoles.membershipId,
+        rows.map((m) => m.id),
+      ),
+    );
   const rolesBy = new Map<string, TeamRole[]>();
-  for (const rr of roleRows) rolesBy.set(rr.membershipId, [...(rolesBy.get(rr.membershipId) ?? []), rr.role]);
+  for (const rr of roleRows)
+    rolesBy.set(rr.membershipId, [
+      ...(rolesBy.get(rr.membershipId) ?? []),
+      rr.role,
+    ]);
   return rows.map((m) => ({ ...m, roles: sortRoles(rolesBy.get(m.id) ?? []) }));
 }
 
 /** Recertifications with their items, optionally narrowed. Ordered by start, then id. */
-export async function loadRecertFacts(r: Reader, where?: SQL): Promise<RecertFacts[]> {
+export async function loadRecertFacts(
+  r: Reader,
+  where?: SQL,
+): Promise<RecertFacts[]> {
   const rows = await r
     .select()
     .from(recertifications)
@@ -79,7 +94,12 @@ export async function loadRecertFacts(r: Reader, where?: SQL): Promise<RecertFac
   const items = await r
     .select()
     .from(recertItems)
-    .where(inArray(recertItems.recertId, rows.map((x) => x.id)))
+    .where(
+      inArray(
+        recertItems.recertId,
+        rows.map((x) => x.id),
+      ),
+    )
     .orderBy(recertItems.userId);
   return rows.map((x) => ({
     id: x.id,
@@ -90,21 +110,39 @@ export async function loadRecertFacts(r: Reader, where?: SQL): Promise<RecertFac
     completedAt: x.completedAt,
     items: items
       .filter((i) => i.recertId === x.id)
-      .map((i) => ({ userId: i.userId, decision: i.decision, decidedBy: i.decidedBy, decidedAt: i.decidedAt })),
+      .map((i) => ({
+        userId: i.userId,
+        decision: i.decision,
+        decidedBy: i.decidedBy,
+        decidedAt: i.decidedAt,
+      })),
   }));
 }
 
 /** Access requests, optionally narrowed. Oldest first. */
-export async function loadRequestFacts(r: Reader, where?: SQL): Promise<AccessRequestFacts[]> {
-  return r.select().from(accessRequests).where(where).orderBy(accessRequests.createdAt, accessRequests.id);
+export async function loadRequestFacts(
+  r: Reader,
+  where?: SQL,
+): Promise<AccessRequestFacts[]> {
+  return r
+    .select()
+    .from(accessRequests)
+    .where(where)
+    .orderBy(accessRequests.createdAt, accessRequests.id);
 }
 
 export async function loadTeamsNamed(r: Reader): Promise<Named[]> {
-  return r.select({ id: teams.id, name: teams.name }).from(teams).orderBy(teams.name);
+  return r
+    .select({ id: teams.id, name: teams.name })
+    .from(teams)
+    .orderBy(teams.name);
 }
 
 export async function loadPeopleNamed(r: Reader): Promise<Named[]> {
-  return r.select({ id: users.id, name: users.name }).from(users).orderBy(users.id);
+  return r
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .orderBy(users.id);
 }
 
 /** Everything `sweepAccess` reads: every membership, the open reviews, team and people names. */
@@ -121,16 +159,28 @@ export async function loadSweepInput(r: Reader, at: Date): Promise<SweepInput> {
 // ── The sweep ─────────────────────────────────────────────────
 
 const isEmpty = (r: SweepResult) =>
-  r.membershipChanges.length === 0 && r.recertsClosed.length === 0 && r.effects.length === 0;
+  r.membershipChanges.length === 0 &&
+  r.recertsClosed.length === 0 &&
+  r.effects.length === 0;
 
 /** Writes a sweep's result inside the caller's transaction: memberships, closed reviews, then effects. */
-export async function applySweep(tx: Tx, result: SweepResult, at: Date): Promise<void> {
-  for (const change of result.membershipChanges) await applyMembershipChange(tx, change);
+export async function applySweep(
+  tx: Tx,
+  result: SweepResult,
+  at: Date,
+): Promise<void> {
+  for (const change of result.membershipChanges)
+    await applyMembershipChange(tx, change);
   for (const closed of result.recertsClosed) {
     await tx
       .update(recertifications)
       .set({ completedAt: closed.completedAt })
-      .where(and(eq(recertifications.id, closed.id), isNull(recertifications.completedAt)));
+      .where(
+        and(
+          eq(recertifications.id, closed.id),
+          isNull(recertifications.completedAt),
+        ),
+      );
   }
   // Team Admin recipients are read after the changes: nobody whose access just ended is told.
   await writeAccessEffects(tx, result.effects, { now: at, actorId: null });

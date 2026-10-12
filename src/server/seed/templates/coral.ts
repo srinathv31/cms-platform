@@ -10,9 +10,15 @@ import type { SeedTemplate } from "./types";
 // alerts are in coral-alerts.ts.
 // Times are days before the reset.
 
-const CUSTOMER_KEYS: VarKey[] = ["first_name", "last_name", "purchase_apr", "home_state"];
+const CUSTOMER_KEYS: VarKey[] = [
+  "first_name",
+  "last_name",
+  "purchase_apr",
+  "home_state",
+];
 const ISSUER = "Coral Bank, N.A. Member FDIC. Credit approval required.";
-const STATE_TERMS = "State-specific terms for {home_state} residents are in your cardmember agreement.";
+const STATE_TERMS =
+  "State-specific terms for {home_state} residents are in your cardmember agreement.";
 
 const addedEndDate: ContractChange = {
   kind: "added",
@@ -23,7 +29,8 @@ const addedEndDate: ContractChange = {
 };
 
 /** Cash Back v3's change request: round 1 said a fee applies, not when it starts. */
-const CASH_BACK_V3_REASON = "Say when the annual fee starts. \"An annual fee applies\" isn't enough.";
+const CASH_BACK_V3_REASON =
+  'Say when the annual fee starts. "An annual fee applies" isn\'t enough.';
 /** Annual Fee Waiver v1's change request. */
 const WAIVER_V1_REASON =
   "The waiver isn't automatic. It depends on a first purchase within 30 days. Restate the eligibility rule and re-check the rates table.";
@@ -37,7 +44,14 @@ function balanceTransferBody(version: 1 | 2) {
         "intro",
         `Hi {first_name}, move a balance from another card to your Coral account within 60 days of opening it and pay 0% intro APR on that balance for ${version === 1 ? 12 : 15} months. After the intro period, your purchase APR of {purchase_apr} applies to any remaining balance.`,
       ),
-      ...(version === 2 ? [p("end_date", "Open your account by {offer_end_date} to qualify for this offer.")] : []),
+      ...(version === 2
+        ? [
+            p(
+              "end_date",
+              "Open your account by {offer_end_date} to qualify for this offer.",
+            ),
+          ]
+        : []),
       ul("eligibility", [
         "Transfers must be requested within 60 days of account opening.",
         "Balances from other Coral accounts are not eligible.",
@@ -49,7 +63,10 @@ function balanceTransferBody(version: 1 | 2) {
         "rates_table",
         ["Rate or fee", "What you pay"],
         [
-          ["Intro APR on balance transfers", `0% for ${version === 1 ? 12 : 15} months`],
+          [
+            "Intro APR on balance transfers",
+            `0% for ${version === 1 ? 12 : 15} months`,
+          ],
           ["Purchase APR after the intro period", "{purchase_apr}"],
           ["Balance transfer fee", "3% of each transfer, $5 minimum"],
           ["Annual fee", "$0"],
@@ -76,7 +93,14 @@ function cashBackBody(version: 1 | 2 | 3, round: 1 | 2 = 2) {
         "intro",
         "Hi {first_name}, spend $1,000 on purchases in your first 3 months and earn a $200 statement credit. Your purchase APR is {purchase_apr}.",
       ),
-      ...(version >= 2 ? [p("end_date", "Open your account by {offer_end_date} to qualify for this offer.")] : []),
+      ...(version >= 2
+        ? [
+            p(
+              "end_date",
+              "Open your account by {offer_end_date} to qualify for this offer.",
+            ),
+          ]
+        : []),
       ul("how_it_works", [
         "Purchases must post within 3 months of account opening.",
         "Cash advances, balance transfers and fees don't count toward the spend requirement.",
@@ -94,7 +118,11 @@ function cashBackBody(version: 1 | 2 | 3, round: 1 | 2 = 2) {
           ["Foreign transaction fee", "None"],
           [
             "Annual fee",
-            version !== 3 ? "$0" : feeStarts ? "$0 the first year, then {annual_fee} per year" : "{annual_fee} per year",
+            version !== 3
+              ? "$0"
+              : feeStarts
+                ? "$0 the first year, then {annual_fee} per year"
+                : "{annual_fee} per year",
           ],
         ],
       ),
@@ -111,7 +139,10 @@ function cashBackBody(version: 1 | 2 | 3, round: 1 | 2 = 2) {
     ],
     legal: [
       p("state_terms", STATE_TERMS),
-      callout("tax_callout", "The statement credit may be taxable. Talk to a tax advisor about your situation."),
+      callout(
+        "tax_callout",
+        "The statement credit may be taxable. Talk to a tax advisor about your situation.",
+      ),
       p("issuer", ISSUER),
     ],
   });
@@ -124,7 +155,10 @@ function annualFeeWaiverBody(version: "v1" | "draft") {
         "intro",
         "Hi {first_name}, open a Coral card and make your first purchase within 30 days to have your annual fee waived for the first year.",
       ),
-      p("waiver_terms", "The waiver is automatic. You don't need to enroll or contact us."),
+      p(
+        "waiver_terms",
+        "The waiver is automatic. You don't need to enroll or contact us.",
+      ),
       p(
         "anniversary",
         version === "v1"
@@ -138,7 +172,10 @@ function annualFeeWaiverBody(version: "v1" | "draft") {
         ["Rate or fee", "What you pay"],
         [
           ["Annual fee, first year", "$0 (waived)"],
-          ["Annual fee after the first year", "As stated in your cardmember agreement"],
+          [
+            "Annual fee after the first year",
+            "As stated in your cardmember agreement",
+          ],
           ["Purchase APR", "{purchase_apr}"],
         ],
       ),
@@ -193,7 +230,10 @@ function holidayPointsBody(version: 1 | 2) {
 function rateChangeBody() {
   return disclosure("rate-change-notice", {
     offer: [
-      p("notice_for", "Notice of change in terms for {first_name} {last_name}."),
+      p(
+        "notice_for",
+        "Notice of change in terms for {first_name} {last_name}.",
+      ),
       p(
         "intro",
         "Hi {first_name}, the purchase APR on your Coral account is changing. Your new purchase APR is {purchase_apr}, effective {effective_date}.",
@@ -255,7 +295,14 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "priya",
           submittedAt: 152,
           submitNote: "First version of the balance transfer intro terms.",
-          approvals: [{ actor: "jordan", decision: "approved", at: 150, seen: ["typical", "long", "minimum"] }],
+          approvals: [
+            {
+              actor: "jordan",
+              decision: "approved",
+              at: 150,
+              seen: ["typical", "long", "minimum"],
+            },
+          ],
           activatedAt: 150,
           supersededAt: 47.5,
           sunset: { inDays: 21, setBy: "jordan", setAt: 2.2 },
@@ -274,8 +321,16 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           createdAt: 55,
           submittedBy: "priya",
           submittedAt: 50,
-          submitNote: "Extends the intro period to 15 months and adds an offer end date.",
-          approvals: [{ actor: "jordan", decision: "approved", at: 47.5, seen: ["typical", "long"] }],
+          submitNote:
+            "Extends the intro period to 15 months and adds an offer end date.",
+          approvals: [
+            {
+              actor: "jordan",
+              decision: "approved",
+              at: 47.5,
+              seen: ["typical", "long"],
+            },
+          ],
           activatedAt: 47.5,
         },
       ],
@@ -285,8 +340,16 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           block: "intro",
           quote: "pay 0% intro APR on that balance for 15 months",
           comments: [
-            { author: "jordan", body: "Confirm 15 months matches the product sheet before this goes out.", at: 49.2 },
-            { author: "priya", body: "Confirmed with Product. The sheet says 15 months.", at: 48.8 },
+            {
+              author: "jordan",
+              body: "Confirm 15 months matches the product sheet before this goes out.",
+              at: 49.2,
+            },
+            {
+              author: "priya",
+              body: "Confirmed with Product. The sheet says 15 months.",
+              at: 48.8,
+            },
           ],
           resolved: { by: "priya", at: 48.7 },
         },
@@ -315,7 +378,14 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "maya",
           submittedAt: 205,
           submitNote: "Welcome bonus terms for the cash back card.",
-          approvals: [{ actor: "alex", decision: "approved", at: 203, seen: ["typical", "long", "minimum"] }],
+          approvals: [
+            {
+              actor: "alex",
+              decision: "approved",
+              at: 203,
+              seen: ["typical", "long", "minimum"],
+            },
+          ],
           activatedAt: 203,
           supersededAt: 86.5,
         },
@@ -334,7 +404,14 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "maya",
           submittedAt: 88,
           submitNote: "Adds an offer end date.",
-          approvals: [{ actor: "jordan", decision: "approved", at: 86.5, seen: ["typical", "long"] }],
+          approvals: [
+            {
+              actor: "jordan",
+              decision: "approved",
+              at: 86.5,
+              seen: ["typical", "long"],
+            },
+          ],
           activatedAt: 86.5,
         },
         {
@@ -344,17 +421,36 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           state: "changes_requested",
           basedOn: "v2",
           body: cashBackBody(3, 1),
-          variables: vars.list([...CUSTOMER_KEYS, "offer_end_date", "annual_fee"]),
+          variables: vars.list([
+            ...CUSTOMER_KEYS,
+            "offer_end_date",
+            "annual_fee",
+          ]),
           channels: ["pdf", "web"],
           contractChanges: [
-            { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+            {
+              kind: "added",
+              key: "annual_fee",
+              breaking: true,
+              type: "currency",
+              required: true,
+            },
           ],
           createdBy: "maya",
           createdAt: 5,
           submittedBy: "maya",
           submittedAt: 3.2,
-          submitNote: "Product added an annual fee. Rates table and copy updated.",
-          approvals: [{ actor: "jordan", decision: "changes_requested", reason: CASH_BACK_V3_REASON, at: 2.6, seen: ["typical"] }],
+          submitNote:
+            "Product added an annual fee. Rates table and copy updated.",
+          approvals: [
+            {
+              actor: "jordan",
+              decision: "changes_requested",
+              reason: CASH_BACK_V3_REASON,
+              at: 2.6,
+              seen: ["typical"],
+            },
+          ],
         },
         {
           ref: "v3",
@@ -363,17 +459,28 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           state: "in_review",
           basedOn: "v3r1",
           body: cashBackBody(3),
-          variables: vars.list([...CUSTOMER_KEYS, "offer_end_date", "annual_fee"]),
+          variables: vars.list([
+            ...CUSTOMER_KEYS,
+            "offer_end_date",
+            "annual_fee",
+          ]),
           channels: ["pdf", "web"],
           contractChanges: [
-            { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+            {
+              kind: "added",
+              key: "annual_fee",
+              breaking: true,
+              type: "currency",
+              required: true,
+            },
           ],
           createdBy: "maya",
           createdAt: 2.6,
           editSessions: 3,
           submittedBy: "maya",
           submittedAt: 0.9,
-          submitNote: "Product confirmed an annual fee after the first year. Rates table and copy updated.",
+          submitNote:
+            "Product confirmed an annual fee after the first year. Rates table and copy updated.",
         },
       ],
       threads: [
@@ -381,7 +488,14 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           // The change request that sent round 1 back, answered by submitting round 2.
           origin: "v3r1",
           block: DOCUMENT_THREAD,
-          comments: [{ author: "jordan", kind: "change_request", body: CASH_BACK_V3_REASON, at: 2.6 }],
+          comments: [
+            {
+              author: "jordan",
+              kind: "change_request",
+              body: CASH_BACK_V3_REASON,
+              at: 2.6,
+            },
+          ],
           resolved: { by: "maya", at: 0.9 },
         },
       ],
@@ -408,7 +522,15 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "maya",
           submittedAt: 4.5,
           submitNote: "Waiver for new accounts, first year only.",
-          approvals: [{ actor: "jordan", decision: "changes_requested", reason: WAIVER_V1_REASON, at: 3.9, seen: ["typical"] }],
+          approvals: [
+            {
+              actor: "jordan",
+              decision: "changes_requested",
+              reason: WAIVER_V1_REASON,
+              at: 3.9,
+              seen: ["typical"],
+            },
+          ],
         },
         {
           ref: "draft",
@@ -433,10 +555,14 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           comments: [
             {
               author: "jordan",
-              body: "Say \"first account anniversary\" instead of \"first year\". A year is ambiguous for accounts opened mid-month.",
+              body: 'Say "first account anniversary" instead of "first year". A year is ambiguous for accounts opened mid-month.',
               at: 4.1,
             },
-            { author: "maya", body: "Done. The new draft says \"first account anniversary\".", at: 3.5 },
+            {
+              author: "maya",
+              body: 'Done. The new draft says "first account anniversary".',
+              at: 3.5,
+            },
           ],
           resolved: { by: "maya", at: 3.4 },
         },
@@ -445,7 +571,12 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           origin: "v1",
           block: DOCUMENT_THREAD,
           comments: [
-            { author: "jordan", kind: "change_request", body: WAIVER_V1_REASON, at: 3.9 },
+            {
+              author: "jordan",
+              kind: "change_request",
+              body: WAIVER_V1_REASON,
+              at: 3.9,
+            },
             {
               author: "maya",
               body: "Understood. I'm rewording the eligibility rule and will resubmit once Product confirms the 30-day window.",
@@ -470,14 +601,23 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           number: 1,
           state: "revoked",
           body: holidayPointsBody(1),
-          variables: vars.list(CUSTOMER_KEYS, { purchase_apr: { label: "APR" } }),
+          variables: vars.list(CUSTOMER_KEYS, {
+            purchase_apr: { label: "APR" },
+          }),
           channels: ["pdf", "web"],
           createdBy: "priya",
           createdAt: 175,
           submittedBy: "priya",
           submittedAt: 170,
           submitNote: "Holiday bonus points promotion.",
-          approvals: [{ actor: "jordan", decision: "approved", at: 168.5, seen: ["typical", "long"] }],
+          approvals: [
+            {
+              actor: "jordan",
+              decision: "approved",
+              at: 168.5,
+              seen: ["typical", "long"],
+            },
+          ],
           activatedAt: 168.5,
           supersededAt: 35,
           revoke: {
@@ -498,7 +638,13 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           variables: customer,
           channels: ["pdf", "web"],
           contractChanges: [
-            { kind: "label_changed", key: "purchase_apr", breaking: false, from: "APR", to: "Purchase APR" },
+            {
+              kind: "label_changed",
+              key: "purchase_apr",
+              breaking: false,
+              from: "APR",
+              to: "Purchase APR",
+            },
           ],
           createdBy: "priya",
           createdAt: 36,
@@ -506,7 +652,9 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "priya",
           submittedAt: 35.6,
           submitNote: "Corrects the bonus from 25,000 to 20,000 points.",
-          approvals: [{ actor: "alex", decision: "approved", at: 35, seen: ["typical"] }],
+          approvals: [
+            { actor: "alex", decision: "approved", at: 35, seen: ["typical"] },
+          ],
           activatedAt: 35,
         },
       ],
@@ -531,8 +679,12 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           channels: ["pdf", "web", "email"],
           channelFields: {
             email: {
-              subject: inlineDoc("Your purchase APR is changing on {effective_date}"),
-              preheader: inlineDoc("Hi {first_name}, here is what is changing on your Coral account."),
+              subject: inlineDoc(
+                "Your purchase APR is changing on {effective_date}",
+              ),
+              preheader: inlineDoc(
+                "Hi {first_name}, here is what is changing on your Coral account.",
+              ),
             },
           },
           createdBy: "maya",
@@ -540,7 +692,14 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           submittedBy: "maya",
           submittedAt: 128,
           submitNote: "Started from the Rate change notice starter.",
-          approvals: [{ actor: "alex", decision: "approved", at: 127, seen: ["typical", "long", "minimum"] }],
+          approvals: [
+            {
+              actor: "alex",
+              decision: "approved",
+              at: 127,
+              seen: ["typical", "long", "minimum"],
+            },
+          ],
           activatedAt: 127,
         },
       ],

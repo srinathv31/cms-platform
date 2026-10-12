@@ -18,14 +18,20 @@ vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
 const ids = seededDatabasePerTest({ base: env.now });
 
-
 const CORAL = { "X-Consumer-Id": "coral" };
 
 function get(query: string, headers: Record<string, string> = CORAL) {
-  return GET(new NextRequest(`http://localhost/api/v1/templates${query}`, { headers }));
+  return GET(
+    new NextRequest(`http://localhost/api/v1/templates${query}`, { headers }),
+  );
 }
 
-async function expectError(res: Response, status: number, code: string, message: string) {
+async function expectError(
+  res: Response,
+  status: number,
+  code: string,
+  message: string,
+) {
   expect(res.status).toBe(status);
   expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
   expect(res.headers.get("Cache-Control")).toBe("no-store");
@@ -37,7 +43,10 @@ async function expectError(res: Response, status: number, code: string, message:
 
 describe("GET /api/v1/templates", () => {
   it("200: the query (trimmed), the demo clock and the results, with the API headers", async () => {
-    const res = await get("?q=%20Balance%20&limit=5", { ...CORAL, "X-Correlation-Id": "search-1" });
+    const res = await get("?q=%20Balance%20&limit=5", {
+      ...CORAL,
+      "X-Correlation-Id": "search-1",
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
@@ -59,7 +68,9 @@ describe("GET /api/v1/templates", () => {
   });
 
   it("limit cuts the list into pages; following nextCursor reads every result once, in order", async () => {
-    const all = ((await (await get("?limit=50")).json()) as ApiTemplateSearch).results.map((r) => r.id);
+    const all = (
+      (await (await get("?limit=50")).json()) as ApiTemplateSearch
+    ).results.map((r) => r.id);
     expect(all.length).toBeGreaterThan(2);
     const first = (await (await get("?limit=2")).json()) as ApiTemplateSearch;
     expect(first.results).toHaveLength(2);
@@ -69,7 +80,9 @@ describe("GET /api/v1/templates", () => {
     let after = "";
     for (let pages = 0; ; pages++) {
       expect(pages, "the search ends").toBeLessThan(100);
-      const page = (await (await get(`?limit=2${after ? `&after=${after}` : ""}`)).json()) as ApiTemplateSearch;
+      const page = (await (
+        await get(`?limit=2${after ? `&after=${after}` : ""}`)
+      ).json()) as ApiTemplateSearch;
       expect(page.results.length).toBeLessThanOrEqual(2);
       seen.push(...page.results.map((r) => r.id));
       if (!page.hasMore) break;
@@ -79,31 +92,68 @@ describe("GET /api/v1/templates", () => {
   });
 
   it("a query's cursor pages that query: q matches in any case, and the last page says no more", async () => {
-    const page1 = (await (await get("?q=rate&limit=1")).json()) as ApiTemplateSearch;
-    const page2 = (await (await get(`?q=RATE&limit=50&after=${page1.nextCursor}`)).json()) as ApiTemplateSearch;
-    const all = ((await (await get("?q=rate&limit=50")).json()) as ApiTemplateSearch).results.map((r) => r.id);
+    const page1 = (await (
+      await get("?q=rate&limit=1")
+    ).json()) as ApiTemplateSearch;
+    const page2 = (await (
+      await get(`?q=RATE&limit=50&after=${page1.nextCursor}`)
+    ).json()) as ApiTemplateSearch;
+    const all = (
+      (await (await get("?q=rate&limit=50")).json()) as ApiTemplateSearch
+    ).results.map((r) => r.id);
     expect([...page1.results, ...page2.results].map((r) => r.id)).toEqual(all);
     expect(page2.hasMore).toBe(false);
     expect(page2.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
   it("400 bad_request for an after that isn't a cursor of this search", async () => {
-    const message = "after must be the nextCursor of an earlier page of this list.";
-    const rate = ((await (await get("?q=rate&limit=1")).json()) as ApiTemplateSearch).nextCursor;
-    await expectError(await get(`?q=balance&after=${rate}`), 400, "bad_request", message);
-    await expectError(await get("?after=not-a-cursor!"), 400, "bad_request", message);
+    const message =
+      "after must be the nextCursor of an earlier page of this list.";
+    const rate = (
+      (await (await get("?q=rate&limit=1")).json()) as ApiTemplateSearch
+    ).nextCursor;
+    await expectError(
+      await get(`?q=balance&after=${rate}`),
+      400,
+      "bad_request",
+      message,
+    );
+    await expectError(
+      await get("?after=not-a-cursor!"),
+      400,
+      "bad_request",
+      message,
+    );
     await expectError(await get("?after=e30"), 400, "bad_request", message);
   });
 
   it("400 consumer_required without X-Consumer-Id", async () => {
-    await expectError(await get("", {}), 400, "consumer_required", "X-Consumer-Id is required.");
+    await expectError(
+      await get("", {}),
+      400,
+      "consumer_required",
+      "X-Consumer-Id is required.",
+    );
   });
 
   it("403 unknown_consumer for an unregistered consumer", async () => {
-    await expectError(await get("", { "X-Consumer-Id": "acme" }), 403, "unknown_consumer", 'Consumer "acme" isn\'t registered.');
+    await expectError(
+      await get("", { "X-Consumer-Id": "acme" }),
+      403,
+      "unknown_consumer",
+      'Consumer "acme" isn\'t registered.',
+    );
   });
 
-  it.each(["0", "51", "ten", "1.5"])("400 bad_request for limit=%s", async (limit) => {
-    await expectError(await get(`?limit=${limit}`), 400, "bad_request", "limit must be a number from 1 to 50.");
-  });
+  it.each(["0", "51", "ten", "1.5"])(
+    "400 bad_request for limit=%s",
+    async (limit) => {
+      await expectError(
+        await get(`?limit=${limit}`),
+        400,
+        "bad_request",
+        "limit must be a number from 1 to 50.",
+      );
+    },
+  );
 });

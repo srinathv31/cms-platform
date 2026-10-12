@@ -49,8 +49,12 @@ export function ProfileMenu({
         <div className="flex items-center gap-3 px-2.5 pt-2 pb-3">
           <UserAvatar initials={me.initials} hue={me.hue} size="lg" />
           <div className="min-w-0">
-            <div className="truncate text-[15px] leading-5 font-medium">{me.name}</div>
-            <div className="truncate text-[13px] leading-[18px] text-text-muted">{me.summary}</div>
+            <div className="truncate text-[15px] leading-5 font-medium">
+              {me.name}
+            </div>
+            <div className="truncate text-[13px] leading-[18px] text-text-muted">
+              {me.summary}
+            </div>
           </div>
         </div>
         {canRequestAccess ? (
@@ -60,7 +64,11 @@ export function ProfileMenu({
               render={<Link href="/request-access" />}
               className="gap-3 rounded-lg px-2.5 py-2 text-[14px] font-medium"
             >
-              <UserPlus aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-[18px] text-text-muted" />
+              <UserPlus
+                aria-hidden
+                strokeWidth={NAV_ICON_STROKE}
+                className="size-[18px] text-text-muted"
+              />
               Request access
             </DropdownMenuItem>
           </>
@@ -86,7 +94,9 @@ export function ProfileMenu({
               >
                 <UserAvatar initials={p.initials} hue={p.hue} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] leading-5 font-medium">{p.name}</span>
+                  <span className="block truncate text-[14px] leading-5 font-medium">
+                    {p.name}
+                  </span>
                   <span className="block truncate text-[12.5px] leading-[18px] text-text-muted">
                     {p.summary}
                   </span>

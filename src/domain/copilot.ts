@@ -9,7 +9,13 @@ import { TYPE_META } from "@/editor/model/variables";
 import type { CopilotPrompt, CopilotPromptInput } from "./import-types";
 import { UNTITLED_TEMPLATE_NAME } from "./lifecycle/drafts";
 import { REQUEST_REFUSALS } from "./refusals";
-import { CHANNELS, type Channel, type ChannelFamily, type JSONContent, type RequiredSection } from "./types";
+import {
+  CHANNELS,
+  type Channel,
+  type ChannelFamily,
+  type JSONContent,
+  type RequiredSection,
+} from "./types";
 
 /**
  * How the prompt names a channel. Copilot writes a document's body, so only a document's channels
@@ -29,7 +35,9 @@ const CHANNEL_NAMES: Record<Channel, string> = {
  * disabled with this reason, and the prompt's read refuses with it.
  */
 export function copilotUnavailable(family: ChannelFamily): string | null {
-  return family === "document" ? null : REQUEST_REFUSALS.copilotDocumentsOnly.reason;
+  return family === "document"
+    ? null
+    : REQUEST_REFUSALS.copilotDocumentsOnly.reason;
 }
 
 /** "a", "a and b", "a, b and c" (the product's lists). */
@@ -58,10 +66,17 @@ function runOf(node: JSONContent): Run | null {
   const marks: Mark[] = node.marks ?? [];
   const has = (type: string) => marks.some((mark) => mark.type === type);
   const link = marks.find((mark) => mark.type === "link");
-  const base = { bold: has("bold"), italic: has("italic"), href: typeof link?.attrs?.href === "string" ? link.attrs.href : null };
-  if (node.type === "text") return { text: escapeText(node.text ?? ""), ...base };
-  if (node.type === "variable" && typeof node.attrs?.key === "string") return { text: `{{${node.attrs.key}}}`, ...base };
-  if (node.type === "hardBreak") return { text: "\\\n", bold: false, italic: false, href: null };
+  const base = {
+    bold: has("bold"),
+    italic: has("italic"),
+    href: typeof link?.attrs?.href === "string" ? link.attrs.href : null,
+  };
+  if (node.type === "text")
+    return { text: escapeText(node.text ?? ""), ...base };
+  if (node.type === "variable" && typeof node.attrs?.key === "string")
+    return { text: `{{${node.attrs.key}}}`, ...base };
+  if (node.type === "hardBreak")
+    return { text: "\\\n", bold: false, italic: false, href: null };
   return null;
 }
 
@@ -79,7 +94,13 @@ function inlineMarkdown(content: JSONContent[] | undefined): string {
     if (!run) continue;
     const last = runs.at(-1);
     // Neighbours with the same marks read as one run.
-    if (last && last.bold === run.bold && last.italic === run.italic && last.href === run.href) last.text += run.text;
+    if (
+      last &&
+      last.bold === run.bold &&
+      last.italic === run.italic &&
+      last.href === run.href
+    )
+      last.text += run.text;
     else runs.push(run);
   }
   return runs
@@ -103,12 +124,19 @@ function cellText(cell: JSONContent): string {
 }
 
 function tableMarkdown(table: JSONContent): string[] {
-  const rows = (table.content ?? []).map((row) => (row.content ?? []).map(cellText));
+  const rows = (table.content ?? []).map((row) =>
+    (row.content ?? []).map(cellText),
+  );
   if (!rows.length) return [];
   const width = Math.max(...rows.map((row) => row.length));
-  const line = (cells: string[]) => `| ${Array.from({ length: width }, (_, i) => cells[i] ?? "").join(" | ")} |`;
+  const line = (cells: string[]) =>
+    `| ${Array.from({ length: width }, (_, i) => cells[i] ?? "").join(" | ")} |`;
   // Markdown needs a header row: the first row is it (the editor marks header cells there too).
-  return [line(rows[0]), line(Array.from({ length: width }, () => "---")), ...rows.slice(1).map(line)];
+  return [
+    line(rows[0]),
+    line(Array.from({ length: width }, () => "---")),
+    ...rows.slice(1).map(line),
+  ];
 }
 
 function listMarkdown(list: JSONContent, indent: string): string[] {
@@ -124,7 +152,10 @@ function listMarkdown(list: JSONContent, indent: string): string[] {
         lines.push(...listMarkdown(block, inner));
         continue;
       }
-      const text = inlineMarkdown(block.content).replace(/\\\n/g, `\\\n${inner}`);
+      const text = inlineMarkdown(block.content).replace(
+        /\\\n/g,
+        `\\\n${inner}`,
+      );
       lines.push(first ? `${indent}${marker} ${text}` : `${inner}${text}`);
       first = false;
     }
@@ -155,7 +186,9 @@ function blockMarkdown(block: JSONContent): string[] | null {
       return ["---"];
     case "callout": {
       // A callout has no Markdown of its own: its paragraphs.
-      const lines = (block.content ?? []).flatMap((child) => blockMarkdown(child) ?? []);
+      const lines = (block.content ?? []).flatMap(
+        (child) => blockMarkdown(child) ?? [],
+      );
       return lines.length ? lines : null;
     }
     default:
@@ -179,8 +212,13 @@ export function documentToMarkdown(body: JSONContent): string {
 /** True when the body has text or chips outside its required headings (a draft to improve). */
 function hasDraftText(body: JSONContent): boolean {
   const filled = (node: JSONContent): boolean =>
-    (node.type === "text" && !!node.text?.trim()) || node.type === "variable" || (node.content ?? []).some(filled);
-  return (body.content ?? []).some((block) => !(block.type === "heading" && block.attrs?.requiredKey) && filled(block));
+    (node.type === "text" && !!node.text?.trim()) ||
+    node.type === "variable" ||
+    (node.content ?? []).some(filled);
+  return (body.content ?? []).some(
+    (block) =>
+      !(block.type === "heading" && block.attrs?.requiredKey) && filled(block),
+  );
 }
 
 // ── The prompt ───────────────────────────────────────────────────
@@ -198,12 +236,22 @@ function plainText(node: JSONContent): string {
  * type that the draft lacks, or whose heading is empty, falls back to the content type's title; a
  * missing one goes after the section that precedes it in the content type.
  */
-export function promptSections(body: JSONContent, typeSections: readonly RequiredSection[]): RequiredSection[] {
-  const typeTitle = new Map(typeSections.map((section) => [section.key, section.title]));
+export function promptSections(
+  body: JSONContent,
+  typeSections: readonly RequiredSection[],
+): RequiredSection[] {
+  const typeTitle = new Map(
+    typeSections.map((section) => [section.key, section.title]),
+  );
   const sections: RequiredSection[] = [];
   for (const block of body.content ?? []) {
     const key = block.type === "heading" ? block.attrs?.requiredKey : null;
-    if (typeof key !== "string" || key === "" || sections.some((section) => section.key === key)) continue;
+    if (
+      typeof key !== "string" ||
+      key === "" ||
+      sections.some((section) => section.key === key)
+    )
+      continue;
     const title = plainText(block).replace(/\s+/g, " ").trim();
     const fallback = typeTitle.get(key);
     if (title || fallback) sections.push({ key, title: title || fallback! });
@@ -239,27 +287,44 @@ function opensWithHeading(body: JSONContent): boolean {
  */
 export function buildCopilotPrompt(input: CopilotPromptInput): CopilotPrompt {
   const kind = input.contentTypeName.toLowerCase();
-  const channels = CHANNELS.filter((channel) => input.channels.includes(channel)).map((channel) => CHANNEL_NAMES[channel]);
+  const channels = CHANNELS.filter((channel) =>
+    input.channels.includes(channel),
+  ).map((channel) => CHANNEL_NAMES[channel]);
   const includesDraft = hasDraftText(input.body);
-  const named = input.templateName.trim() !== "" && input.templateName.trim() !== UNTITLED_TEMPLATE_NAME;
+  const named =
+    input.templateName.trim() !== "" &&
+    input.templateName.trim() !== UNTITLED_TEMPLATE_NAME;
 
-  const lines: string[] = [`Help me write the body of a ${kind} for ${input.teamName}.`, ""];
+  const lines: string[] = [
+    `Help me write the body of a ${kind} for ${input.teamName}.`,
+    "",
+  ];
   if (named) lines.push(`Template: ${input.templateName}`);
-  lines.push(`Team: ${input.teamName}`, `Content type: ${input.contentTypeName}`);
+  lines.push(
+    `Team: ${input.teamName}`,
+    `Content type: ${input.contentTypeName}`,
+  );
   if (channels.length) lines.push(`Published as: ${andList(channels)}`);
 
   const sections = promptSections(input.body, input.requiredSections);
   if (sections.length) {
-    lines.push("", "Use these section headings, exactly as written and in this order:");
+    lines.push(
+      "",
+      "Use these section headings, exactly as written and in this order:",
+    );
     for (const section of sections) lines.push(`## ${section.title}`);
   }
 
   lines.push("");
   if (input.variables.length) {
-    lines.push("Placeholders for customer-specific values (write each exactly as shown, double braces included):");
+    lines.push(
+      "Placeholders for customer-specific values (write each exactly as shown, double braces included):",
+    );
     for (const variable of input.variables) {
       const need = variable.required ? "required" : "optional";
-      lines.push(`- {{${variable.key}}}: ${variable.label} (${TYPE_META[variable.type].label}, ${need})`);
+      lines.push(
+        `- {{${variable.key}}}: ${variable.label} (${TYPE_META[variable.type].label}, ${need})`,
+      );
     }
   } else {
     lines.push("There are no placeholders yet.");
@@ -281,7 +346,8 @@ export function buildCopilotPrompt(input: CopilotPromptInput): CopilotPrompt {
     "",
   );
 
-  if (includesDraft) lines.push("Improve this draft:", "", documentToMarkdown(input.body));
+  if (includesDraft)
+    lines.push("Improve this draft:", "", documentToMarkdown(input.body));
   else lines.push("Write the body now.");
 
   return { text: lines.join("\n"), includesDraft };

@@ -14,7 +14,14 @@ import {
   isMarkerFormat,
 } from "./list-markers";
 import type { CharacterRules } from "./characters";
-import { CELL_BLOCKS, HEADING_LEVELS, MAX_HEADING_LEVEL, normalizeDocument, normalizeField, type FieldLines } from "./normalize";
+import {
+  CELL_BLOCKS,
+  HEADING_LEVELS,
+  MAX_HEADING_LEVEL,
+  normalizeDocument,
+  normalizeField,
+  type FieldLines,
+} from "./normalize";
 import { MAX_TABLE_COLUMNS, linesUp, tableGrid } from "./table-grid";
 import { isNode, type JSONContent } from "./types";
 
@@ -28,8 +35,10 @@ export const DOCUMENT_MESSAGES = {
   listDepth: `Lists can nest at most ${MAX_LIST_DEPTH} levels deep.`,
   tableShape: "This table's cells don't line up into rows and columns.",
   tableColumns: `Tables can have at most ${MAX_TABLE_COLUMNS} columns.`,
-  field: "The email subject and preheader can hold only one line of text and variables.",
-  pushField: "The push title, subtitle and body can hold only text and variables, with no line breaks.",
+  field:
+    "The email subject and preheader can hold only one line of text and variables.",
+  pushField:
+    "The push title, subtitle and body can hold only text and variables, with no line breaks.",
   smsField: "The SMS message can hold only text, line breaks and variables.",
 } as const;
 
@@ -39,7 +48,8 @@ const LISTS = new Set(["bulletList", "orderedList"]);
 const CELLS = new Set(["tableCell", "tableHeader"]);
 
 /** Absent or null, or a value the guard accepts. */
-const optional = (value: unknown, guard: (value: unknown) => boolean) => value === undefined || value === null || guard(value);
+const optional = (value: unknown, guard: (value: unknown) => boolean) =>
+  value === undefined || value === null || guard(value);
 
 /**
  * The first rule the document breaks, in document order, or null. Node and mark names, and where
@@ -50,19 +60,33 @@ export function documentProblem(doc: JSONContent): DocumentProblem | null {
 }
 
 /** `inCell`: the node sits inside a table cell, at any depth. */
-function walk(node: unknown, listDepth: number, inCell: boolean): DocumentProblem | null {
+function walk(
+  node: unknown,
+  listDepth: number,
+  inCell: boolean,
+): DocumentProblem | null {
   if (!isNode(node)) return null; // not a node: the schema parse refuses it
-  const attrs = isNode(node.attrs) ? (node.attrs as Record<string, unknown>) : {};
+  const attrs = isNode(node.attrs)
+    ? (node.attrs as Record<string, unknown>)
+    : {};
   let depth = listDepth;
 
   switch (node.type) {
     case "heading":
       // Absent is the schema's default, 1 (as the resolver reads it); null or anything else is refused.
-      if (attrs.level !== undefined && !(HEADING_LEVELS as readonly unknown[]).includes(attrs.level)) return "heading";
+      if (
+        attrs.level !== undefined &&
+        !(HEADING_LEVELS as readonly unknown[]).includes(attrs.level)
+      )
+        return "heading";
       break;
     case "orderedList":
       if (!optional(attrs.start, isListStart)) return "listStart";
-      if (!optional(attrs.markerFormat, isMarkerFormat) || !optional(attrs.markerDelimiter, isMarkerDelimiter)) return "numbering";
+      if (
+        !optional(attrs.markerFormat, isMarkerFormat) ||
+        !optional(attrs.markerDelimiter, isMarkerDelimiter)
+      )
+        return "numbering";
       break;
     case "table": {
       const grid = tableGrid(node);
@@ -71,10 +95,16 @@ function walk(node: unknown, listDepth: number, inCell: boolean): DocumentProble
       break;
     }
   }
-  if (LISTS.has(node.type ?? "") && ++depth > MAX_LIST_DEPTH) return "listDepth";
+  if (LISTS.has(node.type ?? "") && ++depth > MAX_LIST_DEPTH)
+    return "listDepth";
   // A cell holds paragraphs and lists, and so does every list item inside it, at any depth.
   const cell = CELLS.has(node.type ?? "");
-  if ((cell || (inCell && node.type === "listItem")) && !(node.content ?? []).every((child) => isNode(child) && CELL_BLOCKS.includes(child.type ?? ""))) {
+  if (
+    (cell || (inCell && node.type === "listItem")) &&
+    !(node.content ?? []).every(
+      (child) => isNode(child) && CELL_BLOCKS.includes(child.type ?? ""),
+    )
+  ) {
     return "cell";
   }
 
@@ -103,7 +133,10 @@ export function normalizeAndCheckBody(doc: JSONContent): Checked {
 }
 
 /** The sentences a channel field's check can refuse with: the email's, a push's, an SMS's. */
-export type FieldProblem = Extract<DocumentProblem, "field" | "pushField" | "smsField">;
+export type FieldProblem = Extract<
+  DocumentProblem,
+  "field" | "pushField" | "smsField"
+>;
 
 /**
  * How a field is checked: whether it keeps its line breaks (`lines`, default `"line"`), the problem it
@@ -119,7 +152,10 @@ export interface FieldCheck {
 }
 
 /** A channel field as every save takes it: normalized for its lines and characters, then the field check. */
-export function normalizeAndCheckField(doc: JSONContent, check: FieldCheck = {}): Checked {
+export function normalizeAndCheckField(
+  doc: JSONContent,
+  check: FieldCheck = {},
+): Checked {
   const normalized = normalizeField(doc, check.lines, check.characters);
   return { doc: normalized, problem: fieldProblem(normalized, check) };
 }
@@ -129,15 +165,34 @@ export function normalizeAndCheckField(doc: JSONContent, check: FieldCheck = {})
  * line breaks (`lines: "lines"`). Null when it is one; `check.problem` when it isn't (the body rules
  * don't apply to it).
  */
-export function fieldProblem(doc: JSONContent, check: FieldCheck = {}): FieldProblem | null {
+export function fieldProblem(
+  doc: JSONContent,
+  check: FieldCheck = {},
+): FieldProblem | null {
   const problem = check.problem ?? "field";
   const breaks = check.lines === "lines";
-  if (!isNode(doc) || doc.type !== "doc" || !Array.isArray(doc.content) || doc.content.length !== 1) return problem;
+  if (
+    !isNode(doc) ||
+    doc.type !== "doc" ||
+    !Array.isArray(doc.content) ||
+    doc.content.length !== 1
+  )
+    return problem;
   const paragraph = doc.content[0];
-  if (!isNode(paragraph) || paragraph.type !== "paragraph" || paragraph.marks?.length) return problem;
+  if (
+    !isNode(paragraph) ||
+    paragraph.type !== "paragraph" ||
+    paragraph.marks?.length
+  )
+    return problem;
   for (const child of paragraph.content ?? []) {
     if (!isNode(child) || child.marks?.length) return problem;
-    if (child.type !== "text" && child.type !== "variable" && !(breaks && child.type === "hardBreak")) return problem;
+    if (
+      child.type !== "text" &&
+      child.type !== "variable" &&
+      !(breaks && child.type === "hardBreak")
+    )
+      return problem;
   }
   return null;
 }

@@ -8,7 +8,13 @@
 //   domain/audit.ts            audit sentences, action groups, filters, CSV
 
 import type { Refused } from "./refusals";
-import type { ActionResult, ApprovalStage, NotificationKind, Person, VersionStage } from "./review-types";
+import type {
+  ActionResult,
+  ApprovalStage,
+  NotificationKind,
+  Person,
+  VersionStage,
+} from "./review-types";
 import type { NumberedRound } from "./rounds";
 import type {
   ApproverRule,
@@ -33,7 +39,11 @@ export const INACTIVITY_SUSPEND_DAYS = 120;
 /** A new recertification is due this many days after it starts. */
 export const RECERT_WINDOW_DAYS = 30;
 /** Roles a person may ask for. Team Admins are appointed (Teams page), never requested. */
-export const REQUESTABLE_ROLES = ["viewer", "author", "approver"] as const satisfies readonly TeamRole[];
+export const REQUESTABLE_ROLES = [
+  "viewer",
+  "author",
+  "approver",
+] as const satisfies readonly TeamRole[];
 export type RequestableRole = (typeof REQUESTABLE_ROLES)[number];
 export const ACCESS_REASON_MAX = 500;
 export const DECISION_NOTE_MAX = 500;
@@ -116,7 +126,13 @@ export interface MembershipSet {
 export type MembershipChange =
   | {
       kind: "insert";
-      membership: { userId: string; teamId: string; roles: TeamRole[]; addedAt: Date; addedBy: string };
+      membership: {
+        userId: string;
+        teamId: string;
+        roles: TeamRole[];
+        addedAt: Date;
+        addedBy: string;
+      };
     }
   | { kind: "update"; membershipId: string; set: MembershipSet }
   | { kind: "delete"; membershipId: string };
@@ -146,7 +162,12 @@ export type AccessAuditAction =
   | "recert.closed" // the deadline passed, or every member was decided
   | "platform.config_changed"; // details.area: "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone"; details.summary
 
-export type PlatformArea = "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone";
+export type PlatformArea =
+  | "teams"
+  | "content_types"
+  | "channel_rules"
+  | "approval_chains"
+  | "business_zone";
 
 export interface AccessAuditEffect {
   kind: "audit";
@@ -183,8 +204,10 @@ export type AccessRecipients =
   | { kind: "platform_admins" };
 
 /** Team ids are their slugs (seed contract), so links build from the id. */
-export type TeamSettingsSection = "members" | "access-requests" | "recertification" | "inactivity";
-export type PlatformSettingsSection = "teams" | "content-types" | "channel-rules" | "approval-chains" | "time-zone";
+export type TeamSettingsSection =
+  "members" | "access-requests" | "recertification" | "inactivity";
+export type PlatformSettingsSection =
+  "teams" | "content-types" | "channel-rules" | "approval-chains" | "time-zone";
 
 export type AccessLink =
   | { to: "settings"; teamId: string; section: TeamSettingsSection }
@@ -263,7 +286,13 @@ export interface RequestAccessData {
   /** The latest request per team, newest first. A pending one replaces the form for that team. */
   requests: MyAccessRequest[];
   /** Memberships that ended without the person asking: shown above the teams, one line each. */
-  ended: { teamId: string; teamName: string; status: "lapsed" | "suspended"; reason: MembershipStatusReason | null; at: string }[];
+  ended: {
+    teamId: string;
+    teamName: string;
+    status: "lapsed" | "suspended";
+    reason: MembershipStatusReason | null;
+    at: string;
+  }[];
   roles: readonly RequestableRole[];
 }
 
@@ -281,7 +310,11 @@ export interface MemberRow {
   lastActiveAt: string | null;
   addedAt: string;
   isYou: boolean;
-  can: { editRoles: PermissionResult; remove: PermissionResult; reinstate: PermissionResult };
+  can: {
+    editRoles: PermissionResult;
+    remove: PermissionResult;
+    reinstate: PermissionResult;
+  };
   /** The strips' lines (`memberConsequences`). */
   consequences: { remove: string; reinstate: string };
 }
@@ -387,7 +420,11 @@ export interface InactivityRow {
   statusReason: MembershipStatusReason | null;
   /** Past day 120 and still active: the sweep kept them on as the team's last Team Admin (`heldAsLastAdmin`). */
   heldAsLastAdmin: boolean;
-  can: { suspend: PermissionResult; keep: PermissionResult; reinstate: PermissionResult };
+  can: {
+    suspend: PermissionResult;
+    keep: PermissionResult;
+    reinstate: PermissionResult;
+  };
   /** The strips' lines (`memberConsequences`). */
   consequences: { suspend: string; keep: string; reinstate: string };
 }
@@ -584,7 +621,12 @@ export interface AuditPageData {
     /** The Action menu's group headings; selecting one filters the whole category. */
     categories: (AuditOption & { value: AuditCategory })[];
     /** In `actionOptions()` order (grouped by category). */
-    actions: { value: string; label: string; category: AuditCategory; count: number }[];
+    actions: {
+      value: string;
+      label: string;
+      category: AuditCategory;
+      count: number;
+    }[];
     /** By name. */
     templates: { id: string; name: string; teamSlug: string; count: number }[];
     /** Last 7 / 30 / 90 days on the demo clock, inclusive of today. */
@@ -624,8 +666,22 @@ export interface NotificationsData {
  * `id` is the dismissal key: it changes when the content changes (a new request re-shows the card).
  */
 export type SidebarCardModel =
-  | { kind: "access_requests"; id: string; teamSlug: string; count: number; firstName: string; role: TeamRole }
-  | { kind: "recert_due"; id: string; teamSlug: string; label: string; dueAt: string; progressLabel: string }
+  | {
+      kind: "access_requests";
+      id: string;
+      teamSlug: string;
+      count: number;
+      firstName: string;
+      role: TeamRole;
+    }
+  | {
+      kind: "recert_due";
+      id: string;
+      teamSlug: string;
+      label: string;
+      dueAt: string;
+      progressLabel: string;
+    }
   | {
       kind: "my_request";
       id: string;
@@ -640,9 +696,21 @@ export type SidebarCardModel =
 
 export interface PlatformActions {
   // src/server/actions/platform.ts
-  createTeam(input: { name: string; description: string; icon: string; adminUserId: string }): Promise<ActionResult<{ slug: string }>>;
-  updateContentType(input: { contentTypeId: string; requiredSections: RequiredSection[] }): Promise<ActionResult>;
-  setChannelRule(input: { contentTypeId: string; channel: Channel; allowed: boolean }): Promise<ActionResult>;
+  createTeam(input: {
+    name: string;
+    description: string;
+    icon: string;
+    adminUserId: string;
+  }): Promise<ActionResult<{ slug: string }>>;
+  updateContentType(input: {
+    contentTypeId: string;
+    requiredSections: RequiredSection[];
+  }): Promise<ActionResult>;
+  setChannelRule(input: {
+    contentTypeId: string;
+    channel: Channel;
+    allowed: boolean;
+  }): Promise<ActionResult>;
   /** The whole chain, in order. Existing stages keep their id; new ones have none. */
   saveApprovalChain(input: {
     contentTypeId: string;
@@ -664,18 +732,38 @@ export interface PlatformConfigDomain {
     actor: Named;
     now: Date;
     existing: { slug: string; name: string }[];
-  }): Ok<{ team: { id: string; slug: string; name: string; description: string; icon: string; createdAt: Date }; membership: MembershipChange; effects: AccessEffect[] }> | Refused;
+  }):
+    | Ok<{
+        team: {
+          id: string;
+          slug: string;
+          name: string;
+          description: string;
+          icon: string;
+          createdAt: Date;
+        };
+        membership: MembershipChange;
+        effects: AccessEffect[];
+      }>
+    | Refused;
 
   /**
    * Sections: at least one; titles 1–60 chars, unique; keys snake_case from the title, kept for renamed
    * sections. A message type has none to edit.
    */
   updateRequiredSections(input: {
-    contentType: { id: string; name: string; requiredSections: RequiredSection[]; allowedChannels: readonly Channel[] };
+    contentType: {
+      id: string;
+      name: string;
+      requiredSections: RequiredSection[];
+      allowedChannels: readonly Channel[];
+    };
     next: RequiredSection[];
     actor: Named;
     now: Date;
-  }): Ok<{ requiredSections: RequiredSection[]; effects: AccessEffect[] }> | Refused;
+  }):
+    | Ok<{ requiredSections: RequiredSection[]; effects: AccessEffect[] }>
+    | Refused;
 
   /**
    * At least one channel stays on, and no channel of the other family goes on (`contentTypes` names the
@@ -687,10 +775,19 @@ export interface PlatformConfigDomain {
     channel: Channel;
     allowed: boolean;
     activeUsing: number;
-    contentTypes: readonly { name: string; allowedChannels: readonly Channel[] }[];
+    contentTypes: readonly {
+      name: string;
+      allowedChannels: readonly Channel[];
+    }[];
     actor: Named;
     now: Date;
-  }): Ok<{ allowedChannels: Channel[]; consequences: string[]; effects: AccessEffect[] }> | Refused;
+  }):
+    | Ok<{
+        allowedChannels: Channel[];
+        consequences: string[];
+        effects: AccessEffect[];
+      }>
+    | Refused;
 
   /**
    * At least one stage, and every stage passes `validateChain`: names 1–40 chars, unique; the Approver
@@ -704,15 +801,21 @@ export interface PlatformConfigDomain {
     contentType: { id: string; name: string };
     current: ApprovalStage[];
     next: { id?: string; name: string; rule: ApproverRule }[];
-    inReview: { versionId: string; stages: VersionStage[] | null; currentStage: number }[];
+    inReview: {
+      versionId: string;
+      stages: VersionStage[] | null;
+      currentStage: number;
+    }[];
     people: ApproverFacts[];
     actor: Named;
     now: Date;
-  }): Ok<{
-    /** In order, positions 0..n-1. id null = a new stage (the server assigns the id). */
-    stages: (Omit<ApprovalStage, "id"> & { id: string | null })[];
-    effects: AccessEffect[];
-  }> | Refused;
+  }):
+    | Ok<{
+        /** In order, positions 0..n-1. id null = a new stage (the server assigns the id). */
+        stages: (Omit<ApprovalStage, "id"> & { id: string | null })[];
+        effects: AccessEffect[];
+      }>
+    | Refused;
 
   /** One of `BUSINESS_ZONES`; the same zone again records nothing. Sunsets already set keep their instants. */
   setBusinessZone(input: {
@@ -736,13 +839,19 @@ export interface AuditDomain {
    * "Alex Kim approved Morgan Lee's request for Author access." / "Sam Ortiz's access lapsed: not recertified by March 3, 2027."
    */
   describeAuditEvent(
-    e: { action: string; details: Record<string, unknown> | null; version: NumberedRound | null },
+    e: {
+      action: string;
+      details: Record<string, unknown> | null;
+      version: NumberedRound | null;
+    },
     actor: Person | null,
   ): string;
   /** The action filter's options, grouped by category, in a stable order. */
   actionOptions(): { value: string; label: string; category: AuditCategory }[];
   /** Reads `?team&person&action&from&to`; drops anything malformed (bad dates, unknown actions). */
-  parseAuditFilters(params: Record<string, string | string[] | undefined>): AuditFilters;
+  parseAuditFilters(
+    params: Record<string, string | string[] | undefined>,
+  ): AuditFilters;
   /** RFC 4180 CSV: When (ISO, demo clock), Who, Team, Template, Version, Action, Details. No variable values ever. */
   toCsv(rows: AuditRow[]): string;
 }

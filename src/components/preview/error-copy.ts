@@ -22,22 +22,36 @@ export function listAnd(items: readonly string[]): string {
 }
 
 /** `details`, when it has the shape of ValueErrorDetails. */
-function valueDetails(details: RenderError["details"]): ValueErrorDetails | null {
+function valueDetails(
+  details: RenderError["details"],
+): ValueErrorDetails | null {
   if (!details || typeof details !== "object") return null;
   const { missing, invalid } = details as Partial<ValueErrorDetails>;
   if (!Array.isArray(missing) || !Array.isArray(invalid)) return null;
   if (!missing.every((key) => typeof key === "string")) return null;
-  if (!invalid.every((item) => item && typeof item.key === "string" && item.expected in VALUE_NOUNS)) return null;
+  if (
+    !invalid.every(
+      (item) =>
+        item && typeof item.key === "string" && item.expected in VALUE_NOUNS,
+    )
+  )
+    return null;
   return { missing, invalid };
 }
 
-export function authorMessage(error: RenderError, variables: readonly Pick<Variable, "key" | "label">[]): string {
-  if (error.code !== "missing_variables" && error.code !== "invalid_values") return error.message;
+export function authorMessage(
+  error: RenderError,
+  variables: readonly Pick<Variable, "key" | "label">[],
+): string {
+  if (error.code !== "missing_variables" && error.code !== "invalid_values")
+    return error.message;
   const details = valueDetails(error.details);
-  if (!details || details.missing.length + details.invalid.length === 0) return error.message;
+  if (!details || details.missing.length + details.invalid.length === 0)
+    return error.message;
 
   const labels = new Map<string, string>();
-  for (const { key, label } of variables) if (label.trim() !== "") labels.set(key, label.trim());
+  for (const { key, label } of variables)
+    if (label.trim() !== "") labels.set(key, label.trim());
   const labelOf = (key: string) => labels.get(key);
 
   const missing: string[] = [];
@@ -48,7 +62,8 @@ export function authorMessage(error: RenderError, variables: readonly Pick<Varia
   }
   const sentences: string[] = [];
   if (missing.length === 1) sentences.push(`${missing[0]} needs a value.`);
-  else if (missing.length > 1) sentences.push(`${listAnd(missing)} need values.`);
+  else if (missing.length > 1)
+    sentences.push(`${listAnd(missing)} need values.`);
   for (const item of details.invalid) {
     const label = labelOf(item.key);
     if (label === undefined) return error.message;

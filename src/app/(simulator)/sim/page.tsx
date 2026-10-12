@@ -28,14 +28,20 @@ async function Home() {
       <PageHeader crumbs="Coral Offers" title="Offers" />
       {home.apiError ? <Strip tone="bad">{home.apiError.message}</Strip> : null}
       <OffersTable offers={home.offers.filter((o) => o.kind === "offer")} />
-      <OffersTable kind="alert" offers={home.offers.filter((o) => o.kind === "alert")} />
+      <OffersTable
+        kind="alert"
+        offers={home.offers.filter((o) => o.kind === "alert")}
+      />
       <NoticesPanel
         notices={home.notices.slice(0, HOME_NOTICES)}
         offerNames={offerNames}
         footer={
           home.notices.length > HOME_NOTICES ? (
             <div className="border-t border-(--sim-line) px-4 py-2.5 text-[13px]">
-              <Link href={"/sim/notices" as Route} className="text-(--sim-info)">
+              <Link
+                href={"/sim/notices" as Route}
+                className="text-(--sim-info)"
+              >
                 All {home.notices.length} notices
               </Link>
             </div>

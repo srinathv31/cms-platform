@@ -1,5 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
-import { E2E_EXTERNAL_PORT, E2E_SHARED_STORAGE, E2E_SLOT, e2eDatabaseUrl, e2ePort, e2eUploadsDir } from "./e2e/storage";
+import {
+  E2E_EXTERNAL_PORT,
+  E2E_SHARED_STORAGE,
+  E2E_SLOT,
+  e2eDatabaseUrl,
+  e2ePort,
+  e2eUploadsDir,
+} from "./e2e/storage";
 
 // Each worker runs against its own production build server (`next start`, after a db:reset), database and
 // uploads folder, so spec files run side by side (decision 0050). Worker n listens on E2E_GATE_PORT + n (3100 by
@@ -13,9 +20,15 @@ import { E2E_EXTERNAL_PORT, E2E_SHARED_STORAGE, E2E_SLOT, e2eDatabaseUrl, e2ePor
 // too, so the answer is parked in the environment, which they inherit.
 const OPT_IN = ["demo", "stills-1280"];
 const named = process.argv.flatMap((arg, i, all) =>
-  arg.startsWith("--project=") ? arg.slice("--project=".length).split(",") : arg === "--project" ? (all[i + 1] ?? "").split(",") : [],
+  arg.startsWith("--project=")
+    ? arg.slice("--project=".length).split(",")
+    : arg === "--project"
+      ? (all[i + 1] ?? "").split(",")
+      : [],
 );
-const requested = process.env.UCOMP_OPT_IN_PROJECTS ?? named.filter((name) => OPT_IN.includes(name)).join(",");
+const requested =
+  process.env.UCOMP_OPT_IN_PROJECTS ??
+  named.filter((name) => OPT_IN.includes(name)).join(",");
 process.env.UCOMP_OPT_IN_PROJECTS = requested;
 const wants = (name: string) => requested.split(",").includes(name);
 
@@ -25,10 +38,15 @@ const wants = (name: string) => requested.split(",").includes(name);
 const fromFlag = process.argv.flatMap((arg, i, all) => {
   const inline = /^(?:--workers=|-j=?)(\d+)$/.exec(arg);
   if (inline) return [Number(inline[1])];
-  return (arg === "--workers" || arg === "-j") && /^\d+$/.test(all[i + 1] ?? "") ? [Number(all[i + 1])] : [];
+  return (arg === "--workers" || arg === "-j") && /^\d+$/.test(all[i + 1] ?? "")
+    ? [Number(all[i + 1])]
+    : [];
 })[0];
 const wanted = fromFlag ?? Number(process.env.E2E_WORKERS ?? 4);
-if (!Number.isInteger(wanted) || wanted < 1) throw new Error(`E2E_WORKERS must be a whole number of at least 1, got "${process.env.E2E_WORKERS}".`);
+if (!Number.isInteger(wanted) || wanted < 1)
+  throw new Error(
+    `E2E_WORKERS must be a whole number of at least 1, got "${process.env.E2E_WORKERS}".`,
+  );
 const WORKERS = E2E_SHARED_STORAGE || requested !== "" ? 1 : wanted;
 
 // Only the scenario specs and the whole demo script (Phase 7b): `scenario-02a` (the Phase 2 gate in short
@@ -53,7 +71,14 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "chromium", testIgnore: DEMO_SCRIPT, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+    {
+      name: "chromium",
+      testIgnore: DEMO_SCRIPT,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+      },
+    },
     ...(wants("demo")
       ? [
           {
@@ -68,7 +93,10 @@ export default defineConfig({
             use: {
               ...devices["Desktop Chrome"],
               viewport: { width: 1440, height: 900 },
-              video: { mode: "on" as const, size: { width: 1440, height: 900 } },
+              video: {
+                mode: "on" as const,
+                size: { width: 1440, height: 900 },
+              },
               // Playwright's trace injects scripts into the sandboxed preview frames ("Blocked script execution").
               trace: "off" as const,
             },
@@ -103,7 +131,10 @@ export default defineConfig({
           name: `stencil-${slot}`,
           command: `npm run db:reset && npx next start -p ${e2ePort(slot)}`,
           url: `http://localhost:${e2ePort(slot)}`,
-          env: { DATABASE_URL: e2eDatabaseUrl(slot), UPLOADS_DIR: e2eUploadsDir(slot) },
+          env: {
+            DATABASE_URL: e2eDatabaseUrl(slot),
+            UPLOADS_DIR: e2eUploadsDir(slot),
+          },
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
         }))

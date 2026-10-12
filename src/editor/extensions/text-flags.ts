@@ -76,13 +76,21 @@ export function fieldText(doc: PMNode): { text: string; starts: number[] } {
 const INVISIBLE = /^[\u00AD\u180E\u200B-\u200F\u2060-\u2064\uFEFF]+$/u;
 
 /** The host's flags, placed in `doc` and in document order: a flag outside the text, or empty, is dropped. */
-export function placeFlags(doc: PMNode, flagger: TextFlagger | null): PlacedFlag[] {
+export function placeFlags(
+  doc: PMNode,
+  flagger: TextFlagger | null,
+): PlacedFlag[] {
   if (!flagger) return [];
   const { text, starts } = fieldText(doc);
   const placed: PlacedFlag[] = [];
   for (const flag of flagger(text)) {
-    if (!(flag.from >= 0 && flag.to > flag.from && flag.to <= text.length)) continue;
-    placed.push({ ...flag, from: starts[flag.from]!, to: starts[flag.to - 1]! + 1 });
+    if (!(flag.from >= 0 && flag.to > flag.from && flag.to <= text.length))
+      continue;
+    placed.push({
+      ...flag,
+      from: starts[flag.from]!,
+      to: starts[flag.to - 1]! + 1,
+    });
   }
   return placed.sort((a, b) => a.from - b.from || a.to - b.to);
 }
@@ -91,7 +99,9 @@ function decorate(doc: PMNode, flags: readonly PlacedFlag[]): DecorationSet {
   return DecorationSet.create(
     doc,
     flags.map((flag, i) => {
-      const invisible = INVISIBLE.test(doc.textBetween(flag.from, flag.to, "\n", " "));
+      const invisible = INVISIBLE.test(
+        doc.textBetween(flag.from, flag.to, "\n", " "),
+      );
       return Decoration.inline(flag.from, flag.to, {
         class: FLAG_CLASS,
         "data-flag": String(i),
@@ -107,7 +117,10 @@ export function flagsOf(state: EditorState): readonly PlacedFlag[] {
 }
 
 /** The flag at a position (its edges included), preferring one the position is inside. */
-export function flagAt(flags: readonly PlacedFlag[], pos: number): number | null {
+export function flagAt(
+  flags: readonly PlacedFlag[],
+  pos: number,
+): number | null {
   let edge: number | null = null;
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i]!;
@@ -138,7 +151,9 @@ export interface FlaggerSource {
   set: (next: TextFlagger | null) => boolean;
 }
 
-export function createFlaggerSource(initial: TextFlagger | null): FlaggerSource {
+export function createFlaggerSource(
+  initial: TextFlagger | null,
+): FlaggerSource {
   let current = initial;
   return {
     get: () => current,
@@ -177,7 +192,9 @@ export const TextFlags = Extension.create<TextFlagsOptions>({
         state: {
           init: (_config, state) => compute(state.doc),
           apply: (tr, previous, _old, state) =>
-            tr.docChanged || tr.getMeta(textFlagsKey) === REFRESH_FLAGS ? compute(state.doc) : previous,
+            tr.docChanged || tr.getMeta(textFlagsKey) === REFRESH_FLAGS
+              ? compute(state.doc)
+              : previous,
         },
         props: {
           decorations: (state) => textFlagsKey.getState(state)?.decorations,
@@ -195,8 +212,16 @@ export const TextFlags = Extension.create<TextFlagsOptions>({
               open.close();
               return true;
             }
-            if (event.key === "Tab" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
-              const target = open.element?.querySelector<HTMLElement>("button:not([disabled])");
+            if (
+              event.key === "Tab" &&
+              !event.shiftKey &&
+              !event.metaKey &&
+              !event.ctrlKey &&
+              !event.altKey
+            ) {
+              const target = open.element?.querySelector<HTMLElement>(
+                "button:not([disabled])",
+              );
               if (!target) return false;
               event.preventDefault();
               target.focus();
@@ -209,7 +234,12 @@ export const TextFlags = Extension.create<TextFlagsOptions>({
             blur: (_view, event) => {
               const open = popup();
               const next = event.relatedTarget;
-              if (open && open.index !== null && !(next instanceof Node && open.element?.contains(next))) open.close();
+              if (
+                open &&
+                open.index !== null &&
+                !(next instanceof Node && open.element?.contains(next))
+              )
+                open.close();
               return false;
             },
           },
@@ -219,7 +249,9 @@ export const TextFlags = Extension.create<TextFlagsOptions>({
           // The popover never takes focus, so a screen reader hears its sentence from a polite live region
           // instead, present from the start (as the required-section note's is).
           const host = editorView.dom.parentElement;
-          const live = host ? editorView.dom.ownerDocument.createElement("div") : null;
+          const live = host
+            ? editorView.dom.ownerDocument.createElement("div")
+            : null;
           if (live && host) {
             live.className = "sr-only";
             live.setAttribute("role", "status");
@@ -229,7 +261,9 @@ export const TextFlags = Extension.create<TextFlagsOptions>({
           const unsubscribe = store?.subscribe((state, before) => {
             if (!live) return;
             if (state.index === null) live.textContent = "";
-            else if (state.index !== before.index) live.textContent = flagsOf(editorView.state)[state.index]?.message ?? "";
+            else if (state.index !== before.index)
+              live.textContent =
+                flagsOf(editorView.state)[state.index]?.message ?? "";
           });
           return {
             update: (view, previous) => {
@@ -243,7 +277,9 @@ export const TextFlags = Extension.create<TextFlagsOptions>({
               if (view.state.selection.eq(previous.selection)) return;
               // The caret moved without an edit: onto a flag opens it, off one closes it.
               const { selection } = view.state;
-              const index = selection.empty ? flagAt(flagsOf(view.state), selection.head) : null;
+              const index = selection.empty
+                ? flagAt(flagsOf(view.state), selection.head)
+                : null;
               if (index === null) open.close();
               else if (view.hasFocus()) open.open(index);
             },

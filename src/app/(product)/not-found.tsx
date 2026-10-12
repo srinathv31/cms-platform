@@ -7,7 +7,13 @@ export default function NotFound() {
     <PageHeader
       title="Not found"
       action={
-        <Button variant="outline" size="lg" className="rounded-full bg-surface px-4" nativeButton={false} render={<Link href="/" />}>
+        <Button
+          variant="outline"
+          size="lg"
+          className="rounded-full bg-surface px-4"
+          nativeButton={false}
+          render={<Link href="/" />}
+        >
           Back to library
         </Button>
       }

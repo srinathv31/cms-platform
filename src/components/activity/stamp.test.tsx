@@ -4,7 +4,9 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { Stamp } from "./stamp";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -16,7 +18,13 @@ describe("Stamp", () => {
     document.body.appendChild(container);
     const root = createRoot(container);
     await act(async () =>
-      root.render(<Stamp iso="2026-10-05T02:29:00.000Z" relative="3 hours ago" absolute="Mon, Oct 5, 2026, 2:29 AM UTC" />),
+      root.render(
+        <Stamp
+          iso="2026-10-05T02:29:00.000Z"
+          relative="3 hours ago"
+          absolute="Mon, Oct 5, 2026, 2:29 AM UTC"
+        />,
+      ),
     );
 
     const time = container.querySelector("time")!;

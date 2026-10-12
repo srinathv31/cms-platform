@@ -35,7 +35,11 @@ export function CommentsSection({
         id="review-comments"
         right={
           <div className="flex items-center gap-3">
-            {comments.openThreads > 0 ? <span className="text-[12px] text-text-subtle">{comments.openThreads} open</span> : null}
+            {comments.openThreads > 0 ? (
+              <span className="text-[12px] text-text-subtle">
+                {comments.openThreads} open
+              </span>
+            ) : null}
             {canComment && view === "document" ? (
               <BlockCommentMenu
                 family={template.family}

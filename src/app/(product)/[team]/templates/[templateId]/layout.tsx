@@ -1,6 +1,9 @@
 import { Stream } from "@/components/primitives/stream";
 import { WorkspaceSessionProvider } from "@/components/workspace/session/workspace-session";
-import { WorkspaceHeader, WorkspaceHeaderSkeleton } from "@/components/workspace/workspace-header";
+import {
+  WorkspaceHeader,
+  WorkspaceHeaderSkeleton,
+} from "@/components/workspace/workspace-header";
 import { WS } from "@/components/workspace/workspace-grid";
 import { WorkspaceTabBar } from "@/components/workspace/workspace-tab-bar";
 

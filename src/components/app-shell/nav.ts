@@ -1,4 +1,10 @@
-import { ChartColumn, ClipboardCheck, Library, ScrollText, type LucideIcon } from "lucide-react";
+import {
+  ChartColumn,
+  ClipboardCheck,
+  Library,
+  ScrollText,
+  type LucideIcon,
+} from "lucide-react";
 
 export type NavKey = "library" | "review" | "usage" | "audit";
 

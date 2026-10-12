@@ -42,7 +42,11 @@ import { createStore } from "zustand/vanilla";
 import type { DeviceSettings, PushScreen } from "@/components/device";
 import type { DocumentEditorHandle } from "@/editor/types";
 import type { Channel } from "@/domain/types";
-import { mergeFields, type SaveFields, type SaveStatus } from "../autosave/autosave-scheduler";
+import {
+  mergeFields,
+  type SaveFields,
+  type SaveStatus,
+} from "../autosave/autosave-scheduler";
 import { createFocusTargets, type FocusTargets } from "./focus-targets";
 
 /** The draft the workspace is editing. `rev` is where autosave starts; it is read once per version. */
@@ -178,7 +182,10 @@ export interface WorkspaceSession {
    * The provider's autosave host connects (and, with null, disconnects) the live `save` and its
    * `flush`. Changes held until now are handed to `save`, and anyone waiting in `flush` carries on.
    */
-  attach: (save: ((fields: SaveFields) => void) | null, flush?: () => Promise<void>) => void;
+  attach: (
+    save: ((fields: SaveFields) => void) | null,
+    flush?: () => Promise<void>,
+  ) => void;
   publishStatus: (status: SessionStatus) => void;
 
   /**
@@ -324,15 +331,29 @@ export const INITIAL_SESSION_STATE: SessionState = {
 };
 
 /** One preview field unchanged: equal, or (the phone's settings) equal field by field. */
-function samePreviewValue(a: PreviewState[keyof PreviewState], b: PreviewState[keyof PreviewState]): boolean {
+function samePreviewValue(
+  a: PreviewState[keyof PreviewState],
+  b: PreviewState[keyof PreviewState],
+): boolean {
   if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (
+    typeof a !== "object" ||
+    typeof b !== "object" ||
+    a === null ||
+    b === null
+  )
+    return false;
   const keys = Object.keys(a) as (keyof typeof a)[];
-  return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => a[key] === b[key])
+  );
 }
 
 export function createWorkspaceSession(): WorkspaceSession {
-  const store = createStore<SessionState>()(() => ({ ...INITIAL_SESSION_STATE }));
+  const store = createStore<SessionState>()(() => ({
+    ...INITIAL_SESSION_STATE,
+  }));
   const get = store.getState;
   const set = store.setState;
   // What only the rules use, and no component renders (so none of it is state: a change would notify
@@ -349,9 +370,13 @@ export function createWorkspaceSession(): WorkspaceSession {
   let inertHolds = 0;
   let failedTabs = 0;
 
-  const owned = () => new Set([...targets].flatMap((target) => Object.keys(target.opening)));
+  const owned = () =>
+    new Set([...targets].flatMap((target) => Object.keys(target.opening)));
   /** Every edited field has a part of the page on screen that can show its opening value again. */
-  const revertible = (edited: SaveFields | null, binding: DraftBinding | null) => {
+  const revertible = (
+    edited: SaveFields | null,
+    binding: DraftBinding | null,
+  ) => {
     if (edited === null || binding === null) return false;
     const mine = owned();
     return Object.keys(edited).every((key) => mine.has(key));
@@ -361,7 +386,8 @@ export function createWorkspaceSession(): WorkspaceSession {
     const { ownedFields, canRevert, edited, binding } = get();
     const nextOwned = [...owned()].sort().join(",");
     const nextCanRevert = revertible(edited, binding);
-    if (nextOwned !== ownedFields || nextCanRevert !== canRevert) set({ ownedFields: nextOwned, canRevert: nextCanRevert });
+    if (nextOwned !== ownedFields || nextCanRevert !== canRevert)
+      set({ ownedFields: nextOwned, canRevert: nextCanRevert });
   };
   /** Hands fields to autosave (now, or once the host connects). */
   const send = (fields: SaveFields) => {
@@ -396,7 +422,12 @@ export function createWorkspaceSession(): WorkspaceSession {
   const setPreview = (patch: Partial<PreviewState>) => {
     const { preview } = get();
     const next = { ...preview, ...patch };
-    if ((Object.keys(next) as (keyof PreviewState)[]).every((key) => samePreviewValue(next[key], preview[key]))) return;
+    if (
+      (Object.keys(next) as (keyof PreviewState)[]).every((key) =>
+        samePreviewValue(next[key], preview[key]),
+      )
+    )
+      return;
     set({ preview: next });
   };
 
@@ -428,12 +459,25 @@ export function createWorkspaceSession(): WorkspaceSession {
         if (binding === null) return;
         held = null;
         releaseWaiting();
-        set({ binding: null, status: SAVED, edited: null, canRevert: false, editGeneration: editGeneration + 1 });
+        set({
+          binding: null,
+          status: SAVED,
+          edited: null,
+          canRevert: false,
+          editGeneration: editGeneration + 1,
+        });
         return;
       }
       // A re-render or a tab switch binds the same draft again; only a new version starts a session.
       if (binding?.versionId === next.versionId) return;
-      set({ binding: next, status: SAVED, edited: null, canRevert: false, editGeneration: editGeneration + 1, openedAt: Date.now() });
+      set({
+        binding: next,
+        status: SAVED,
+        edited: null,
+        canRevert: false,
+        editGeneration: editGeneration + 1,
+        openedAt: Date.now(),
+      });
     },
 
     attach(save, flush) {
@@ -450,13 +494,20 @@ export function createWorkspaceSession(): WorkspaceSession {
       if (release.length > 0) {
         const done = flusher ? flusher() : Promise.resolve();
         // A failed flush is the status's to report; the waiting callers just carry on.
-        void done.catch(() => undefined).then(() => release.forEach((resolve) => resolve()));
+        void done
+          .catch(() => undefined)
+          .then(() => release.forEach((resolve) => resolve()));
       }
     },
 
     publishStatus(next) {
       const { status, saveTick } = get();
-      if (status.status === next.status && status.error === next.error && !!status.stopped === !!next.stopped) return;
+      if (
+        status.status === next.status &&
+        status.error === next.error &&
+        !!status.stopped === !!next.stopped
+      )
+        return;
       // A save landing: the one transition a preview cares about. (A save that fails goes to "error".)
       const landed = status.status === "saving" && next.status === "saved";
       set({ status: next, saveTick: landed ? saveTick + 1 : saveTick });
@@ -471,7 +522,11 @@ export function createWorkspaceSession(): WorkspaceSession {
         return;
       }
       const next = mergeFields(edited, fields);
-      set({ edited: next, canRevert: revertible(next, binding), editGeneration: editGeneration + 1 });
+      set({
+        edited: next,
+        canRevert: revertible(next, binding),
+        editGeneration: editGeneration + 1,
+      });
     },
 
     flush() {
@@ -488,7 +543,15 @@ export function createWorkspaceSession(): WorkspaceSession {
     setHistory(next) {
       const { history } = get();
       if (next === history) return;
-      if (next && history && next.canUndo === history.canUndo && next.canRedo === history.canRedo && next.undo === history.undo && next.redo === history.redo) return;
+      if (
+        next &&
+        history &&
+        next.canUndo === history.canUndo &&
+        next.canRedo === history.canRedo &&
+        next.undo === history.undo &&
+        next.redo === history.redo
+      )
+        return;
       set({ history: next });
     },
 
@@ -507,9 +570,18 @@ export function createWorkspaceSession(): WorkspaceSession {
       const changed = edited;
       const opening = openingValues();
       // Only what changed goes back: a field nobody touched stays out of the save.
-      const back = Object.fromEntries(Object.keys(changed).map((key) => [key, opening[key as keyof SaveFields]])) as SaveFields;
+      const back = Object.fromEntries(
+        Object.keys(changed).map((key) => [
+          key,
+          opening[key as keyof SaveFields],
+        ]),
+      ) as SaveFields;
       apply(back);
-      set({ edited: null, canRevert: false, editGeneration: get().editGeneration + 1 });
+      set({
+        edited: null,
+        canRevert: false,
+        editGeneration: get().editGeneration + 1,
+      });
       return changed;
     },
 
@@ -520,20 +592,38 @@ export function createWorkspaceSession(): WorkspaceSession {
       apply(fields);
       const { edited, binding, editGeneration } = get();
       const next = mergeFields(edited, fields);
-      set({ edited: next, canRevert: revertible(next, binding), editGeneration: editGeneration + 1 });
+      set({
+        edited: next,
+        canRevert: revertible(next, binding),
+        editGeneration: editGeneration + 1,
+      });
       return true;
     },
 
     replace(fields) {
       const mine = owned();
       const { binding, inert, edited } = get();
-      if (binding === null || inert || !Object.keys(fields).every((key) => mine.has(key))) return null;
+      if (
+        binding === null ||
+        inert ||
+        !Object.keys(fields).every((key) => mine.has(key))
+      )
+        return null;
       const current: SaveFields = { ...openingValues(), ...edited };
-      const previous = Object.fromEntries(Object.keys(fields).map((key) => [key, current[key as keyof SaveFields]])) as SaveFields;
+      const previous = Object.fromEntries(
+        Object.keys(fields).map((key) => [
+          key,
+          current[key as keyof SaveFields],
+        ]),
+      ) as SaveFields;
       apply(fields);
       const after = get();
       const next = mergeFields(after.edited, fields);
-      set({ edited: next, canRevert: revertible(next, after.binding), editGeneration: after.editGeneration + 1 });
+      set({
+        edited: next,
+        canRevert: revertible(next, after.binding),
+        editGeneration: after.editGeneration + 1,
+      });
       return previous;
     },
 
@@ -576,15 +666,18 @@ export function createWorkspaceSession(): WorkspaceSession {
     selectRailView(view) {
       const { railTab, preview } = get();
       const patch: Partial<SessionState> = {};
-      if (view !== "preview" && view !== "original" && railTab !== view) patch.railTab = view;
-      if (preview.open && preview.view !== view) patch.preview = { ...preview, view };
+      if (view !== "preview" && view !== "original" && railTab !== view)
+        patch.railTab = view;
+      if (preview.open && preview.view !== view)
+        patch.preview = { ...preview, view };
       if (Object.keys(patch).length > 0) set(patch);
     },
     showComments() {
       const { railTab, preview, railOpen } = get();
       const patch: Partial<SessionState> = {};
       if (railTab !== "comments") patch.railTab = "comments";
-      if (preview.open && preview.view !== "comments") patch.preview = { ...preview, view: "comments" };
+      if (preview.open && preview.view !== "comments")
+        patch.preview = { ...preview, view: "comments" };
       if (!railOpen) patch.railOpen = true;
       if (Object.keys(patch).length > 0) set(patch);
     },

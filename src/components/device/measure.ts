@@ -8,7 +8,14 @@ import type { FieldFit } from "./types";
 // that shows before the platform's ellipsis. What the author is warned about is what the phone draws.
 
 /** A field the screen doesn't show. */
-export const NOT_SHOWN: FieldFit = { shown: false, cut: false, visibleText: "", lines: 0, fullLines: 0, maxLines: 0 };
+export const NOT_SHOWN: FieldFit = {
+  shown: false,
+  cut: false,
+  visibleText: "",
+  lines: 0,
+  fullLines: 0,
+  maxLines: 0,
+};
 
 /** Where one character sits, in the phone's layout px from the field's top left: enough to tell whether it shows. */
 export interface CharBox {
@@ -53,7 +60,8 @@ export function visibleLength(
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
     let box: CharBox | null = null;
-    for (let probe = mid; !box && probe >= 0; probe--) box = boxOf(candidates[probe]!);
+    for (let probe = mid; !box && probe >= 0; probe--)
+      box = boxOf(candidates[probe]!);
     if (box && charShows(box, clip)) {
       last = mid;
       lo = mid + 1;
@@ -82,7 +90,9 @@ function ellipsisWidth(style: CSSStyleDeclaration): number {
   const context = canvas.getContext("2d");
   if (!context) return 0;
   context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-  if ("letterSpacing" in context) context.letterSpacing = style.letterSpacing === "normal" ? "0px" : style.letterSpacing;
+  if ("letterSpacing" in context)
+    context.letterSpacing =
+      style.letterSpacing === "normal" ? "0px" : style.letterSpacing;
   return context.measureText("…").width;
 }
 
@@ -92,7 +102,10 @@ function ellipsisWidth(style: CSSStyleDeclaration): number {
  */
 function screenScale(element: HTMLElement): number {
   const frame = element.closest<HTMLElement>('[data-slot="device-frame"]');
-  const scale = frame && frame.offsetWidth > 0 ? frame.getBoundingClientRect().width / frame.offsetWidth : 1;
+  const scale =
+    frame && frame.offsetWidth > 0
+      ? frame.getBoundingClientRect().width / frame.offsetWidth
+      : 1;
   return scale > 0 ? scale : 1;
 }
 
@@ -100,29 +113,52 @@ function screenScale(element: HTMLElement): number {
 export function measureField(element: HTMLElement, maxLines: number): FieldFit {
   const text = element.textContent ?? "";
   const style = getComputedStyle(element);
-  const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
-  const fullLines = text.trim() === "" ? 0 : Math.max(1, Math.round(element.scrollHeight / lineHeight));
+  const lineHeight =
+    parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+  const fullLines =
+    text.trim() === ""
+      ? 0
+      : Math.max(1, Math.round(element.scrollHeight / lineHeight));
   const cut = element.scrollHeight - element.clientHeight > lineHeight / 2;
   const lines = Math.min(fullLines, maxLines);
-  if (!cut) return { shown: true, cut: false, visibleText: text.trimEnd(), lines, fullLines, maxLines };
+  if (!cut)
+    return {
+      shown: true,
+      cut: false,
+      visibleText: text.trimEnd(),
+      lines,
+      fullLines,
+      maxLines,
+    };
 
   // Positions are in the phone's own layout px, from the element's top left corner: the clip from its
   // layout, each character's box from the screen, unscaled. So the phone's scale (and any round it) changes
   // nothing: the answer is the one at 1:1.
   const rect = element.getBoundingClientRect();
   const scale = screenScale(element);
-  const bottom = element.clientTop + element.clientHeight - parseFloat(style.paddingBottom);
-  const right = element.clientLeft + element.clientWidth - parseFloat(style.paddingRight);
-  const clip: Clip = { bottom, lastLineTop: bottom - lineHeight, lastLineRight: right - ellipsisWidth(style) };
+  const bottom =
+    element.clientTop + element.clientHeight - parseFloat(style.paddingBottom);
+  const right =
+    element.clientLeft + element.clientWidth - parseFloat(style.paddingRight);
+  const clip: Clip = {
+    bottom,
+    lastLineTop: bottom - lineHeight,
+    lastLineRight: right - ellipsisWidth(style),
+  };
 
   // The element's text nodes, with where each starts in `text`.
   const nodes: { node: Text; start: number }[] = [];
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  for (let offset = 0, node = walker.nextNode(); node; node = walker.nextNode()) {
+  for (
+    let offset = 0, node = walker.nextNode();
+    node;
+    node = walker.nextNode()
+  ) {
     nodes.push({ node: node as Text, start: offset });
     offset += node.nodeValue?.length ?? 0;
   }
-  const charLength = (index: number) => (isHighSurrogate(text.charCodeAt(index)) ? 2 : 1);
+  const charLength = (index: number) =>
+    isHighSurrogate(text.charCodeAt(index)) ? 2 : 1;
   const range = document.createRange();
   const boxOf = (index: number): CharBox | null => {
     let at = nodes[0];
@@ -133,7 +169,11 @@ export function measureField(element: HTMLElement, maxLines: number): FieldFit {
     range.setEnd(at.node, Math.min(offset + charLength(index), at.node.length));
     const box = range.getClientRects()[0];
     if (!box || (box.width === 0 && box.height === 0)) return null;
-    return { top: (box.top - rect.top) / scale, bottom: (box.bottom - rect.top) / scale, right: (box.right - rect.left) / scale };
+    return {
+      top: (box.top - rect.top) / scale,
+      bottom: (box.bottom - rect.top) / scale,
+      right: (box.right - rect.left) / scale,
+    };
   };
   const candidates: number[] = [];
   for (let i = 0; i < text.length; i++) {
@@ -141,7 +181,14 @@ export function measureField(element: HTMLElement, maxLines: number): FieldFit {
     if (!isLowSurrogate(code) && !/\s/.test(text[i]!)) candidates.push(i);
   }
   const visible = visibleLength(candidates, boxOf, clip, charLength);
-  return { shown: true, cut: true, visibleText: text.slice(0, visible).trimEnd(), lines, fullLines, maxLines };
+  return {
+    shown: true,
+    cut: true,
+    visibleText: text.slice(0, visible).trimEnd(),
+    lines,
+    fullLines,
+    maxLines,
+  };
 }
 
 /** How each `[data-field]` inside `root` fits, by field name. */
@@ -149,7 +196,8 @@ export function measureFields(root: HTMLElement): Record<string, FieldFit> {
   const fits: Record<string, FieldFit> = {};
   for (const element of root.querySelectorAll<HTMLElement>("[data-field]")) {
     const name = element.dataset.field;
-    if (name) fits[name] = measureField(element, Number(element.dataset.maxLines) || 1);
+    if (name)
+      fits[name] = measureField(element, Number(element.dataset.maxLines) || 1);
   }
   return fits;
 }

@@ -9,12 +9,20 @@ import { getViewer } from "@/server/viewer";
 // demo clock. Request-time only: it reads the persona cookie, and checks `audit.view` itself.
 // A refusal (403 or 404) is `{ ok: false, code, reason }` like every other refusal, never the file.
 
-export async function GET(request: NextRequest, ctx: RouteContext<"/[team]/audit/export">) {
+export async function GET(
+  request: NextRequest,
+  ctx: RouteContext<"/[team]/audit/export">,
+) {
   const { team } = await ctx.params;
   const params: Record<string, string[]> = {};
-  for (const [key, value] of request.nextUrl.searchParams) (params[key] ??= []).push(value);
+  for (const [key, value] of request.nextUrl.searchParams)
+    (params[key] ??= []).push(value);
 
-  const result = await getAuditExport(await getViewer(), team, parseAuditFilters(params));
+  const result = await getAuditExport(
+    await getViewer(),
+    team,
+    parseAuditFilters(params),
+  );
   if (!result.ok) return readResponse(result);
   // The BOM makes Excel read the file as UTF-8 (names with accents).
   return new Response(`﻿${result.csv}`, {

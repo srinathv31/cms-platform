@@ -5,16 +5,35 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import type { ApiChannel, ApiContractChange, ApiTemplateSummary } from "@/contracts/api-v1";
+import type {
+  ApiChannel,
+  ApiContractChange,
+  ApiTemplateSummary,
+} from "@/contracts/api-v1";
 import { cn } from "@/lib/utils";
 import { linkTemplate } from "@/simulator/actions";
 import { simField } from "@/simulator/fields";
 import { KIND_CHANNELS, sendable } from "@/simulator/kinds";
 import { blockedSentence } from "@/simulator/mapping";
 import { readTemplateSearch } from "@/simulator/reads";
-import type { SimFieldPath, SimLinkFlow, SimMappingRow } from "@/simulator/types";
+import type {
+  SimFieldPath,
+  SimLinkFlow,
+  SimMappingRow,
+} from "@/simulator/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Btn, Mono, PageHeader, Panel, Pill, Strip, TableWrap, TD, btnClass, type Tone } from "./bits";
+import {
+  Btn,
+  Mono,
+  PageHeader,
+  Panel,
+  Pill,
+  Strip,
+  TableWrap,
+  TD,
+  btnClass,
+  type Tone,
+} from "./bits";
 import { channelList, CHANNEL_LABEL, dayLabel, withKeys } from "./format";
 import { MappingTable } from "./mapping-table";
 import { PageScroll } from "./page-frame";
@@ -29,8 +48,17 @@ const KIND: Record<ApiContractChange["kind"], { label: string; tone: Tone }> = {
   label_changed: { label: "Label changed", tone: "plain" },
 };
 
-
-function Step({ n, title, right, children }: { n: number; title: string; right?: React.ReactNode; children: React.ReactNode }) {
+function Step({
+  n,
+  title,
+  right,
+  children,
+}: {
+  n: number;
+  title: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <Panel title={`${n} · ${title}`} right={right}>
       {children}
@@ -65,7 +93,11 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
         setResultsFor(q);
         if (result.ok) {
           // Only what this offer or alert can send: an alert lists alert templates, an offer documents.
-          setResults(result.results.filter((t) => sendable(offer.kind, t.channels).length > 0));
+          setResults(
+            result.results.filter(
+              (t) => sendable(offer.kind, t.channels).length > 0,
+            ),
+          );
           setSearchError(null);
         } else setSearchError(result.reason);
       },
@@ -78,47 +110,99 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
   }, [q, searching, offer.kind]);
 
   // ── The chosen template ────────────────────────────────────────────────────
-  const contractChannels = sendable(offer.kind, candidate?.template.contract?.channels ?? []);
+  const contractChannels = sendable(
+    offer.kind,
+    candidate?.template.contract?.channels ?? [],
+  );
   const [channels, setChannels] = useState<ApiChannel[]>(() => {
-    const kept = current ? current.channels.filter((c) => contractChannels.includes(c)) : [];
+    const kept = current
+      ? current.channels.filter((c) => contractChannels.includes(c))
+      : [];
     return kept.length > 0 ? kept : contractChannels;
   });
-  const [mapping, setMapping] = useState<Record<string, SimFieldPath | null>>(() => ({ ...(candidate?.mapping ?? {}) }));
+  const [mapping, setMapping] = useState<Record<string, SimFieldPath | null>>(
+    () => ({ ...(candidate?.mapping ?? {}) }),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const variables = candidate?.variables ?? [];
-  const relinking = Boolean(candidate && current && candidate.template.id === current.templateId && candidate.diff);
+  const relinking = Boolean(
+    candidate &&
+    current &&
+    candidate.template.id === current.templateId &&
+    candidate.diff,
+  );
   const diff = candidate?.diff ?? null;
   const missing = variables.filter((v) => v.required && !mapping[v.key]);
   const sentence = blockedSentence(missing);
-  const sameVersion = Boolean(candidate && current && current.templateId === candidate.template.id && current.pinnedVersion === candidate.version);
+  const sameVersion = Boolean(
+    candidate &&
+    current &&
+    current.templateId === candidate.template.id &&
+    current.pinnedVersion === candidate.version,
+  );
 
-  const touched = new Set(diff ? [...diff.items.map((i) => i.key), ...diff.newRequired] : []);
-  const shown = variables.filter((v) => (relinking ? touched.has(v.key) || (v.required && !mapping[v.key]) : true));
+  const touched = new Set(
+    diff ? [...diff.items.map((i) => i.key), ...diff.newRequired] : [],
+  );
+  const shown = variables.filter((v) =>
+    relinking ? touched.has(v.key) || (v.required && !mapping[v.key]) : true,
+  );
   const rows: SimMappingRow[] = shown.map((v) => {
     const field = simField(mapping[v.key] ?? null);
-    return { key: v.key, label: v.label, type: v.type, required: v.required, field: field?.path ?? null, fieldLabel: field?.label ?? null };
+    return {
+      key: v.key,
+      label: v.label,
+      type: v.type,
+      required: v.required,
+      field: field?.path ?? null,
+      fieldLabel: field?.label ?? null,
+    };
   });
   const unchanged = variables.filter((v) => !shown.includes(v));
 
   const confirm = () =>
     startTransition(async () => {
       if (!candidate) return;
-      const result = await linkTemplate({ offerId: offer.id, templateId: candidate.template.id, version: candidate.version, channels, mapping });
+      const result = await linkTemplate({
+        offerId: offer.id,
+        templateId: candidate.template.id,
+        version: candidate.version,
+        channels,
+        mapping,
+      });
       if (!result.ok) return setError(result.reason);
-      router.push(`${base}?tab=${missing.length > 0 ? "values" : "send"}` as Route);
+      router.push(
+        `${base}?tab=${missing.length > 0 ? "values" : "send"}` as Route,
+      );
     });
 
-  const toggleChannel = (c: ApiChannel) => setChannels((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : contractChannels.filter((x) => x === c || cur.includes(x))));
+  const toggleChannel = (c: ApiChannel) =>
+    setChannels((cur) =>
+      cur.includes(c)
+        ? cur.filter((x) => x !== c)
+        : contractChannels.filter((x) => x === c || cur.includes(x)),
+    );
 
-  const title = relinking && candidate ? `Relink to v${candidate.version}` : "Link template";
+  const title =
+    relinking && candidate
+      ? `Relink to v${candidate.version}`
+      : "Link template";
   // The consequence, before the commitment: which version sends use from now on, and what happens to the old one.
   const stops =
-    current && candidate && !sameVersion && current.sunsetDay && !current.sunsetPassed && !current.revokedAt
+    current &&
+    candidate &&
+    !sameVersion &&
+    current.sunsetDay &&
+    !current.sunsetPassed &&
+    !current.revokedAt
       ? ` v${current.pinnedVersion} stops rendering ${dayLabel(current.sunsetDay)}.`
       : "";
-  const consequence = candidate && channels.length > 0 && !sameVersion ? `Sends use v${candidate.version} on ${channelList(channels)}.${stops}` : "";
+  const consequence =
+    candidate && channels.length > 0 && !sameVersion
+      ? `Sends use v${candidate.version} on ${channelList(channels)}.${stops}`
+      : "";
   const blocker = sameVersion
     ? `Already linked to v${candidate?.version}.`
     : candidate && contractChannels.length === 0
@@ -132,18 +216,28 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
       <PageHeader
         crumbs={
           <>
-            <Link href={"/sim" as Route} className="text-(--sim-muted) no-underline hover:underline">
+            <Link
+              href={"/sim" as Route}
+              className="text-(--sim-muted) no-underline hover:underline"
+            >
               {offer.kind === "alert" ? "Alerts" : "Offers"}
             </Link>
             {"  /  "}
-            <Link href={base as Route} className="text-(--sim-muted) no-underline hover:underline">
+            <Link
+              href={base as Route}
+              className="text-(--sim-muted) no-underline hover:underline"
+            >
               {offer.name}
             </Link>
             {"  /  "}
             {relinking ? "Relink" : "Link template"}
           </>
         }
-        title={relinking && candidate ? `Relink to v${candidate.version}` : "Link a template"}
+        title={
+          relinking && candidate
+            ? `Relink to v${candidate.version}`
+            : "Link a template"
+        }
       />
       {flow.apiError ? <Strip tone="bad">{flow.apiError.message}</Strip> : null}
 
@@ -153,7 +247,11 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
             <Step n={1} title="Find a template">
               <div className="flex flex-col gap-3 p-4">
                 <label className="flex h-9 items-center gap-2 rounded-(--sim-rb) border border-(--sim-line) bg-(--sim-panel2) px-3 text-[13px] focus-within:border-(--sim-info)">
-                  <Search aria-hidden className="size-4 shrink-0 text-(--sim-muted)" strokeWidth={1.75} />
+                  <Search
+                    aria-hidden
+                    className="size-4 shrink-0 text-(--sim-muted)"
+                    strokeWidth={1.75}
+                  />
                   <input
                     type="search"
                     aria-label="Search templates"
@@ -167,27 +265,44 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
                     {searchError}
                   </p>
                 ) : null}
-                <ul aria-label="Templates" aria-busy={resultsFor !== q} className="m-0 h-[19rem] list-none divide-y divide-(--sim-line) overflow-y-auto overscroll-contain rounded-(--sim-rb) border border-(--sim-line) p-0">
+                <ul
+                  aria-label="Templates"
+                  aria-busy={resultsFor !== q}
+                  className="m-0 h-[19rem] list-none divide-y divide-(--sim-line) overflow-y-auto overscroll-contain rounded-(--sim-rb) border border-(--sim-line) p-0"
+                >
                   {results === null ? (
                     Array.from({ length: 5 }, (_, i) => (
-                      <li key={i} aria-hidden className="flex h-[3.75rem] items-center px-3">
+                      <li
+                        key={i}
+                        aria-hidden
+                        className="flex h-[3.75rem] items-center px-3"
+                      >
                         <Skeleton className="h-4 w-1/2 bg-(--sim-line)" />
                       </li>
                     ))
                   ) : results.length === 0 ? (
-                    <li className="px-3 py-3 text-[13px] text-(--sim-muted)">No Active template matches.</li>
+                    <li className="px-3 py-3 text-[13px] text-(--sim-muted)">
+                      No Active template matches.
+                    </li>
                   ) : (
                     results.map((t) => (
                       <li key={t.id}>
                         <button
                           type="button"
-                          onClick={() => router.push(`${base}/link?template=${encodeURIComponent(t.id)}` as Route)}
+                          onClick={() =>
+                            router.push(
+                              `${base}/link?template=${encodeURIComponent(t.id)}` as Route,
+                            )
+                          }
                           className="flex h-[3.75rem] w-full items-center gap-3 px-3 text-left hover:bg-(--sim-panel2)"
                         >
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[13px] font-medium">{t.name}</span>
+                            <span className="block truncate text-[13px] font-medium">
+                              {t.name}
+                            </span>
                             <span className="block truncate text-[12px] text-(--sim-muted)">
-                              <Mono>{t.id}</Mono> · {t.team.name} · {channelList(t.channels)}
+                              <Mono>{t.id}</Mono> · {t.team.name} ·{" "}
+                              {channelList(t.channels)}
                             </span>
                           </span>
                           <Pill tone="ok">Active v{t.activeVersion}</Pill>
@@ -201,19 +316,36 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
           ) : (
             <>
               {relinking && diff ? (
-                <Step n={1} title="What changed" right={<Mono className="text-(--sim-muted)">v{diff.since} to v{diff.to}</Mono>}>
+                <Step
+                  n={1}
+                  title="What changed"
+                  right={
+                    <Mono className="text-(--sim-muted)">
+                      v{diff.since} to v{diff.to}
+                    </Mono>
+                  }
+                >
                   <TableWrap label="Changes">
-                    <table aria-label="Changes" className="w-full border-collapse">
+                    <table
+                      aria-label="Changes"
+                      className="w-full border-collapse"
+                    >
                       <tbody>
                         {diff.items.map((item, i) => (
                           <tr key={i} className="border-b border-(--sim-line)">
                             <td className={cn(TD, "w-36")}>
-                              <Pill tone={KIND[item.kind].tone}>{KIND[item.kind].label}</Pill>
+                              <Pill tone={KIND[item.kind].tone}>
+                                {KIND[item.kind].label}
+                              </Pill>
                             </td>
                             <td className={cn(TD, "w-44")}>
-                              <Mono className="text-(--sim-text)">{item.key}</Mono>
+                              <Mono className="text-(--sim-text)">
+                                {item.key}
+                              </Mono>
                             </td>
-                            <td className={cn(TD, "text-(--sim-muted)")}>{withKeys(item.text)}</td>
+                            <td className={cn(TD, "text-(--sim-muted)")}>
+                              {withKeys(item.text)}
+                            </td>
                           </tr>
                         ))}
                         {unchanged.length > 0 ? (
@@ -222,8 +354,13 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
                               <Pill>Same</Pill>
                             </td>
                             <td className={TD} colSpan={2}>
-                              <Mono className="text-(--sim-text)">{unchanged.map((v) => v.key).join(", ")}</Mono>
-                              <span className="text-(--sim-muted)"> · mapping kept</span>
+                              <Mono className="text-(--sim-text)">
+                                {unchanged.map((v) => v.key).join(", ")}
+                              </Mono>
+                              <span className="text-(--sim-muted)">
+                                {" "}
+                                · mapping kept
+                              </span>
                             </td>
                           </tr>
                         ) : null}
@@ -236,16 +373,22 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
                   n={1}
                   title="Template"
                   right={
-                    <Link href={`${base}/link` as Route} className={btnClass("ghost", "h-7")}>
+                    <Link
+                      href={`${base}/link` as Route}
+                      className={btnClass("ghost", "h-7")}
+                    >
                       Choose another
                     </Link>
                   }
                 >
                   <div className="flex items-center gap-3 px-4 py-3">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">{candidate.template.name}</span>
+                      <span className="block truncate text-[13px] font-medium">
+                        {candidate.template.name}
+                      </span>
                       <span className="block text-[12px] text-(--sim-muted)">
-                        <Mono>{candidate.template.id}</Mono> · {candidate.template.team.name}
+                        <Mono>{candidate.template.id}</Mono> ·{" "}
+                        {candidate.template.team.name}
                       </span>
                     </span>
                     <Pill tone="ok">Active v{candidate.version}</Pill>
@@ -267,8 +410,16 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
                         Channels
                       </span>
                       {contractChannels.map((c) => (
-                        <label key={c} className="flex h-8 cursor-pointer items-center gap-2 rounded-(--sim-rb) border border-(--sim-line) px-2.5 has-checked:border-(--sim-accent)">
-                          <input type="checkbox" checked={channels.includes(c)} onChange={() => toggleChannel(c)} className="accent-(--sim-accent)" />
+                        <label
+                          key={c}
+                          className="flex h-8 cursor-pointer items-center gap-2 rounded-(--sim-rb) border border-(--sim-line) px-2.5 has-checked:border-(--sim-accent)"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={channels.includes(c)}
+                            onChange={() => toggleChannel(c)}
+                            className="accent-(--sim-accent)"
+                          />
                           {CHANNEL_LABEL[c]}
                         </label>
                       ))}
@@ -278,7 +429,10 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
               ) : null}
 
               {rows.length > 0 ? (
-                <Step n={relinking ? 2 : 3} title={relinking ? "Map new value" : "Map values"}>
+                <Step
+                  n={relinking ? 2 : 3}
+                  title={relinking ? "Map new value" : "Map values"}
+                >
                   <MappingTable
                     rows={rows}
                     fields={flow.fields}
@@ -316,15 +470,23 @@ export function LinkFlow({ flow }: { flow: SimLinkFlow }) {
                 <span className="text-(--sim-muted)">Choose a template</span>
               )}
             </p>
-            {consequence ? <p className="m-0 text-(--sim-muted)">{consequence}</p> : null}
-            {candidate && sentence ? <p className="m-0 text-(--sim-warn)">{sentence}</p> : null}
+            {consequence ? (
+              <p className="m-0 text-(--sim-muted)">{consequence}</p>
+            ) : null}
+            {candidate && sentence ? (
+              <p className="m-0 text-(--sim-warn)">{sentence}</p>
+            ) : null}
             {blocker ? <p className="m-0 text-(--sim-bad)">{blocker}</p> : null}
             {error ? (
               <p role="alert" className="m-0 text-(--sim-bad)">
                 {error}
               </p>
             ) : null}
-            <Btn kind="primary" disabled={!candidate || pending || blocker !== ""} onClick={confirm}>
+            <Btn
+              kind="primary"
+              disabled={!candidate || pending || blocker !== ""}
+              onClick={confirm}
+            >
               {pending ? "Linking…" : title}
             </Btn>
           </div>

@@ -6,7 +6,9 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       // `server-only` throws outside the react-server condition; tests import server modules directly.
-      "server-only": fileURLToPath(new URL("./scripts/empty.ts", import.meta.url)),
+      "server-only": fileURLToPath(
+        new URL("./scripts/empty.ts", import.meta.url),
+      ),
     },
   },
   test: {

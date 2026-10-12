@@ -53,8 +53,10 @@ const AVG_ADVANCE = 7.34;
 /** Glyph advances are rounded to 1/64px per character, which makes the ring run ~0.4 units long. */
 const SEAM_BIAS = 0.45;
 
-export interface ShareRingProps
-  extends Omit<React.ComponentPropsWithoutRef<"button">, "children" | "type"> {
+export interface ShareRingProps extends Omit<
+  React.ComponentPropsWithoutRef<"button">,
+  "children" | "type"
+> {
   /** The word repeated around the ring. Default "SHARE". */
   text?: string;
   /** How many times the word repeats. Default 3. */
@@ -88,11 +90,16 @@ export function ShareRing({
   const reduceMotion = useReducedMotion();
 
   const ringText =
-    Array.from({ length: repeat }, () => `${text.toUpperCase().replaceAll(" ", NBSP)}${NBSP}·${NBSP}`).join("") ||
-    "";
+    Array.from(
+      { length: repeat },
+      () => `${text.toUpperCase().replaceAll(" ", NBSP)}${NBSP}·${NBSP}`,
+    ).join("") || "";
 
   const glyphCount = ringText.length;
-  const seamStep = Math.max(0, CIRCUMFERENCE / glyphCount - AVG_ADVANCE + SEAM_BIAS);
+  const seamStep = Math.max(
+    0,
+    CIRCUMFERENCE / glyphCount - AVG_ADVANCE + SEAM_BIAS,
+  );
   const textLength = CIRCUMFERENCE - seamStep;
 
   // Rest angle puts the middle of the first word at 12 o'clock, so the ring reads
@@ -100,11 +107,18 @@ export function ShareRing({
   // first part and " · " the rest (about 1.8 glyph widths), so the word's center sits at
   // L / (L + 1.8) / 2 of the slot.
   const wordLength = text.length;
-  const restAngle = -(360 / repeat) * (0.5 * wordLength) / (wordLength + 1.8);
+  const restAngle = (-(360 / repeat) * (0.5 * wordLength)) / (wordLength + 1.8);
   const rotate = useMotionValue(restAngle);
 
   // ── Hover / focus-driven rotation (eased in and out, no React re-renders) ──
-  const spin = useRef({ raf: 0, last: 0, speed: 0, target: 0, hover: false, focus: false });
+  const spin = useRef({
+    raf: 0,
+    last: 0,
+    speed: 0,
+    target: 0,
+    hover: false,
+    focus: false,
+  });
 
   const run = useCallback(() => {
     const s = spin.current;
@@ -195,7 +209,11 @@ export function ShareRing({
           "motion-safe:group-hover/ring:scale-[1.04] motion-safe:group-focus-visible/ring:scale-[1.04]",
         )}
       >
-        <m.span aria-hidden className="absolute inset-0 will-change-transform" style={{ rotate }}>
+        <m.span
+          aria-hidden
+          className="absolute inset-0 will-change-transform"
+          style={{ rotate }}
+        >
           <svg
             viewBox={`0 0 ${VIEW} ${VIEW}`}
             className="block size-full overflow-visible"

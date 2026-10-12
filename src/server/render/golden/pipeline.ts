@@ -10,11 +10,27 @@
 // still render.
 
 import { smsLength } from "@/domain/messages/gsm7";
-import { PUSH_PLATFORMS, pushPayloadBytes, type PushPlatform } from "@/domain/messages/push";
-import type { EmailRender, PushRender, RenderBlock, RenderDoc, RenderError, RenderTarget, SmsRender } from "@/domain/render/types";
+import {
+  PUSH_PLATFORMS,
+  pushPayloadBytes,
+  type PushPlatform,
+} from "@/domain/messages/push";
+import type {
+  EmailRender,
+  PushRender,
+  RenderBlock,
+  RenderDoc,
+  RenderError,
+  RenderTarget,
+  SmsRender,
+} from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
 import { runEngine, type EngineResult } from "@/server/render/engine";
-import { engineInput, json, type RenderFixture } from "@/server/render/testing/fixture";
+import {
+  engineInput,
+  json,
+  type RenderFixture,
+} from "@/server/render/testing/fixture";
 import {
   VIEWS,
   compareContent,
@@ -28,14 +44,22 @@ import {
   verbatimProblems,
   type Content,
 } from "./content";
-import { extractPdf, pdfContentBlocks, pdfLayoutText, type PdfExtract } from "./extract-pdf";
+import {
+  extractPdf,
+  pdfContentBlocks,
+  pdfLayoutText,
+  type PdfExtract,
+} from "./extract-pdf";
 
 // ── Running a case ───────────────────────────────────────────────────────────
 
-export type PdfOutcome = { ok: true; bytes: Uint8Array; extract: PdfExtract } | { ok: false; error: RenderError };
+export type PdfOutcome =
+  | { ok: true; bytes: Uint8Array; extract: PdfExtract }
+  | { ok: false; error: RenderError };
 
 /** A message channel's run: what the route returns on a 200, or the error it refuses with (422). */
-export type MessageOutcome<T> = { ok: true; output: T } | { ok: false; error: RenderError };
+export type MessageOutcome<T> =
+  { ok: true; output: T } | { ok: false; error: RenderError };
 
 export interface CaseRun {
   input: RenderFixture;
@@ -64,13 +88,17 @@ const emptyContent: Content = { lines: [], links: [] };
  * field reads as the email's.
  */
 function targetsOf(input: RenderFixture): RenderTarget[] {
-  return CHANNELS.filter((channel) => input.channels.includes(channel)).flatMap((channel): RenderTarget[] =>
-    channel === "push" ? PUSH_PLATFORMS.map((platform) => ({ channel, platform })) : [{ channel }],
+  return CHANNELS.filter((channel) => input.channels.includes(channel)).flatMap(
+    (channel): RenderTarget[] =>
+      channel === "push"
+        ? PUSH_PLATFORMS.map((platform) => ({ channel, platform }))
+        : [{ channel }],
   );
 }
 
 /** "push.ios", "sms", "pdf": a run's name, as its files are named. */
-const runName = (target: RenderTarget) => (target.channel === "push" ? `push.${target.platform}` : target.channel);
+const runName = (target: RenderTarget) =>
+  target.channel === "push" ? `push.${target.platform}` : target.channel;
 
 export async function runCase(input: RenderFixture): Promise<CaseRun> {
   const at = new Date(input.at);
@@ -79,7 +107,18 @@ export async function runCase(input: RenderFixture): Promise<CaseRun> {
     const result = await runEngine(engineInput(input), target, at);
     // Refused before the adapter (values, the document check, resolution): nothing renders.
     if (!result.ok && result.stage < 9) {
-      return { input, error: result.error, doc: null, blocks: [], web: "", email: null, pdf: null, push: null, sms: null, ref: emptyContent };
+      return {
+        input,
+        error: result.error,
+        doc: null,
+        blocks: [],
+        web: "",
+        email: null,
+        pdf: null,
+        push: null,
+        sms: null,
+        ref: emptyContent,
+      };
     }
     runs.set(runName(target), result);
   }
@@ -98,7 +137,9 @@ export async function runCase(input: RenderFixture): Promise<CaseRun> {
     }
   }
   const message = <T>(result: EngineResult): MessageOutcome<T> =>
-    result.ok ? { ok: true, output: result.body as T } : { ok: false, error: result.error };
+    result.ok
+      ? { ok: true, output: result.body as T }
+      : { ok: false, error: result.error };
   return {
     input,
     error: null,
@@ -109,10 +150,19 @@ export async function runCase(input: RenderFixture): Promise<CaseRun> {
     pdf: !pdf
       ? null
       : pdf.ok
-        ? { ok: true, bytes: pdf.body as Uint8Array, extract: await extractPdf(pdf.body as Uint8Array) }
+        ? {
+            ok: true,
+            bytes: pdf.body as Uint8Array,
+            extract: await extractPdf(pdf.body as Uint8Array),
+          }
         : { ok: false, error: pdf.error },
     push: input.channels.includes("push")
-      ? (Object.fromEntries(PUSH_PLATFORMS.map((p) => [p, message<PushRender>(runs.get(`push.${p}`)!)])) as CaseRun["push"])
+      ? (Object.fromEntries(
+          PUSH_PLATFORMS.map((p) => [
+            p,
+            message<PushRender>(runs.get(`push.${p}`)!),
+          ]),
+        ) as CaseRun["push"])
       : null,
     sms: runs.has("sms") ? message<SmsRender>(runs.get("sms")!) : null,
     ref: doc ? contentFromRenderDoc(doc.blocks) : emptyContent,
@@ -122,8 +172,13 @@ export async function runCase(input: RenderFixture): Promise<CaseRun> {
 // ── The files ────────────────────────────────────────────────────────────────
 
 /** A message run's file: `<name>.json` with the route's 200 body, or `<name>.error.json` with its error. */
-function messageFile<T>(name: string, outcome: MessageOutcome<T>): Record<string, string> {
-  return outcome.ok ? { [`${name}.json`]: json(outcome.output) } : { [`${name}.error.json`]: json(outcome.error) };
+function messageFile<T>(
+  name: string,
+  outcome: MessageOutcome<T>,
+): Record<string, string> {
+  return outcome.ok
+    ? { [`${name}.json`]: json(outcome.output) }
+    : { [`${name}.error.json`]: json(outcome.error) };
 }
 
 /** Everything the engine-neutral `expected/` folder holds for this run (file name -> contents). */
@@ -138,10 +193,15 @@ export function expectedFiles(run: CaseRun): Record<string, string> {
   if (run.input.channels.includes("web")) files["web.html"] = run.web;
   if (run.email) {
     files["email.html"] = run.email.html;
-    files["email.json"] = json({ subject: run.email.subject, preheader: run.email.preheader });
+    files["email.json"] = json({
+      subject: run.email.subject,
+      preheader: run.email.preheader,
+    });
     files["email.txt"] = run.email.text;
   }
-  for (const platform of PUSH_PLATFORMS) if (run.push) Object.assign(files, messageFile(`push.${platform}`, run.push[platform]));
+  for (const platform of PUSH_PLATFORMS)
+    if (run.push)
+      Object.assign(files, messageFile(`push.${platform}`, run.push[platform]));
   if (run.sms) Object.assign(files, messageFile("sms", run.sms));
   if (run.pdf?.ok) {
     const info = run.pdf.extract.info;
@@ -169,7 +229,11 @@ export function nodeFiles(run: CaseRun): Record<string, string> {
       pageCount: x.pageCount,
       missingGlyphs: x.missingGlyphs,
       links: x.pages.flatMap((p, n) =>
-        p.links.map((l) => ({ page: n + 1, url: l.url, text: l.text.replace(/[\u0001\u0003]/g, " ") })),
+        p.links.map((l) => ({
+          page: n + 1,
+          url: l.url,
+          text: l.text.replace(/[\u0001\u0003]/g, " "),
+        })),
       ),
     }),
   };
@@ -196,25 +260,38 @@ function messageProblems(run: CaseRun): string[] {
   if (run.push) {
     const { ios, android } = run.push;
     if (ios.ok && android.ok) {
-      if (ios.output.title !== android.output.title) problems.push("push: the title differs between iPhone and Android");
-      if (ios.output.body !== android.output.body) problems.push("push: the body differs between iPhone and Android");
+      if (ios.output.title !== android.output.title)
+        problems.push("push: the title differs between iPhone and Android");
+      if (ios.output.body !== android.output.body)
+        problems.push("push: the body differs between iPhone and Android");
     }
-    if (android.ok && "subtitle" in android.output) problems.push("push.android: has a subtitle");
+    if (android.ok && "subtitle" in android.output)
+      problems.push("push.android: has a subtitle");
     for (const platform of PUSH_PLATFORMS) {
       const push = run.push[platform];
-      if (push.ok && push.output.payloadBytes !== pushPayloadBytes(platform, push.output)) {
-        problems.push(`push.${platform}: payloadBytes isn't the size of its notification JSON`);
+      if (
+        push.ok &&
+        push.output.payloadBytes !== pushPayloadBytes(platform, push.output)
+      ) {
+        problems.push(
+          `push.${platform}: payloadBytes isn't the size of its notification JSON`,
+        );
       }
     }
   }
   if (run.sms?.ok) {
     const { text, encoding, parts, characters } = run.sms.output;
     const measured = smsLength(text);
-    if (encoding !== measured.encoding || parts !== measured.parts || characters !== measured.characters) {
+    if (
+      encoding !== measured.encoding ||
+      parts !== measured.parts ||
+      characters !== measured.characters
+    ) {
       problems.push("sms: encoding, parts or characters don't match its text");
     }
     const footer = run.input.smsFooter;
-    if (footer && !(text === footer || text.endsWith(`\n${footer}`))) problems.push("sms: the footer isn't on its own last line");
+    if (footer && !(text === footer || text.endsWith(`\n${footer}`)))
+      problems.push("sms: the footer isn't on its own last line");
   }
   return problems;
 }
@@ -223,17 +300,42 @@ function messageProblems(run: CaseRun): string[] {
 function documentProblems(run: CaseRun): string[] {
   if (!run.email) return [];
   const problems: string[] = [];
-  problems.push(...compareContent("web", run.ref, contentFromHtml(run.web, ["main", "body"])));
-  problems.push(...compareContent("email.html", run.ref, contentFromHtml(run.email.html, [".email-body", "body"])));
+  problems.push(
+    ...compareContent(
+      "web",
+      run.ref,
+      contentFromHtml(run.web, ["main", "body"]),
+    ),
+  );
+  problems.push(
+    ...compareContent(
+      "email.html",
+      run.ref,
+      contentFromHtml(run.email.html, [".email-body", "body"]),
+    ),
+  );
   problems.push(...plainTextProblems(run.blocks, run.email.text));
   if (run.pdf?.ok) {
     const x = run.pdf.extract;
     const ref = contentFromRenderDoc(run.blocks, VIEWS.pdf);
     const links = x.pages.flatMap((p) => p.links);
-    problems.push(...compareContent("pdf", ref, contentFromPdf(pdfContentBlocks(x), links, ref), { pdf: true }));
-    if (x.missingGlyphs) problems.push(`pdf: ${x.missingGlyphs} missing glyph(s) (U+0000): the font cannot draw some characters and the PDF was not refused`);
+    problems.push(
+      ...compareContent(
+        "pdf",
+        ref,
+        contentFromPdf(pdfContentBlocks(x), links, ref),
+        { pdf: true },
+      ),
+    );
+    if (x.missingGlyphs)
+      problems.push(
+        `pdf: ${x.missingGlyphs} missing glyph(s) (U+0000): the font cannot draw some characters and the PDF was not refused`,
+      );
   }
-  problems.push(...listMarkupProblems("web", run.web), ...listMarkupProblems("email.html", run.email.html));
+  problems.push(
+    ...listMarkupProblems("web", run.web),
+    ...listMarkupProblems("email.html", run.email.html),
+  );
   problems.push(
     ...verbatimProblems(
       verbatimFromRenderDoc(run.blocks),

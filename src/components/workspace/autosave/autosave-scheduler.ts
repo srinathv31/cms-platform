@@ -47,7 +47,10 @@ export interface SendOptions {
  * Sends one patch. Resolves with the server's answer, whatever it is. Rejects when there is no
  * usable answer (network down, a 5xx, a reply that isn't JSON); the scheduler retries those.
  */
-export type Send = (patch: DraftPatch, options: SendOptions) => Promise<DraftSaveResponse>;
+export type Send = (
+  patch: DraftPatch,
+  options: SendOptions,
+) => Promise<DraftSaveResponse>;
 
 export interface AutosaveOptions {
   initialRev: number;
@@ -96,7 +99,12 @@ export const OFFLINE = "Not saved. Check your connection.";
  * The refusals of the patch itself: what the author fixes by editing, so saving waits for the next
  * change instead of stopping. Their sentence is the server's, shown as it is.
  */
-const WAITS_FOR_EDIT: readonly RefusalCode[] = ["invalid_input", "draft_too_large", "no_channels", "channel_unavailable"];
+const WAITS_FOR_EDIT: readonly RefusalCode[] = [
+  "invalid_input",
+  "draft_too_large",
+  "no_channels",
+  "channel_unavailable",
+];
 
 /** Whether the refusal ends saving from this page: retrying can't fix it, and nothing more is sent. */
 export function stopsSaving({ code }: { code: RefusalCode }): boolean {
@@ -108,7 +116,10 @@ export function stopsSaving({ code }: { code: RefusalCode }): boolean {
  * not yet saved never will be; the save status offers Reload beside it. One that waits for an edit
  * shows the server's sentence.
  */
-export function failureMessage(refusal: { code: RefusalCode; reason: string }): string {
+export function failureMessage(refusal: {
+  code: RefusalCode;
+  reason: string;
+}): string {
   switch (refusal.code) {
     case "draft_changed":
       return "Your latest changes can't be saved — this draft changed elsewhere.";
@@ -119,12 +130,17 @@ export function failureMessage(refusal: { code: RefusalCode; reason: string }): 
     case "version_gone":
       return "Your latest changes can't be saved — this draft no longer exists.";
     default:
-      return stopsSaving(refusal) ? `Your latest changes can't be saved. ${refusal.reason}` : `Not saved. ${refusal.reason}`;
+      return stopsSaving(refusal)
+        ? `Your latest changes can't be saved. ${refusal.reason}`
+        : `Not saved. ${refusal.reason}`;
   }
 }
 
 /** `base` with every defined field of `next` laid over it. */
-export function mergeFields(base: SaveFields | null, next: SaveFields): SaveFields {
+export function mergeFields(
+  base: SaveFields | null,
+  next: SaveFields,
+): SaveFields {
   const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(next)) {
     if (value !== undefined) merged[key] = value;
@@ -140,7 +156,8 @@ export function createAutosave(options: AutosaveOptions): Autosave {
   const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   const maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
   const retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
-  const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const requestTimeoutMs =
+    options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const sessionGapMs = options.sessionGapMs ?? DEFAULT_SESSION_GAP_MS;
 
   let rev = options.initialRev;
@@ -164,10 +181,25 @@ export function createAutosave(options: AutosaveOptions): Autosave {
   const listeners = new Set<() => void>();
 
   function emit() {
-    const status: SaveStatus = error ? "error" : inflight ? "saving" : pending ? "unsaved" : "saved";
+    const status: SaveStatus = error
+      ? "error"
+      : inflight
+        ? "saving"
+        : pending
+          ? "unsaved"
+          : "saved";
     const message = error ?? undefined;
-    if (status === state.status && message === state.error && stopped === (state.stopped ?? false)) return;
-    state = { status, ...(message === undefined ? {} : { error: message }), ...(stopped ? { stopped } : {}) };
+    if (
+      status === state.status &&
+      message === state.error &&
+      stopped === (state.stopped ?? false)
+    )
+      return;
+    state = {
+      status,
+      ...(message === undefined ? {} : { error: message }),
+      ...(stopped ? { stopped } : {}),
+    };
     for (const listener of [...listeners]) listener();
   }
 
@@ -188,7 +220,8 @@ export function createAutosave(options: AutosaveOptions): Autosave {
 
   /** Arms the debounce timer for whatever is pending. A retry wait in progress is left alone. */
   function schedule() {
-    if (disabled || stopped || inflight || !pending || timerKind === "retry") return;
+    if (disabled || stopped || inflight || !pending || timerKind === "retry")
+      return;
     const due = Math.min(lastChangeAt + debounceMs, firstChangeAt + maxWaitMs);
     startTimer("debounce", Math.max(0, due - Date.now()));
   }
@@ -199,7 +232,11 @@ export function createAutosave(options: AutosaveOptions): Autosave {
     pending = { ...fields, ...pending };
   }
 
-  function settle(response: DraftSaveResponse | null, fields: SaveFields, since: number) {
+  function settle(
+    response: DraftSaveResponse | null,
+    fields: SaveFields,
+    since: number,
+  ) {
     if (response === null) {
       restore(fields, since);
       lastSavedAt = null;
@@ -241,7 +278,11 @@ export function createAutosave(options: AutosaveOptions): Autosave {
     if (failures === 0) error = null;
 
     const sentAt = Date.now();
-    if (options.newSessionKey && lastSavedAt !== null && sentAt - lastSavedAt > sessionGapMs) {
+    if (
+      options.newSessionKey &&
+      lastSavedAt !== null &&
+      sentAt - lastSavedAt > sessionGapMs
+    ) {
       sessionKey = options.newSessionKey();
       lastSavedAt = sentAt;
     }

@@ -2,7 +2,15 @@ import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { rowsOf } from "./helpers/cleanup";
-import { asPersona, expect, hydrated, liveEditor, tap, test, typeSlowly } from "./helpers/scenario";
+import {
+  asPersona,
+  expect,
+  hydrated,
+  liveEditor,
+  tap,
+  test,
+  typeSlowly,
+} from "./helpers/scenario";
 import { settled } from "./helpers/settled";
 
 // Comments belong to a draft or a version in review (docs/handoff-review.md, S7 and S9; decision 0010).
@@ -31,7 +39,8 @@ let balance: { templateId: string; number: number };
 /** Jordan's thread on Cash Back v3, once it is saved, and when (the demo clock), for the cleanup. */
 let posted: { id: string; createdAt: number } | null = null;
 
-const one = async (sql: string, args: InValue[]) => (await rowsOf(db, sql, args))[0];
+const one = async (sql: string, args: InValue[]) =>
+  (await rowsOf(db, sql, args))[0];
 
 test.beforeAll(async () => {
   db = openDb();
@@ -43,14 +52,30 @@ test.beforeAll(async () => {
     "SELECT v.id, v.template_id, v.number, v.body FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.state = 'active'",
     [BALANCE],
   );
-  if (!inReview || !active) throw new Error("This spec needs the fresh seed (npm run db:reset).");
-  cashBack = { templateId: String(inReview.template_id), number: Number(inReview.number) };
-  balance = { templateId: String(active.template_id), number: Number(active.number) };
-  const drafts = await rowsOf(db, "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'", [balance.templateId]);
-  expect(drafts, "Balance Transfer has no open draft: nothing on it takes comments").toEqual([]);
+  if (!inReview || !active)
+    throw new Error("This spec needs the fresh seed (npm run db:reset).");
+  cashBack = {
+    templateId: String(inReview.template_id),
+    number: Number(inReview.number),
+  };
+  balance = {
+    templateId: String(active.template_id),
+    number: Number(active.number),
+  };
+  const drafts = await rowsOf(
+    db,
+    "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
+    [balance.templateId],
+  );
+  expect(
+    drafts,
+    "Balance Transfer has no open draft: nothing on it takes comments",
+  ).toEqual([]);
 
   // A thread on a block of the Active version, as one left from its review would be.
-  const body = JSON.parse(String(active.body)) as { content: { attrs?: { id?: string } }[] };
+  const body = JSON.parse(String(active.body)) as {
+    content: { attrs?: { id?: string } }[];
+  };
   const blockId = body.content.map((b) => b.attrs?.id).filter(Boolean)[1]!;
   const at = Date.now() - 86_400_000;
   await rowsOf(
@@ -71,26 +96,40 @@ test.afterAll(async () => {
     const threads = [RECORD, ...(posted ? [posted.id] : [])];
     for (const id of threads) {
       await rowsOf(db, "DELETE FROM comments WHERE thread_id = ?", [id]);
-      await rowsOf(db, "DELETE FROM audit_events WHERE json_extract(details, '$.threadId') = ?", [id]);
+      await rowsOf(
+        db,
+        "DELETE FROM audit_events WHERE json_extract(details, '$.threadId') = ?",
+        [id],
+      );
       await rowsOf(db, "DELETE FROM comment_threads WHERE id = ?", [id]);
     }
     if (posted) {
-      await rowsOf(db, "DELETE FROM notifications WHERE kind = 'comment_added' AND href LIKE ? AND created_at >= ?", [
-        `%/${cashBack.templateId}%`,
-        posted.createdAt,
-      ]);
+      await rowsOf(
+        db,
+        "DELETE FROM notifications WHERE kind = 'comment_added' AND href LIKE ? AND created_at >= ?",
+        [`%/${cashBack.templateId}%`, posted.createdAt],
+      );
     }
   } finally {
     db.close();
   }
 });
 
-const decision = (page: Page): Locator => page.locator('aside[aria-label="Decision"]').filter({ visible: true });
-const blockMenu = (scope: Locator) => scope.getByRole("button", { name: "Comment on a block" });
+const decision = (page: Page): Locator =>
+  page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+const blockMenu = (scope: Locator) =>
+  scope.getByRole("button", { name: "Comment on a block" });
 const replyControl = (card: Locator) => card.locator('[data-slot="reply"]');
-const resolveButton = (card: Locator) => card.getByRole("button", { name: "Resolve", exact: true });
+const resolveButton = (card: Locator) =>
+  card.getByRole("button", { name: "Resolve", exact: true });
 
-async function openReview(page: Page, person: string, templateId: string, number: number, name: string) {
+async function openReview(
+  page: Page,
+  person: string,
+  templateId: string,
+  number: number,
+  name: string,
+) {
   await asPersona(page, person);
   await page.goto(`/${TEAM}/review/${templateId}/${number}`);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
@@ -103,11 +142,19 @@ async function openReview(page: Page, person: string, templateId: string, number
 
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
-test("a reviewer comments on a version in review; an Active version's threads offer nothing to answer them with", async ({ page }) => {
+test("a reviewer comments on a version in review; an Active version's threads offer nothing to answer them with", async ({
+  page,
+}) => {
   test.setTimeout(120_000);
 
   await test.step("1. Jordan comments on a block of Cash Back v3, replies and resolves", async () => {
-    await openReview(page, "jordan", cashBack.templateId, cashBack.number, CASH_BACK);
+    await openReview(
+      page,
+      "jordan",
+      cashBack.templateId,
+      cashBack.number,
+      CASH_BACK,
+    );
     await tap(blockMenu(decision(page)));
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
@@ -121,12 +168,25 @@ test("a reviewer comments on a version in review; an Active version's threads of
     await tap(composer.getByRole("button", { name: "Comment", exact: true }));
     await expect(composer).toBeHidden();
 
-    const card = decision(page).locator("article[data-thread]").filter({ hasText: COMMENT });
+    const card = decision(page)
+      .locator("article[data-thread]")
+      .filter({ hasText: COMMENT });
     await expect(card).toHaveAttribute("data-status", "open");
     await expect(card).toContainText("Jordan Ellis");
-    await expect.poll(async () => (await one("SELECT id FROM comment_threads WHERE id IN (SELECT thread_id FROM comments WHERE body = ?)", [COMMENT]))?.id, {
-      message: "the thread is saved",
-    }).toBeTruthy();
+    await expect
+      .poll(
+        async () =>
+          (
+            await one(
+              "SELECT id FROM comment_threads WHERE id IN (SELECT thread_id FROM comments WHERE body = ?)",
+              [COMMENT],
+            )
+          )?.id,
+        {
+          message: "the thread is saved",
+        },
+      )
+      .toBeTruthy();
     const saved = await one(
       "SELECT t.id, t.created_at, t.origin_version_id, v.number FROM comment_threads t JOIN versions v ON v.id = t.origin_version_id WHERE t.id IN (SELECT thread_id FROM comments WHERE body = ?)",
       [COMMENT],
@@ -143,22 +203,45 @@ test("a reviewer comments on a version in review; an Active version's threads of
     await tap(card.getByRole("button", { name: "Reply", exact: true }));
     await expect(card).toContainText(REPLY);
     await expect
-      .poll(async () => (await rowsOf(db, "SELECT body FROM comments WHERE thread_id = ? ORDER BY created_at", [posted!.id])).map((r) => r.body), {
-        message: "the reply is saved",
-      })
+      .poll(
+        async () =>
+          (
+            await rowsOf(
+              db,
+              "SELECT body FROM comments WHERE thread_id = ? ORDER BY created_at",
+              [posted!.id],
+            )
+          ).map((r) => r.body),
+        {
+          message: "the reply is saved",
+        },
+      )
       .toEqual([COMMENT, REPLY]);
     await expect(card.locator('[role="alert"]')).toHaveCount(0);
 
     await tap(resolveButton(card));
     await expect
-      .poll(async () => (await one("SELECT status, resolved_by FROM comment_threads WHERE id = ?", [posted!.id])) ?? null, {
-        message: "the resolve is saved",
-      })
+      .poll(
+        async () =>
+          (await one(
+            "SELECT status, resolved_by FROM comment_threads WHERE id = ?",
+            [posted!.id],
+          )) ?? null,
+        {
+          message: "the resolve is saved",
+        },
+      )
       .toMatchObject({ status: "resolved", resolved_by: "jordan" });
   });
 
   await test.step("2. On Balance Transfer v2 (Active), the review screen offers nothing to comment with", async () => {
-    await openReview(page, "jordan", balance.templateId, balance.number, BALANCE);
+    await openReview(
+      page,
+      "jordan",
+      balance.templateId,
+      balance.number,
+      BALANCE,
+    );
     const record = decision(page).locator(`article[data-thread="${RECORD}"]`);
     await expect(record).toBeVisible();
     await expect(record).toContainText(RECORD_BODY);

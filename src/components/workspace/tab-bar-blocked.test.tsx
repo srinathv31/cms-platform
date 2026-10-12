@@ -7,22 +7,33 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-const server = vi.hoisted(() => ({ startDraft: vi.fn(), submitVersion: vi.fn() }));
+const server = vi.hoisted(() => ({
+  startDraft: vi.fn(),
+  submitVersion: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   unstable_rethrow: () => undefined,
   useSelectedLayoutSegment: () => null,
   useParams: () => ({ team: "coral-offers", templateId: "UC-ABC123" }),
 }));
-vi.mock("@/server/actions/templates", () => ({ startDraft: server.startDraft }));
-vi.mock("@/server/actions/review", () => ({ submitVersion: server.submitVersion }));
+vi.mock("@/server/actions/templates", () => ({
+  startDraft: server.startDraft,
+}));
+vi.mock("@/server/actions/review", () => ({
+  submitVersion: server.submitVersion,
+}));
 vi.stubGlobal("fetch", vi.fn());
 
-const { EditButton, PreviewToggle, RailToggle, SubmitButton } = await import("./workspace-actions");
+const { EditButton, PreviewToggle, RailToggle, SubmitButton } =
+  await import("./workspace-actions");
 const { TAB_BLOCKED, TabError } = await import("./tab-error");
-const { WorkspaceSessionProvider } = await import("./session/workspace-session");
+const { WorkspaceSessionProvider } =
+  await import("./session/workspace-session");
 
 const TEMPLATE = "UC-ABC123";
 
@@ -52,22 +63,39 @@ function Workspace({ failed }: { failed: boolean }) {
       <RailToggle />
       <EditButton templateId={TEMPLATE} />
       <SubmitButton templateId={TEMPLATE} />
-      {failed ? <TabError error={new Error("SQLITE_BUSY")} retry={() => {}} /> : null}
+      {failed ? (
+        <TabError error={new Error("SQLITE_BUSY")} retry={() => {}} />
+      ) : null}
     </WorkspaceSessionProvider>
   );
 }
 
-const render = (failed: boolean) => act(async () => root.render(<Workspace failed={failed} />));
-const control = (name: string) => container.querySelector<HTMLButtonElement>(`button[aria-label='${name}']`)!;
-const edit = () => [...container.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.trim() === "Edit")!;
-const actions = () => [control("Preview"), control("Channels and variables"), edit(), control("Submit for review")];
-const reasonOf = (button: HTMLElement) => document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent;
+const render = (failed: boolean) =>
+  act(async () => root.render(<Workspace failed={failed} />));
+const control = (name: string) =>
+  container.querySelector<HTMLButtonElement>(`button[aria-label='${name}']`)!;
+const edit = () =>
+  [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+    (b) => b.textContent?.trim() === "Edit",
+  )!;
+const actions = () => [
+  control("Preview"),
+  control("Channels and variables"),
+  edit(),
+  control("Submit for review"),
+];
+const reasonOf = (button: HTMLElement) =>
+  document.getElementById(button.getAttribute("aria-describedby") ?? "")
+    ?.textContent;
 
 describe("the tab bar's actions", () => {
   it("are live while the tab loaded", async () => {
     await render(false);
     for (const button of actions()) {
-      expect(button.hasAttribute("data-disabled"), button.textContent ?? button.ariaLabel ?? "").toBe(false);
+      expect(
+        button.hasAttribute("data-disabled"),
+        button.textContent ?? button.ariaLabel ?? "",
+      ).toBe(false);
       expect(button.getAttribute("aria-disabled")).toBeNull();
     }
   });
@@ -77,8 +105,13 @@ describe("the tab bar's actions", () => {
     expect(actions()).toHaveLength(4);
     for (const button of actions()) {
       const name = button.getAttribute("aria-label") ?? button.textContent;
-      expect(button.hasAttribute("data-disabled"), `${name} is greyed`).toBe(true);
-      expect(button.getAttribute("aria-disabled"), `${name} is marked disabled`).toBe("true");
+      expect(button.hasAttribute("data-disabled"), `${name} is greyed`).toBe(
+        true,
+      );
+      expect(
+        button.getAttribute("aria-disabled"),
+        `${name} is marked disabled`,
+      ).toBe("true");
       expect(reasonOf(button), `${name} says why`).toBe(TAB_BLOCKED);
       // Still in the bar and reachable from the keyboard: a hidden or removed control can't say why.
       expect(button.tabIndex).toBeGreaterThanOrEqual(0);
@@ -97,14 +130,17 @@ describe("the tab bar's actions", () => {
     for (const button of actions()) await act(async () => button.click());
     expect(server.startDraft).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
-    expect(document.body.querySelector("[data-slot='scrim-dialog-content']")).toBeNull();
+    expect(
+      document.body.querySelector("[data-slot='scrim-dialog-content']"),
+    ).toBeNull();
     expect(control("Preview").getAttribute("aria-pressed")).toBe("false");
   });
 
   it("are live again once the error goes (Try again worked, or the person left the tab)", async () => {
     await render(true);
     await render(false);
-    for (const button of actions()) expect(button.hasAttribute("data-disabled")).toBe(false);
+    for (const button of actions())
+      expect(button.hasAttribute("data-disabled")).toBe(false);
     await act(async () => edit().click());
     expect(server.startDraft).toHaveBeenCalledWith({ templateId: TEMPLATE });
   });

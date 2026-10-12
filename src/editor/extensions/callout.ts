@@ -24,7 +24,12 @@ declare module "@tiptap/core" {
 }
 
 /** The caret's line in a callout: its index and the callout's depth, or null outside one. */
-function calloutLine(state: EditorState): { index: number; childCount: number; empty: boolean; atStart: boolean } | null {
+function calloutLine(state: EditorState): {
+  index: number;
+  childCount: number;
+  empty: boolean;
+  atStart: boolean;
+} | null {
   const { selection } = state;
   if (!selection.empty) return null;
   const { $from } = selection;
@@ -74,7 +79,8 @@ export const Callout = Node.create({
     return {
       Enter: () => {
         const line = calloutLine(this.editor.state);
-        if (!line || !line.empty || line.index !== line.childCount - 1) return false;
+        if (!line || !line.empty || line.index !== line.childCount - 1)
+          return false;
         return this.editor.commands.lift(this.name);
       },
       Backspace: () => {

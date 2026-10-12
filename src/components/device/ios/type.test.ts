@@ -16,7 +16,9 @@ describe("tracking", () => {
 
 describe("textMetrics", () => {
   it("grows with the reader's text size", () => {
-    const sizes = (["default", "large", "ax"] as const).map((s) => textMetrics("subheadline", s).size);
+    const sizes = (["default", "large", "ax"] as const).map(
+      (s) => textMetrics("subheadline", s).size,
+    );
     expect(sizes).toEqual([15, 21, 25]);
   });
 });

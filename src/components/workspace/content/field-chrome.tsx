@@ -10,11 +10,24 @@ import { Lock } from "lucide-react";
  * The visible label over a field, 20px tall, and its tag. Hidden from assistive tech: the field (a
  * textbox in the composer, a group in the review) names itself with the field's full name ("Push title").
  */
-export function FieldLabel({ label, tag }: { label: string; tag?: string | null }) {
+export function FieldLabel({
+  label,
+  tag,
+}: {
+  label: string;
+  tag?: string | null;
+}) {
   return (
-    <div aria-hidden className="mb-2 flex h-5 items-center gap-2 text-[13px] leading-5 font-medium text-text-muted">
+    <div
+      aria-hidden
+      className="mb-2 flex h-5 items-center gap-2 text-[13px] leading-5 font-medium text-text-muted"
+    >
       {label}
-      {tag ? <span className="rounded-sm border border-hairline px-1.5 text-[11px] leading-4 font-normal text-text-subtle">{tag}</span> : null}
+      {tag ? (
+        <span className="rounded-sm border border-hairline px-1.5 text-[11px] leading-4 font-normal text-text-subtle">
+          {tag}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -34,9 +47,20 @@ export function LockedFooter({
   children?: ReactNode;
 }) {
   return (
-    <p data-slot="sms-footer" data-redline={status} className="mt-0.5 flex items-start gap-1.5 text-text-muted select-none">
-      <Lock role="img" aria-label="Locked" strokeWidth={1.75} className="mt-[5px] size-3.5 shrink-0 text-text-subtle" />
-      <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{children ?? text}</span>
+    <p
+      data-slot="sms-footer"
+      data-redline={status}
+      className="mt-0.5 flex items-start gap-1.5 text-text-muted select-none"
+    >
+      <Lock
+        role="img"
+        aria-label="Locked"
+        strokeWidth={1.75}
+        className="mt-[5px] size-3.5 shrink-0 text-text-subtle"
+      />
+      <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">
+        {children ?? text}
+      </span>
     </p>
   );
 }

@@ -7,10 +7,19 @@ import type { ActionResult } from "@/domain/review-types";
 // Route handlers rather than server actions: actions run one at a time with the page's mutations.
 
 /** A template's reads, by the last segment of their route. */
-export type TemplateRead = "compare" | "base-version" | "submit-summary" | "copilot-prompt" | "integration";
+export type TemplateRead =
+  | "compare"
+  | "base-version"
+  | "submit-summary"
+  | "copilot-prompt"
+  | "integration";
 
 /** `/api/templates/UC-4F7K2Q/compare?from=…&to=…` */
-export function templateReadUrl(templateId: string, read: TemplateRead, params: Record<string, string> = {}): string {
+export function templateReadUrl(
+  templateId: string,
+  read: TemplateRead,
+  params: Record<string, string> = {},
+): string {
   const query = new URLSearchParams(params).toString();
   return `/api/templates/${encodeURIComponent(templateId)}/${read}${query ? `?${query}` : ""}`;
 }
@@ -25,14 +34,25 @@ export async function readTemplate<T>(
   params?: Record<string, string>,
 ): Promise<ActionResult<T>> {
   const url = templateReadUrl(templateId, read, params);
-  const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
   const body: unknown = await response.json();
-  if (!isResult(body)) throw new Error(`GET ${url} answered ${response.status} without a result.`);
+  if (!isResult(body))
+    throw new Error(`GET ${url} answered ${response.status} without a result.`);
   return body as ActionResult<T>;
 }
 
 function isResult(body: unknown): boolean {
   if (typeof body !== "object" || body === null) return false;
-  const { ok, code, reason } = body as { ok?: unknown; code?: unknown; reason?: unknown };
-  return ok === true || (ok === false && typeof code === "string" && typeof reason === "string");
+  const { ok, code, reason } = body as {
+    ok?: unknown;
+    code?: unknown;
+    reason?: unknown;
+  };
+  return (
+    ok === true ||
+    (ok === false && typeof code === "string" && typeof reason === "string")
+  );
 }

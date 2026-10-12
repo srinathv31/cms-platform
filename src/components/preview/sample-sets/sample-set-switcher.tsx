@@ -125,15 +125,25 @@ export function SampleSetSwitcher({
               // 32px tall like every control in the rail, so the header row never changes height. The
               // button is as wide as the name needs; a name wider than the room it is given (a long
               // custom name, a narrow overlay) is cut short with an ellipsis, and `title` has it whole.
-              className={cn("max-w-full min-w-0 justify-between gap-2 bg-surface px-2.5 text-[13px] font-normal", className)}
+              className={cn(
+                "max-w-full min-w-0 justify-between gap-2 bg-surface px-2.5 text-[13px] font-normal",
+                className,
+              )}
             />
           }
         >
           <span className="min-w-0 truncate text-left">{current.name}</span>
-          <ChevronDown data-icon="inline-end" strokeWidth={1.75} className="text-text-muted" />
+          <ChevronDown
+            data-icon="inline-end"
+            strokeWidth={1.75}
+            className="text-text-muted"
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64 shadow-pop">
-          <DropdownMenuRadioGroup value={current.id} onValueChange={(id) => onSelect(String(id))}>
+          <DropdownMenuRadioGroup
+            value={current.id}
+            onValueChange={(id) => onSelect(String(id))}
+          >
             {sets.map((set) => (
               <DropdownMenuRadioItem key={set.id} value={set.id} closeOnClick>
                 {set.name}
@@ -167,13 +177,21 @@ export function SampleSetSwitcher({
             align="start"
             sideOffset={4}
             // Under the trigger (or over it when there's more room there); never beside it. A long list scrolls.
-            collisionAvoidance={{ side: "flip", align: "shift", fallbackAxisSide: "none" }}
+            collisionAvoidance={{
+              side: "flip",
+              align: "shift",
+              fallbackAxisSide: "none",
+            }}
             className="isolate z-50"
           >
             <PopoverPrimitive.Popup
               ref={popupRef}
               data-slot="sample-set-editor"
-              initialFocus={() => popupRef.current?.querySelector<HTMLElement>(`[${AUTOFOCUS_ATTR}]`) ?? true}
+              initialFocus={() =>
+                popupRef.current?.querySelector<HTMLElement>(
+                  `[${AUTOFOCUS_ATTR}]`,
+                ) ?? true
+              }
               finalFocus={triggerRef}
               className="z-50 flex max-h-(--available-height) w-[min(26rem,calc(100vw-2rem))] origin-(--transform-origin) flex-col overflow-hidden rounded-xl bg-popover text-sm text-popover-foreground shadow-pop ring-1 ring-foreground/10 outline-hidden duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
             >

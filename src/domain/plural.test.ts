@@ -6,7 +6,9 @@ describe("plural", () => {
     expect(plural(0, "version")).toBe("0 versions");
     expect(plural(1, "version")).toBe("1 version");
     expect(plural(3, "version")).toBe("3 versions");
-    expect(plural(2, "repeated header or footer line")).toBe("2 repeated header or footer lines");
+    expect(plural(2, "repeated header or footer line")).toBe(
+      "2 repeated header or footer lines",
+    );
   });
 
   it("takes an irregular plural", () => {

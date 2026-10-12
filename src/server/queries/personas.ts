@@ -31,46 +31,57 @@ const PLATFORM_LABEL: Record<PlatformRole, string> = {
 const ROLE_ORDER: TeamRole[] = ["viewer", "author", "approver", "team_admin"];
 
 /** All switchable personas with their one-line role summary. Order = the switcher's order. */
-export const getPersonaSummaries = cache(async (): Promise<PersonaSummary[]> => {
-  const personas = await getPersonas();
-  const ids = personas.map((p) => p.id);
-  if (ids.length === 0) return [];
+export const getPersonaSummaries = cache(
+  async (): Promise<PersonaSummary[]> => {
+    const personas = await getPersonas();
+    const ids = personas.map((p) => p.id);
+    if (ids.length === 0) return [];
 
-  const rows = await db
-    .select({
-      membershipId: memberships.id,
-      userId: memberships.userId,
-      teamName: teams.name,
-      status: memberships.status,
-    })
-    .from(memberships)
-    .innerJoin(teams, eq(teams.id, memberships.teamId))
-    .where(inArray(memberships.userId, ids));
+    const rows = await db
+      .select({
+        membershipId: memberships.id,
+        userId: memberships.userId,
+        teamName: teams.name,
+        status: memberships.status,
+      })
+      .from(memberships)
+      .innerJoin(teams, eq(teams.id, memberships.teamId))
+      .where(inArray(memberships.userId, ids));
 
-  const roleRows = rows.length
-    ? await db
-        .select()
-        .from(membershipRoles)
-        .where(inArray(membershipRoles.membershipId, rows.map((r) => r.membershipId)))
-    : [];
+    const roleRows = rows.length
+      ? await db
+          .select()
+          .from(membershipRoles)
+          .where(
+            inArray(
+              membershipRoles.membershipId,
+              rows.map((r) => r.membershipId),
+            ),
+          )
+      : [];
 
-  return personas.map((p) => {
-    const parts: string[] = [];
-    if (p.platformRole) parts.push(PLATFORM_LABEL[p.platformRole]);
-    for (const m of rows.filter((r) => r.userId === p.id && r.status === "active")) {
-      const roles = roleRows
-        .filter((rr) => rr.membershipId === m.membershipId)
-        .map((rr) => rr.role as TeamRole)
-        .sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
-      if (roles.length === 0) continue;
-      parts.push(`${m.teamName} · ${roles.map((r) => ROLE_LABEL[r]).join(" & ")}`);
-    }
-    return {
-      id: p.id,
-      name: p.name,
-      initials: p.initials,
-      hue: p.avatarHue,
-      summary: parts.length ? parts.join(", ") : "No team yet",
-    };
-  });
-});
+    return personas.map((p) => {
+      const parts: string[] = [];
+      if (p.platformRole) parts.push(PLATFORM_LABEL[p.platformRole]);
+      for (const m of rows.filter(
+        (r) => r.userId === p.id && r.status === "active",
+      )) {
+        const roles = roleRows
+          .filter((rr) => rr.membershipId === m.membershipId)
+          .map((rr) => rr.role as TeamRole)
+          .sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
+        if (roles.length === 0) continue;
+        parts.push(
+          `${m.teamName} · ${roles.map((r) => ROLE_LABEL[r]).join(" & ")}`,
+        );
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        initials: p.initials,
+        hue: p.avatarHue,
+        summary: parts.length ? parts.join(", ") : "No team yet",
+      };
+    });
+  },
+);

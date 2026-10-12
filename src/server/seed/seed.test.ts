@@ -11,13 +11,24 @@ import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
-import { ALL_CHANNEL_FIELDS, channelFieldValue, normalizeAndCheckChannelField, type ChannelFields } from "@/domain/channel-fields";
+import {
+  ALL_CHANNEL_FIELDS,
+  channelFieldValue,
+  normalizeAndCheckChannelField,
+  type ChannelFields,
+} from "@/domain/channel-fields";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import { headOf, isReleased } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
 import * as ucomp from "@/server/db/schema/ucomp";
 import * as sim from "@/server/db/schema/sim";
-import { TEMPLATE_ID_PATTERN, newId, newTemplateId, seededId, seededTemplateId } from "@/server/ids";
+import {
+  TEMPLATE_ID_PATTERN,
+  newId,
+  newTemplateId,
+  seededId,
+  seededTemplateId,
+} from "@/server/ids";
 import { trySubmit } from "@/server/testing/submit-check";
 import { createContext } from "./context";
 import { seedDatabase, type SeedResult } from "./index";
@@ -25,7 +36,11 @@ import { mulberry32 } from "./rng";
 
 const DAY = 86_400_000;
 const REQUIRED = ["offer_details", "rates_and_fees", "legal_notices"];
-const ALERTS = ["payment-due-reminder", "card-used-abroad", "rate-change-heads-up"];
+const ALERTS = [
+  "payment-due-reminder",
+  "card-used-abroad",
+  "rate-change-heads-up",
+];
 const BLOCK_TYPES = new Set([
   "paragraph",
   "heading",
@@ -63,7 +78,15 @@ const contractSchema = getSchema([
     name: "blockIds",
     addGlobalAttributes: () => [
       {
-        types: ["paragraph", "heading", "bulletList", "orderedList", "table", "callout", "horizontalRule"],
+        types: [
+          "paragraph",
+          "heading",
+          "bulletList",
+          "orderedList",
+          "table",
+          "callout",
+          "horizontalRule",
+        ],
         attributes: { id: { default: null } },
       },
       { types: ["heading"], attributes: { requiredKey: { default: null } } },
@@ -107,15 +130,21 @@ const tpl = (key: string) => {
   if (!id) throw new Error(`no template ${key}`);
   return id;
 };
-const versionsOf = (key: string) => versions.filter((v) => v.templateId === tpl(key));
+const versionsOf = (key: string) =>
+  versions.filter((v) => v.templateId === tpl(key));
 /** The versions of templates on one content type. */
 const versionsOn = (contentTypeId: string) => {
-  const ids = new Set(templates.filter((t) => t.contentTypeId === contentTypeId).map((t) => t.id));
+  const ids = new Set(
+    templates.filter((t) => t.contentTypeId === contentTypeId).map((t) => t.id),
+  );
   return versions.filter((v) => ids.has(v.templateId));
 };
 /** A number's head (its released row, else its latest round), or the draft (null). */
 const version = (key: string, n: number | null) => {
-  const found = n === null ? versionsOf(key).find((v) => v.number === null) : headOf(versionsOf(key), n);
+  const found =
+    n === null
+      ? versionsOf(key).find((v) => v.number === null)
+      : headOf(versionsOf(key), n);
   if (!found) throw new Error(`no ${key} v${n}`);
   return found;
 };
@@ -173,24 +202,48 @@ describe("ids", () => {
     const plain = createContext(0);
     const keyed = createContext(0);
     const first = keyed.keyedId("high-yield-savings:v2r1:doc", "th");
-    expect(first).toBe(createContext(0).keyedId("high-yield-savings:v2r1:doc", "th"));
+    expect(first).toBe(
+      createContext(0).keyedId("high-yield-savings:v2r1:doc", "th"),
+    );
     expect(keyed.keyedId("high-yield-savings:v2r1:doc", "cm")).toMatch(/^cm_/);
     expect(keyed.keyedId("high-yield-savings:v2r2:doc", "th")).not.toBe(first);
-    expect([keyed.id("v"), keyed.templateId()]).toEqual([plain.id("v"), plain.templateId()]);
+    expect([keyed.id("v"), keyed.templateId()]).toEqual([
+      plain.id("v"),
+      plain.templateId(),
+    ]);
   });
 });
 
 describe("people, teams and access", () => {
   it("has the nine personas with the fixed ids (the build plan's eight, plus Dana Park in Phase 6)", () => {
-    const personas = users.filter((u) => u.isPersona).map((u) => u.id).sort();
-    expect(personas).toEqual(["alex", "dana", "jordan", "maya", "morgan", "priya", "riley", "sam", "taylor"]);
-    expect(users.find((u) => u.id === "riley")?.platformRole).toBe("platform_admin");
+    const personas = users
+      .filter((u) => u.isPersona)
+      .map((u) => u.id)
+      .sort();
+    expect(personas).toEqual([
+      "alex",
+      "dana",
+      "jordan",
+      "maya",
+      "morgan",
+      "priya",
+      "riley",
+      "sam",
+      "taylor",
+    ]);
+    expect(users.find((u) => u.id === "riley")?.platformRole).toBe(
+      "platform_admin",
+    );
     expect(users.find((u) => u.id === "taylor")?.platformRole).toBe("auditor");
     expect(users.find((u) => u.id === "maya")?.name).toBe("Maya Chen");
   });
 
   it("has the three teams, with slugs as ids", () => {
-    expect(teams.map((t) => t.id).sort()).toEqual(["card-statements", "coral-offers", "deposits"]);
+    expect(teams.map((t) => t.id).sort()).toEqual([
+      "card-statements",
+      "coral-offers",
+      "deposits",
+    ]);
     for (const t of teams) expect(t.slug).toBe(t.id);
   });
 
@@ -199,27 +252,45 @@ describe("people, teams and access", () => {
     const roles = await db.select().from(ucomp.membershipRoles);
     const byUser = new Map<string, string[]>();
     for (const m of members) {
-      const r = roles.filter((x) => x.membershipId === m.id).map((x) => x.role).sort();
-      byUser.set(m.userId, [...(byUser.get(m.userId) ?? []), `${m.teamId}:${r.join("+")}`].sort());
+      const r = roles
+        .filter((x) => x.membershipId === m.id)
+        .map((x) => x.role)
+        .sort();
+      byUser.set(
+        m.userId,
+        [...(byUser.get(m.userId) ?? []), `${m.teamId}:${r.join("+")}`].sort(),
+      );
     }
     expect(byUser.get("maya")).toEqual(["coral-offers:author"]);
     expect(byUser.get("jordan")).toEqual(["coral-offers:approver"]);
     expect(byUser.get("alex")).toEqual(["coral-offers:approver+team_admin"]);
-    expect(byUser.get("priya")).toEqual(["coral-offers:author", "deposits:viewer"]);
+    expect(byUser.get("priya")).toEqual([
+      "coral-offers:author",
+      "deposits:viewer",
+    ]);
     expect(byUser.get("sam")).toEqual(["coral-offers:viewer"]);
     expect(byUser.get("dana")).toEqual(["coral-offers:viewer"]);
-    for (const none of ["riley", "taylor", "morgan"]) expect(byUser.has(none)).toBe(false);
+    for (const none of ["riley", "taylor", "morgan"])
+      expect(byUser.has(none)).toBe(false);
 
     // Card Statements has no switchable persona; Coral Offers has 7 members (Dana Park joined in Phase 6).
-    const personaIds = new Set(users.filter((u) => u.isPersona).map((u) => u.id));
-    expect(members.filter((m) => m.teamId === "card-statements").some((m) => personaIds.has(m.userId))).toBe(false);
+    const personaIds = new Set(
+      users.filter((u) => u.isPersona).map((u) => u.id),
+    );
+    expect(
+      members
+        .filter((m) => m.teamId === "card-statements")
+        .some((m) => personaIds.has(m.userId)),
+    ).toBe(false);
     expect(members.filter((m) => m.teamId === "coral-offers")).toHaveLength(7);
   });
 
   it("seeds the inactivity story and the stretch persona", () => {
     const devon = users.find((u) => u.id === "devon");
     const lastActive = devon?.lastActiveAt?.getTime() ?? 0;
-    expect(Math.abs(base.getTime() - lastActive - 95 * DAY)).toBeLessThan(2 * 3_600_000);
+    expect(Math.abs(base.getTime() - lastActive - 95 * DAY)).toBeLessThan(
+      2 * 3_600_000,
+    );
     expect(users.find((u) => u.id === "dana")?.isPersona).toBe(true);
     expect(users.find((u) => u.id === "chris")?.name).toBe("Chris Morales");
   });
@@ -228,9 +299,18 @@ describe("people, teams and access", () => {
     const members = await db.select().from(ucomp.memberships);
     const flagged = members.filter((m) => m.inactivityFlaggedAt !== null);
     expect(flagged.map((m) => m.userId)).toEqual(["devon"]);
-    expect(flagged[0].inactivityFlaggedAt?.getTime()).toBe(base.getTime() - 5 * DAY);
-    for (const m of members) expect(m).toMatchObject({ status: "active", statusReason: null, inactivityKeptAt: null });
-    const events = (await db.select().from(ucomp.auditEvents)).filter((e) => e.action === "access.flagged_inactive");
+    expect(flagged[0].inactivityFlaggedAt?.getTime()).toBe(
+      base.getTime() - 5 * DAY,
+    );
+    for (const m of members)
+      expect(m).toMatchObject({
+        status: "active",
+        statusReason: null,
+        inactivityKeptAt: null,
+      });
+    const events = (await db.select().from(ucomp.auditEvents)).filter(
+      (e) => e.action === "access.flagged_inactive",
+    );
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ actorId: null, teamId: "coral-offers" });
   });
@@ -253,15 +333,31 @@ describe("people, teams and access", () => {
     const stages = await db.select().from(ucomp.approvalStages);
     expect(stages).toHaveLength(2);
     for (const stage of stages) {
-      expect(stage).toMatchObject({ position: 0, name: "Team approver", approverRule: { kind: "team_role", role: "approver" } });
+      expect(stage).toMatchObject({
+        position: 0,
+        name: "Team approver",
+        approverRule: { kind: "team_role", role: "approver" },
+      });
     }
-    expect(stages.map((s) => s.contentTypeId)).toEqual(["ct_disclosure", "ct_alert"]);
+    expect(stages.map((s) => s.contentTypeId)).toEqual([
+      "ct_disclosure",
+      "ct_alert",
+    ]);
     const consumers = await db.select().from(ucomp.consumers);
-    expect(consumers.map((c) => c.id).sort()).toEqual(["coral", "deposits-online"]);
+    expect(consumers.map((c) => c.id).sort()).toEqual([
+      "coral",
+      "deposits-online",
+    ]);
   });
 
   it("gives every team the app name and short code its messages come from, so no preview shows the fallback", async () => {
-    const rows = await db.select({ id: ucomp.teams.id, appName: ucomp.teams.appName, smsSender: ucomp.teams.smsSender }).from(ucomp.teams);
+    const rows = await db
+      .select({
+        id: ucomp.teams.id,
+        appName: ucomp.teams.appName,
+        smsSender: ucomp.teams.smsSender,
+      })
+      .from(ucomp.teams);
     expect(rows.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
       { id: "card-statements", appName: "Card Center", smsSender: "22737" },
       { id: "coral-offers", appName: "Coral", smsSender: "26725" },
@@ -272,84 +368,170 @@ describe("people, teams and access", () => {
 
 describe("lifecycle states", () => {
   it("shows every state among the Coral Offers versions", () => {
-    const coralTemplates = new Set(templates.filter((t) => t.teamId === "coral-offers").map((t) => t.id));
-    const states = new Set(versions.filter((v) => coralTemplates.has(v.templateId)).map((v) => v.state));
-    expect([...states].sort()).toEqual(
-      ["active", "changes_requested", "draft", "in_review", "revoked", "superseded"],
+    const coralTemplates = new Set(
+      templates.filter((t) => t.teamId === "coral-offers").map((t) => t.id),
     );
+    const states = new Set(
+      versions
+        .filter((v) => coralTemplates.has(v.templateId))
+        .map((v) => v.state),
+    );
+    expect([...states].sort()).toEqual([
+      "active",
+      "changes_requested",
+      "draft",
+      "in_review",
+      "revoked",
+      "superseded",
+    ]);
   });
 
   it("has at most one draft and one active version per template", () => {
     for (const t of templates) {
       const own = versions.filter((v) => v.templateId === t.id);
-      expect(own.filter((v) => v.state === "draft").length).toBeLessThanOrEqual(1);
-      expect(own.filter((v) => v.state === "active").length).toBeLessThanOrEqual(1);
+      expect(own.filter((v) => v.state === "draft").length).toBeLessThanOrEqual(
+        1,
+      );
+      expect(
+        own.filter((v) => v.state === "active").length,
+      ).toBeLessThanOrEqual(1);
     }
   });
 
   it("numbers versions only after submit: released numbers 1..n, and each number's rounds 1..k", () => {
     for (const t of templates) {
-      const own = versions.filter((v) => v.templateId === t.id && v.state !== "draft");
-      const released = own.filter((v) => isReleased(v.state)).map((v) => v.number!).sort((a, b) => a - b);
-      released.forEach((n, i) => expect(n, `${t.id} released numbers`).toBe(i + 1));
+      const own = versions.filter(
+        (v) => v.templateId === t.id && v.state !== "draft",
+      );
+      const released = own
+        .filter((v) => isReleased(v.state))
+        .map((v) => v.number!)
+        .sort((a, b) => a - b);
+      released.forEach((n, i) =>
+        expect(n, `${t.id} released numbers`).toBe(i + 1),
+      );
       for (const number of new Set(own.map((v) => v.number!))) {
-        const rounds = own.filter((v) => v.number === number).map((v) => v.round!).sort((a, b) => a - b);
-        rounds.forEach((r, i) => expect(r, `${t.id} v${number} rounds`).toBe(i + 1));
+        const rounds = own
+          .filter((v) => v.number === number)
+          .map((v) => v.round!)
+          .sort((a, b) => a - b);
+        rounds.forEach((r, i) =>
+          expect(r, `${t.id} v${number} rounds`).toBe(i + 1),
+        );
       }
     }
-    for (const v of versions.filter((x) => x.state === "draft")) expect([v.number, v.round]).toEqual([null, null]);
+    for (const v of versions.filter((x) => x.state === "draft"))
+      expect([v.number, v.round]).toEqual([null, null]);
   });
 
   it("matches the five Coral templates in the build plan", () => {
-    const states = (key: string) => versionsOf(key).map((v) => `${v.number ?? "draft"}:${v.state}`).sort();
-    const rounds = (key: string) => versionsOf(key).map((v) => `${v.number ?? "draft"}/${v.round ?? "-"}:${v.state}`).sort();
+    const states = (key: string) =>
+      versionsOf(key)
+        .map((v) => `${v.number ?? "draft"}:${v.state}`)
+        .sort();
+    const rounds = (key: string) =>
+      versionsOf(key)
+        .map((v) => `${v.number ?? "draft"}/${v.round ?? "-"}:${v.state}`)
+        .sort();
     expect(states("balance-transfer")).toEqual(["1:superseded", "2:active"]);
     // v3 was sent back on round 1 and is in review on round 2.
-    expect(rounds("cash-back")).toEqual(["1/1:superseded", "2/1:active", "3/1:changes_requested", "3/2:in_review"]);
-    expect(states("annual-fee-waiver")).toEqual(["1:changes_requested", "draft:draft"]);
+    expect(rounds("cash-back")).toEqual([
+      "1/1:superseded",
+      "2/1:active",
+      "3/1:changes_requested",
+      "3/2:in_review",
+    ]);
+    expect(states("annual-fee-waiver")).toEqual([
+      "1:changes_requested",
+      "draft:draft",
+    ]);
     expect(states("holiday-points")).toEqual(["1:revoked", "2:active"]);
     expect(states("rate-change-notice")).toEqual(["1:active"]);
-    expect(templates.find((t) => t.id === tpl("rate-change-notice"))?.starterKey).toBe("rate_change_notice");
+    expect(
+      templates.find((t) => t.id === tpl("rate-change-notice"))?.starterKey,
+    ).toBe("rate_change_notice");
   });
 
   it("gives Coral Offers three alerts, on the Alert content type: Active, In review and a Draft", () => {
-    const states = (key: string) => versionsOf(key).map((v) => `${v.number ?? "draft"}:${v.state}`);
+    const states = (key: string) =>
+      versionsOf(key).map((v) => `${v.number ?? "draft"}:${v.state}`);
     expect(states("payment-due-reminder")).toEqual(["1:active"]);
     expect(states("card-used-abroad")).toEqual(["1:in_review"]);
     expect(states("rate-change-heads-up")).toEqual(["draft:draft"]);
     for (const key of ALERTS) {
       const template = templates.find((t) => t.id === tpl(key))!;
-      expect(template).toMatchObject({ teamId: "coral-offers", contentTypeId: "ct_alert" });
-      for (const v of versionsOf(key)) expect(v.channels).toEqual(["push", "sms"]);
+      expect(template).toMatchObject({
+        teamId: "coral-offers",
+        contentTypeId: "ct_alert",
+      });
+      for (const v of versionsOf(key))
+        expect(v.channels).toEqual(["push", "sms"]);
       // Each submitted version froze the Alert's footer, as submit does; a draft shows the content type's.
-      for (const v of versionsOf(key)) expect(v.smsFooter).toBe(v.state === "draft" ? null : "Coral: Reply STOP to opt out, HELP for help.");
+      for (const v of versionsOf(key))
+        expect(v.smsFooter).toBe(
+          v.state === "draft"
+            ? null
+            : "Coral: Reply STOP to opt out, HELP for help.",
+        );
     }
     for (const v of versionsOn("ct_disclosure")) expect(v.smsFooter).toBeNull();
-    expect(versionsOf("payment-due-reminder")[0]).toMatchObject({ name: "Payment Due Reminder", stages: [{ id: "stage_alert_0" }] });
-    expect(templates.find((t) => t.id === tpl("payment-due-reminder"))?.starterKey).toBe("payment_reminder");
-    expect(templates.find((t) => t.id === tpl("card-used-abroad"))?.starterKey).toBe("card_activity");
+    expect(versionsOf("payment-due-reminder")[0]).toMatchObject({
+      name: "Payment Due Reminder",
+      stages: [{ id: "stage_alert_0" }],
+    });
+    expect(
+      templates.find((t) => t.id === tpl("payment-due-reminder"))?.starterKey,
+    ).toBe("payment_reminder");
+    expect(
+      templates.find((t) => t.id === tpl("card-used-abroad"))?.starterKey,
+    ).toBe("card_activity");
     // Only alerts are on the Alert content type, and every other template is a document.
-    expect(new Set(versionsOn("ct_alert").map((v) => v.templateId)).size).toBe(3);
-    for (const v of versionsOn("ct_disclosure")) expect(v.channels.every((c) => ["pdf", "web", "email"].includes(c))).toBe(true);
+    expect(new Set(versionsOn("ct_alert").map((v) => v.templateId)).size).toBe(
+      3,
+    );
+    for (const v of versionsOn("ct_disclosure"))
+      expect(v.channels.every((c) => ["pdf", "web", "email"].includes(c))).toBe(
+        true,
+      );
   });
 
   it("gives High-Yield Savings v2 approved on round 3, after Naomi sent rounds 1 and 2 back", async () => {
-    const rounds = versionsOf("high-yield-savings").map((v) => `${v.number}/${v.round}:${v.state}`).sort();
-    expect(rounds).toEqual(["1/1:superseded", "2/1:changes_requested", "2/2:changes_requested", "2/3:active"]);
+    const rounds = versionsOf("high-yield-savings")
+      .map((v) => `${v.number}/${v.round}:${v.state}`)
+      .sort();
+    expect(rounds).toEqual([
+      "1/1:superseded",
+      "2/1:changes_requested",
+      "2/2:changes_requested",
+      "2/3:active",
+    ]);
     const sentBack = (await db.select().from(ucomp.approvals)).filter(
-      (a) => versionsOf("high-yield-savings").some((v) => v.id === a.versionId) && a.decision === "changes_requested",
+      (a) =>
+        versionsOf("high-yield-savings").some((v) => v.id === a.versionId) &&
+        a.decision === "changes_requested",
     );
     expect(sentBack.map((a) => a.actorId)).toEqual(["naomi", "naomi"]);
     // Each round resubmits the one sent back.
-    const [r1, r2, r3] = [1, 2, 3].map((round) => versionsOf("high-yield-savings").find((v) => v.number === 2 && v.round === round)!);
-    expect([r2!.basedOnVersionId, r3!.basedOnVersionId]).toEqual([r1!.id, r2!.id]);
+    const [r1, r2, r3] = [1, 2, 3].map((round) =>
+      versionsOf("high-yield-savings").find(
+        (v) => v.number === 2 && v.round === round,
+      )!,
+    );
+    expect([r2!.basedOnVersionId, r3!.basedOnVersionId]).toEqual([
+      r1!.id,
+      r2!.id,
+    ]);
   });
 
   it("gives Deposits and Card Statements templates in Active and Draft", () => {
     for (const team of ["deposits", "card-statements"]) {
-      const ids = new Set(templates.filter((t) => t.teamId === team).map((t) => t.id));
+      const ids = new Set(
+        templates.filter((t) => t.teamId === team).map((t) => t.id),
+      );
       expect(ids.size).toBeGreaterThanOrEqual(2);
-      const states = new Set(versions.filter((v) => ids.has(v.templateId)).map((v) => v.state));
+      const states = new Set(
+        versions.filter((v) => ids.has(v.templateId)).map((v) => v.state),
+      );
       expect(states.has("active")).toBe(true);
       expect(states.has("draft")).toBe(true);
     }
@@ -358,7 +540,10 @@ describe("lifecycle states", () => {
   it("sets the sunset 21 days out, by Jordan, on Balance Transfer v1: 00:00 Eastern on that day", () => {
     const v1 = version("balance-transfer", 1);
     expect(v1.sunsetSetBy).toBe("jordan");
-    const day = todayIn(new Date(base.getTime() + 21 * DAY), "America/New_York");
+    const day = todayIn(
+      new Date(base.getTime() + 21 * DAY),
+      "America/New_York",
+    );
     expect(v1.sunsetAt).toEqual(sunsetInstant(day, "America/New_York"));
     expect(sunsetDay(v1.sunsetAt!, "America/New_York")).toBe(day);
     expect(version("balance-transfer", 2).sunsetAt).toBeNull();
@@ -367,7 +552,11 @@ describe("lifecycle states", () => {
 
   it("records the Holiday Points revoke with two different approvers", async () => {
     const v1 = version("holiday-points", 1);
-    expect(v1.revoke).toMatchObject({ reason: "Wrong bonus amount", startedBy: "jordan", confirmedBy: "alex" });
+    expect(v1.revoke).toMatchObject({
+      reason: "Wrong bonus amount",
+      startedBy: "jordan",
+      confirmedBy: "alex",
+    });
     expect(v1.revoke?.confirmedAt).toBeTruthy();
     expect(v1.revoke?.startedBy).not.toBe(v1.revoke?.confirmedBy);
   });
@@ -387,15 +576,19 @@ describe("lifecycle states", () => {
       expect(v.writers).toContain(v.createdBy);
       if (v.submittedBy) expect(v.writers).toContain(v.submittedBy);
     }
-    expect(version("annual-fee-waiver", null).writers).toEqual(version("annual-fee-waiver", 1).writers);
+    expect(version("annual-fee-waiver", null).writers).toEqual(
+      version("annual-fee-waiver", 1).writers,
+    );
     // Cash Back v3 was copied from the Active v2: it starts afresh.
     expect(version("cash-back", 3).writers).toEqual(["maya"]);
   });
 
   it("gives frozen versions the timestamps their state implies", () => {
     for (const v of versions) {
-      if (["active", "superseded", "revoked"].includes(v.state)) expect(v.activatedAt).toBeTruthy();
-      if (["superseded", "revoked"].includes(v.state) && v.revoke === null) expect(v.supersededAt).toBeTruthy();
+      if (["active", "superseded", "revoked"].includes(v.state))
+        expect(v.activatedAt).toBeTruthy();
+      if (["superseded", "revoked"].includes(v.state) && v.revoke === null)
+        expect(v.supersededAt).toBeTruthy();
       if (v.state !== "draft") expect(v.submittedAt).toBeTruthy();
       expect(v.createdAt.getTime()).toBeLessThanOrEqual(base.getTime());
       expect(v.updatedAt.getTime()).toBeLessThanOrEqual(base.getTime());
@@ -406,10 +599,18 @@ describe("lifecycle states", () => {
     const v3 = version("cash-back", 3);
     expect(v3.submittedBy).toBe("maya");
     expect(v3.contractChanges).toEqual([
-      { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
+      {
+        kind: "added",
+        key: "annual_fee",
+        breaking: true,
+        type: "currency",
+        required: true,
+      },
     ]);
     expect(v3.variables.map((v) => v.key)).toContain("annual_fee");
-    expect(version("cash-back", 2).variables.map((v) => v.key)).not.toContain("annual_fee");
+    expect(version("cash-back", 2).variables.map((v) => v.key)).not.toContain(
+      "annual_fee",
+    );
   });
 });
 
@@ -419,7 +620,8 @@ describe("bodies", () => {
       const blocks = v.body.content ?? [];
       expect(blocks.length).toBeGreaterThan(0);
       const ids = blocks.map((b) => b.attrs?.id);
-      for (const id of ids) expect(typeof id === "string" && id.length > 0).toBe(true);
+      for (const id of ids)
+        expect(typeof id === "string" && id.length > 0).toBe(true);
       expect(new Set(ids).size).toBe(ids.length);
       for (const b of blocks) expect(BLOCK_TYPES.has(b.type!)).toBe(true);
     }
@@ -428,13 +630,19 @@ describe("bodies", () => {
   it("parses as valid TipTap documents under the contract schema", () => {
     for (const v of versions) {
       for (const doc of [v.body, ...fieldDocs(v.channelFields)]) {
-        if (doc) expect(() => PMNode.fromJSON(contractSchema, doc).check()).not.toThrow();
+        if (doc)
+          expect(() =>
+            PMNode.fromJSON(contractSchema, doc).check(),
+          ).not.toThrow();
       }
     }
   });
 
   it("keeps the ids of surviving blocks stable between versions", () => {
-    const ids = (n: number) => new Set((version("cash-back", n).body.content ?? []).map((b) => b.attrs?.id));
+    const ids = (n: number) =>
+      new Set(
+        (version("cash-back", n).body.content ?? []).map((b) => b.attrs?.id),
+      );
     const v2 = ids(2);
     const shared = [...ids(3)].filter((id) => v2.has(id));
     expect(shared.length).toBeGreaterThan(8);
@@ -457,7 +665,9 @@ describe("bodies", () => {
 
   it("has the required sections as ordered H2s in every disclosure", () => {
     for (const v of versionsOn("ct_disclosure")) {
-      const required = (v.body.content ?? []).filter((b) => b.type === "heading" && b.attrs?.requiredKey);
+      const required = (v.body.content ?? []).filter(
+        (b) => b.type === "heading" && b.attrs?.requiredKey,
+      );
       expect(required.map((b) => b.attrs!.requiredKey)).toEqual(REQUIRED);
       for (const h of required) expect(h.attrs!.level).toBe(2);
     }
@@ -468,7 +678,10 @@ describe("bodies", () => {
     expect(alerts).toHaveLength(3);
     for (const v of alerts) {
       expect(v.body.content).toHaveLength(1);
-      expect(v.body.content?.[0]).toEqual({ type: "paragraph", attrs: { id: expect.stringMatching(/^b_/) } });
+      expect(v.body.content?.[0]).toEqual({
+        type: "paragraph",
+        attrs: { id: expect.stringMatching(/^b_/) },
+      });
     }
   });
 
@@ -494,7 +707,14 @@ describe("bodies", () => {
       });
     }
     // The set shows every block kind the editor supports.
-    for (const type of ["table", "bulletList", "orderedList", "callout", "horizontalRule", "variable"]) {
+    for (const type of [
+      "table",
+      "bulletList",
+      "orderedList",
+      "callout",
+      "horizontalRule",
+      "variable",
+    ]) {
       expect(seen.has(type)).toBe(true);
     }
   });
@@ -502,17 +722,27 @@ describe("bodies", () => {
   it("puts a callout in Legal notices and a table in Rates and fees", () => {
     const v = version("cash-back", 2);
     const blocks = v.body.content ?? [];
-    const at = (key: string) => blocks.findIndex((b) => b.attrs?.requiredKey === key);
-    const between = (from: number, to: number) => blocks.slice(from + 1, to < 0 ? undefined : to).map((b) => b.type);
-    expect(between(at("rates_and_fees"), at("legal_notices"))).toContain("table");
+    const at = (key: string) =>
+      blocks.findIndex((b) => b.attrs?.requiredKey === key);
+    const between = (from: number, to: number) =>
+      blocks.slice(from + 1, to < 0 ? undefined : to).map((b) => b.type);
+    expect(between(at("rates_and_fees"), at("legal_notices"))).toContain(
+      "table",
+    );
     expect(between(at("legal_notices"), -1)).toContain("callout");
   });
 
   it("has the same variable list as the version's sample sets cover", () => {
     for (const v of versions) {
-      expect(v.sampleSets.map((s) => s.id)).toEqual(["typical", "long", "minimum"]);
+      expect(v.sampleSets.map((s) => s.id)).toEqual([
+        "typical",
+        "long",
+        "minimum",
+      ]);
       for (const set of v.sampleSets) {
-        expect(Object.keys(set.values).sort()).toEqual(v.variables.map((x) => x.key).sort());
+        expect(Object.keys(set.values).sort()).toEqual(
+          v.variables.map((x) => x.key).sort(),
+        );
       }
     }
   });
@@ -522,7 +752,8 @@ describe("bodies", () => {
       for (const field of ALL_CHANNEL_FIELDS) {
         const value = channelFieldValue(v.channelFields, field);
         if (value) expect(v.channels, field.id).toContain(field.channel);
-        if (field.required && v.channels.includes(field.channel)) expect(value, field.id).toBeTruthy();
+        if (field.required && v.channels.includes(field.channel))
+          expect(value, field.id).toBeTruthy();
       }
     }
   });
@@ -533,8 +764,14 @@ describe("alerts", () => {
   // budget: GSM-7 as typed, within 3 parts with the long sample values, no public shortener, and a push
   // inside 4,096 bytes on both platforms (decisions 0034 and 0035). The draft too, so the demo can submit it.
   it("pass every submit rule, with the Alert content type's footer and part budget", async () => {
-    const [alert] = await db.select().from(ucomp.contentTypes).where(eq(ucomp.contentTypes.id, "ct_alert"));
-    const rules = { smsFooter: alert!.smsFooter, smsMaxParts: alert!.smsMaxParts };
+    const [alert] = await db
+      .select()
+      .from(ucomp.contentTypes)
+      .where(eq(ucomp.contentTypes.id, "ct_alert"));
+    const rules = {
+      smsFooter: alert!.smsFooter,
+      smsMaxParts: alert!.smsMaxParts,
+    };
     for (const v of versionsOn("ct_alert")) {
       expect(trySubmit(v, rules, base), v.name).toMatchObject({ ok: true });
     }
@@ -544,21 +781,28 @@ describe("alerts", () => {
     const alerts = versionsOn("ct_alert");
     const keys = (doc: JSONContent | undefined) => {
       const found: string[] = [];
-      if (doc) walk(doc, (n) => n.type === "variable" && found.push(n.attrs!.key));
+      if (doc)
+        walk(doc, (n) => n.type === "variable" && found.push(n.attrs!.key));
       return found;
     };
-    for (const v of alerts) expect(keys(v.channelFields.push?.title), v.name).toEqual([]);
-    expect(alerts.filter((v) => v.channelFields.push?.subtitle).map((v) => v.name).sort()).toEqual([
-      "Card Used Abroad",
-      "Payment Due Reminder",
-    ]);
+    for (const v of alerts)
+      expect(keys(v.channelFields.push?.title), v.name).toEqual([]);
+    expect(
+      alerts
+        .filter((v) => v.channelFields.push?.subtitle)
+        .map((v) => v.name)
+        .sort(),
+    ).toEqual(["Card Used Abroad", "Payment Due Reminder"]);
   });
 
   it("use every variable they declare, in the push or the SMS", () => {
     for (const v of versionsOn("ct_alert")) {
       const used = new Set<string>();
-      for (const doc of fieldDocs(v.channelFields)) walk(doc, (n) => n.type === "variable" && used.add(n.attrs!.key));
-      expect([...used].sort(), v.name).toEqual(v.variables.map((x) => x.key).sort());
+      for (const doc of fieldDocs(v.channelFields))
+        walk(doc, (n) => n.type === "variable" && used.add(n.attrs!.key));
+      expect([...used].sort(), v.name).toEqual(
+        v.variables.map((x) => x.key).sort(),
+      );
     }
   });
 });
@@ -571,9 +815,12 @@ describe("comments", () => {
       const origin = versions.find((v) => v.id === t.originVersionId)!;
       // A thread about the whole version (a change request's reason) has no block.
       if (t.blockId === DOCUMENT_THREAD) continue;
-      const blocks = (v: typeof origin) => (v.body.content ?? []).map((b) => b.attrs?.id);
+      const blocks = (v: typeof origin) =>
+        (v.body.content ?? []).map((b) => b.attrs?.id);
       expect(blocks(origin)).toContain(t.blockId);
-      for (const draft of versions.filter((v) => v.basedOnVersionId === origin.id && v.state === "draft")) {
+      for (const draft of versions.filter(
+        (v) => v.basedOnVersionId === origin.id && v.state === "draft",
+      )) {
         expect(blocks(draft)).toContain(t.blockId);
       }
     }
@@ -583,54 +830,114 @@ describe("comments", () => {
     const threads = await db.select().from(ucomp.commentThreads);
     const comments = await db.select().from(ucomp.comments);
     const events = await db.select().from(ucomp.auditEvents);
-    const sentBack = (await db.select().from(ucomp.approvals)).filter((a) => a.decision === "changes_requested");
+    const sentBack = (await db.select().from(ucomp.approvals)).filter(
+      (a) => a.decision === "changes_requested",
+    );
     expect(sentBack.length).toBeGreaterThanOrEqual(4);
     for (const a of sentBack) {
       const round = versions.find((v) => v.id === a.versionId)!;
-      const thread = threads.find((t) => t.originVersionId === round.id && t.blockId === DOCUMENT_THREAD);
-      expect(thread, `${round.templateId} v${round.number} round ${round.round}`).toBeDefined();
-      const first = comments.filter((c) => c.threadId === thread!.id).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())[0];
-      expect(first).toMatchObject({ authorId: a.actorId, kind: "change_request", body: a.reason, createdAt: a.decidedAt });
+      const thread = threads.find(
+        (t) => t.originVersionId === round.id && t.blockId === DOCUMENT_THREAD,
+      );
+      expect(
+        thread,
+        `${round.templateId} v${round.number} round ${round.round}`,
+      ).toBeDefined();
+      const first = comments
+        .filter((c) => c.threadId === thread!.id)
+        .sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())[0];
+      expect(first).toMatchObject({
+        authorId: a.actorId,
+        kind: "change_request",
+        body: a.reason,
+        createdAt: a.decidedAt,
+      });
 
       // As submit resolves it: by the next round's submitter, then, naming the round that answered it.
-      const next = versions.find((v) => v.basedOnVersionId === round.id && v.number !== null);
+      const next = versions.find(
+        (v) => v.basedOnVersionId === round.id && v.number !== null,
+      );
       if (!next) {
         expect(thread!.status).toBe("open");
         continue;
       }
-      expect(thread).toMatchObject({ status: "resolved", resolvedBy: next.submittedBy, resolvedAt: next.submittedAt });
-      const resolved = events.filter((e) => e.action === "thread.resolved" && (e.details as { threadId?: string }).threadId === thread!.id);
-      expect(resolved.map((e) => [e.actorId, e.versionId, e.at.getTime(), e.details])).toEqual([
+      expect(thread).toMatchObject({
+        status: "resolved",
+        resolvedBy: next.submittedBy,
+        resolvedAt: next.submittedAt,
+      });
+      const resolved = events.filter(
+        (e) =>
+          e.action === "thread.resolved" &&
+          (e.details as { threadId?: string }).threadId === thread!.id,
+      );
+      expect(
+        resolved.map((e) => [
+          e.actorId,
+          e.versionId,
+          e.at.getTime(),
+          e.details,
+        ]),
+      ).toEqual([
         [
           next.submittedBy,
           round.id,
           next.submittedAt!.getTime(),
-          { threadId: thread!.id, blockId: DOCUMENT_THREAD, auto: true, resolvedWith: next.number, resolvedWithRound: next.round },
+          {
+            threadId: thread!.id,
+            blockId: DOCUMENT_THREAD,
+            auto: true,
+            resolvedWith: next.number,
+            resolvedWithRound: next.round,
+          },
         ],
       ]);
     }
   });
 
   it("gives High-Yield Savings v2 rounds 1 and 2 Naomi's reasons, each resolved by Eli submitting the next round", async () => {
-    const ids = versionsOf("high-yield-savings").filter((v) => v.number === 2).sort((a, b) => a.round! - b.round!).map((v) => v.id);
-    const threads = (await db.select().from(ucomp.commentThreads)).filter((t) => t.templateId === tpl("high-yield-savings"));
-    expect(threads.map((t) => [ids.indexOf(t.originVersionId) + 1, t.blockId, t.status, t.resolvedBy]).sort()).toEqual([
+    const ids = versionsOf("high-yield-savings")
+      .filter((v) => v.number === 2)
+      .sort((a, b) => a.round! - b.round!)
+      .map((v) => v.id);
+    const threads = (await db.select().from(ucomp.commentThreads)).filter(
+      (t) => t.templateId === tpl("high-yield-savings"),
+    );
+    expect(
+      threads
+        .map((t) => [
+          ids.indexOf(t.originVersionId) + 1,
+          t.blockId,
+          t.status,
+          t.resolvedBy,
+        ])
+        .sort(),
+    ).toEqual([
       [1, DOCUMENT_THREAD, "resolved", "eli"],
       [2, DOCUMENT_THREAD, "resolved", "eli"],
     ]);
     const answered = (await db.select().from(ucomp.auditEvents))
-      .filter((e) => e.templateId === tpl("high-yield-savings") && e.action === "thread.resolved")
-      .map((e) => (e.details as { resolvedWithRound: number }).resolvedWithRound)
+      .filter(
+        (e) =>
+          e.templateId === tpl("high-yield-savings") &&
+          e.action === "thread.resolved",
+      )
+      .map(
+        (e) => (e.details as { resolvedWithRound: number }).resolvedWithRound,
+      )
       .sort();
     expect(answered).toEqual([2, 3]);
   });
 
   it("gives Annual Fee Waiver one resolved and one open thread, with Jordan's change request", async () => {
-    const threads = (await db.select().from(ucomp.commentThreads)).filter((t) => t.templateId === tpl("annual-fee-waiver"));
+    const threads = (await db.select().from(ucomp.commentThreads)).filter(
+      (t) => t.templateId === tpl("annual-fee-waiver"),
+    );
     expect(threads.map((t) => t.status).sort()).toEqual(["open", "resolved"]);
     const comments = await db.select().from(ucomp.comments);
     const change = comments.filter(
-      (c) => c.kind === "change_request" && threads.some((t) => t.id === c.threadId),
+      (c) =>
+        c.kind === "change_request" && threads.some((t) => t.id === c.threadId),
     );
     expect(change).toHaveLength(1);
     expect(change[0].authorId).toBe("jordan");
@@ -653,8 +960,19 @@ describe("render history", () => {
     const info = await client.execute("PRAGMA table_info(render_log)");
     expect(info.rows.map((r) => String(r.name)).sort()).toEqual(
       [
-        "at", "channel", "consumer_id", "correlation_id", "duration_ms", "error_code", "id",
-        "is_preview", "outcome", "platform", "template_id", "version_id", "version_number",
+        "at",
+        "channel",
+        "consumer_id",
+        "correlation_id",
+        "duration_ms",
+        "error_code",
+        "id",
+        "is_preview",
+        "outcome",
+        "platform",
+        "template_id",
+        "version_id",
+        "version_number",
       ].sort(),
     );
 
@@ -676,7 +994,8 @@ describe("render history", () => {
     for (const r of rows) {
       const v = versionById.get(r.versionId);
       expect(v?.templateId).toBe(r.templateId);
-      if (r.consumerId !== null) expect(["coral", "deposits-online"]).toContain(r.consumerId);
+      if (r.consumerId !== null)
+        expect(["coral", "deposits-online"]).toContain(r.consumerId);
     }
   });
 
@@ -685,7 +1004,8 @@ describe("render history", () => {
     const previews = rows.filter((r) => r.isPreview);
     expect(previews.length).toBeGreaterThanOrEqual(10);
     for (const p of previews) expect(p.consumerId).toBeNull();
-    for (const r of rows.filter((x) => !x.isPreview)) expect(r.consumerId).not.toBeNull();
+    for (const r of rows.filter((x) => !x.isPreview))
+      expect(r.consumerId).not.toBeNull();
     const errors = rows.filter((r) => r.outcome === "error");
     expect(errors.length).toBeGreaterThanOrEqual(3);
     expect(errors.length).toBeLessThan(40);
@@ -696,7 +1016,12 @@ describe("render history", () => {
     const rows = await db.select().from(ucomp.renderLog);
     const v1 = version("balance-transfer", 1);
     const v2 = version("balance-transfer", 2);
-    const last = (id: string) => Math.max(...rows.filter((r) => r.versionId === id && r.consumerId === "coral").map((r) => r.at.getTime()));
+    const last = (id: string) =>
+      Math.max(
+        ...rows
+          .filter((r) => r.versionId === id && r.consumerId === "coral")
+          .map((r) => r.at.getTime()),
+      );
     expect(base.getTime() - last(v1.id)).toBeLessThan(DAY);
     expect(base.getTime() - last(v2.id)).toBeLessThan(DAY);
   });
@@ -704,20 +1029,29 @@ describe("render history", () => {
   it("has Coral rendering Payment Due Reminder v1 as push and SMS every day, and nothing else on those channels", async () => {
     const rows = await db.select().from(ucomp.renderLog);
     const v1 = version("payment-due-reminder", 1);
-    const mine = rows.filter((r) => r.versionId === v1.id && !r.isPreview && r.outcome === "ok");
+    const mine = rows.filter(
+      (r) => r.versionId === v1.id && !r.isPreview && r.outcome === "ok",
+    );
     const push = mine.filter((r) => r.channel === "push").length;
     const sms = mine.filter((r) => r.channel === "sms").length;
     expect(push).toBeGreaterThan(1000);
     expect(sms).toBeGreaterThan(700);
     expect(push + sms).toBe(mine.length);
     expect(new Set(mine.map((r) => r.consumerId))).toEqual(new Set(["coral"]));
-    expect(Math.min(...mine.map((r) => r.at.getTime()))).toBeGreaterThanOrEqual(v1.activatedAt!.getTime());
-    expect(base.getTime() - Math.max(...mine.map((r) => r.at.getTime()))).toBeLessThan(DAY);
+    expect(Math.min(...mine.map((r) => r.at.getTime()))).toBeGreaterThanOrEqual(
+      v1.activatedAt!.getTime(),
+    );
+    expect(
+      base.getTime() - Math.max(...mine.map((r) => r.at.getTime())),
+    ).toBeLessThan(DAY);
 
     // A version renders only its own channels: messages for alerts, documents for the rest.
     const alertIds = new Set(versionsOn("ct_alert").map((v) => v.id));
     for (const r of rows) {
-      expect(["push", "sms"].includes(r.channel), `${r.channel} on ${r.versionId}`).toBe(alertIds.has(r.versionId));
+      expect(
+        ["push", "sms"].includes(r.channel),
+        `${r.channel} on ${r.versionId}`,
+      ).toBe(alertIds.has(r.versionId));
     }
   });
 
@@ -725,16 +1059,21 @@ describe("render history", () => {
     const rows = await db.select().from(ucomp.renderLog);
     const pushes = rows.filter((r) => r.channel === "push");
     expect(pushes.length).toBeGreaterThan(1000);
-    for (const r of rows.filter((x) => x.channel !== "push")) expect(r.platform, `${r.channel} row ${r.id}`).toBeNull();
-    for (const r of pushes) expect(["ios", "android"], r.id).toContain(r.platform);
+    for (const r of rows.filter((x) => x.channel !== "push"))
+      expect(r.platform, `${r.channel} row ${r.id}`).toBeNull();
+    for (const r of pushes)
+      expect(["ios", "android"], r.id).toContain(r.platform);
     // About six in ten for an iPhone.
-    const ios = pushes.filter((r) => r.platform === "ios").length / pushes.length;
+    const ios =
+      pushes.filter((r) => r.platform === "ios").length / pushes.length;
     expect(ios).toBeGreaterThan(0.5);
     expect(ios).toBeLessThan(0.66);
     // A failed push says which phone it failed on.
     const failed = pushes.filter((r) => r.outcome === "error");
     expect(failed.length).toBeGreaterThan(0);
-    expect(new Set(failed.map((r) => r.platform))).toEqual(new Set(["android"]));
+    expect(new Set(failed.map((r) => r.platform))).toEqual(
+      new Set(["android"]),
+    );
   });
 
   it("stops Holiday Points v1 renders at the revoke, and renders nothing for unreleased versions as a consumer", async () => {
@@ -743,11 +1082,15 @@ describe("render history", () => {
     const mine = rows.filter((r) => r.versionId === v1.id);
     expect(mine.length).toBeGreaterThan(100);
     const revokedAt = new Date(v1.revoke!.confirmedAt!).getTime();
-    expect(Math.max(...mine.map((r) => r.at.getTime()))).toBeLessThanOrEqual(revokedAt);
+    expect(Math.max(...mine.map((r) => r.at.getTime()))).toBeLessThanOrEqual(
+      revokedAt,
+    );
 
     for (const state of ["draft", "in_review", "changes_requested"]) {
       for (const v of versions.filter((x) => x.state === state)) {
-        expect(rows.filter((r) => r.versionId === v.id && !r.isPreview)).toHaveLength(0);
+        expect(
+          rows.filter((r) => r.versionId === v.id && !r.isPreview),
+        ).toHaveLength(0);
       }
     }
   });
@@ -763,21 +1106,40 @@ describe("notifications, access and audit", () => {
       expect(approvals.filter((a) => a.versionId === v.id)).toHaveLength(0);
     }
 
-    const notes = (await db.select().from(ucomp.notifications)).filter((n) => n.userId === "jordan");
+    const notes = (await db.select().from(ucomp.notifications)).filter(
+      (n) => n.userId === "jordan",
+    );
     expect(notes).toHaveLength(2);
-    for (const n of notes) expect(n).toMatchObject({ kind: "review_requested", readAt: null, teamId: "coral-offers" });
+    for (const n of notes)
+      expect(n).toMatchObject({
+        kind: "review_requested",
+        readAt: null,
+        teamId: "coral-offers",
+      });
     expect(notes.map((n) => n.href).sort()).toEqual(
       // Cash Back v3 was sent back once, so its link names the round (reviewPath); the alert's first round doesn't.
-      [`/coral-offers/review/${tpl("card-used-abroad")}/1`, `/coral-offers/review/${tpl("cash-back")}/3?round=2`].sort(),
+      [
+        `/coral-offers/review/${tpl("card-used-abroad")}/1`,
+        `/coral-offers/review/${tpl("cash-back")}/3?round=2`,
+      ].sort(),
     );
 
-    const waiting = versions.filter((v) => v.state === "in_review" && v.submittedBy !== "jordan");
-    expect(waiting.map((v) => v.id).sort()).toEqual(pending.map((v) => v.id).sort());
+    const waiting = versions.filter(
+      (v) => v.state === "in_review" && v.submittedBy !== "jordan",
+    );
+    expect(waiting.map((v) => v.id).sort()).toEqual(
+      pending.map((v) => v.id).sort(),
+    );
   });
 
   it("gives Alex an access request and a recertification due in 30 days", async () => {
     const [request] = await db.select().from(ucomp.accessRequests);
-    expect(request).toMatchObject({ userId: "chris", teamId: "coral-offers", role: "author", status: "pending" });
+    expect(request).toMatchObject({
+      userId: "chris",
+      teamId: "coral-offers",
+      role: "author",
+      status: "pending",
+    });
 
     const [recert] = await db.select().from(ucomp.recertifications);
     expect(recert.teamId).toBe("coral-offers");
@@ -787,7 +1149,14 @@ describe("notifications, access and audit", () => {
 
     // Everyone but the Team Admin: Jordan, Maya, Priya, Sam, Devon and Dana.
     const items = await db.select().from(ucomp.recertItems);
-    expect(items.map((i) => i.userId).sort()).toEqual(["dana", "devon", "jordan", "maya", "priya", "sam"]);
+    expect(items.map((i) => i.userId).sort()).toEqual([
+      "dana",
+      "devon",
+      "jordan",
+      "maya",
+      "priya",
+      "sam",
+    ]);
     for (const i of items) expect(i.decision).toBeNull();
 
     const kinds = (await db.select().from(ucomp.notifications))
@@ -799,30 +1168,58 @@ describe("notifications, access and audit", () => {
 
   it("gives Maya a changes-requested notification, and only Coral Offers people get any", async () => {
     const notes = await db.select().from(ucomp.notifications);
-    expect(notes.some((n) => n.userId === "maya" && n.kind === "changes_requested" && !n.readAt)).toBe(true);
-    for (const n of notes) expect(["maya", "jordan", "alex", "priya"]).toContain(n.userId);
+    expect(
+      notes.some(
+        (n) =>
+          n.userId === "maya" && n.kind === "changes_requested" && !n.readAt,
+      ),
+    ).toBe(true);
+    for (const n of notes)
+      expect(["maya", "jordan", "alex", "priya"]).toContain(n.userId);
   });
 
   it("records an audit event for each lifecycle step", async () => {
     const events = await db.select().from(ucomp.auditEvents);
-    const forVersion = (id: string) => events.filter((e) => e.versionId === id).map((e) => e.action);
-    expect(forVersion(version("cash-back", 3).id)).toContain("version.submitted");
-    expect(forVersion(version("annual-fee-waiver", 1).id)).toContain("version.changes_requested");
-    expect(forVersion(version("balance-transfer", 1).id)).toContain("version.sunset_set");
+    const forVersion = (id: string) =>
+      events.filter((e) => e.versionId === id).map((e) => e.action);
+    expect(forVersion(version("cash-back", 3).id)).toContain(
+      "version.submitted",
+    );
+    expect(forVersion(version("annual-fee-waiver", 1).id)).toContain(
+      "version.changes_requested",
+    );
+    expect(forVersion(version("balance-transfer", 1).id)).toContain(
+      "version.sunset_set",
+    );
     expect(forVersion(version("holiday-points", 1).id)).toEqual(
-      expect.arrayContaining(["version.revoke_started", "version.revoke_confirmed"]),
+      expect.arrayContaining([
+        "version.revoke_started",
+        "version.revoke_confirmed",
+      ]),
     );
     for (const v of versions.filter((x) => x.number !== null)) {
       expect(forVersion(v.id)).toContain("version.submitted");
     }
-    for (const e of events) expect(e.at.getTime()).toBeLessThanOrEqual(base.getTime());
-    expect(events.filter((e) => e.action === "draft.edited").every((e) => e.sessionKey)).toBe(true);
+    for (const e of events)
+      expect(e.at.getTime()).toBeLessThanOrEqual(base.getTime());
+    expect(
+      events
+        .filter((e) => e.action === "draft.edited")
+        .every((e) => e.sessionKey),
+    ).toBe(true);
   });
 
   it("sends consumer notices for new versions, the sunset and the revoke", async () => {
     const notices = await db.select().from(ucomp.consumerNotices);
-    const kinds = (templateKey: string) => notices.filter((n) => n.templateId === tpl(templateKey)).map((n) => n.kind).sort();
-    expect(kinds("balance-transfer")).toEqual(["new_version", "sunset_scheduled"]);
+    const kinds = (templateKey: string) =>
+      notices
+        .filter((n) => n.templateId === tpl(templateKey))
+        .map((n) => n.kind)
+        .sort();
+    expect(kinds("balance-transfer")).toEqual([
+      "new_version",
+      "sunset_scheduled",
+    ]);
     expect(kinds("holiday-points")).toEqual(["new_version", "revoked"]);
     expect(kinds("rate-change-notice")).toEqual([]);
   });
@@ -844,43 +1241,64 @@ describe("simulator data", () => {
     expect(links.some((l) => l.offerId === spring!.id)).toBe(false);
     expect(links).toHaveLength(4);
 
-    const pinned = Object.fromEntries(links.map((l) => [l.templateId, l.pinnedVersion]));
+    const pinned = Object.fromEntries(
+      links.map((l) => [l.templateId, l.pinnedVersion]),
+    );
     expect(pinned[tpl("balance-transfer")]).toBe(1);
     expect(pinned[tpl("cash-back")]).toBe(2);
     expect(pinned[tpl("holiday-points")]).toBe(2);
     expect(pinned[tpl("payment-due-reminder")]).toBe(1);
     for (const l of links) {
       const kind = offers.find((o) => o.id === l.offerId)!.kind;
-      expect(l.channels.every((c) => (kind === "alert" ? ["push", "sms"] : ["pdf", "web", "email"]).includes(c))).toBe(true);
+      expect(
+        l.channels.every((c) =>
+          (kind === "alert"
+            ? ["push", "sms"]
+            : ["pdf", "web", "email"]
+          ).includes(c),
+        ),
+      ).toBe(true);
     }
 
     for (const l of links) {
-      const v = versions.find((x) => x.templateId === l.templateId && x.number === l.pinnedVersion)!;
+      const v = versions.find(
+        (x) => x.templateId === l.templateId && x.number === l.pinnedVersion,
+      )!;
       expect(["active", "superseded"]).toContain(v.state);
       const mapped = new Set(Object.keys(l.mapping));
-      for (const variable of v.variables.filter((x) => x.required)) expect(mapped.has(variable.key)).toBe(true);
-      for (const key of mapped) expect(v.variables.map((x) => x.key)).toContain(key);
+      for (const variable of v.variables.filter((x) => x.required))
+        expect(mapped.has(variable.key)).toBe(true);
+      for (const key of mapped)
+        expect(v.variables.map((x) => x.key)).toContain(key);
     }
   });
 
   it("has about ten customers, including one very long name", async () => {
     const customers = await db.select().from(sim.simCustomers);
     expect(customers.length).toBeGreaterThanOrEqual(10);
-    expect(new Set(customers.map((c) => c.homeState)).size).toBeGreaterThanOrEqual(6);
-    expect(customers.some((c) => `${c.firstName} ${c.lastName}`.length > 40)).toBe(true);
+    expect(
+      new Set(customers.map((c) => c.homeState)).size,
+    ).toBeGreaterThanOrEqual(6);
+    expect(
+      customers.some((c) => `${c.firstName} ${c.lastName}`.length > 40),
+    ).toBe(true);
   });
 
   it("gives every customer an annual fee and Spring Travel an offer fee and end date (Phase 5 mapping)", async () => {
     const customers = await db.select().from(sim.simCustomers);
     for (const c of customers) expect(c.annualFee).toMatch(/^\d+$/);
-    const spring = (await db.select().from(sim.simOffers)).find((o) => o.id === "offer_spring_travel")!;
+    const spring = (await db.select().from(sim.simOffers)).find(
+      (o) => o.id === "offer_spring_travel",
+    )!;
     expect(spring.terms?.annualFee).toBe(95);
     expect(spring.terms?.endsOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("gives every customer a fictional phone, iPhone or Android, and a card account for the alerts", async () => {
     const customers = await db.select().from(sim.simCustomers);
-    expect(new Set(customers.map((c) => c.platform))).toEqual(new Set(["ios", "android"]));
+    expect(new Set(customers.map((c) => c.platform))).toEqual(
+      new Set(["ios", "android"]),
+    );
     expect(new Set(customers.map((c) => c.phone)).size).toBe(customers.length);
     for (const c of customers) {
       expect(c.phone).toMatch(/^\+1\d{3}55501\d{2}$/);
@@ -892,19 +1310,28 @@ describe("simulator data", () => {
   });
 
   it("has two alerts with no terms: Payment due linked on Push and SMS, Card used abroad not linked", async () => {
-    const alerts = (await db.select().from(sim.simOffers)).filter((o) => o.kind === "alert");
+    const alerts = (await db.select().from(sim.simOffers)).filter(
+      (o) => o.kind === "alert",
+    );
     expect(alerts.map((a) => [a.name, a.terms])).toEqual([
       ["Payment due", null],
       ["Card used abroad", null],
     ]);
     const links = await db.select().from(sim.simLinks);
-    expect(links.find((l) => l.offerId === "alert_payment_due")).toMatchObject({ templateId: tpl("payment-due-reminder"), channels: ["push", "sms"] });
+    expect(links.find((l) => l.offerId === "alert_payment_due")).toMatchObject({
+      templateId: tpl("payment-due-reminder"),
+      channels: ["push", "sms"],
+    });
     expect(links.some((l) => l.offerId === "alert_card_abroad")).toBe(false);
   });
 
   it("has Coral's seeded notices read, except Balance Transfer v1's sunset", async () => {
-    const notices = (await db.select().from(ucomp.consumerNotices)).filter((n) => n.consumerId === "coral");
-    const reads = new Set((await db.select().from(sim.simNoticeReads)).map((r) => r.noticeId));
+    const notices = (await db.select().from(ucomp.consumerNotices)).filter(
+      (n) => n.consumerId === "coral",
+    );
+    const reads = new Set(
+      (await db.select().from(sim.simNoticeReads)).map((r) => r.noticeId),
+    );
     const unread = notices.filter((n) => !reads.has(n.id));
     expect(unread).toHaveLength(1);
     expect(unread[0].kind).toBe("sunset_scheduled");
@@ -928,14 +1355,22 @@ describe("determinism", () => {
             round: v.round,
             body: v.body,
             // Date samples are relative to the base, so compare the contract without them.
-            variables: v.variables.map(({ key, label, type, required }) => ({ key, label, type, required })),
+            variables: v.variables.map(({ key, label, type, required }) => ({
+              key,
+              label,
+              type,
+              required,
+            })),
           }))
           .sort((a, b) => a.id.localeCompare(b.id));
       expect(shape(otherVersions)).toEqual(shape(versions));
 
       // Timestamps move with the base; offsets from it do not (a sunset is 00:00 Eastern on its day).
       const sunset = otherVersions.find((v) => v.sunsetAt)!;
-      const day = todayIn(new Date(base.getTime() + 37 * DAY + 21 * DAY), "America/New_York");
+      const day = todayIn(
+        new Date(base.getTime() + 37 * DAY + 21 * DAY),
+        "America/New_York",
+      );
       expect(sunset.sunsetAt).toEqual(sunsetInstant(day, "America/New_York"));
     } finally {
       other.client.close();

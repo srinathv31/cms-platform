@@ -8,7 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatShortDate } from "@/domain/dates";
 import { plural } from "@/domain/plural";
-import type { ImportOriginalRef, ImportOriginalView } from "@/domain/import-types";
+import type {
+  ImportOriginalRef,
+  ImportOriginalView,
+} from "@/domain/import-types";
 import { DocxSource } from "./docx-source";
 import { OriginalFailed } from "./original-failed";
 import { PdfSource } from "./pdf-source";
@@ -17,8 +20,10 @@ import { TxtSource } from "./txt-source";
 /** Each original's view as fetched in this tab: it never changes, so coming back to the tab is instant. */
 const viewCache = new Map<string, ImportOriginalView>();
 
-type Loaded = { status: "loading" } | { status: "ready"; view: ImportOriginalView } | { status: "failed" };
-
+type Loaded =
+  | { status: "loading" }
+  | { status: "ready"; view: ImportOriginalView }
+  | { status: "failed" };
 
 /** "860 bytes", "24 KB", "1.2 MB". */
 export function formatFileSize(bytes: number): string {
@@ -38,7 +43,13 @@ export function formatFileSize(bytes: number): string {
  * stands where the report and the source go, and is swapped out whole, so nothing that was on screen
  * moves when they arrive.
  */
-export function OriginalView({ original, today }: { original: ImportOriginalRef; /** The demo clock's day, YYYY-MM-DD. */ today: string }) {
+export function OriginalView({
+  original,
+  today,
+}: {
+  original: ImportOriginalRef;
+  /** The demo clock's day, YYYY-MM-DD. */ today: string;
+}) {
   const { uploadId } = original;
   const [loaded, setLoaded] = useState<Loaded>(() => {
     const cached = viewCache.get(uploadId);
@@ -49,7 +60,9 @@ export function OriginalView({ original, today }: { original: ImportOriginalRef;
   useEffect(() => {
     if (viewCache.has(uploadId)) return;
     let live = true;
-    fetch(`/api/imports/${encodeURIComponent(uploadId)}/view`, { cache: "no-store" })
+    fetch(`/api/imports/${encodeURIComponent(uploadId)}/view`, {
+      cache: "no-store",
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status));
         const view = (await response.json()) as ImportOriginalView;
@@ -78,11 +91,21 @@ export function OriginalView({ original, today }: { original: ImportOriginalRef;
       transition={{ duration: duration.fast, ease: ease.outSoft }}
       className="mt-3 flex min-h-0 flex-1 flex-col"
     >
-      <div data-slot="original-file" className="flex h-8 shrink-0 items-center gap-2 text-[13px] text-text-muted">
-        <FileText aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-text-subtle" />
-        <span className="min-w-0 truncate text-[14px] font-medium text-text">{original.filename}</span>
+      <div
+        data-slot="original-file"
+        className="flex h-8 shrink-0 items-center gap-2 text-[13px] text-text-muted"
+      >
+        <FileText
+          aria-hidden
+          strokeWidth={1.75}
+          className="size-4 shrink-0 text-text-subtle"
+        />
+        <span className="min-w-0 truncate text-[14px] font-medium text-text">
+          {original.filename}
+        </span>
         <span className="shrink-0">
-          {formatFileSize(original.size)} · {original.uploadedByName} · {formatShortDate(original.uploadedAt, `${today}T00:00:00.000Z`)}
+          {formatFileSize(original.size)} · {original.uploadedByName} ·{" "}
+          {formatShortDate(original.uploadedAt, `${today}T00:00:00.000Z`)}
         </span>
       </div>
       {loaded.status === "ready" ? (
@@ -107,7 +130,10 @@ function Source({ view }: { view: ImportOriginalView }) {
   return (
     <>
       {detected.length > 0 || dropped.length > 0 || kept.length > 0 ? (
-        <section aria-label="Import report" className="mt-3 grid shrink-0 grid-cols-2 gap-x-8 gap-y-3 text-[13px] leading-5 text-text-muted">
+        <section
+          aria-label="Import report"
+          className="mt-3 grid shrink-0 grid-cols-2 gap-x-8 gap-y-3 text-[13px] leading-5 text-text-muted"
+        >
           <ReportList title="Detected" lines={detected} />
           <ReportList title="Dropped" lines={dropped} />
           <ReportList title="Kept as text" lines={kept} wide />
@@ -127,7 +153,15 @@ function Source({ view }: { view: ImportOriginalView }) {
 }
 
 /** One group of the report. `wide` runs under both columns (the kept lines are long). An empty group takes no room. */
-function ReportList({ title, lines, wide = false }: { title: string; lines: string[]; wide?: boolean }) {
+function ReportList({
+  title,
+  lines,
+  wide = false,
+}: {
+  title: string;
+  lines: string[];
+  wide?: boolean;
+}) {
   if (lines.length === 0) return wide ? null : <div />;
   return (
     <div className={cn("min-w-0", wide && "col-span-2")}>
@@ -163,7 +197,11 @@ function Well({ children }: { children: React.ReactNode }) {
 /** Two report lines and a sheet, in one box that is replaced whole when the view arrives. */
 function Placeholder() {
   return (
-    <div aria-busy aria-label="Loading the original" className="mt-3 flex min-h-0 flex-1 flex-col">
+    <div
+      aria-busy
+      aria-label="Loading the original"
+      className="mt-3 flex min-h-0 flex-1 flex-col"
+    >
       <div className="flex shrink-0 flex-col gap-2 py-1">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-3 w-56" />

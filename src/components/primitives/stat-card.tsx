@@ -1,6 +1,10 @@
 import { Info, TrendingDown, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // A stat card: a big regular-weight numeral and its tracked-caps label on the tinted card, with what
@@ -16,17 +20,31 @@ import { cn } from "@/lib/utils";
 // client parts, and they come with `ui/tooltip`.
 
 /** The card: tinted fill, hairline border, 14px corners, 24px padding; no ring, no shadow. The Usage screens' `Panel` is this card. */
-export function StatCard({ className, ...props }: React.ComponentProps<typeof Card>) {
+export function StatCard({
+  className,
+  ...props
+}: React.ComponentProps<typeof Card>) {
   return (
     <Card
       {...props}
-      className={cn("min-w-0 gap-0 rounded-xl border border-hairline bg-surface-tinted p-6 ring-0", className)}
+      className={cn(
+        "min-w-0 gap-0 rounded-xl border border-hairline bg-surface-tinted p-6 ring-0",
+        className,
+      )}
     />
   );
 }
 
 /** The numeral, with a trend (`StatTrend`) at the right of its row. */
-export function StatValue({ value, trend, className }: { value: string; trend?: React.ReactNode; className?: string }) {
+export function StatValue({
+  value,
+  trend,
+  className,
+}: {
+  value: string;
+  trend?: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={cn("flex items-start justify-between gap-3", className)}>
       <div className="numeral text-text">{value}</div>
@@ -36,7 +54,15 @@ export function StatValue({ value, trend, className }: { value: string; trend?: 
 }
 
 /** The tracked-caps label. A `tip` adds an "i" whose tooltip says how the number is counted. */
-export function StatLabel({ children, tip, className }: { children: React.ReactNode; tip?: string; className?: string }) {
+export function StatLabel({
+  children,
+  tip,
+  className,
+}: {
+  children: React.ReactNode;
+  tip?: string;
+  className?: string;
+}) {
   return (
     <div className={cn("caps-label", className)}>
       {children} {tip ? <InfoDot tip={tip} /> : null}
@@ -45,11 +71,20 @@ export function StatLabel({ children, tip, className }: { children: React.ReactN
 }
 
 /** Plain label and value lines under a hairline. */
-export function StatLines({ rows, className }: { rows: readonly (readonly [string, string])[]; className?: string }) {
+export function StatLines({
+  rows,
+  className,
+}: {
+  rows: readonly (readonly [string, string])[];
+  className?: string;
+}) {
   return (
     <div className={cn("mt-5 border-t border-hairline-strong pt-4", className)}>
       {rows.map(([label, value]) => (
-        <div key={label} className="flex items-center justify-between gap-3 py-1.5 text-[16px] text-text">
+        <div
+          key={label}
+          className="flex items-center justify-between gap-3 py-1.5 text-[16px] text-text"
+        >
           <span>{label}</span>
           <span className="text-text-muted">{value}</span>
         </div>
@@ -73,12 +108,18 @@ export function StatTrend({ pct }: { pct: number }) {
             className={cn(
               "inline-flex h-6 shrink-0 cursor-default items-center gap-1 rounded-md px-2 text-[12px] font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring",
               // Ink on the soft green: the green text alone is 4.3:1; the arrow keeps the colour.
-              up ? "bg-positive-soft text-text" : "bg-danger-soft text-danger-text",
+              up
+                ? "bg-positive-soft text-text"
+                : "bg-danger-soft text-danger-text",
             )}
           />
         }
       >
-        <Icon aria-hidden strokeWidth={1.75} className={cn("size-3.5", up && "text-positive")} />
+        <Icon
+          aria-hidden
+          strokeWidth={1.75}
+          className={cn("size-3.5", up && "text-positive")}
+        />
         {text}
       </TooltipTrigger>
       <TooltipContent>Compared with the 30 days before</TooltipContent>

@@ -36,10 +36,20 @@ export function contractSection(input: {
   const changes = diffVariables(baseline.variables, variables);
   // One change at a time, so a line's flag is its own change's, however the sentences are worded.
   const lines = changes.flatMap((change) =>
-    describeChanges([change], versionNumber).map((text): ContractLine => ({ text, breaking: change.breaking })),
+    describeChanges([change], versionNumber).map((text): ContractLine => ({
+      text,
+      breaking: change.breaking,
+    })),
   );
-  const ordered = [...lines.filter((l) => l.breaking), ...lines.filter((l) => !l.breaking)];
-  return { baselineNumber: baseline.number, lines: ordered, breaking: changes.some((c) => c.breaking) };
+  const ordered = [
+    ...lines.filter((l) => l.breaking),
+    ...lines.filter((l) => !l.breaking),
+  ];
+  return {
+    baselineNumber: baseline.number,
+    lines: ordered,
+    breaking: changes.some((c) => c.breaking),
+  };
 }
 
 export interface TextPart {

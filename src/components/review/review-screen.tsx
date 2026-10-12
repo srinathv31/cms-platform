@@ -12,7 +12,13 @@ import { ReviewWorkspace } from "./review-workspace";
 type Params = Promise<{ team: string; templateId: string; version: string }>;
 type SearchParams = Promise<{ round?: string | string[] }>;
 
-async function ReviewData({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
+async function ReviewData({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { team, templateId, version } = await params;
   // `?round=N` is that round; without it, the number's head (its released row, else its latest round).
   const round = parseRoundParam((await searchParams).round);
@@ -24,7 +30,15 @@ async function ReviewData({ params, searchParams }: { params: Params; searchPara
   const viewer = await getViewer();
   const me = personOf(await getPeople(), viewer.userId);
   // A different version or round is a different screen: its own document, threads and dialogs.
-  return <ReviewWorkspace key={data.version.id} data={data} team={team} nowIso={nowDate.toISOString()} viewer={me} />;
+  return (
+    <ReviewWorkspace
+      key={data.version.id}
+      data={data}
+      team={team}
+      nowIso={nowDate.toISOString()}
+      viewer={me}
+    />
+  );
 }
 
 /**
@@ -32,7 +46,13 @@ async function ReviewData({ params, searchParams }: { params: Params; searchPara
  * the decision rail beside it. The grid is static; everything that depends on who is looking (and the
  * search params) streams in under a skeleton with the same cells.
  */
-export function ReviewScreen({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
+export function ReviewScreen({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   return (
     <div data-slot="review" className={RV.grid}>
       <Stream fallback={<ReviewSkeleton />}>

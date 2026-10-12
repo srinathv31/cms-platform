@@ -33,7 +33,14 @@ vi.mock("@/server/clock", () => ({
 }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 
-const { auditEvents, consumerNotices, consumers, renderLog, settings, versions } = schema;
+const {
+  auditEvents,
+  consumerNotices,
+  consumers,
+  renderLog,
+  settings,
+  versions,
+} = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
 const day = (n: number) => new Date(BASE.getTime() + n * DAY);
@@ -42,10 +49,20 @@ let db: Db;
 let templateId: string;
 let v1: typeof versions.$inferSelect;
 
-const passedRows = () => db.select().from(auditEvents).where(eq(auditEvents.action, "version.sunset_passed"));
+const passedRows = () =>
+  db
+    .select()
+    .from(auditEvents)
+    .where(eq(auditEvents.action, "version.sunset_passed"));
 const passedNotices = () =>
-  db.select().from(consumerNotices).where(eq(consumerNotices.kind, "sunset_passed")).orderBy(consumerNotices.seq);
-const lastSeq = async () => (await db.select().from(settings).where(eq(settings.key, NOTICE_SEQ_KEY)))[0]?.value as number;
+  db
+    .select()
+    .from(consumerNotices)
+    .where(eq(consumerNotices.kind, "sunset_passed"))
+    .orderBy(consumerNotices.seq);
+const lastSeq = async () =>
+  (await db.select().from(settings).where(eq(settings.key, NOTICE_SEQ_KEY)))[0]
+    ?.value as number;
 /** The sweep as it runs `n` days after the seed. */
 async function sweepAt(n: number) {
   env.now = day(n);
@@ -53,12 +70,26 @@ async function sweepAt(n: number) {
 }
 
 freshDatabasePerTest(async (built) => {
-  templateId = (await seedDatabase(built, { base: BASE })).templates["balance-transfer"]!;
-  v1 = (await built.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.number, 1)) }))!;
+  templateId = (await seedDatabase(built, { base: BASE })).templates[
+    "balance-transfer"
+  ]!;
+  v1 = (await built.query.versions.findFirst({
+    where: and(eq(versions.templateId, templateId), eq(versions.number, 1)),
+  }))!;
 
   const sunset = v1.sunsetAt!.getTime();
-  await built.insert(consumers).values({ id: "ledger", name: "Ledger", description: "Test consumer", clientName: "ledger" });
-  const render = (id: string, consumerId: string, at: number, isPreview = false) => ({
+  await built.insert(consumers).values({
+    id: "ledger",
+    name: "Ledger",
+    description: "Test consumer",
+    clientName: "ledger",
+  });
+  const render = (
+    id: string,
+    consumerId: string,
+    at: number,
+    isPreview = false,
+  ) => ({
     id,
     at: new Date(at),
     templateId,
@@ -70,11 +101,13 @@ freshDatabasePerTest(async (built) => {
     correlationId: id,
     outcome: "ok" as const,
   });
-  await built.insert(renderLog).values([
-    render("rl_deposits", "deposits-online", sunset - 30 * DAY),
-    render("rl_ledger_old", "ledger", sunset - 91 * DAY),
-    render("rl_ledger_preview", "ledger", sunset - DAY, true),
-  ]);
+  await built
+    .insert(renderLog)
+    .values([
+      render("rl_deposits", "deposits-online", sunset - 30 * DAY),
+      render("rl_ledger_old", "ledger", sunset - 91 * DAY),
+      render("rl_ledger_preview", "ledger", sunset - DAY, true),
+    ]);
 });
 
 beforeAll(async () => {
@@ -109,10 +142,24 @@ describe("runSunsetSweep across the seed's sunset", () => {
       teamId: "coral-offers",
       templateId,
       versionId: v1.id,
-      details: { number: 1, sunsetAt: v1.sunsetAt!.toISOString(), sunsetDay: day21, zone: "America/New_York" },
+      details: {
+        number: 1,
+        sunsetAt: v1.sunsetAt!.toISOString(),
+        sunsetDay: day21,
+        zone: "America/New_York",
+      },
     });
     // What the Activity tab and the Audit page say for it.
-    expect(describeActivity({ action: rows[0]!.action, details: rows[0]!.details, version: { number: 1, round: 1, state: "superseded" } }, null)).toBe(
+    expect(
+      describeActivity(
+        {
+          action: rows[0]!.action,
+          details: rows[0]!.details,
+          version: { number: 1, round: 1, state: "superseded" },
+        },
+        null,
+      ),
+    ).toBe(
       `v1 stopped rendering: its sunset passed on ${formatLongDate(day21)}.`,
     );
   });
@@ -121,7 +168,10 @@ describe("runSunsetSweep across the seed's sunset", () => {
     await sweepAt(22);
     const notices = await passedNotices();
     // Coral (the seed's renders) and Deposits Online (30 days before); not Ledger (91 days before, or a preview).
-    expect(notices.map((n) => n.consumerId)).toEqual(["coral", "deposits-online"]);
+    expect(notices.map((n) => n.consumerId)).toEqual([
+      "coral",
+      "deposits-online",
+    ]);
     const day21 = sunsetDay(v1.sunsetAt!, "America/New_York");
     for (const notice of notices) {
       expect(notice).toMatchObject({
@@ -144,7 +194,9 @@ describe("runSunsetSweep across the seed's sunset", () => {
     const seqs = notices.map((n) => n.seq);
     expect(seqs[1]).toBe(seqs[0]! + 1);
     expect(await lastSeq()).toBe(seqs[1]);
-    expect(JSON.stringify(notices.map((n) => n.payload))).not.toContain("first_name");
+    expect(JSON.stringify(notices.map((n) => n.payload))).not.toContain(
+      "first_name",
+    );
   });
 
   it("is idempotent: a second sweep, now or later, writes nothing: no row, no notice", async () => {
@@ -163,7 +215,9 @@ describe("runSunsetSweep across the seed's sunset", () => {
 
   it("changes nothing on the version: the render rule alone decides that it stopped", async () => {
     await sweepAt(22);
-    const after = await db.query.versions.findFirst({ where: eq(versions.id, v1.id) });
+    const after = await db.query.versions.findFirst({
+      where: eq(versions.id, v1.id),
+    });
     expect(after).toEqual(v1);
   });
 });
@@ -173,10 +227,19 @@ describe("a sweep that runs long after the sunset", () => {
     // 179 days after the sunset: nobody has rendered the template in the 90 days before now.
     expect((await sweepAt(200)).map((p) => p.versionId)).toEqual([v1.id]);
     const notices = await passedNotices();
-    expect(notices.map((n) => n.consumerId)).toEqual(["coral", "deposits-online"]);
+    expect(notices.map((n) => n.consumerId)).toEqual([
+      "coral",
+      "deposits-online",
+    ]);
     expect(notices.map((n) => n.createdAt)).toEqual([day(200), day(200)]);
-    expect(notices.map((n) => n.payload.sunsetAt)).toEqual([v1.sunsetAt!.toISOString(), v1.sunsetAt!.toISOString()]);
-    expect((await passedRows())[0]!.at, "the row is still dated at the sunset").toEqual(v1.sunsetAt);
+    expect(notices.map((n) => n.payload.sunsetAt)).toEqual([
+      v1.sunsetAt!.toISOString(),
+      v1.sunsetAt!.toISOString(),
+    ]);
+    expect(
+      (await passedRows())[0]!.at,
+      "the row is still dated at the sunset",
+    ).toEqual(v1.sunsetAt);
   });
 });
 
@@ -186,7 +249,10 @@ describe("two sweeps at once", () => {
     const [a, b] = await Promise.all([runSunsetSweep(), runSunsetSweep()]);
     expect([...a, ...b].map((p) => p.versionId)).toEqual([v1.id]);
     expect(await passedRows()).toHaveLength(1);
-    expect((await passedNotices()).map((n) => n.consumerId)).toEqual(["coral", "deposits-online"]);
+    expect((await passedNotices()).map((n) => n.consumerId)).toEqual([
+      "coral",
+      "deposits-online",
+    ]);
   });
 });
 
@@ -195,7 +261,9 @@ describe("Advance clock", () => {
     await advanceClockAction(22);
     expect(env.now).toEqual(day(22));
     expect((await passedRows()).map((r) => r.versionId)).toEqual([v1.id]);
-    expect((await passedNotices()).map((n) => [n.consumerId, n.createdAt])).toEqual([
+    expect(
+      (await passedNotices()).map((n) => [n.consumerId, n.createdAt]),
+    ).toEqual([
       ["coral", day(22)],
       ["deposits-online", day(22)],
     ]);

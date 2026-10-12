@@ -93,10 +93,12 @@ export const WS = {
   grid: "@container/ws relative pl-5 mr-[calc(-1*(var(--canvas-pad-x)+max(0px,(100cqw-96rem)/2)))] @max-[51.25rem]/canvas:pr-(--canvas-pad-x) -mb-14 grid min-h-(--ws-h) grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_2.75rem_1fr] @max-[26rem]/canvas:grid-rows-[auto_5.5rem_1fr] [--ws-h:calc(100svh-5.5rem-2px)] [--rail-preview-w:min(calc((100cqw+68px)*0.52),calc(100cqw-424px),60rem)]",
 
   /** Holds the rail column's width on tabs without a rail (same size and breakpoint as `rail`). */
-  railSpace: "pointer-events-none invisible col-start-2 row-start-1 hidden h-px w-80 @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block",
+  railSpace:
+    "pointer-events-none invisible col-start-2 row-start-1 hidden h-px w-80 @min-[53rem]/ws:ml-10 @min-[53rem]/ws:block",
 
   /** Name, status row, ID and SHARE ring. */
-  header: "col-start-1 row-start-1 w-full max-w-(--doc-width) justify-self-center pt-2 pb-6",
+  header:
+    "col-start-1 row-start-1 w-full max-w-(--doc-width) justify-self-center pt-2 pb-6",
 
   /** Tabs and the template's actions. Spans rows 2 and 3 so it can stay stuck to the top while the document scrolls. */
   tabs: "@container/bar sticky top-0 z-20 col-start-1 row-start-2 row-end-4 flex h-11 w-full @max-[26rem]/canvas:static @max-[26rem]/canvas:row-end-3 @max-[26rem]/canvas:h-auto @max-[26rem]/canvas:flex-wrap max-w-(--doc-width) items-start justify-between gap-6 @max-[53rem]/ws:gap-3 self-start justify-self-center border-b border-hairline bg-canvas @max-[34rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[39rem]/bar:[&_nav]:gap-4 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav]:gap-3 @max-[53rem]/ws:@max-[28rem]/bar:[&_nav_a]:text-[14px]",

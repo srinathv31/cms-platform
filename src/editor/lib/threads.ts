@@ -17,9 +17,12 @@ import type { CommentRequest, ThreadAnchor } from "../types";
 export type LeafText = (node: PMNode) => string;
 
 /** Chips read as their variable's label (the key when the list doesn't have it); a line break as a space. */
-export function variableLeafText(lookup: (key: string) => Pick<Variable, "label"> | undefined): LeafText {
+export function variableLeafText(
+  lookup: (key: string) => Pick<Variable, "label"> | undefined,
+): LeafText {
   return (node) => {
-    if (node.type.name !== NODE.variable) return node.type.spec.leafText?.(node) ?? " ";
+    if (node.type.name !== NODE.variable)
+      return node.type.spec.leafText?.(node) ?? " ";
     const key = (node.attrs.key as string | null) ?? "";
     return (key && lookup(key)?.label) || key;
   };
@@ -68,7 +71,11 @@ export interface TextIndex {
 
 const WHITESPACE = /\s/;
 
-export function textIndex(block: PMNode, blockPos: number, leafText: LeafText): TextIndex {
+export function textIndex(
+  block: PMNode,
+  blockPos: number,
+  leafText: LeafText,
+): TextIndex {
   const chars: string[] = [];
   const from: number[] = [];
   const to: number[] = [];
@@ -108,20 +115,37 @@ export function textIndex(block: PMNode, blockPos: number, leafText: LeafText): 
 export type ThreadRange = { kind: "text" | "block"; from: number; to: number };
 
 /** Where a thread's highlight goes in `doc`, or null when its block isn't there. */
-export function locateThread(doc: PMNode, thread: Pick<ThreadAnchor, "blockId" | "quote">, leafText: LeafText): ThreadRange | null {
+export function locateThread(
+  doc: PMNode,
+  thread: Pick<ThreadAnchor, "blockId" | "quote">,
+  leafText: LeafText,
+): ThreadRange | null {
   const block = findBlock(doc, thread.blockId);
   if (!block) return null;
   const quote = normalizeQuote(thread.quote);
   if (quote) {
     const index = textIndex(block.node, block.pos, leafText);
     const at = index.text.indexOf(quote);
-    if (at >= 0) return { kind: "text", from: index.from[at], to: index.to[at + quote.length - 1] };
+    if (at >= 0)
+      return {
+        kind: "text",
+        from: index.from[at],
+        to: index.to[at + quote.length - 1],
+      };
   }
-  return { kind: "block", from: block.pos, to: block.pos + block.node.nodeSize };
+  return {
+    kind: "block",
+    from: block.pos,
+    to: block.pos + block.node.nodeSize,
+  };
 }
 
 /** The text runs of [from, to] (chips and other atoms left out), adjacent text nodes merged. */
-export function textSegments(doc: PMNode, from: number, to: number): Array<[number, number]> {
+export function textSegments(
+  doc: PMNode,
+  from: number,
+  to: number,
+): Array<[number, number]> {
   const segments: Array<[number, number]> = [];
   doc.nodesBetween(from, to, (node, pos) => {
     if (!node.isText) return true;
@@ -142,7 +166,10 @@ export function textSegments(doc: PMNode, from: number, to: number): Array<[numb
  * counts), with something to quote. Null for a caret, a selected chip or block, a table cell
  * selection, select-all, or text across blocks.
  */
-export function commentTarget(state: EditorState, leafText: LeafText): Required<CommentRequest> | null {
+export function commentTarget(
+  state: EditorState,
+  leafText: LeafText,
+): Required<CommentRequest> | null {
   const { selection, doc } = state;
   if (selection.empty || !(selection instanceof TextSelection)) return null;
   const { $from } = selection;
@@ -168,8 +195,13 @@ export function commentTarget(state: EditorState, leafText: LeafText): Required<
 }
 
 /** The top-level block a position sits in, as a block-level comment request. */
-export function blockRequestAt(state: EditorState, pos: number): CommentRequest | null {
-  const $pos = state.doc.resolve(Math.max(0, Math.min(pos, state.doc.content.size)));
+export function blockRequestAt(
+  state: EditorState,
+  pos: number,
+): CommentRequest | null {
+  const $pos = state.doc.resolve(
+    Math.max(0, Math.min(pos, state.doc.content.size)),
+  );
   if ($pos.depth < 1) return null;
   const blockId = $pos.node(1).attrs.id as string | null | undefined;
   return blockId ? { blockId } : null;

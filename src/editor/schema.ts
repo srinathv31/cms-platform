@@ -14,13 +14,23 @@
 // is exported for the editor's own modules and tests, and ESLint refuses it to code outside src/editor
 // (`allowImportNames` for this module, in eslint.config.mjs).
 
-import { Extension, InputRule, Node, type Extensions, type JSONContent } from "@tiptap/core";
+import {
+  Extension,
+  InputRule,
+  Node,
+  type Extensions,
+  type JSONContent,
+} from "@tiptap/core";
 import { TableCell, TableHeader, TableKit } from "@tiptap/extension-table";
 import { UniqueID, generateUniqueIds } from "@tiptap/extension-unique-id";
 import { Placeholder } from "@tiptap/extensions";
 import { StarterKit } from "@tiptap/starter-kit";
 import { normalizeLink } from "./model/links";
-import { ORDERED_LIST_ATTRS, isMarkerDelimiter, isMarkerFormat } from "./model/list-markers";
+import {
+  ORDERED_LIST_ATTRS,
+  isMarkerDelimiter,
+  isMarkerFormat,
+} from "./model/list-markers";
 import { CELL_BLOCKS, HEADING_LEVELS } from "./model/normalize";
 import type { Variable as VariableModel } from "./model/types";
 import type { VariableStore } from "./state/variable-store";
@@ -28,20 +38,33 @@ import { BlockMove } from "./extensions/block-move";
 import { BlockRangeHighlight } from "./extensions/block-range-highlight";
 import { Callout } from "./extensions/callout";
 import { ContentLimits } from "./extensions/content-limits";
-import { FieldBindingExtension, type FieldBinding } from "./extensions/field-binding";
+import {
+  FieldBindingExtension,
+  type FieldBinding,
+} from "./extensions/field-binding";
 import { LineBoundaryKeys } from "./extensions/line-boundary-keys";
 import { ListMarkers } from "./extensions/list-markers";
-import { ReviewThreads, type ReviewThreadsOptions } from "./extensions/review-threads";
+import {
+  ReviewThreads,
+  type ReviewThreadsOptions,
+} from "./extensions/review-threads";
 import { SingleLine } from "./extensions/single-line";
 import { FieldLines } from "./extensions/field-lines";
 import type { CharacterRules } from "./model/characters";
 import type { FieldLines as FieldLinesMode } from "./model/normalize";
-import { DEFAULT_REQUIRED_NOTE, RequiredSections } from "./extensions/required-sections";
+import {
+  DEFAULT_REQUIRED_NOTE,
+  RequiredSections,
+} from "./extensions/required-sections";
 import { SectionPaste } from "./extensions/section-paste";
 import { SlashCommand, type SlashRender } from "./extensions/slash-command";
 import { TextFlags, type TextFlagsOptions } from "./extensions/text-flags";
 import { Variable } from "./extensions/variable";
-import { variableSuggestion, type VariablePickerRender, type VariableSuggestion } from "./extensions/variable-picker";
+import {
+  variableSuggestion,
+  type VariablePickerRender,
+  type VariableSuggestion,
+} from "./extensions/variable-picker";
 import { VariableWithChip } from "./extensions/variable-view";
 import { variableLeafText } from "./lib/threads";
 
@@ -80,7 +103,9 @@ const ListNumbering = Extension.create({
             },
             renderHTML: (attributes) => {
               const value = attributes[ORDERED_LIST_ATTRS.format];
-              return isMarkerFormat(value) ? { "data-marker-format": value } : {};
+              return isMarkerFormat(value)
+                ? { "data-marker-format": value }
+                : {};
             },
           },
           [ORDERED_LIST_ATTRS.delimiter]: {
@@ -91,7 +116,9 @@ const ListNumbering = Extension.create({
             },
             renderHTML: (attributes) => {
               const value = attributes[ORDERED_LIST_ATTRS.delimiter];
-              return isMarkerDelimiter(value) ? { "data-marker-delimiter": value } : {};
+              return isMarkerDelimiter(value)
+                ? { "data-marker-delimiter": value }
+                : {};
             },
           },
         },
@@ -127,7 +154,12 @@ const Kit = StarterKit.extend({
         ? extension.extend({
             addInputRules() {
               return (this.parent?.() ?? []).map(
-                (rule) => new InputRule({ find: ORDERED_LIST_INPUT, handler: rule.handler, undoable: rule.undoable }),
+                (rule) =>
+                  new InputRule({
+                    find: ORDERED_LIST_INPUT,
+                    handler: rule.handler,
+                    undoable: rule.undoable,
+                  }),
               );
             },
           })
@@ -154,7 +186,9 @@ interface InternalBaseOptions extends BaseExtensionOptions {
   requiredGuard?: { note: () => string } | null;
 }
 
-function createLookup(opts: BaseExtensionOptions): (key: string) => VariableModel | undefined {
+function createLookup(
+  opts: BaseExtensionOptions,
+): (key: string) => VariableModel | undefined {
   if (opts.lookup) return opts.lookup;
   const byKey = new Map((opts.variables ?? []).map((v) => [v.key, v]));
   return (key) => byKey.get(key);
@@ -187,7 +221,10 @@ function buildBase(opts: InternalBaseOptions): Extensions {
         shouldAutoLink: (url) => /^[a-z][a-z0-9+.-]*:\/\//i.test(url),
         // One link check everywhere (model/links.ts): what the editor links, every channel links.
         isAllowedUri: (url) => normalizeLink(url) !== null,
-        HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
+        HTMLAttributes: {
+          rel: "noopener noreferrer nofollow",
+          target: "_blank",
+        },
       },
       // Colored by styles.css (.ucomp-dropcursor) so it follows the brand token.
       dropcursor: { color: false, width: 2, class: "ucomp-dropcursor" },
@@ -201,7 +238,12 @@ function buildBase(opts: InternalBaseOptions): Extensions {
     ParagraphsAndListsCell,
     ParagraphsAndListsHeader,
     ContentLimits,
-    opts.requiredGuard ? RequiredSections.configure({ guard: true, note: opts.requiredGuard.note }) : RequiredSections,
+    opts.requiredGuard
+      ? RequiredSections.configure({
+          guard: true,
+          note: opts.requiredGuard.note,
+        })
+      : RequiredSections,
     ListNumbering,
     Callout,
     variableNode(opts),
@@ -231,12 +273,17 @@ export interface EditorExtensionOptions {
   textFlags?: TextFlagsOptions | null;
 }
 
-function clientVariableOptions({ store, pickerRender }: EditorExtensionOptions): InternalBaseOptions {
+function clientVariableOptions({
+  store,
+  pickerRender,
+}: EditorExtensionOptions): InternalBaseOptions {
   return {
     store,
     lookup: (key) => store.getState().byKey.get(key),
     variableNode: VariableWithChip,
-    suggestion: pickerRender ? variableSuggestion({ store, render: pickerRender }) : null,
+    suggestion: pickerRender
+      ? variableSuggestion({ store, render: pickerRender })
+      : null,
   };
 }
 
@@ -245,10 +292,13 @@ export function editorExtensions(options: EditorExtensionOptions): Extensions {
   return [
     ...buildBase({
       ...clientVariableOptions(options),
-      requiredGuard: { note: options.requiredNote ?? (() => DEFAULT_REQUIRED_NOTE) },
+      requiredGuard: {
+        note: options.requiredNote ?? (() => DEFAULT_REQUIRED_NOTE),
+      },
     }),
     Placeholder.configure({
-      placeholder: ({ node }) => (node.type.name === "paragraph" ? EMPTY_LINE_PLACEHOLDER : ""),
+      placeholder: ({ node }) =>
+        node.type.name === "paragraph" ? EMPTY_LINE_PLACEHOLDER : "",
       showOnlyCurrent: true,
       showOnlyWhenEditable: true,
       includeChildren: false,
@@ -261,8 +311,14 @@ export function editorExtensions(options: EditorExtensionOptions): Extensions {
     LineBoundaryKeys,
     ListMarkers,
     ReviewThreads.configure({
-      ...Object.fromEntries(Object.entries(options.reviewThreads ?? {}).filter(([, value]) => value !== undefined)),
-      leafText: variableLeafText((key) => options.store.getState().byKey.get(key)),
+      ...Object.fromEntries(
+        Object.entries(options.reviewThreads ?? {}).filter(
+          ([, value]) => value !== undefined,
+        ),
+      ),
+      leafText: variableLeafText((key) =>
+        options.store.getState().byKey.get(key),
+      ),
     }),
   ];
 }
@@ -280,7 +336,11 @@ const InlineDocument = Node.create({
  * `lines`: the field keeps its line breaks (an SMS message), so its schema has the hard break. `characters`:
  * which characters a paste keeps (model/characters.ts; `"message"` for a push's or an SMS's field).
  */
-function buildInline(opts: InternalBaseOptions, lines: FieldLinesMode, characters: CharacterRules): Extensions {
+function buildInline(
+  opts: InternalBaseOptions,
+  lines: FieldLinesMode,
+  characters: CharacterRules,
+): Extensions {
   return [
     InlineDocument,
     StarterKit.configure({

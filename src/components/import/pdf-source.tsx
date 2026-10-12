@@ -12,8 +12,16 @@ const bytesCache = new Map<string, Uint8Array>();
  * A .pdf original: its real pages, drawn by the preview's PdfViewer from the file route. The viewer
  * shows its page-shaped skeleton until the bytes are here.
  */
-export function PdfSource({ fileUrl, fileName }: { fileUrl: string; fileName: string }) {
-  const [data, setData] = useState<Uint8Array | null>(() => bytesCache.get(fileUrl) ?? null);
+export function PdfSource({
+  fileUrl,
+  fileName,
+}: {
+  fileUrl: string;
+  fileName: string;
+}) {
+  const [data, setData] = useState<Uint8Array | null>(
+    () => bytesCache.get(fileUrl) ?? null,
+  );
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -45,5 +53,12 @@ export function PdfSource({ fileUrl, fileName }: { fileUrl: string; fileName: st
       />
     );
   }
-  return <PdfViewer data={data} fileName={fileName} className="min-h-full bg-transparent" contentClassName={WELL_INSET} />;
+  return (
+    <PdfViewer
+      data={data}
+      fileName={fileName}
+      className="min-h-full bg-transparent"
+      contentClassName={WELL_INSET}
+    />
+  );
 }

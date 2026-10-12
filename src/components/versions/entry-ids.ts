@@ -5,4 +5,5 @@
 export const entryHeadingId = (versionId: string) => `version-${versionId}`;
 
 /** The entry's "Revoke vN" button. */
-export const entryRevokeId = (versionId: string) => `version-${versionId}-revoke`;
+export const entryRevokeId = (versionId: string) =>
+  `version-${versionId}-revoke`;

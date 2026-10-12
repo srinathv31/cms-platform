@@ -1,7 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatShortDate, formatWeekdayDate } from "@/domain/dates";
 import { compactCount, formatCount } from "@/domain/numbers";
 import { plural } from "@/domain/plural";
@@ -30,14 +34,28 @@ import { hbarsMinHeight } from "./geometry";
 
 /** The props of a chart's `i`th readable mark, for `ChartKeys`: the first is the chart's one Tab stop. */
 function markProps(i: number, label: string) {
-  return { "data-mark": "", tabIndex: i === 0 ? 0 : -1, role: "img", "aria-label": label } as const;
+  return {
+    "data-mark": "",
+    tabIndex: i === 0 ? 0 : -1,
+    role: "img",
+    "aria-label": label,
+  } as const;
 }
 
 /** A mark's hit area: invisible, tinted while hovered or focused (the focus ring is the global one). */
-const HIT = "fill-transparent hover:fill-foreground/5 focus-visible:fill-foreground/5";
+const HIT =
+  "fill-transparent hover:fill-foreground/5 focus-visible:fill-foreground/5";
 
 /** A chart's values as a table only a screen reader reads, after the chart. */
-function ChartTable({ caption, columns, rows }: { caption: string; columns: string[]; rows: { key: string; head: string; cells: string[] }[] }) {
+function ChartTable({
+  caption,
+  columns,
+  rows,
+}: {
+  caption: string;
+  columns: string[];
+  rows: { key: string; head: string; cells: string[] }[];
+}) {
   return (
     <table className="sr-only">
       <caption>{caption}</caption>
@@ -103,8 +121,19 @@ export function Gauge({
   const fill = Math.max(0, Math.min(100, pct ?? 0));
   return (
     <div className={cn("relative mx-auto w-full max-w-[15rem]", className)}>
-      <svg viewBox="0 0 240 136" role="img" aria-label={label} className="block w-full">
-        <path d="M24 120 A96 96 0 0 1 216 120" fill="none" strokeWidth={26} strokeLinecap="round" className="stroke-hairline-strong" />
+      <svg
+        viewBox="0 0 240 136"
+        role="img"
+        aria-label={label}
+        className="block w-full"
+      >
+        <path
+          d="M24 120 A96 96 0 0 1 216 120"
+          fill="none"
+          strokeWidth={26}
+          strokeLinecap="round"
+          className="stroke-hairline-strong"
+        />
         {fill > 0 ? (
           <path
             d="M24 120 A96 96 0 0 1 216 120"
@@ -117,7 +146,9 @@ export function Gauge({
           />
         ) : null}
       </svg>
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center leading-tight">{children}</div>
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center leading-tight">
+        {children}
+      </div>
     </div>
   );
 }
@@ -148,7 +179,10 @@ export function HBars({
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
-    <ul className={cn("m-0 flex list-none flex-col gap-4 p-0", className)} style={minRows ? { minHeight: hbarsMinHeight(minRows) } : undefined}>
+    <ul
+      className={cn("m-0 flex list-none flex-col gap-4 p-0", className)}
+      style={minRows ? { minHeight: hbarsMinHeight(minRows) } : undefined}
+    >
       {rows.map((r) => {
         const pct = Math.round(r.share * 100);
         const width = Math.max(14, (r.value / max) * 100);
@@ -165,7 +199,10 @@ export function HBars({
           </Tip>
         );
         const name = r.href ? (
-          <Link href={r.href as Route} className="truncate rounded-sm text-[13px] text-text outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+          <Link
+            href={r.href as Route}
+            className="truncate rounded-sm text-[13px] text-text outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
             {r.label}
           </Link>
         ) : (
@@ -175,7 +212,9 @@ export function HBars({
           <li key={r.key} className="flex min-w-0 flex-col gap-1.5">
             <span className="flex h-[1.125rem] min-w-0 items-baseline justify-between gap-3 leading-[1.125rem]">
               {name}
-              <span className="shrink-0 text-[13px] text-text-muted tabular-nums">{formatCount(r.value)}</span>
+              <span className="shrink-0 text-[13px] text-text-muted tabular-nums">
+                {formatCount(r.value)}
+              </span>
             </span>
             {bar}
           </li>
@@ -183,7 +222,9 @@ export function HBars({
           <li key={r.key} className="flex min-w-0 items-center gap-4">
             <div className="w-[55%] shrink-0">{bar}</div>
             <span className="flex min-w-0 items-baseline gap-2">
-              <span className="caps-label shrink-0 tabular-nums">{formatCount(r.value)}</span>
+              <span className="caps-label shrink-0 tabular-nums">
+                {formatCount(r.value)}
+              </span>
               {name}
             </span>
           </li>
@@ -198,8 +239,20 @@ export function HBars({
 const HEAT_CELL = 18;
 const HEAT_GAP = 4;
 const HEAT_PITCH = HEAT_CELL + HEAT_GAP;
-const HEAT_FILL = ["fill-heat-empty", "fill-brand-1", "fill-brand-2", "fill-brand-3", "fill-brand-4"] as const;
-const HEAT_BG = ["bg-heat-empty", "bg-brand-1", "bg-brand-2", "bg-brand-3", "bg-brand-4"] as const;
+const HEAT_FILL = [
+  "fill-heat-empty",
+  "fill-brand-1",
+  "fill-brand-2",
+  "fill-brand-3",
+  "fill-brand-4",
+] as const;
+const HEAT_BG = [
+  "bg-heat-empty",
+  "bg-brand-1",
+  "bg-brand-2",
+  "bg-brand-3",
+  "bg-brand-4",
+] as const;
 const WEEKDAY_LABELS: [number, string][] = [
   [1, "Mon"],
   [3, "Wed"],
@@ -208,7 +261,10 @@ const WEEKDAY_LABELS: [number, string][] = [
 
 /** The heatmap's height for a given column count, as the width the squares are drawn at: used by the skeleton too. */
 export function heatmapBox(weeks: number) {
-  return { width: weeks * HEAT_PITCH - HEAT_GAP, height: 7 * HEAT_PITCH - HEAT_GAP };
+  return {
+    width: weeks * HEAT_PITCH - HEAT_GAP,
+    height: 7 * HEAT_PITCH - HEAT_GAP,
+  };
 }
 
 /**
@@ -233,28 +289,53 @@ export function Heatmap({ heat }: { heat: UsageHeatmap }) {
         <div />
         <div aria-hidden className="relative h-5">
           {heat.months.map((m) => (
-            <span key={`${m.label}-${m.week}`} className="absolute top-0 text-[11px] leading-4 text-text-muted" style={{ left: `${((m.week * HEAT_PITCH) / width) * 100}%` }}>
+            <span
+              key={`${m.label}-${m.week}`}
+              className="absolute top-0 text-[11px] leading-4 text-text-muted"
+              style={{ left: `${((m.week * HEAT_PITCH) / width) * 100}%` }}
+            >
               {m.label}
             </span>
           ))}
         </div>
         <div aria-hidden className="relative">
           {WEEKDAY_LABELS.map(([row, label]) => (
-            <span key={label} className="absolute left-0 -translate-y-1/2 text-[11px] leading-4 text-text-muted" style={{ top: `${((row * HEAT_PITCH + HEAT_CELL / 2) / height) * 100}%` }}>
+            <span
+              key={label}
+              className="absolute left-0 -translate-y-1/2 text-[11px] leading-4 text-text-muted"
+              style={{
+                top: `${((row * HEAT_PITCH + HEAT_CELL / 2) / height) * 100}%`,
+              }}
+            >
               {label}
             </span>
           ))}
         </div>
-        <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Daily renders, last 18 weeks" className="block h-auto w-full">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          role="group"
+          aria-label="Daily renders, last 18 weeks"
+          className="block h-auto w-full"
+        >
           <ChartKeys rows={7}>
             {heat.weeks.flatMap((week, col) =>
               week.map((cell, row) => {
                 if (!cell.inRange) return null;
-                const value = cell.count === 0 ? "No renders" : plural(cell.count, "render");
+                const value =
+                  cell.count === 0
+                    ? "No renders"
+                    : plural(cell.count, "render");
                 return (
-                  <Tip key={cell.date} title={formatWeekdayDate(cell.date)} value={value}>
+                  <Tip
+                    key={cell.date}
+                    title={formatWeekdayDate(cell.date)}
+                    value={value}
+                  >
                     <rect
-                      {...markProps(order.get(cell.date) ?? -1, `${formatWeekdayDate(cell.date)}: ${value}`)}
+                      {...markProps(
+                        order.get(cell.date) ?? -1,
+                        `${formatWeekdayDate(cell.date)}: ${value}`,
+                      )}
                       x={col * HEAT_PITCH}
                       y={row * HEAT_PITCH}
                       width={HEAT_CELL}
@@ -274,11 +355,19 @@ export function Heatmap({ heat }: { heat: UsageHeatmap }) {
         columns={["Week of", "Renders", "Busiest day"]}
         rows={heat.weeks.map((week) => {
           const days = week.filter((c) => c.inRange);
-          const busiest = days.reduce<(typeof days)[number] | null>((b, c) => (c.count > (b?.count ?? 0) ? c : b), null);
+          const busiest = days.reduce<(typeof days)[number] | null>(
+            (b, c) => (c.count > (b?.count ?? 0) ? c : b),
+            null,
+          );
           return {
             key: week[0]!.date,
             head: formatShortDate(week[0]!.date),
-            cells: [formatCount(days.reduce((sum, c) => sum + c.count, 0)), busiest ? `${formatShortDate(busiest.date)}, ${formatCount(busiest.count)}` : "None"],
+            cells: [
+              formatCount(days.reduce((sum, c) => sum + c.count, 0)),
+              busiest
+                ? `${formatShortDate(busiest.date)}, ${formatCount(busiest.count)}`
+                : "None",
+            ],
           };
         })}
       />
@@ -287,7 +376,9 @@ export function Heatmap({ heat }: { heat: UsageHeatmap }) {
 }
 
 /** The renders a day each heat level means, from 0 up; a level no day can wear (tied thresholds) has none. */
-export function heatLegendLevels(thresholds: UsageHeatmap["thresholds"]): { level: number; from: number; to: number }[] {
+export function heatLegendLevels(
+  thresholds: UsageHeatmap["thresholds"],
+): { level: number; from: number; to: number }[] {
   return [
     { level: 0, from: 0, to: 0 },
     ...thresholds.flatMap((to, i) => {
@@ -298,23 +389,53 @@ export function heatLegendLevels(thresholds: UsageHeatmap["thresholds"]): { leve
 }
 
 /** Text on each heat step: white on the darkest, ink on the rest. Both clear 4.5:1. */
-const HEAT_TEXT = ["text-text", "text-text", "text-text", "text-text", "text-white"] as const;
+const HEAT_TEXT = [
+  "text-text",
+  "text-text",
+  "text-text",
+  "text-text",
+  "text-white",
+] as const;
 
 /**
  * The heatmap's key: a swatch per shade, in the shade's own colour, with the renders a day it means printed
  * in it ("2–9"), least to most. No range is left to a tooltip. A screen reader gets the same range as words
  * ("2 to 9"), which it reads the same whatever it does with a dash.
  */
-export function HeatLegend({ thresholds, className }: { thresholds: UsageHeatmap["thresholds"]; className?: string }) {
+export function HeatLegend({
+  thresholds,
+  className,
+}: {
+  thresholds: UsageHeatmap["thresholds"];
+  className?: string;
+}) {
   return (
-    <ul aria-label="Renders in a day" className={cn("m-0 flex list-none flex-wrap items-center gap-1 p-0", className)}>
+    <ul
+      aria-label="Renders in a day"
+      className={cn(
+        "m-0 flex list-none flex-wrap items-center gap-1 p-0",
+        className,
+      )}
+    >
       {heatLegendLevels(thresholds).map(({ level, from, to }) => (
         <li
           key={level}
-          className={cn("flex h-5 min-w-6 items-center justify-center rounded-[4px] px-1 text-[11px] leading-4 tabular-nums", HEAT_BG[level], HEAT_TEXT[level])}
+          className={cn(
+            "flex h-5 min-w-6 items-center justify-center rounded-[4px] px-1 text-[11px] leading-4 tabular-nums",
+            HEAT_BG[level],
+            HEAT_TEXT[level],
+          )}
         >
-          <span aria-hidden>{from === to ? formatCount(from) : `${formatCount(from)}–${formatCount(to)}`}</span>
-          <span className="sr-only">{from === to ? formatCount(from) : `${formatCount(from)} to ${formatCount(to)}`}</span>
+          <span aria-hidden>
+            {from === to
+              ? formatCount(from)
+              : `${formatCount(from)}–${formatCount(to)}`}
+          </span>
+          <span className="sr-only">
+            {from === to
+              ? formatCount(from)
+              : `${formatCount(from)} to ${formatCount(to)}`}
+          </span>
         </li>
       ))}
     </ul>
@@ -338,11 +459,23 @@ function niceMax(v: number) {
 }
 
 /** The y axis's tick labels: drawn for the eye; the chart's table carries the numbers for a screen reader. */
-function YLabels({ ticks, y, format }: { ticks: number[]; y: (v: number) => number; format: (v: number) => string }) {
+function YLabels({
+  ticks,
+  y,
+  format,
+}: {
+  ticks: number[];
+  y: (v: number) => number;
+  format: (v: number) => string;
+}) {
   return (
     <div aria-hidden className={cn("relative shrink-0", GUTTER)}>
       {ticks.map((t) => (
-        <span key={t} className="absolute right-2 -translate-y-1/2 text-[11px] leading-4 text-text-muted tabular-nums" style={{ top: y(t) }}>
+        <span
+          key={t}
+          className="absolute right-2 -translate-y-1/2 text-[11px] leading-4 text-text-muted tabular-nums"
+          style={{ top: y(t) }}
+        >
           {format(t)}
         </span>
       ))}
@@ -409,22 +542,43 @@ export function StackedBars({
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
   const col = 100 / n;
   const barW = col * 0.62;
-  const title = (d: StackDatum) => (d.partial ? `${d.title} (so far)` : d.title);
-  const values = (d: StackDatum) => series.map((s, k) => `${s.label} ${formatCount(d.parts[k] ?? 0)}`).join(", ");
+  const title = (d: StackDatum) =>
+    d.partial ? `${d.title} (so far)` : d.title;
+  const values = (d: StackDatum) =>
+    series
+      .map((s, k) => `${s.label} ${formatCount(d.parts[k] ?? 0)}`)
+      .join(", ");
   return (
     <>
       <div className="flex" style={{ height }}>
         <YLabels ticks={ticks} y={y} format={compactCount} />
         {/* Overflow visible: the first and last tick label are centred on their column, and on a narrow canvas a column is
             narrower than half a label (reflow, decision 0045). */}
-        <svg role="group" aria-label={label} width="100%" height={height} className="block min-w-0 flex-1 overflow-visible">
+        <svg
+          role="group"
+          aria-label={label}
+          width="100%"
+          height={height}
+          className="block min-w-0 flex-1 overflow-visible"
+        >
           {ticks.map((t) => (
-            <line key={t} x1="0" x2="100%" y1={y(t)} y2={y(t)} className={t === 0 ? "stroke-hairline-strong" : "stroke-hairline"} strokeWidth={1} />
+            <line
+              key={t}
+              x1="0"
+              x2="100%"
+              y1={y(t)}
+              y2={y(t)}
+              className={t === 0 ? "stroke-hairline-strong" : "stroke-hairline"}
+              strokeWidth={1}
+            />
           ))}
           {data.map((d, i) => {
             let acc = 0;
             const x = i * col + (col - barW) / 2;
-            const top = d.parts.map((p, s) => (p > 0 ? s : -1)).filter((s) => s >= 0).pop();
+            const top = d.parts
+              .map((p, s) => (p > 0 ? s : -1))
+              .filter((s) => s >= 0)
+              .pop();
             return (
               <g key={`${d.label}-${i}`}>
                 {d.parts.map((p, s) => {
@@ -432,7 +586,15 @@ export function StackedBars({
                   const h = y(acc) - yTop;
                   acc += p;
                   return h > 0 ? (
-                    <rect key={s} x={`${x}%`} y={yTop} width={`${barW}%`} height={h} rx={s === top ? 3 : 0} className={cn(series[s]?.fill, d.partial && "opacity-55")} />
+                    <rect
+                      key={s}
+                      x={`${x}%`}
+                      y={yTop}
+                      width={`${barW}%`}
+                      height={h}
+                      rx={s === top ? 3 : 0}
+                      className={cn(series[s]?.fill, d.partial && "opacity-55")}
+                    />
                   ) : null;
                 })}
                 {i % tickEvery === 0 ? (
@@ -442,7 +604,10 @@ export function StackedBars({
                     y={height - 6}
                     textAnchor="middle"
                     // On a narrow canvas every other label goes: two labels a column apart would print over each other.
-                    className={cn("fill-text-muted text-[11px]", i % (tickEvery * 2) !== 0 && "@max-[22rem]/canvas:hidden")}
+                    className={cn(
+                      "fill-text-muted text-[11px]",
+                      i % (tickEvery * 2) !== 0 && "@max-[22rem]/canvas:hidden",
+                    )}
                   >
                     {d.label}
                   </text>
@@ -465,7 +630,14 @@ export function StackedBars({
                   </span>
                 }
               >
-                <rect {...markProps(i, `${title(d)}: ${values(d)}`)} x={`${i * col}%`} y={0} width={`${col}%`} height={PLOT_TOP + plotH} className={HIT} />
+                <rect
+                  {...markProps(i, `${title(d)}: ${values(d)}`)}
+                  x={`${i * col}%`}
+                  y={0}
+                  width={`${col}%`}
+                  height={PLOT_TOP + plotH}
+                  className={HIT}
+                />
               </Tip>
             ))}
           </ChartKeys>
@@ -477,7 +649,10 @@ export function StackedBars({
         rows={data.map((d, i) => ({
           key: `${d.label}-${i}`,
           head: d.partial ? `${d.label} (so far)` : d.label,
-          cells: [...series.map((_, k) => formatCount(d.parts[k] ?? 0)), formatCount(total(d))],
+          cells: [
+            ...series.map((_, k) => formatCount(d.parts[k] ?? 0)),
+            formatCount(total(d)),
+          ],
         }))}
       />
     </>
@@ -485,9 +660,20 @@ export function StackedBars({
 }
 
 /** Names each series beside its swatch, in stacking order: the swatch is the bars' own shape and hue. */
-export function Legend({ series, className }: { series: StackSeries[]; className?: string }) {
+export function Legend({
+  series,
+  className,
+}: {
+  series: StackSeries[];
+  className?: string;
+}) {
   return (
-    <ul className={cn("m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-[13px] text-text-muted", className)}>
+    <ul
+      className={cn(
+        "m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-[13px] text-text-muted",
+        className,
+      )}
+    >
       {series.map((s) => (
         <li key={s.label} className="flex items-center gap-1.5">
           <span aria-hidden className={cn("size-2.5 rounded-[3px]", s.bg)} />
@@ -513,7 +699,21 @@ export interface RatePoint {
  * A rate per day as a line over a soft area, the worst day marked. Axis labels are fixed-size text.
  * Hover or focus a day for its numbers; its table lists them all.
  */
-export function RateLine({ points, startLabel, midLabel, endLabel, height = 190, label }: { points: RatePoint[]; startLabel: string; midLabel: string; endLabel: string; height?: number; label: string }) {
+export function RateLine({
+  points,
+  startLabel,
+  midLabel,
+  endLabel,
+  height = 190,
+  label,
+}: {
+  points: RatePoint[];
+  startLabel: string;
+  midLabel: string;
+  endLabel: string;
+  height?: number;
+  label: string;
+}) {
   const plotH = height - X_AXIS - PLOT_TOP;
   const top = Math.max(0, ...points.map((p) => p.pct));
   const max = Math.max(2, Math.ceil(top / 2) * 2);
@@ -522,8 +722,16 @@ export function RateLine({ points, startLabel, midLabel, endLabel, height = 190,
   const x = (i: number) => (n < 2 ? 50 : pad + ((100 - 2 * pad) * i) / (n - 1));
   const yIn = (v: number) => plotH - (v / max) * plotH;
   const y = (v: number) => PLOT_TOP + yIn(v);
-  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(2)} ${yIn(p.pct).toFixed(2)}`).join(" ");
-  const area = n > 0 ? `${line} L${x(n - 1).toFixed(2)} ${plotH} L${x(0).toFixed(2)} ${plotH} Z` : "";
+  const line = points
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${x(i).toFixed(2)} ${yIn(p.pct).toFixed(2)}`,
+    )
+    .join(" ");
+  const area =
+    n > 0
+      ? `${line} L${x(n - 1).toFixed(2)} ${plotH} L${x(0).toFixed(2)} ${plotH} Z`
+      : "";
   const worst = top > 0 ? points.findIndex((p) => p.pct === top) : -1;
   const colW = n < 2 ? 100 : (100 - 2 * pad) / (n - 1);
   const ticks = [0, max / 2, max];
@@ -532,26 +740,97 @@ export function RateLine({ points, startLabel, midLabel, endLabel, height = 190,
     <>
       <div className="flex" style={{ height }}>
         <YLabels ticks={ticks} y={y} format={(v) => `${v}%`} />
-        <svg role="group" aria-label={label} width="100%" height={height} className="block min-w-0 flex-1">
+        <svg
+          role="group"
+          aria-label={label}
+          width="100%"
+          height={height}
+          className="block min-w-0 flex-1"
+        >
           {ticks.map((t) => (
-            <line key={t} x1="0" x2="100%" y1={y(t)} y2={y(t)} className={t === 0 ? "stroke-hairline-strong" : "stroke-hairline"} />
+            <line
+              key={t}
+              x1="0"
+              x2="100%"
+              y1={y(t)}
+              y2={y(t)}
+              className={t === 0 ? "stroke-hairline-strong" : "stroke-hairline"}
+            />
           ))}
           {n > 1 ? (
-            <svg x="0" y={PLOT_TOP} width="100%" height={plotH} viewBox={`0 0 100 ${plotH}`} preserveAspectRatio="none" overflow="visible">
+            <svg
+              x="0"
+              y={PLOT_TOP}
+              width="100%"
+              height={plotH}
+              viewBox={`0 0 100 ${plotH}`}
+              preserveAspectRatio="none"
+              overflow="visible"
+            >
               <path d={area} className="fill-brand-1/60" />
-              <path d={line} fill="none" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" className="stroke-brand-4" />
+              <path
+                d={line}
+                fill="none"
+                strokeWidth={2}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                className="stroke-brand-4"
+              />
             </svg>
           ) : null}
-          {worst >= 0 ? <circle cx={`${x(worst)}%`} cy={y(points[worst].pct)} r={4} className="fill-danger stroke-surface-tinted" strokeWidth={2} /> : null}
+          {worst >= 0 ? (
+            <circle
+              cx={`${x(worst)}%`}
+              cy={y(points[worst].pct)}
+              r={4}
+              className="fill-danger stroke-surface-tinted"
+              strokeWidth={2}
+            />
+          ) : null}
           <g aria-hidden>
-            <text x="0" y={height - 6} textAnchor="start" className="fill-text-muted text-[11px]">{startLabel}</text>
-            <text x="50%" y={height - 6} textAnchor="middle" className="fill-text-muted text-[11px]">{midLabel}</text>
-            <text x="100%" y={height - 6} textAnchor="end" className="fill-text-muted text-[11px]">{endLabel}</text>
+            <text
+              x="0"
+              y={height - 6}
+              textAnchor="start"
+              className="fill-text-muted text-[11px]"
+            >
+              {startLabel}
+            </text>
+            <text
+              x="50%"
+              y={height - 6}
+              textAnchor="middle"
+              className="fill-text-muted text-[11px]"
+            >
+              {midLabel}
+            </text>
+            <text
+              x="100%"
+              y={height - 6}
+              textAnchor="end"
+              className="fill-text-muted text-[11px]"
+            >
+              {endLabel}
+            </text>
           </g>
           <ChartKeys>
             {points.map((p, i) => (
-              <Tip key={i} title={p.title} value={`${rate(p)} failed · ${p.detail}`}>
-                <rect {...markProps(i, `${p.title}: ${rate(p)} failed, ${p.detail}`)} x={`${x(i) - colW / 2}%`} y={0} width={`${colW}%`} height={PLOT_TOP + plotH} className={HIT} />
+              <Tip
+                key={i}
+                title={p.title}
+                value={`${rate(p)} failed · ${p.detail}`}
+              >
+                <rect
+                  {...markProps(
+                    i,
+                    `${p.title}: ${rate(p)} failed, ${p.detail}`,
+                  )}
+                  x={`${x(i) - colW / 2}%`}
+                  y={0}
+                  width={`${colW}%`}
+                  height={PLOT_TOP + plotH}
+                  className={HIT}
+                />
               </Tip>
             ))}
           </ChartKeys>
@@ -560,7 +839,11 @@ export function RateLine({ points, startLabel, midLabel, endLabel, height = 190,
       <ChartTable
         caption={label}
         columns={["Day", "Failure rate", "Failed"]}
-        rows={points.map((p, i) => ({ key: String(i), head: p.title, cells: [rate(p), p.detail] }))}
+        rows={points.map((p, i) => ({
+          key: String(i),
+          head: p.title,
+          cells: [rate(p), p.detail],
+        }))}
       />
     </>
   );
@@ -569,17 +852,52 @@ export function RateLine({ points, startLabel, midLabel, endLabel, height = 190,
 // ── Sparkline ────────────────────────────────────────────────────────────────
 
 /** One consumer's last 30 days, drawn at its real size (the table gives it a fixed column). */
-export function Sparkline({ values, width = 80, height = 28, label }: { values: number[]; width?: number; height?: number; label: string }) {
+export function Sparkline({
+  values,
+  width = 80,
+  height = 28,
+  label,
+}: {
+  values: number[];
+  width?: number;
+  height?: number;
+  label: string;
+}) {
   const max = Math.max(...values, 1);
   const last = values.length - 1;
   const x = (i: number) => 2 + (last <= 0 ? 0.5 : i / last) * (width - 4);
   const y = (v: number) => height - 3 - (v / max) * (height - 6);
-  const d = values.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  const d = values
+    .map(
+      (v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`,
+    )
+    .join(" ");
   return (
     <Tip title={label} value="Renders a day, last 30 days">
-      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-label={`${label}, last 30 days`} className="block">
-        <path d={d} fill="none" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="stroke-brand-4" />
-        {last >= 0 ? <circle cx={x(last)} cy={y(values[last])} r={2.5} className="fill-brand-4" /> : null}
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        width={width}
+        height={height}
+        role="img"
+        aria-label={`${label}, last 30 days`}
+        className="block"
+      >
+        <path
+          d={d}
+          fill="none"
+          strokeWidth={1.75}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="stroke-brand-4"
+        />
+        {last >= 0 ? (
+          <circle
+            cx={x(last)}
+            cy={y(values[last])}
+            r={2.5}
+            className="fill-brand-4"
+          />
+        ) : null}
       </svg>
     </Tip>
   );
@@ -605,7 +923,13 @@ const FADED = "opacity-55";
  * a screen that lists only some of the channels gives each part its hue. The counts, in the tooltips, are in
  * the table too.
  */
-export function ChannelMix({ parts, className }: { parts: MixPart[]; className?: string }) {
+export function ChannelMix({
+  parts,
+  className,
+}: {
+  parts: MixPart[];
+  className?: string;
+}) {
   const total = parts.reduce((a, p) => a + p.value, 0);
   const pct = (v: number) => (total === 0 ? 0 : Math.round((v / total) * 100));
   const hue = (p: MixPart, i: number) => p.bg ?? SERIES[i]?.bg;
@@ -614,8 +938,15 @@ export function ChannelMix({ parts, className }: { parts: MixPart[]; className?:
       <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-heat-empty">
         {parts.map((p, i) =>
           p.value > 0 ? (
-            <Tip key={p.label} title={p.label} value={`${formatCount(p.value)} · ${pct(p.value)}%`}>
-              <span className={cn(hue(p, i), p.faded && FADED)} style={{ width: `${(p.value / total) * 100}%` }} />
+            <Tip
+              key={p.label}
+              title={p.label}
+              value={`${formatCount(p.value)} · ${pct(p.value)}%`}
+            >
+              <span
+                className={cn(hue(p, i), p.faded && FADED)}
+                style={{ width: `${(p.value / total) * 100}%` }}
+              />
             </Tip>
           ) : null,
         )}
@@ -623,15 +954,23 @@ export function ChannelMix({ parts, className }: { parts: MixPart[]; className?:
       <ul className="m-0 mt-2.5 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[13px] text-text-muted">
         {parts.map((p, i) => (
           <li key={p.label} className="flex items-center gap-1.5">
-            <span aria-hidden className={cn("size-2 rounded-full", hue(p, i), p.faded && FADED)} />
-            {p.label} <span className="text-text tabular-nums">{pct(p.value)}%</span>
+            <span
+              aria-hidden
+              className={cn("size-2 rounded-full", hue(p, i), p.faded && FADED)}
+            />
+            {p.label}{" "}
+            <span className="text-text tabular-nums">{pct(p.value)}%</span>
           </li>
         ))}
       </ul>
       <ChartTable
         caption="Renders by channel"
         columns={["Channel", "Renders", "Share"]}
-        rows={parts.map((p) => ({ key: p.label, head: p.label, cells: [formatCount(p.value), `${pct(p.value)}%`] }))}
+        rows={parts.map((p) => ({
+          key: p.label,
+          head: p.label,
+          cells: [formatCount(p.value), `${pct(p.value)}%`],
+        }))}
       />
     </div>
   );

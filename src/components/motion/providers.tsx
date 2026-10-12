@@ -11,8 +11,12 @@ import { spring } from "./presets";
 function useIgnoreAbortedViewTransitions() {
   useEffect(() => {
     const onRejection = (event: PromiseRejectionEvent) => {
-      const reason = event.reason as { name?: string; message?: string } | undefined;
-      if (reason?.name === "InvalidStateError" && reason.message?.includes("Transition was aborted")) {
+      const reason = event.reason as
+        { name?: string; message?: string } | undefined;
+      if (
+        reason?.name === "InvalidStateError" &&
+        reason.message?.includes("Transition was aborted")
+      ) {
         event.preventDefault();
       }
     };
@@ -30,7 +34,8 @@ function useIgnoreAbortedViewTransitions() {
 const TOAST_OPTIONS = {
   classNames: {
     toast: "cn-toast",
-    actionButton: "border! border-border! bg-surface! text-text! hover:bg-hover!",
+    actionButton:
+      "border! border-border! bg-surface! text-text! hover:bg-hover!",
   },
 };
 

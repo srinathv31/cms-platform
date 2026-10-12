@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { ApiContractChange, ApiVariable } from "@/contracts/api-v1";
 import { SIM_FIELDS, isSimFieldPath, simField } from "./fields";
-import { blockedSentence, fieldValue, missingRequired, suggestMapping, valuesFor } from "./mapping";
+import {
+  blockedSentence,
+  fieldValue,
+  missingRequired,
+  suggestMapping,
+  valuesFor,
+} from "./mapping";
 import type { SimCustomerRecord, SimOfferRecord } from "./types";
 
-const v = (key: string, label: string, type: ApiVariable["type"], required = true): ApiVariable => ({
+const v = (
+  key: string,
+  label: string,
+  type: ApiVariable["type"],
+  required = true,
+): ApiVariable => ({
   key,
   label,
   type,
@@ -31,7 +42,11 @@ const customer: SimCustomerRecord = {
   annualFee: "0",
   cardLast4: "3417",
   statement: { minimumDue: "35.00", dueDate: "2026-10-21" },
-  lastPurchase: { amount: "48.20", merchant: "Café Lisboa", country: "Portugal" },
+  lastPurchase: {
+    amount: "48.20",
+    merchant: "Café Lisboa",
+    country: "Portugal",
+  },
 };
 
 /** Card Used Abroad and Payment Due Reminder, Coral's alerts. */
@@ -49,12 +64,22 @@ const offer: SimOfferRecord = {
   id: "offer_spring_travel",
   name: "Spring Travel Rewards",
   headline: "Spend $1,000 in 3 months, get $200 back",
-  terms: { spend: 1000, bonus: 200, months: 3, annualFee: 95, endsOn: "2027-06-30" },
+  terms: {
+    spend: 1000,
+    bonus: 200,
+    months: 3,
+    annualFee: 95,
+    endsOn: "2027-06-30",
+  },
 };
 
 describe("SIM_FIELDS", () => {
   it("lists every customer, card and offer path once, labelled by source", () => {
-    const prefix = { customer: "Customer · ", card: "Card · ", offer: "Offer · " };
+    const prefix = {
+      customer: "Customer · ",
+      card: "Card · ",
+      offer: "Offer · ",
+    };
     expect(new Set(SIM_FIELDS.map((f) => f.path)).size).toBe(SIM_FIELDS.length);
     for (const f of SIM_FIELDS) {
       expect(f.path.startsWith(`${f.source}.`)).toBe(true);
@@ -82,13 +107,24 @@ describe("suggestMapping", () => {
       annual_fee: "offer.annualFee",
       retired_key: "customer.email",
     } as const;
-    expect(suggestMapping(V3, current)).toMatchObject({ first_name: "customer.fullName", annual_fee: "offer.annualFee" });
+    expect(suggestMapping(V3, current)).toMatchObject({
+      first_name: "customer.fullName",
+      annual_fee: "offer.annualFee",
+    });
     expect(suggestMapping(V3, current)).not.toHaveProperty("retired_key");
   });
 
   it("drops a current mapping whose field no longer fits the variable's type", () => {
-    const retyped = [v("purchase_apr", "Purchase APR", "date"), v("home_state", "Home state", "currency")];
-    expect(suggestMapping(retyped, { purchase_apr: "customer.purchaseApr", home_state: "offer.annualFee" })).toEqual({
+    const retyped = [
+      v("purchase_apr", "Purchase APR", "date"),
+      v("home_state", "Home state", "currency"),
+    ];
+    expect(
+      suggestMapping(retyped, {
+        purchase_apr: "customer.purchaseApr",
+        home_state: "offer.annualFee",
+      }),
+    ).toEqual({
       home_state: "offer.annualFee",
     });
   });
@@ -110,59 +146,136 @@ describe("suggestMapping", () => {
   });
 
   describe("across a renamed variable", () => {
-    const renamed = (from: string, to: string): ApiContractChange => ({ kind: "key_renamed", key: to, breaking: true, from, to, text: `Renames \`${from}\`.` });
-    const NOW = [v("first_name", "First name", "text"), v("state", "State", "us_state"), v("annual_fee", "Annual fee", "currency")];
+    const renamed = (from: string, to: string): ApiContractChange => ({
+      kind: "key_renamed",
+      key: to,
+      breaking: true,
+      from,
+      to,
+      text: `Renames \`${from}\`.`,
+    });
+    const NOW = [
+      v("first_name", "First name", "text"),
+      v("state", "State", "us_state"),
+      v("annual_fee", "Annual fee", "currency"),
+    ];
 
     it("carries the mapping of the earlier key to the renamed one", () => {
-      const current = { first_name: "customer.fullName", home_state: "customer.homeState" } as const;
-      expect(suggestMapping(NOW, current)).toEqual({ first_name: "customer.fullName" });
-      expect(suggestMapping(NOW, current, [renamed("home_state", "state")])).toEqual({ first_name: "customer.fullName", state: "customer.homeState" });
+      const current = {
+        first_name: "customer.fullName",
+        home_state: "customer.homeState",
+      } as const;
+      expect(suggestMapping(NOW, current)).toEqual({
+        first_name: "customer.fullName",
+      });
+      expect(
+        suggestMapping(NOW, current, [renamed("home_state", "state")]),
+      ).toEqual({
+        first_name: "customer.fullName",
+        state: "customer.homeState",
+      });
     });
 
     it("carries a choice the person made, not what Coral would have auto-mapped", () => {
       const given = [v("given", "Given name", "text")];
-      expect(suggestMapping(given, { first_name: "customer.fullName" }, [renamed("first_name", "given")])).toEqual({ given: "customer.fullName" });
+      expect(
+        suggestMapping(given, { first_name: "customer.fullName" }, [
+          renamed("first_name", "given"),
+        ]),
+      ).toEqual({ given: "customer.fullName" });
     });
 
     it("keeps a mapping already under the new key, and drops a carried one that no longer fits the type", () => {
-      const current = { home_state: "customer.homeState", state: "customer.homeState", annual_fee: "offer.annualFee" } as const;
-      expect(suggestMapping(NOW, current, [renamed("home_state", "state")])).toEqual({
+      const current = {
+        home_state: "customer.homeState",
+        state: "customer.homeState",
+        annual_fee: "offer.annualFee",
+      } as const;
+      expect(
+        suggestMapping(NOW, current, [renamed("home_state", "state")]),
+      ).toEqual({
         first_name: "customer.firstName",
         state: "customer.homeState",
         annual_fee: "offer.annualFee",
       });
       const retyped = [v("state", "State", "date")];
-      expect(suggestMapping(retyped, { home_state: "customer.homeState" }, [renamed("home_state", "state")])).toEqual({});
+      expect(
+        suggestMapping(retyped, { home_state: "customer.homeState" }, [
+          renamed("home_state", "state"),
+        ]),
+      ).toEqual({});
     });
 
     it("auto-maps the new key when the earlier one had no mapping, and ignores other kinds of change", () => {
-      const to = [v("first_name", "First name", "text"), v("full_name", "Full name", "text")];
-      expect(suggestMapping(to, {}, [renamed("name", "full_name")])).toEqual({ first_name: "customer.firstName", full_name: "customer.fullName" });
-      const retyped: ApiContractChange = { kind: "type_changed", key: "state", breaking: true, from: "text", to: "us_state", text: "Retyped." };
-      expect(suggestMapping(NOW, { home_state: "customer.homeState" }, [retyped])).toEqual({ first_name: "customer.firstName" });
+      const to = [
+        v("first_name", "First name", "text"),
+        v("full_name", "Full name", "text"),
+      ];
+      expect(suggestMapping(to, {}, [renamed("name", "full_name")])).toEqual({
+        first_name: "customer.firstName",
+        full_name: "customer.fullName",
+      });
+      const retyped: ApiContractChange = {
+        kind: "type_changed",
+        key: "state",
+        breaking: true,
+        from: "text",
+        to: "us_state",
+        text: "Retyped.",
+      };
+      expect(
+        suggestMapping(NOW, { home_state: "customer.homeState" }, [retyped]),
+      ).toEqual({ first_name: "customer.firstName" });
     });
 
     it("follows a chain the API folded into one change", () => {
       // a renamed to b in one version and b to c in the next arrives as a single change from a to c.
-      expect(suggestMapping([v("c", "C", "text")], { a: "customer.email" }, [renamed("a", "c")])).toEqual({ c: "customer.email" });
+      expect(
+        suggestMapping([v("c", "C", "text")], { a: "customer.email" }, [
+          renamed("a", "c"),
+        ]),
+      ).toEqual({ c: "customer.email" });
     });
   });
 
   it("ignores unknown field paths in the current mapping", () => {
-    expect(suggestMapping([v("annual_fee", "Annual fee", "currency")], { annual_fee: "customer.ssn" })).toEqual({});
+    expect(
+      suggestMapping([v("annual_fee", "Annual fee", "currency")], {
+        annual_fee: "customer.ssn",
+      }),
+    ).toEqual({});
   });
 });
 
 describe("missingRequired", () => {
   it("names unmapped required variables in contract order and ignores optional ones", () => {
-    const missing = missingRequired(V3, { first_name: "customer.firstName", home_state: "customer.homeState" });
-    expect(missing.map((m) => m.key)).toEqual(["last_name", "purchase_apr", "annual_fee"]);
+    const missing = missingRequired(V3, {
+      first_name: "customer.firstName",
+      home_state: "customer.homeState",
+    });
+    expect(missing.map((m) => m.key)).toEqual([
+      "last_name",
+      "purchase_apr",
+      "annual_fee",
+    ]);
   });
 
   it("treats null and unknown paths as unmapped", () => {
-    expect(missingRequired([v("annual_fee", "Annual fee", "currency")], { annual_fee: null }).length).toBe(1);
-    expect(missingRequired([v("annual_fee", "Annual fee", "currency")], { annual_fee: "nope" }).length).toBe(1);
-    expect(missingRequired([v("annual_fee", "Annual fee", "currency")], { annual_fee: "offer.annualFee" })).toEqual([]);
+    expect(
+      missingRequired([v("annual_fee", "Annual fee", "currency")], {
+        annual_fee: null,
+      }).length,
+    ).toBe(1);
+    expect(
+      missingRequired([v("annual_fee", "Annual fee", "currency")], {
+        annual_fee: "nope",
+      }).length,
+    ).toBe(1);
+    expect(
+      missingRequired([v("annual_fee", "Annual fee", "currency")], {
+        annual_fee: "offer.annualFee",
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -217,25 +330,62 @@ describe("valuesFor", () => {
   });
 
   it("leaves out fields Coral has no value for, so UCOMP reports them", () => {
-    const bare: SimOfferRecord = { ...offer, terms: { spend: 0, bonus: 0, months: 12 } };
-    expect(valuesFor({ annual_fee: "offer.annualFee", end: "offer.endsOn" }, customer, bare)).toEqual({});
-    expect(fieldValue("customer.annualFee", { ...customer, annualFee: null }, offer)).toBeNull();
+    const bare: SimOfferRecord = {
+      ...offer,
+      terms: { spend: 0, bonus: 0, months: 12 },
+    };
+    expect(
+      valuesFor(
+        { annual_fee: "offer.annualFee", end: "offer.endsOn" },
+        customer,
+        bare,
+      ),
+    ).toEqual({});
+    expect(
+      fieldValue("customer.annualFee", { ...customer, annualFee: null }, offer),
+    ).toBeNull();
   });
 
   it("has no offer terms for an alert, and no card values for a card without a statement or purchase", () => {
-    const alert: SimOfferRecord = { id: "alert_card_abroad", name: "Card used abroad", headline: "A card is used outside the US", terms: null };
-    const terms = ["offer.spend", "offer.bonus", "offer.months", "offer.annualFee", "offer.endsOn"] as const;
-    expect(valuesFor(Object.fromEntries(terms.map((p) => [p, p])) as never, customer, alert)).toEqual({});
+    const alert: SimOfferRecord = {
+      id: "alert_card_abroad",
+      name: "Card used abroad",
+      headline: "A card is used outside the US",
+      terms: null,
+    };
+    const terms = [
+      "offer.spend",
+      "offer.bonus",
+      "offer.months",
+      "offer.annualFee",
+      "offer.endsOn",
+    ] as const;
+    expect(
+      valuesFor(
+        Object.fromEntries(terms.map((p) => [p, p])) as never,
+        customer,
+        alert,
+      ),
+    ).toEqual({});
     const bare = { ...customer, statement: null, lastPurchase: null };
-    expect(valuesFor(suggestMapping(ALERT_VARS), bare, alert)).toEqual({ first_name: "Olivia", card_last4: "3417" });
+    expect(valuesFor(suggestMapping(ALERT_VARS), bare, alert)).toEqual({
+      first_name: "Olivia",
+      card_last4: "3417",
+    });
   });
 });
 
 describe("blockedSentence", () => {
   it("names the missing labels", () => {
     expect(blockedSentence([])).toBe("");
-    expect(blockedSentence([{ label: "Annual fee" }])).toBe("Map Annual fee to send.");
-    expect(blockedSentence([{ label: "First name" }, { label: "Annual fee" }])).toBe("Map First name and Annual fee to send.");
-    expect(blockedSentence([{ label: "A" }, { label: "B" }, { label: "C" }])).toBe("Map A, B and C to send.");
+    expect(blockedSentence([{ label: "Annual fee" }])).toBe(
+      "Map Annual fee to send.",
+    );
+    expect(
+      blockedSentence([{ label: "First name" }, { label: "Annual fee" }]),
+    ).toBe("Map First name and Annual fee to send.");
+    expect(
+      blockedSentence([{ label: "A" }, { label: "B" }, { label: "C" }]),
+    ).toBe("Map A, B and C to send.");
   });
 });

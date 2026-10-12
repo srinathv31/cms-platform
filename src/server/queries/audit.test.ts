@@ -4,7 +4,10 @@ import { parseCsv } from "@/domain/audit";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { getAuditExport, getAuditPage } from "./audit";
 
@@ -30,7 +33,8 @@ seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
-  for (const id of ["taylor", "riley", "alex", "maya"]) people[id] = await loadPersona(db, id);
+  for (const id of ["taylor", "riley", "alex", "maya"])
+    people[id] = await loadPersona(db, id);
 });
 
 function as(userId: string) {
@@ -38,7 +42,9 @@ function as(userId: string) {
 }
 
 const isNextError = (digest: string) => (e: unknown) =>
-  typeof e === "object" && e !== null && String((e as { digest?: unknown }).digest).startsWith(digest);
+  typeof e === "object" &&
+  e !== null &&
+  String((e as { digest?: unknown }).digest).startsWith(digest);
 
 describe("getAuditPage: who sees what", () => {
   it("shows the Auditor every team and the platform-wide events in All teams", async () => {
@@ -46,11 +52,24 @@ describe("getAuditPage: who sees what", () => {
     const page = await getAuditPage("all", {});
     expect(page.space).toEqual({ slug: "all", isAll: true, name: "All teams" });
     const teams = new Set(page.rows.map((r) => r.team?.slug ?? null));
-    expect(teams).toEqual(new Set(["coral-offers", "deposits", "card-statements", null]));
+    expect(teams).toEqual(
+      new Set(["coral-offers", "deposits", "card-statements", null]),
+    );
     expect(page.total).toBe(page.rows.length);
-    expect(page.options.teams.map((t) => t.slug).sort()).toEqual(["card-statements", "coral-offers", "deposits"]);
-    expect(page.options.categories.map((c) => c.value)).toEqual(["templates", "access", "platform"]);
-    expect(page.options.people.at(-1)).toMatchObject({ id: "system", name: "Stencil" });
+    expect(page.options.teams.map((t) => t.slug).sort()).toEqual([
+      "card-statements",
+      "coral-offers",
+      "deposits",
+    ]);
+    expect(page.options.categories.map((c) => c.value)).toEqual([
+      "templates",
+      "access",
+      "platform",
+    ]);
+    expect(page.options.people.at(-1)).toMatchObject({
+      id: "system",
+      name: "Stencil",
+    });
     expect(page.options.datePresets.map((p) => p.days)).toEqual([7, 30, 90]);
     expect(page.today).toBe("2026-10-04");
     expect(page.csvHref).toBe("/all/audit/export");
@@ -64,7 +83,9 @@ describe("getAuditPage: who sees what", () => {
       as(who);
       const page = await getAuditPage("coral-offers", { team: "deposits" });
       expect(page.rows.length).toBeGreaterThan(0);
-      expect(page.rows.every((r) => r.team?.slug === "coral-offers")).toBe(true);
+      expect(page.rows.every((r) => r.team?.slug === "coral-offers")).toBe(
+        true,
+      );
       expect(page.applied.team).toBeUndefined();
       expect(page.options.teams).toEqual([]);
     }
@@ -72,11 +93,17 @@ describe("getAuditPage: who sees what", () => {
 
   it("hides the page from people without audit.view, and All teams from a Team Admin", async () => {
     as("maya");
-    await expect(getAuditPage("coral-offers", {})).rejects.toSatisfy(isNextError("NEXT_HTTP_ERROR_FALLBACK;404"));
+    await expect(getAuditPage("coral-offers", {})).rejects.toSatisfy(
+      isNextError("NEXT_HTTP_ERROR_FALLBACK;404"),
+    );
     as("alex");
-    await expect(getAuditPage("all", {})).rejects.toSatisfy(isNextError("NEXT_REDIRECT"));
+    await expect(getAuditPage("all", {})).rejects.toSatisfy(
+      isNextError("NEXT_REDIRECT"),
+    );
     as("alex");
-    await expect(getAuditPage("deposits", {})).rejects.toSatisfy(isNextError("NEXT_REDIRECT"));
+    await expect(getAuditPage("deposits", {})).rejects.toSatisfy(
+      isNextError("NEXT_REDIRECT"),
+    );
   });
 
   it("writes rows with a sentence, labels and demo-clock times", async () => {
@@ -86,12 +113,23 @@ describe("getAuditPage: who sees what", () => {
       expect(r.summary, r.action).toMatch(/[.]$/);
       expect(r.actionLabel).toBeTruthy();
       // UTC, labelled; the year only when it isn't the demo clock's.
-      expect(r.when).toMatch(/^[A-Z][a-z]{2} \d{1,2}, (20\d\d, )?\d{1,2}:\d\d [AP]M UTC$/);
+      expect(r.when).toMatch(
+        /^[A-Z][a-z]{2} \d{1,2}, (20\d\d, )?\d{1,2}:\d\d [AP]M UTC$/,
+      );
       expect(r.ago).toBeTruthy();
     }
-    const flagged = page.rows.find((r) => r.action === "access.flagged_inactive")!;
-    expect(flagged).toMatchObject({ actor: null, subject: { id: "devon" }, category: "access", ago: "5 days ago" });
-    const config = page.rows.find((r) => r.action === "platform.config_changed" && r.team === null)!;
+    const flagged = page.rows.find(
+      (r) => r.action === "access.flagged_inactive",
+    )!;
+    expect(flagged).toMatchObject({
+      actor: null,
+      subject: { id: "devon" },
+      category: "access",
+      ago: "5 days ago",
+    });
+    const config = page.rows.find(
+      (r) => r.action === "platform.config_changed" && r.team === null,
+    )!;
     expect(config.category).toBe("platform");
     const submitted = page.rows.find((r) => r.action === "version.submitted")!;
     expect(submitted.template?.id).toMatch(/^UC-/);
@@ -103,7 +141,11 @@ describe("getAuditPage: filters", () => {
   it("filters by person, action and team together, with counts under the other filters", async () => {
     as("taylor");
     const all = await getAuditPage("all", {});
-    const page = await getAuditPage("all", { team: "coral-offers", person: "alex", action: "access" });
+    const page = await getAuditPage("all", {
+      team: "coral-offers",
+      person: "alex",
+      action: "access",
+    });
     expect(page.rows.length).toBeGreaterThan(0);
     for (const r of page.rows) {
       expect(r.team?.slug).toBe("coral-offers");
@@ -112,11 +154,17 @@ describe("getAuditPage: filters", () => {
     }
     const alexOption = page.options.people.find((p) => p.id === "alex")!;
     expect(alexOption.count).toBe(page.total);
-    const accessOption = page.options.categories.find((c) => c.value === "access")!;
+    const accessOption = page.options.categories.find(
+      (c) => c.value === "access",
+    )!;
     expect(accessOption.count).toBe(page.total);
     // The team menu counts ignore the team pick: Deposits shows its own count.
-    expect(page.options.teams.find((t) => t.slug === "deposits")!.count).toBeGreaterThanOrEqual(0);
-    expect(page.csvHref).toBe("/all/audit/export?team=coral-offers&person=alex&action=access");
+    expect(
+      page.options.teams.find((t) => t.slug === "deposits")!.count,
+    ).toBeGreaterThanOrEqual(0);
+    expect(page.csvHref).toBe(
+      "/all/audit/export?team=coral-offers&person=alex&action=access",
+    );
     expect(page.total).toBeLessThan(all.total);
   });
 
@@ -128,17 +176,27 @@ describe("getAuditPage: filters", () => {
     expect(page.total).toBe(template.count);
     expect(page.rows.every((r) => r.template?.id === template.id)).toBe(true);
 
-    const today = await getAuditPage("all", { from: "2026-10-04", to: "2026-10-04" });
+    const today = await getAuditPage("all", {
+      from: "2026-10-04",
+      to: "2026-10-04",
+    });
     expect(today.rows.every((r) => r.at.startsWith("2026-10-04"))).toBe(true);
     const week = all.options.datePresets[0]!;
-    const lastWeek = await getAuditPage("all", { from: week.from, to: week.to });
+    const lastWeek = await getAuditPage("all", {
+      from: week.from,
+      to: week.to,
+    });
     expect(lastWeek.total).toBeGreaterThanOrEqual(today.total);
     expect(lastWeek.total).toBeLessThan(all.total);
   });
 
   it("drops values the space doesn't know", async () => {
     as("taylor");
-    const page = await getAuditPage("all", { team: "nowhere", person: "nobody,alex", template: "UC-ZZZZZZ" });
+    const page = await getAuditPage("all", {
+      team: "nowhere",
+      person: "nobody,alex",
+      template: "UC-ZZZZZZ",
+    });
     expect(page.applied).toEqual({ person: "alex" });
   });
 });
@@ -147,17 +205,29 @@ describe("getAuditExport", () => {
   it("exports every matching event as CSV, permission-checked", async () => {
     as("taylor");
     const page = await getAuditPage("all", { action: "access" });
-    const out = await getAuditExport(people.taylor!, "all", { action: "access" });
+    const out = await getAuditExport(people.taylor!, "all", {
+      action: "access",
+    });
     if (!out.ok) throw new Error(out.reason);
     expect(out.filename).toBe("stencil-audit-all-2026-10-04.csv");
     expect(out.count).toBe(page.total);
     const lines = parseCsv(out.csv);
-    expect(lines[0]).toEqual(["When", "Who", "Team", "Template", "Version", "Action", "Details"]);
+    expect(lines[0]).toEqual([
+      "When",
+      "Who",
+      "Team",
+      "Template",
+      "Version",
+      "Action",
+      "Details",
+    ]);
     expect(lines).toHaveLength(page.total + 1);
     expect(lines[1]![0]).toBe(page.rows[0]!.at);
     // Chris's request reason has a comma and an apostrophe: it survives the round trip.
     const request = lines.find((l) => l[5] === "Access requested")!;
-    expect(request[6]).toContain("I'm joining the Offers content team next week");
+    expect(request[6]).toContain(
+      "I'm joining the Offers content team next week",
+    );
   });
 
   // The name is versioned: an event about a version keeps the name that version had, in the page and the
@@ -165,36 +235,81 @@ describe("getAuditExport", () => {
   it("names each event's template as its version had it; the filter lists the template by its current name", async () => {
     as("taylor");
     const { versions } = schema;
-    const [v2] = await db.select().from(versions).where(and(eq(versions.name, "Balance Transfer Intro — Terms"), eq(versions.number, 2)));
-    const v2Only = and(eq(versions.templateId, v2!.templateId), eq(versions.number, 2));
-    await db.update(versions).set({ name: "Balance Transfer Intro — Card Terms" }).where(v2Only);
+    const [v2] = await db
+      .select()
+      .from(versions)
+      .where(
+        and(
+          eq(versions.name, "Balance Transfer Intro — Terms"),
+          eq(versions.number, 2),
+        ),
+      );
+    const v2Only = and(
+      eq(versions.templateId, v2!.templateId),
+      eq(versions.number, 2),
+    );
+    await db
+      .update(versions)
+      .set({ name: "Balance Transfer Intro — Card Terms" })
+      .where(v2Only);
     try {
       const page = await getAuditPage("all", { template: v2!.templateId });
       const named = (number: number | null, action?: string) =>
         new Set(
           page.rows
-            .filter((r) => r.versionLabel === (number === null ? null : `v${number}`) && (!action || r.action === action))
+            .filter(
+              (r) =>
+                r.versionLabel === (number === null ? null : `v${number}`) &&
+                (!action || r.action === action),
+            )
             .map((r) => r.template?.name),
         );
       expect(named(1)).toEqual(new Set(["Balance Transfer Intro — Terms"]));
-      expect(named(2)).toEqual(new Set(["Balance Transfer Intro — Card Terms"]));
-      expect(named(null, "template.created")).toEqual(new Set(["Balance Transfer Intro — Card Terms"]));
-      expect(page.options.templates.find((t) => t.id === v2!.templateId)?.name).toBe("Balance Transfer Intro — Card Terms");
+      expect(named(2)).toEqual(
+        new Set(["Balance Transfer Intro — Card Terms"]),
+      );
+      expect(named(null, "template.created")).toEqual(
+        new Set(["Balance Transfer Intro — Card Terms"]),
+      );
+      expect(
+        page.options.templates.find((t) => t.id === v2!.templateId)?.name,
+      ).toBe("Balance Transfer Intro — Card Terms");
 
-      const out = await getAuditExport(people.taylor!, "all", { template: v2!.templateId });
+      const out = await getAuditExport(people.taylor!, "all", {
+        template: v2!.templateId,
+      });
       if (!out.ok) throw new Error(out.reason);
-      const templates = new Set(parseCsv(out.csv).slice(1).filter((l) => l[4] === "v1").map((l) => l[3]));
-      expect(templates).toEqual(new Set([`Balance Transfer Intro — Terms (${v2!.templateId})`]));
+      const templates = new Set(
+        parseCsv(out.csv)
+          .slice(1)
+          .filter((l) => l[4] === "v1")
+          .map((l) => l[3]),
+      );
+      expect(templates).toEqual(
+        new Set([`Balance Transfer Intro — Terms (${v2!.templateId})`]),
+      );
     } finally {
-      await db.update(versions).set({ name: "Balance Transfer Intro — Terms" }).where(v2Only);
+      await db
+        .update(versions)
+        .set({ name: "Balance Transfer Intro — Terms" })
+        .where(v2Only);
     }
   });
 
   it("refuses a space without audit.view (403, `generic`) and an unknown team (404, `space_unavailable`)", async () => {
-    const forbidden = { ok: false, status: 403, code: "generic", reason: "You don't have access to do this." };
-    expect(await getAuditExport(people.maya!, "coral-offers", {})).toEqual(forbidden);
+    const forbidden = {
+      ok: false,
+      status: 403,
+      code: "generic",
+      reason: "You don't have access to do this.",
+    };
+    expect(await getAuditExport(people.maya!, "coral-offers", {})).toEqual(
+      forbidden,
+    );
     expect(await getAuditExport(people.alex!, "all", {})).toEqual(forbidden);
-    expect(await getAuditExport(people.alex!, "deposits", {})).toEqual(forbidden);
+    expect(await getAuditExport(people.alex!, "deposits", {})).toEqual(
+      forbidden,
+    );
     expect(await getAuditExport(people.taylor!, "nowhere", {})).toEqual({
       ok: false,
       status: 404,

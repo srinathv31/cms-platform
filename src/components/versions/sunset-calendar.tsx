@@ -25,9 +25,21 @@ export function sunsetZoneLine(zone: string): string {
 }
 
 /** The zone line, at the picker. The trigger names it with `aria-describedby={id}`. */
-export function SunsetZone({ id, zone, className }: { id: string; zone: string; className?: string }) {
+export function SunsetZone({
+  id,
+  zone,
+  className,
+}: {
+  id: string;
+  zone: string;
+  className?: string;
+}) {
   return (
-    <p id={id} data-slot="sunset-zone" className={cn("text-[13px] text-text-muted", className)}>
+    <p
+      id={id}
+      data-slot="sunset-zone"
+      className={cn("text-[13px] text-text-muted", className)}
+    >
       {sunsetZoneLine(zone)}
     </p>
   );
@@ -58,7 +70,9 @@ export function SunsetCalendarContent({
       aria-label="Choose a sunset date"
       className="w-auto p-0"
       // The selected day takes the focus; with none (it can't happen) the popover's default stands.
-      initialFocus={() => root.current?.querySelector<HTMLElement>(SELECTED_DAY) ?? true}
+      initialFocus={() =>
+        root.current?.querySelector<HTMLElement>(SELECTED_DAY) ?? true
+      }
     >
       <div ref={root}>
         <Calendar

@@ -28,10 +28,16 @@ export function AndroidLockClock({ clock }: { clock: DeviceClock }) {
       className="relative text-(--device-m3-lock-ink)"
       style={{ paddingTop: pt(58), paddingInline: pt(26) }}
     >
-      <div className="tabular-nums" style={{ ...androidFixed(86, 92, -0.01), ...ROUND, fontWeight: 430 }}>
+      <div
+        className="tabular-nums"
+        style={{ ...androidFixed(86, 92, -0.01), ...ROUND, fontWeight: 430 }}
+      >
         {clock.time}
       </div>
-      <div className="font-medium" style={{ ...androidFixed(17, 24), marginTop: pt(2) }}>
+      <div
+        className="font-medium"
+        style={{ ...androidFixed(17, 24), marginTop: pt(2) }}
+      >
         {shortDate(clock.date)}
       </div>
     </m.div>
@@ -51,12 +57,27 @@ export function QuietCard({
       {...fadeRise}
       aria-hidden
       className="flex items-center"
-      style={{ background, borderRadius: corners.map(pt).join(" "), height: pt(60), padding: `0 ${pt(16)}`, gap: pt(12) }}
+      style={{
+        background,
+        borderRadius: corners.map(pt).join(" "),
+        height: pt(60),
+        padding: `0 ${pt(16)}`,
+        gap: pt(12),
+      }}
     >
-      <span className="shrink-0 rounded-full bg-(--device-m3-surface-container-highest)" style={{ width: pt(32), height: pt(32) }} />
+      <span
+        className="shrink-0 rounded-full bg-(--device-m3-surface-container-highest)"
+        style={{ width: pt(32), height: pt(32) }}
+      />
       <span className="flex flex-col" style={{ gap: pt(7) }}>
-        <span className="rounded-full bg-(--device-m3-surface-container-highest)" style={{ width: pt(108), height: pt(8) }} />
-        <span className="rounded-full bg-(--device-m3-surface-container-highest)" style={{ width: pt(170), height: pt(7), opacity: 0.7 }} />
+        <span
+          className="rounded-full bg-(--device-m3-surface-container-highest)"
+          style={{ width: pt(108), height: pt(8) }}
+        />
+        <span
+          className="rounded-full bg-(--device-m3-surface-container-highest)"
+          style={{ width: pt(170), height: pt(7), opacity: 0.7 }}
+        />
       </span>
     </m.span>
   );
@@ -90,7 +111,10 @@ export function AndroidLockScreen({
     <div className="absolute inset-0 flex flex-col">
       <StatusBar platform="android" time={null} ink="wall" />
       <AndroidLockClock clock={clock} />
-      <div className="flex shrink-0 flex-col" style={{ margin: `${pt(26)} ${pt(12)} 0`, gap: pt(2) }}>
+      <div
+        className="flex shrink-0 flex-col"
+        style={{ margin: `${pt(26)} ${pt(12)} 0`, gap: pt(2) }}
+      >
         <AndroidNotification
           content={content}
           screen="lock"
@@ -105,12 +129,23 @@ export function AndroidLockScreen({
         <QuietCard corners={[6, 6, 24, 24]} />
       </div>
       <div className="min-h-0 flex-1" />
-      <div aria-hidden className="flex shrink-0 items-end justify-between" style={{ padding: `${pt(16)} ${pt(28)} ${pt(36)}` }}>
+      <div
+        aria-hidden
+        className="flex shrink-0 items-end justify-between"
+        style={{ padding: `${pt(16)} ${pt(28)} ${pt(36)}` }}
+      >
         <Shortcut>
           <Flashlight strokeWidth={2} style={glyph} />
         </Shortcut>
-        <m.span {...fadeRise} className="text-(--device-m3-lock-ink)" style={{ marginBottom: pt(20) }}>
-          <Fingerprint strokeWidth={1.6} style={{ width: pt(40), height: pt(40) }} />
+        <m.span
+          {...fadeRise}
+          className="text-(--device-m3-lock-ink)"
+          style={{ marginBottom: pt(20) }}
+        >
+          <Fingerprint
+            strokeWidth={1.6}
+            style={{ width: pt(40), height: pt(40) }}
+          />
         </m.span>
         <Shortcut>
           <QrCode strokeWidth={2} style={glyph} />

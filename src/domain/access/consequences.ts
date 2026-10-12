@@ -30,7 +30,11 @@ export function describeRoleChange(input: {
   to: readonly TeamRole[];
 }): { line: string; blocked: boolean } {
   const to = sortRoles(input.to);
-  if (validateRoles(to)) return { line: `${firstName(input.member.name)} needs at least one role on ${input.team.name}.`, blocked: true };
+  if (validateRoles(to))
+    return {
+      line: `${firstName(input.member.name)} needs at least one role on ${input.team.name}.`,
+      blocked: true,
+    };
   return {
     line: `${input.member.name} will be ${rolesLabel(to)} on ${input.team.name}.`,
     blocked: to.join() === sortRoles(input.from).join(),
@@ -47,10 +51,18 @@ export interface MemberConsequences {
 }
 
 /** What each member action does: Remove, Restore, Suspend and Keep. */
-export function memberConsequences(input: { membership: MembershipFacts; member: Named; team: Named; now: Date }): MemberConsequences {
+export function memberConsequences(input: {
+  membership: MembershipFacts;
+  member: Named;
+  team: Named;
+  now: Date;
+}): MemberConsequences {
   const { membership, member, team, now } = input;
   const first = firstName(member.name);
-  const flaggedAgain = inactivity({ ...membership, inactivityKeptAt: now }, now).flagAt;
+  const flaggedAgain = inactivity(
+    { ...membership, inactivityKeptAt: now },
+    now,
+  ).flagAt;
   return {
     remove: `${member.name} loses access to ${team.name} and drops off this list. They can ask for access again.`,
     reinstate: `${first} signs in to ${team.name} again as ${rolesLabel(membership.roles)}. The inactivity count restarts today.`,
@@ -60,7 +72,11 @@ export function memberConsequences(input: { membership: MembershipFacts; member:
 }
 
 /** What approving and denying a pending access request do. */
-export function requestConsequences(input: { requester: Named; role: TeamRole; team: Named }): { approve: string; deny: string } {
+export function requestConsequences(input: {
+  requester: Named;
+  role: TeamRole;
+  team: Named;
+}): { approve: string; deny: string } {
   const { requester, role, team } = input;
   return {
     approve: `${requester.name} gets ${ROLE_LABEL[role]} access to ${team.name} and sees its Library the next time they open Stencil.`,
@@ -92,9 +108,14 @@ export function recertFootnote(input: {
 }): string {
   const { recert, now } = input;
   const day = (d: Date) => formatShortDate(d, now);
-  if (recertPhase(recert, now) !== "closed") return `Anyone not confirmed by ${day(recert.dueAt)} loses access to ${input.team.name}.`;
-  if (input.lapsed.length) return `Access lapsed on ${day(recert.dueAt)} for ${joinWithAnd(input.lapsed.map((p) => p.name))}.`;
-  if (recert.completedAt && recert.completedAt.getTime() < recert.dueAt.getTime()) {
+  if (recertPhase(recert, now) !== "closed")
+    return `Anyone not confirmed by ${day(recert.dueAt)} loses access to ${input.team.name}.`;
+  if (input.lapsed.length)
+    return `Access lapsed on ${day(recert.dueAt)} for ${joinWithAnd(input.lapsed.map((p) => p.name))}.`;
+  if (
+    recert.completedAt &&
+    recert.completedAt.getTime() < recert.dueAt.getTime()
+  ) {
     return `Closed on ${day(recert.completedAt)}: every member was decided.`;
   }
   return "Nobody lapsed.";
@@ -118,9 +139,11 @@ export function recertItemOutcome(input: {
   if (item.decision === "keep") {
     return `Kept${input.decidedBy ? ` · ${input.decidedBy.name}` : ""}${item.decidedAt ? `, ${day(item.decidedAt)}` : ""}`;
   }
-  if (item.decision === "remove" || input.membership === "removed") return `Removed${item.decidedAt ? ` · ${day(item.decidedAt)}` : ""}`;
+  if (item.decision === "remove" || input.membership === "removed")
+    return `Removed${item.decidedAt ? ` · ${day(item.decidedAt)}` : ""}`;
   if (input.membership === "suspended") return "Suspended for inactivity";
-  if (input.membership === "lapsed") return `Access lapsed ${day(recert.dueAt)}`;
+  if (input.membership === "lapsed")
+    return `Access lapsed ${day(recert.dueAt)}`;
   if (recertPhase(recert, now) === "closed") return "Not confirmed";
   return null;
 }
@@ -131,5 +154,9 @@ export function recertItemOutcome(input: {
  */
 export function heldAsLastAdmin(m: MembershipFacts, now: Date): boolean {
   const idle = inactivity(m, now);
-  return m.status === "active" && idle.state === "suspend_due" && suspensionHeld(m, idle);
+  return (
+    m.status === "active" &&
+    idle.state === "suspend_due" &&
+    suspensionHeld(m, idle)
+  );
 }

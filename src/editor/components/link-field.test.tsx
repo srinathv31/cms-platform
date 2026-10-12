@@ -12,7 +12,9 @@ import { createVariableStore } from "../state/variable-store";
 import { doc, p } from "../testing/editor";
 import { LinkField } from "./link-field";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let cleanup: (() => void) | null = null;
 afterEach(() => {
@@ -25,20 +27,35 @@ function setup(initialHref = "") {
   const element = document.createElement("div");
   const host = document.createElement("div");
   document.body.append(element, host);
-  const editor = new Editor({ element, extensions: editorExtensions({ store: createVariableStore([]) }), content: doc(p("Read the terms")) });
+  const editor = new Editor({
+    element,
+    extensions: editorExtensions({ store: createVariableStore([]) }),
+    content: doc(p("Read the terms")),
+  });
   editor.commands.setTextSelection({ from: 10, to: 15 }); // "terms"
   let closed = 0;
   let root: Root;
   act(() => {
     root = createRoot(host);
-    root.render(<LinkField editor={editor} initialHref={initialHref} hasLink={!!initialHref} onClose={() => closed++} />);
+    root.render(
+      <LinkField
+        editor={editor}
+        initialHref={initialHref}
+        hasLink={!!initialHref}
+        onClose={() => closed++}
+      />,
+    );
   });
   cleanup = () => {
     act(() => root.unmount());
     editor.destroy();
   };
-  const input = host.querySelector<HTMLInputElement>('input[aria-label="Link address"]')!;
-  const apply = host.querySelector<HTMLButtonElement>('button[aria-label="Apply link"]')!;
+  const input = host.querySelector<HTMLInputElement>(
+    'input[aria-label="Link address"]',
+  )!;
+  const apply = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="Apply link"]',
+  )!;
   return {
     editor,
     host,
@@ -47,14 +64,23 @@ function setup(initialHref = "") {
     closed: () => closed,
     type(value: string) {
       act(() => {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )!.set!.call(input, value);
         input.dispatchEvent(new Event("input", { bubbles: true }));
       });
     },
     /** Enter in the field, as the keyboard sends it. */
     enter() {
       act(() => {
-        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Enter",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
       });
     },
     clickApply() {
@@ -64,12 +90,18 @@ function setup(initialHref = "") {
     },
     reason: () => {
       const id = input.getAttribute("aria-describedby");
-      return id ? (host.querySelector(`#${CSS.escape(id)}`)?.textContent ?? null) : null;
+      return id
+        ? (host.querySelector(`#${CSS.escape(id)}`)?.textContent ?? null)
+        : null;
     },
     hrefs: () =>
       editor
         .getJSON()
-        .content?.[0].content?.flatMap((node) => (node.marks ?? []).filter((m) => m.type === "link").map((m) => m.attrs?.href)) ?? [],
+        .content?.[0].content?.flatMap((node) =>
+          (node.marks ?? [])
+            .filter((m) => m.type === "link")
+            .map((m) => m.attrs?.href),
+        ) ?? [],
   };
 }
 
@@ -104,24 +136,42 @@ describe("LinkField", () => {
   });
 
   it.each([
-    ["coral.example", "Links must start with https://, http://, mailto: or tel:."],
-    ["javascript:alert(1)", "Links must start with https://, http://, mailto: or tel:."],
+    [
+      "coral.example",
+      "Links must start with https://, http://, mailto: or tel:.",
+    ],
+    [
+      "javascript:alert(1)",
+      "Links must start with https://, http://, mailto: or tel:.",
+    ],
     ["/terms", "Links must start with https://, http://, mailto: or tel:."],
-    ["https://coral.example/card terms", "Links can't contain spaces or line breaks."],
-    ["https://bank.example@evil.example/", "Web links can't have a name or password before the site's address."],
-    ["mailto:nobody", "Enter an email address after mailto:, like mailto:help@example.com."],
-  ])("refuses %s with the reason, Apply disabled, and neither Enter nor Apply applies it", (input, message) => {
-    const field = setup();
-    field.type(input);
-    expect(field.reason()).toBe(message);
-    expect(field.input.getAttribute("aria-invalid")).toBe("true");
-    expect(field.apply.hasAttribute("data-disabled")).toBe(true);
-    field.enter();
-    field.clickApply();
-    expect(field.reason()).toBe(message);
-    expect(field.hrefs()).toEqual([]);
-    expect(field.closed()).toBe(0);
-  });
+    [
+      "https://coral.example/card terms",
+      "Links can't contain spaces or line breaks.",
+    ],
+    [
+      "https://bank.example@evil.example/",
+      "Web links can't have a name or password before the site's address.",
+    ],
+    [
+      "mailto:nobody",
+      "Enter an email address after mailto:, like mailto:help@example.com.",
+    ],
+  ])(
+    "refuses %s with the reason, Apply disabled, and neither Enter nor Apply applies it",
+    (input, message) => {
+      const field = setup();
+      field.type(input);
+      expect(field.reason()).toBe(message);
+      expect(field.input.getAttribute("aria-invalid")).toBe("true");
+      expect(field.apply.hasAttribute("data-disabled")).toBe(true);
+      field.enter();
+      field.clickApply();
+      expect(field.reason()).toBe(message);
+      expect(field.hrefs()).toEqual([]);
+      expect(field.closed()).toBe(0);
+    },
+  );
 
   it("empty: Apply is disabled without a message, until Enter asks for a link", () => {
     const field = setup();
@@ -139,7 +189,13 @@ describe("LinkField", () => {
     const field = setup();
     field.type("https://coral.example");
     act(() => {
-      field.input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      field.input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     });
     expect(field.closed()).toBe(1);
     expect(field.hrefs()).toEqual([]);
@@ -147,6 +203,8 @@ describe("LinkField", () => {
 
   it("an existing link the check refuses opens with its reason", () => {
     const field = setup("ftp://files.example");
-    expect(field.reason()).toBe("Links must start with https://, http://, mailto: or tel:.");
+    expect(field.reason()).toBe(
+      "Links must start with https://, http://, mailto: or tel:.",
+    );
   });
 });

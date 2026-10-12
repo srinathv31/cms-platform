@@ -9,7 +9,9 @@ const DISABLED = /\sdisabled(=""|\s|>)/;
 
 describe("ChannelTabs", () => {
   it("offers only the channels that are on, with the shown one pressed", () => {
-    const html = renderToStaticMarkup(<ChannelTabs channels={["pdf", "email"]} value="email" onChange={noop} />);
+    const html = renderToStaticMarkup(
+      <ChannelTabs channels={["pdf", "email"]} value="email" onChange={noop} />,
+    );
     expect(html).toContain("PDF");
     expect(html).toContain("Email");
     expect(html).not.toContain("Web");
@@ -19,9 +21,16 @@ describe("ChannelTabs", () => {
 
 describe("the segmented controls", () => {
   it("are one style: the same 32px track and the same segment, on the channel and on the device", () => {
-    const channel = renderToStaticMarkup(<ChannelTabs channels={["pdf", "web"]} value="pdf" onChange={noop} />);
-    const device = renderToStaticMarkup(<DevicePicker value="desktop" onChange={noop} />);
-    const track = (html: string) => /class="([^"]*)"[^>]*data-slot="toggle-group"|data-slot="toggle-group"[^>]*class="([^"]*)"/.exec(html);
+    const channel = renderToStaticMarkup(
+      <ChannelTabs channels={["pdf", "web"]} value="pdf" onChange={noop} />,
+    );
+    const device = renderToStaticMarkup(
+      <DevicePicker value="desktop" onChange={noop} />,
+    );
+    const track = (html: string) =>
+      /class="([^"]*)"[^>]*data-slot="toggle-group"|data-slot="toggle-group"[^>]*class="([^"]*)"/.exec(
+        html,
+      );
     for (const html of [channel, device]) {
       const match = track(html);
       const classes = match?.[1] ?? match?.[2] ?? "";
@@ -34,7 +43,9 @@ describe("the segmented controls", () => {
 
 describe("DevicePicker", () => {
   it("is Desktop and Mobile, with the chosen one pressed", () => {
-    const html = renderToStaticMarkup(<DevicePicker value="mobile" onChange={noop} />);
+    const html = renderToStaticMarkup(
+      <DevicePicker value="mobile" onChange={noop} />,
+    );
     expect(html).toContain("Desktop");
     expect(html).toContain("Mobile");
     expect(html).toMatch(/aria-pressed="true"[^>]*>(?:(?!<button).)*Mobile/);
@@ -43,13 +54,25 @@ describe("DevicePicker", () => {
 
 describe("DownloadPdfButton", () => {
   it("waits until there is a PDF to save", () => {
-    expect(renderToStaticMarkup(<DownloadPdfButton output={null} />)).toMatch(DISABLED);
-    expect(renderToStaticMarkup(<DownloadPdfButton output={{ kind: "web", html: "" }} />)).toMatch(DISABLED);
+    expect(renderToStaticMarkup(<DownloadPdfButton output={null} />)).toMatch(
+      DISABLED,
+    );
+    expect(
+      renderToStaticMarkup(
+        <DownloadPdfButton output={{ kind: "web", html: "" }} />,
+      ),
+    ).toMatch(DISABLED);
   });
 
   it("is ready once a PDF has rendered", () => {
     const html = renderToStaticMarkup(
-      <DownloadPdfButton output={{ kind: "pdf", bytes: new Uint8Array([1]), filename: "UC-4F7K2Q-draft.pdf" }} />,
+      <DownloadPdfButton
+        output={{
+          kind: "pdf",
+          bytes: new Uint8Array([1]),
+          filename: "UC-4F7K2Q-draft.pdf",
+        }}
+      />,
     );
     expect(html).not.toMatch(DISABLED);
     expect(html).toContain('aria-label="Download PDF"');
@@ -109,7 +132,14 @@ describe("OutputError", () => {
 
   it("offers no Try again where there is nothing to send again", () => {
     const html = renderToStaticMarkup(
-      <OutputError error={{ code: "render_failed", message: "The SMS couldn't be rendered." }} variables={VARIABLES} onEditValues={noop} />,
+      <OutputError
+        error={{
+          code: "render_failed",
+          message: "The SMS couldn't be rendered.",
+        }}
+        variables={VARIABLES}
+        onEditValues={noop}
+      />,
     );
     expect(html).toContain("The SMS couldn&#x27;t be rendered.");
     expect(html).not.toContain("<button");

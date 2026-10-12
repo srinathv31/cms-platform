@@ -8,7 +8,10 @@ import { getViewer } from "@/server/viewer";
 // A GET route, so the prefetch never waits on, or holds up, the page's server actions (Edit, Submit).
 // Anyone who can see the template. Request-time only: it reads the persona cookie first.
 
-export async function GET(_request: NextRequest, ctx: RouteContext<"/api/templates/[templateId]/integration">) {
+export async function GET(
+  _request: NextRequest,
+  ctx: RouteContext<"/api/templates/[templateId]/integration">,
+) {
   const viewer = await getViewer();
   const { templateId } = await ctx.params;
   return readResponse(await loadIntegrationPanel(viewer, { templateId }));

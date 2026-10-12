@@ -3,10 +3,16 @@
 // 120 days. Boundaries are inclusive: the instant a day count is reached, it applies.
 
 import { DAY_MS } from "../dates";
-import { INACTIVITY_FLAG_DAYS, INACTIVITY_SUSPEND_DAYS, type MembershipFacts } from "../access-types";
+import {
+  INACTIVITY_FLAG_DAYS,
+  INACTIVITY_SUSPEND_DAYS,
+  type MembershipFacts,
+} from "../access-types";
 
 /** The instant the inactivity clock runs from: the latest of last sign-in, date added, and last Keep. */
-export function inactivityAnchor(m: Pick<MembershipFacts, "addedAt" | "lastActiveAt" | "inactivityKeptAt">): Date {
+export function inactivityAnchor(
+  m: Pick<MembershipFacts, "addedAt" | "lastActiveAt" | "inactivityKeptAt">,
+): Date {
   const times = [m.addedAt, m.lastActiveAt, m.inactivityKeptAt]
     .filter((d): d is Date => d instanceof Date)
     .map((d) => d.getTime());
@@ -33,8 +39,18 @@ export function inactivity(
   const flagAt = new Date(anchor + INACTIVITY_FLAG_DAYS * DAY_MS);
   const suspendAt = new Date(anchor + INACTIVITY_SUSPEND_DAYS * DAY_MS);
   const t = now.getTime();
-  const state: InactivityState = t >= suspendAt.getTime() ? "suspend_due" : t >= flagAt.getTime() ? "flagged" : "ok";
-  return { daysInactive: Math.max(0, Math.floor((t - anchor) / DAY_MS)), flagAt, suspendAt, state };
+  const state: InactivityState =
+    t >= suspendAt.getTime()
+      ? "suspend_due"
+      : t >= flagAt.getTime()
+        ? "flagged"
+        : "ok";
+  return {
+    daysInactive: Math.max(0, Math.floor((t - anchor) / DAY_MS)),
+    flagAt,
+    suspendAt,
+    state,
+  };
 }
 
 /**
@@ -42,7 +58,10 @@ export function inactivity(
  * (which moves the clock) is stale and doesn't count, so the next 90 days flag again.
  */
 export function flaggedFor(m: MembershipFacts, idle: Inactivity): boolean {
-  return m.inactivityFlaggedAt !== null && m.inactivityFlaggedAt.getTime() >= idle.flagAt.getTime();
+  return (
+    m.inactivityFlaggedAt !== null &&
+    m.inactivityFlaggedAt.getTime() >= idle.flagAt.getTime()
+  );
 }
 
 /**
@@ -50,5 +69,8 @@ export function flaggedFor(m: MembershipFacts, idle: Inactivity): boolean {
  * last Team Admin with `inactivityFlaggedAt = suspendAt` (they stay flagged), so it says so once.
  */
 export function suspensionHeld(m: MembershipFacts, idle: Inactivity): boolean {
-  return m.inactivityFlaggedAt !== null && m.inactivityFlaggedAt.getTime() >= idle.suspendAt.getTime();
+  return (
+    m.inactivityFlaggedAt !== null &&
+    m.inactivityFlaggedAt.getTime() >= idle.suspendAt.getTime()
+  );
 }

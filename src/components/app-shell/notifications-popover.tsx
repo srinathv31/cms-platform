@@ -28,9 +28,20 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { AnyNotificationKind, NotificationView, NotificationsData } from "@/domain/access-types";
-import { markAllNotificationsRead, markNotificationRead } from "@/server/actions/notifications";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import type {
+  AnyNotificationKind,
+  NotificationView,
+  NotificationsData,
+} from "@/domain/access-types";
+import {
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "@/server/actions/notifications";
 import { NAV_ICON_STROKE } from "./nav";
 
 /** One quiet glyph per kind. An unknown (older) kind falls back to the bell. */
@@ -60,38 +71,65 @@ const ICONS: Record<string, LucideIcon | undefined> = KIND_ICON;
 type Change = { type: "one"; id: string } | { type: "all" };
 
 /** The list as it will read once the server catches up: what the viewer just marked is read at once. */
-function applyChange(data: NotificationsData, change: Change): NotificationsData {
+function applyChange(
+  data: NotificationsData,
+  change: Change,
+): NotificationsData {
   if (change.type === "all") {
-    return { items: data.items.map((i) => ({ ...i, unread: false })), unreadCount: 0 };
+    return {
+      items: data.items.map((i) => ({ ...i, unread: false })),
+      unreadCount: 0,
+    };
   }
   const target = data.items.find((i) => i.id === change.id);
   if (!target?.unread) return data;
   return {
-    items: data.items.map((i) => (i.id === change.id ? { ...i, unread: false } : i)),
+    items: data.items.map((i) =>
+      i.id === change.id ? { ...i, unread: false } : i,
+    ),
     unreadCount: Math.max(0, data.unreadCount - 1),
   };
 }
 
-function Row({ item, onOpen }: { item: NotificationView; onOpen: (item: NotificationView) => void }) {
+function Row({
+  item,
+  onOpen,
+}: {
+  item: NotificationView;
+  onOpen: (item: NotificationView) => void;
+}) {
   const content = (
     <>
       {createElement(ICONS[item.kind] ?? Bell, {
         "aria-hidden": true,
         strokeWidth: NAV_ICON_STROKE,
-        className: cn("mt-0.5 size-[18px] shrink-0", item.unread ? "text-text" : "text-text-subtle"),
+        className: cn(
+          "mt-0.5 size-[18px] shrink-0",
+          item.unread ? "text-text" : "text-text-subtle",
+        ),
       })}
       <span className="min-w-0 flex-1">
-        <span className={cn("block text-[14px] leading-5", item.unread ? "font-medium text-text" : "text-text-muted")}>
+        <span
+          className={cn(
+            "block text-[14px] leading-5",
+            item.unread ? "font-medium text-text" : "text-text-muted",
+          )}
+        >
           {item.title}
         </span>
         {item.body ? (
-          <span className="mt-0.5 line-clamp-2 block text-[13px] leading-[18px] text-text-muted">{item.body}</span>
+          <span className="mt-0.5 line-clamp-2 block text-[13px] leading-[18px] text-text-muted">
+            {item.body}
+          </span>
         ) : null}
         <span className="mt-1 block text-xs text-text-subtle">{item.ago}</span>
       </span>
       <span
         aria-hidden
-        className={cn("mt-1.5 size-2 shrink-0 rounded-full", item.unread ? "bg-brand" : "bg-transparent")}
+        className={cn(
+          "mt-1.5 size-2 shrink-0 rounded-full",
+          item.unread ? "bg-brand" : "bg-transparent",
+        )}
       />
     </>
   );
@@ -105,7 +143,8 @@ function Row({ item, onOpen }: { item: NotificationView; onOpen: (item: Notifica
       data-unread={item.unread ? "true" : undefined}
       onClick={(e) => {
         // A plain click on an unread item marks it read, then goes. Modified clicks keep their meaning.
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
+          return;
         e.preventDefault();
         onOpen(item);
       }}
@@ -151,7 +190,11 @@ export function NotificationsPopover({ data }: { data: NotificationsData }) {
           <Button
             variant="ghost"
             size="icon-lg"
-            aria-label={unread ? `Notifications, ${view.unreadCount} unread` : "Notifications"}
+            aria-label={
+              unread
+                ? `Notifications, ${view.unreadCount} unread`
+                : "Notifications"
+            }
             className="relative size-9 rounded-full text-text hover:bg-hover aria-expanded:bg-hover"
           />
         }
@@ -174,13 +217,20 @@ export function NotificationsPopover({ data }: { data: NotificationsData }) {
         <div className="flex h-8 items-center justify-between gap-3 px-3 pt-0.5">
           <span className="text-[15px] font-medium">Notifications</span>
           {unread ? (
-            <Button variant="ghost" size="sm" className="-mr-2 text-text-muted" onClick={markAll}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-mr-2 text-text-muted"
+              onClick={markAll}
+            >
               Mark all as read
             </Button>
           ) : null}
         </div>
         {view.items.length === 0 ? (
-          <div className="px-3 pt-2 pb-4 text-sm text-text-muted">Nothing new</div>
+          <div className="px-3 pt-2 pb-4 text-sm text-text-muted">
+            Nothing new
+          </div>
         ) : (
           <ul className="mt-1 flex max-h-[26rem] flex-col gap-0.5 overflow-y-auto overscroll-contain">
             {view.items.map((item) => (

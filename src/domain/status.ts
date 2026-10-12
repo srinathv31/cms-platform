@@ -13,7 +13,12 @@ export interface StatusMeta {
 
 export const STATUS_META: Record<VersionState, StatusMeta> = {
   draft: { label: "Draft", tone: "draft", icon: "dot", renders: "preview" },
-  in_review: { label: "In review", tone: "review", icon: "clock", renders: "preview" },
+  in_review: {
+    label: "In review",
+    tone: "review",
+    icon: "clock",
+    renders: "preview",
+  },
   changes_requested: {
     label: "Changes requested",
     tone: "changes",
@@ -21,7 +26,12 @@ export const STATUS_META: Record<VersionState, StatusMeta> = {
     renders: "no",
   },
   active: { label: "Active", tone: "active", icon: "check", renders: "yes" },
-  superseded: { label: "Superseded", tone: "superseded", icon: "archive", renders: "until-sunset" },
+  superseded: {
+    label: "Superseded",
+    tone: "superseded",
+    icon: "archive",
+    renders: "until-sunset",
+  },
   revoked: { label: "Revoked", tone: "revoked", icon: "ban", renders: "no" },
 };
 

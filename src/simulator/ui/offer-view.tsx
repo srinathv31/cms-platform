@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,9 +16,18 @@ import { saveMapping, sendToCustomers } from "@/simulator/actions";
 import { simField } from "@/simulator/fields";
 import { blockedSentence } from "@/simulator/mapping";
 import { readDeliveryView } from "@/simulator/reads";
-import type { SimBatch, SimFieldPath, SimMappingRow, SimOfferPage } from "@/simulator/types";
+import type {
+  SimBatch,
+  SimFieldPath,
+  SimMappingRow,
+  SimOfferPage,
+} from "@/simulator/types";
 import { Mono, PageHeader, Pill, Strip } from "./bits";
-import { CustomerDrawer, type Arrival, type ViewState } from "./customer-drawer";
+import {
+  CustomerDrawer,
+  type Arrival,
+  type ViewState,
+} from "./customer-drawer";
 import { dayLabel, linkStatus, resultsHeadline, upgradeLabel } from "./format";
 import { NavButton } from "./nav-button";
 import { NoticesPanel } from "./notices-panel";
@@ -33,25 +48,53 @@ const TABS: { id: OfferTab; label: string }[] = [
  * One offer, one page: Template | Values | Send. The mapping rows are optimistic (each change saves at once),
  * Send reads the same rows to know what is still unmapped, and the customer drawer sits beside the page.
  */
-export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage; defaultTab: OfferTab; offerNames: Record<string, string> }) {
+export function OfferView({
+  page,
+  defaultTab,
+  offerNames,
+}: {
+  page: SimOfferPage;
+  defaultTab: OfferTab;
+  offerNames: Record<string, string>;
+}) {
   const { offer, link, upgrade } = page;
   // The tab lives in the URL (?tab=), so a link to "Send" opens on Send even when this page is kept alive
   // from an earlier visit. Switching rewrites the URL in place: no request, no history entry.
   const param = useSearchParams().get("tab");
   const tab: OfferTab = TABS.find((t) => t.id === param)?.id ?? defaultTab;
-  const setTab = (next: OfferTab) => window.history.replaceState(null, "", `?tab=${next}`);
+  const setTab = (next: OfferTab) =>
+    window.history.replaceState(null, "", `?tab=${next}`);
 
   // ── Mapping ────────────────────────────────────────────────────────────────
-  const [rows, setRow] = useOptimistic(link?.mapping ?? [], (current: SimMappingRow[], update: { key: string; field: SimFieldPath | null }) =>
-    current.map((r) => (r.key === update.key ? { ...r, field: update.field, fieldLabel: simField(update.field)?.label ?? null } : r)),
+  const [rows, setRow] = useOptimistic(
+    link?.mapping ?? [],
+    (
+      current: SimMappingRow[],
+      update: { key: string; field: SimFieldPath | null },
+    ) =>
+      current.map((r) =>
+        r.key === update.key
+          ? {
+              ...r,
+              field: update.field,
+              fieldLabel: simField(update.field)?.label ?? null,
+            }
+          : r,
+      ),
   );
-  const [mapError, setMapError] = useState<{ key: string; reason: string } | null>(null);
+  const [mapError, setMapError] = useState<{
+    key: string;
+    reason: string;
+  } | null>(null);
   const [, startMap] = useTransition();
   const sentence = blockedSentence(rows.filter((r) => r.required && !r.field));
   const changeMapping = (key: string, field: SimFieldPath | null) =>
     startMap(async () => {
       setRow({ key, field });
-      const result = await saveMapping({ offerId: offer.id, mapping: { [key]: field } });
+      const result = await saveMapping({
+        offerId: offer.id,
+        mapping: { [key]: field },
+      });
       setMapError(result.ok ? null : { key, reason: result.reason });
     });
 
@@ -60,7 +103,10 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
   // which changes on every fresh Link/push navigation to this page but not on refresh(), a ?tab= switch
   // or browser back/forward. A kept-alive page from an earlier visit so never shows its old ticks.
   const { bfcacheId } = useRouter();
-  const [picked, setPicked] = useState<{ visit: string; ids: string[] }>({ visit: bfcacheId, ids: [] });
+  const [picked, setPicked] = useState<{ visit: string; ids: string[] }>({
+    visit: bfcacheId,
+    ids: [],
+  });
   const selected = picked.visit === bfcacheId ? picked.ids : [];
   const setSelected = (ids: string[]) => setPicked({ visit: bfcacheId, ids });
   const [sent, setSent] = useState<SimBatch | null>(null);
@@ -69,17 +115,27 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
   const batch = sent ?? page.lastBatch;
   const send = () =>
     startSend(async () => {
-      const result = await sendToCustomers({ offerId: offer.id, customerIds: selected });
+      const result = await sendToCustomers({
+        offerId: offer.id,
+        customerIds: selected,
+      });
       if (result.ok) {
         setSent(result.batch);
         setSendError(null);
         // The open drawer stays on its customer when the send reached them: the new delivery comes in on
         // their phone (a push drops in as a banner). Otherwise it closes.
         const find = (b: SimBatch | null) =>
-          viewing ? b?.rows.find((r) => r.customerId === viewing.customerId)?.results.find((r) => r.channel === viewing.channel) : undefined;
+          viewing
+            ? b?.rows
+                .find((r) => r.customerId === viewing.customerId)
+                ?.results.find((r) => r.channel === viewing.channel)
+            : undefined;
         const next = find(result.batch);
         if (next) {
-          setArrival({ deliveryId: next.deliveryId, previous: find(batch)?.deliveryId ?? null });
+          setArrival({
+            deliveryId: next.deliveryId,
+            previous: find(batch)?.deliveryId ?? null,
+          });
           ensureView(next.deliveryId);
         } else setViewing(null);
       } else setSendError(result.reason);
@@ -89,12 +145,20 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
   // failing send would otherwise look like nothing happened.
   useEffect(() => {
     if (!sent) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    document.getElementById("results-panel")?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    document.getElementById("results-panel")?.scrollIntoView({
+      block: "start",
+      behavior: reduce ? "auto" : "smooth",
+    });
   }, [sent]);
 
   // ── Customer drawer ────────────────────────────────────────────────────────
-  const [viewing, setViewing] = useState<{ customerId: string; channel: ApiChannel } | null>(null);
+  const [viewing, setViewing] = useState<{
+    customerId: string;
+    channel: ApiChannel;
+  } | null>(null);
   const [views, setViews] = useState<Record<string, ViewState>>({});
   // A delivery that came in while the drawer showed its customer; any other view ends it.
   const [arrival, setArrival] = useState<Arrival | null>(null);
@@ -103,13 +167,23 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
   const ensureView = (deliveryId: string) => {
     if (views[deliveryId]?.status === "ready") return;
     setViews((v) => ({ ...v, [deliveryId]: { status: "loading" } }));
-    void readDeliveryView(deliveryId).then((r) => setViews((v) => ({ ...v, [deliveryId]: r.ok ? { status: "ready", view: r.view } : { status: "error", reason: r.reason } })));
+    void readDeliveryView(deliveryId).then((r) =>
+      setViews((v) => ({
+        ...v,
+        [deliveryId]: r.ok
+          ? { status: "ready", view: r.view }
+          : { status: "error", reason: r.reason },
+      })),
+    );
   };
   const openView = (customerId: string, channel: ApiChannel) => {
-    if (!viewing) trigger.current = document.activeElement as HTMLElement | null;
+    if (!viewing)
+      trigger.current = document.activeElement as HTMLElement | null;
     setViewing({ customerId, channel });
     setArrival(null);
-    const delivery = batch?.rows.find((r) => r.customerId === customerId)?.results.find((r) => r.channel === channel);
+    const delivery = batch?.rows
+      .find((r) => r.customerId === customerId)
+      ?.results.find((r) => r.channel === channel);
     if (delivery) ensureView(delivery.deliveryId);
   };
   const closeView = () => {
@@ -117,22 +191,30 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
     setArrival(null);
     trigger.current?.focus();
   };
-  const viewRow = viewing ? batch?.rows.find((r) => r.customerId === viewing.customerId) : undefined;
-  const viewPlatform = viewing ? (page.customers.find((c) => c.id === viewing.customerId)?.platform ?? "ios") : "ios";
+  const viewRow = viewing
+    ? batch?.rows.find((r) => r.customerId === viewing.customerId)
+    : undefined;
+  const viewPlatform = viewing
+    ? (page.customers.find((c) => c.id === viewing.customerId)?.platform ??
+      "ios")
+    : "ios";
 
   // ── Header and strips ──────────────────────────────────────────────────────
   const status = linkStatus(link);
-  const relinkHref = link ? (`/sim/offers/${offer.id}/link?template=${encodeURIComponent(link.templateId)}` as Route) : null;
+  const relinkHref = link
+    ? (`/sim/offers/${offer.id}/link?template=${encodeURIComponent(link.templateId)}` as Route)
+    : null;
   const changeHref = `/sim/offers/${offer.id}/link` as Route;
-  const relinkAction = upgrade && relinkHref ? (
-    <NavButton href={relinkHref} className="h-7 text-(--sim-text)">
-      Relink to v{upgrade.toVersion}
-    </NavButton>
-  ) : link ? (
-    <NavButton href={changeHref} className="h-7 text-(--sim-text)">
-      Change template
-    </NavButton>
-  ) : null;
+  const relinkAction =
+    upgrade && relinkHref ? (
+      <NavButton href={relinkHref} className="h-7 text-(--sim-text)">
+        Relink to v{upgrade.toVersion}
+      </NavButton>
+    ) : link ? (
+      <NavButton href={changeHref} className="h-7 text-(--sim-text)">
+        Change template
+      </NavButton>
+    ) : null;
 
   let strip: React.ReactNode = null;
   if (link && status.failing) {
@@ -153,7 +235,8 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
         Stencil released v{upgrade.toVersion}.{" "}
         {needs.length > 0 ? (
           <>
-            It needs {needs.map((k, i) => (
+            It needs{" "}
+            {needs.map((k, i) => (
               <span key={k}>
                 {i > 0 ? (i === needs.length - 1 ? " and " : ", ") : ""}
                 <Mono className="text-(--sim-info)">{k}</Mono>
@@ -164,7 +247,9 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
         ) : (
           "Nothing new to map."
         )}
-        {link.sunsetDay && !link.sunsetPassed ? ` v${link.pinnedVersion} stops rendering ${dayLabel(link.sunsetDay)}.` : null}
+        {link.sunsetDay && !link.sunsetPassed
+          ? ` v${link.pinnedVersion} stops rendering ${dayLabel(link.sunsetDay)}.`
+          : null}
       </Strip>
     );
   }
@@ -175,7 +260,10 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
         <PageHeader
           crumbs={
             <>
-              <Link href={"/sim" as Route} className="text-(--sim-muted) no-underline hover:underline">
+              <Link
+                href={"/sim" as Route}
+                className="text-(--sim-muted) no-underline hover:underline"
+              >
                 {offer.kind === "alert" ? "Alerts" : "Offers"}
               </Link>
               {"  /  "}
@@ -185,13 +273,23 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
           title={offer.name}
           right={
             <span className="flex items-center gap-1.5">
-              {link ? <Pill tone={status.tone === "ok" ? "ok" : "plain"}>Pinned to v{link.pinnedVersion}</Pill> : null}
-              {!link || status.label !== "Live" ? <Pill tone={status.tone}>{status.label}</Pill> : null}
-              {upgrade ? <Pill tone="info">{upgradeLabel(upgrade)}</Pill> : null}
+              {link ? (
+                <Pill tone={status.tone === "ok" ? "ok" : "plain"}>
+                  Pinned to v{link.pinnedVersion}
+                </Pill>
+              ) : null}
+              {!link || status.label !== "Live" ? (
+                <Pill tone={status.tone}>{status.label}</Pill>
+              ) : null}
+              {upgrade ? (
+                <Pill tone="info">{upgradeLabel(upgrade)}</Pill>
+              ) : null}
             </span>
           }
         />
-        {page.apiError ? <Strip tone="bad">{page.apiError.message}</Strip> : null}
+        {page.apiError ? (
+          <Strip tone="bad">{page.apiError.message}</Strip>
+        ) : null}
         {strip}
 
         <div
@@ -200,9 +298,20 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
           className="flex gap-6 border-b border-(--sim-line)"
           onKeyDown={(e) => {
             // From the focused tab (not the selected one), and Home / End jump to the ends.
-            const at = TABS.findIndex((t) => `tab-${t.id}` === (e.target as HTMLElement).id);
+            const at = TABS.findIndex(
+              (t) => `tab-${t.id}` === (e.target as HTMLElement).id,
+            );
             if (at < 0) return;
-            const index = e.key === "ArrowRight" ? (at + 1) % TABS.length : e.key === "ArrowLeft" ? (at - 1 + TABS.length) % TABS.length : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : -1;
+            const index =
+              e.key === "ArrowRight"
+                ? (at + 1) % TABS.length
+                : e.key === "ArrowLeft"
+                  ? (at - 1 + TABS.length) % TABS.length
+                  : e.key === "Home"
+                    ? 0
+                    : e.key === "End"
+                      ? TABS.length - 1
+                      : -1;
             if (index < 0) return;
             e.preventDefault();
             setTab(TABS[index].id);
@@ -221,7 +330,9 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
               onClick={() => setTab(t.id)}
               className={cn(
                 "-mb-px h-10 border-b-2 text-[13px] font-medium",
-                tab === t.id ? "border-(--sim-accent) text-(--sim-text)" : "border-transparent text-(--sim-muted) hover:text-(--sim-text)",
+                tab === t.id
+                  ? "border-(--sim-accent) text-(--sim-text)"
+                  : "border-transparent text-(--sim-muted) hover:text-(--sim-text)",
               )}
             >
               {t.label}
@@ -229,19 +340,35 @@ export function OfferView({ page, defaultTab, offerNames }: { page: SimOfferPage
           ))}
         </div>
 
-        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="flex min-h-[20rem] flex-col gap-5">
+        <div
+          role="tabpanel"
+          id={`panel-${tab}`}
+          aria-labelledby={`tab-${tab}`}
+          className="flex min-h-[20rem] flex-col gap-5"
+        >
           {tab === "template" ? (
             <>
               <TemplateTab page={page} />
-              {page.notices.length > 0 ? <NoticesPanel notices={page.notices} offerNames={offerNames} /> : null}
+              {page.notices.length > 0 ? (
+                <NoticesPanel notices={page.notices} offerNames={offerNames} />
+              ) : null}
             </>
           ) : !link ? (
             <div className="flex items-center justify-between gap-4 rounded-md border border-(--sim-line) bg-(--sim-panel) p-4">
-              <span className="text-[13px] text-(--sim-muted)">Link a template first.</span>
+              <span className="text-[13px] text-(--sim-muted)">
+                Link a template first.
+              </span>
               <NavButton href={changeHref}>Link template</NavButton>
             </div>
           ) : tab === "values" ? (
-            <ValuesTab rows={rows} templateId={link.templateId} version={link.pinnedVersion} sentence={sentence} error={mapError} onChange={changeMapping} />
+            <ValuesTab
+              rows={rows}
+              templateId={link.templateId}
+              version={link.pinnedVersion}
+              sentence={sentence}
+              error={mapError}
+              onChange={changeMapping}
+            />
           ) : (
             <SendTab
               link={link}

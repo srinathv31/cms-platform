@@ -3,7 +3,14 @@
 
 import { REASONS } from "../permissions";
 import { refuse, type Refusal } from "../refusals";
-import type { AccessEffect, MembershipChange, MembershipFacts, Named, Ok, Refused } from "../access-types";
+import type {
+  AccessEffect,
+  MembershipChange,
+  MembershipFacts,
+  Named,
+  Ok,
+  Refused,
+} from "../access-types";
 import { TEAM_ROLES, type TeamRole } from "../types";
 import { inactivity } from "./inactivity";
 import { ACCESS_REFUSALS } from "./refusals";
@@ -11,7 +18,9 @@ import { sortRoles, rolesLabel } from "./roles";
 
 /** Why a member can't be given this set of roles, or null: they keep at least one. */
 export function validateRoles(roles: readonly TeamRole[]): Refusal | null {
-  return roles.some((r) => (TEAM_ROLES as readonly string[]).includes(r)) ? null : ACCESS_REFUSALS.pickRoles;
+  return roles.some((r) => (TEAM_ROLES as readonly string[]).includes(r))
+    ? null
+    : ACCESS_REFUSALS.pickRoles;
 }
 
 interface MemberInput {
@@ -25,10 +34,16 @@ interface MemberInput {
 /** Every membership on the team (any status): for the "at least one Team Admin" rule. */
 type TeamMemberships = { teamMemberships: readonly MembershipFacts[] };
 
-function otherActiveAdmins(teamMemberships: readonly MembershipFacts[], membership: MembershipFacts): number {
+function otherActiveAdmins(
+  teamMemberships: readonly MembershipFacts[],
+  membership: MembershipFacts,
+): number {
   return teamMemberships.filter(
     (m) =>
-      m.id !== membership.id && m.teamId === membership.teamId && m.status === "active" && m.roles.includes("team_admin"),
+      m.id !== membership.id &&
+      m.teamId === membership.teamId &&
+      m.status === "active" &&
+      m.roles.includes("team_admin"),
   ).length;
 }
 
@@ -37,23 +52,34 @@ export function losesLastAdmin(
   membership: MembershipFacts,
   nextRoles: readonly TeamRole[] | null,
 ): boolean {
-  const isAdmin = membership.status === "active" && membership.roles.includes("team_admin");
+  const isAdmin =
+    membership.status === "active" && membership.roles.includes("team_admin");
   const staysAdmin = nextRoles?.includes("team_admin") ?? false;
-  return isAdmin && !staysAdmin && otherActiveAdmins(teamMemberships, membership) === 0;
+  return (
+    isAdmin &&
+    !staysAdmin &&
+    otherActiveAdmins(teamMemberships, membership) === 0
+  );
 }
 
 export function changeRoles(
   input: MemberInput & TeamMemberships & { roles: readonly TeamRole[] },
-): Ok<{ membership: MembershipChange | null; effects: AccessEffect[] }> | Refused {
+):
+  | Ok<{ membership: MembershipChange | null; effects: AccessEffect[] }>
+  | Refused {
   const { membership, member, team, actor } = input;
   if (actor.id === membership.userId) return refuse(REASONS.ownAccess);
   if (membership.status !== "active") return refuse(ACCESS_REFUSALS.notActive);
   const rolesProblem = validateRoles(input.roles);
   if (rolesProblem) return refuse(rolesProblem);
-  const roles = sortRoles(input.roles.filter((r) => (TEAM_ROLES as readonly string[]).includes(r)));
+  const roles = sortRoles(
+    input.roles.filter((r) => (TEAM_ROLES as readonly string[]).includes(r)),
+  );
   const from = sortRoles(membership.roles);
-  if (from.join() === roles.join()) return { ok: true, membership: null, effects: [] };
-  if (losesLastAdmin(input.teamMemberships, membership, roles)) return refuse(ACCESS_REFUSALS.lastAdmin(team.name));
+  if (from.join() === roles.join())
+    return { ok: true, membership: null, effects: [] };
+  if (losesLastAdmin(input.teamMemberships, membership, roles))
+    return refuse(ACCESS_REFUSALS.lastAdmin(team.name));
 
   return {
     ok: true,
@@ -82,7 +108,8 @@ export function removeMember(
 ): Ok<{ membership: MembershipChange; effects: AccessEffect[] }> | Refused {
   const { membership, member, team, actor } = input;
   if (actor.id === membership.userId) return refuse(REASONS.ownAccess);
-  if (losesLastAdmin(input.teamMemberships, membership, null)) return refuse(ACCESS_REFUSALS.lastAdmin(team.name));
+  if (losesLastAdmin(input.teamMemberships, membership, null))
+    return refuse(ACCESS_REFUSALS.lastAdmin(team.name));
   return {
     ok: true,
     membership: { kind: "delete", membershipId: membership.id },
@@ -91,7 +118,12 @@ export function removeMember(
         kind: "audit",
         action: "access.removed",
         teamId: team.id,
-        details: { userId: member.id, userName: member.name, roles: sortRoles(membership.roles), status: membership.status },
+        details: {
+          userId: member.id,
+          userName: member.name,
+          roles: sortRoles(membership.roles),
+          status: membership.status,
+        },
       },
       {
         kind: "notification",
@@ -114,20 +146,30 @@ export function suspendInactive(
   if (membership.status !== "active") return refuse(ACCESS_REFUSALS.notActive);
   const state = inactivity(membership, now);
   if (state.state === "ok") return refuse(ACCESS_REFUSALS.notFlagged);
-  if (losesLastAdmin(input.teamMemberships, membership, null)) return refuse(ACCESS_REFUSALS.lastAdmin(team.name));
+  if (losesLastAdmin(input.teamMemberships, membership, null))
+    return refuse(ACCESS_REFUSALS.lastAdmin(team.name));
   return {
     ok: true,
     membership: {
       kind: "update",
       membershipId: membership.id,
-      set: { status: "suspended", statusReason: "inactivity", statusChangedAt: now },
+      set: {
+        status: "suspended",
+        statusReason: "inactivity",
+        statusChangedAt: now,
+      },
     },
     effects: [
       {
         kind: "audit",
         action: "access.suspended",
         teamId: team.id,
-        details: { userId: member.id, userName: member.name, reason: "inactivity", daysInactive: state.daysInactive },
+        details: {
+          userId: member.id,
+          userName: member.name,
+          reason: "inactivity",
+          daysInactive: state.daysInactive,
+        },
       },
       {
         kind: "notification",
@@ -142,7 +184,9 @@ export function suspendInactive(
 }
 
 /** A Team Admin keeps a flagged member: the inactivity clock restarts now. */
-export function keepInactive(input: MemberInput): Ok<{ membership: MembershipChange; effects: AccessEffect[] }> | Refused {
+export function keepInactive(
+  input: MemberInput,
+): Ok<{ membership: MembershipChange; effects: AccessEffect[] }> | Refused {
   const { membership, member, team, actor, now } = input;
   if (actor.id === membership.userId) return refuse(REASONS.ownAccess);
   if (membership.status !== "active") return refuse(ACCESS_REFUSALS.notActive);
@@ -160,7 +204,11 @@ export function keepInactive(input: MemberInput): Ok<{ membership: MembershipCha
         kind: "audit",
         action: "access.kept",
         teamId: team.id,
-        details: { userId: member.id, userName: member.name, daysInactive: state.daysInactive },
+        details: {
+          userId: member.id,
+          userName: member.name,
+          daysInactive: state.daysInactive,
+        },
       },
     ],
   };
@@ -179,13 +227,20 @@ export function reinstatedSet(now: Date, roles?: TeamRole[]) {
 }
 
 /** A Team Admin restores a suspended or lapsed member with their previous roles. */
-export function reinstate(input: MemberInput): Ok<{ membership: MembershipChange; effects: AccessEffect[] }> | Refused {
+export function reinstate(
+  input: MemberInput,
+): Ok<{ membership: MembershipChange; effects: AccessEffect[] }> | Refused {
   const { membership, member, team, actor, now } = input;
   if (actor.id === membership.userId) return refuse(REASONS.ownAccess);
-  if (membership.status === "active") return refuse(ACCESS_REFUSALS.alreadyActive);
+  if (membership.status === "active")
+    return refuse(ACCESS_REFUSALS.alreadyActive);
   return {
     ok: true,
-    membership: { kind: "update", membershipId: membership.id, set: reinstatedSet(now) },
+    membership: {
+      kind: "update",
+      membershipId: membership.id,
+      set: reinstatedSet(now),
+    },
     effects: [
       {
         kind: "audit",

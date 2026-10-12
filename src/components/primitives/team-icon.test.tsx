@@ -5,13 +5,18 @@ import { TeamIcon, teamIconLabel } from "./team-icon";
 
 // A team's icon from its stored Lucide key, and the name the icon picker reads out.
 
-const svgClass = (name: string) => /<svg[^>]*class="([^"]*)"/.exec(renderToStaticMarkup(<TeamIcon name={name} />))?.[1] ?? "";
+const svgClass = (name: string) =>
+  /<svg[^>]*class="([^"]*)"/.exec(
+    renderToStaticMarkup(<TeamIcon name={name} />),
+  )?.[1] ?? "";
 
 describe("TeamIcon", () => {
   it("draws every key a team can pick as its own icon, decorative", () => {
     const drawn = TEAM_ICONS.map(svgClass);
     expect(new Set(drawn).size).toBe(TEAM_ICONS.length);
-    const svg = renderToStaticMarkup(<TeamIcon name="piggy-bank" className="size-4" />);
+    const svg = renderToStaticMarkup(
+      <TeamIcon name="piggy-bank" className="size-4" />,
+    );
     expect(svg).toContain('aria-hidden="true"');
     expect(svgClass("piggy-bank")).toContain("lucide-piggy-bank");
     expect(svg).toMatch(/class="[^"]*size-4/);

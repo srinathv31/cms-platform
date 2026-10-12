@@ -9,7 +9,12 @@ import { contentTypeFamily, type Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
-import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  contentTypes,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 
 // The Copilot prompt for a template's draft (Phase 7a), served by
 // GET /api/templates/[templateId]/copilot-prompt. A read, not a change: the dialog sends the pending
@@ -19,9 +24,13 @@ import { contentTypes, teams, templates, versions } from "@/server/db/schema/uco
 
 const Input = z.object({ templateId: z.string().min(1).max(64) });
 
-export async function getCopilotPrompt(viewer: Viewer, input: { templateId: string }): Promise<ReadResult<{ prompt: CopilotPrompt }>> {
+export async function getCopilotPrompt(
+  viewer: Viewer,
+  input: { templateId: string },
+): Promise<ReadResult<{ prompt: CopilotPrompt }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
+  if (!parsed.success)
+    return refusal(400, REQUEST_REFUSALS.templateUnavailable);
 
   const template = await db
     .select({
@@ -44,14 +53,22 @@ export async function getCopilotPrompt(viewer: Viewer, input: { templateId: stri
   if (!allowed.ok) return refusal(403, allowed);
 
   const draft = await db
-    .select({ name: versions.name, body: versions.body, channels: versions.channels, variables: versions.variables })
+    .select({
+      name: versions.name,
+      body: versions.body,
+      channels: versions.channels,
+      variables: versions.variables,
+    })
     .from(versions)
-    .where(and(eq(versions.templateId, template.id), eq(versions.state, "draft")))
+    .where(
+      and(eq(versions.templateId, template.id), eq(versions.state, "draft")),
+    )
     .limit(1)
     .then((rows) => rows[0]);
   if (!draft) return refusal(409, REQUEST_REFUSALS.noDraftToWrite);
   // The content type's family, never the draft's channels: a draft can't change what kind of template it is.
-  if (copilotUnavailable(contentTypeFamily(template.allowedChannels))) return refusal(409, REQUEST_REFUSALS.copilotDocumentsOnly);
+  if (copilotUnavailable(contentTypeFamily(template.allowedChannels)))
+    return refusal(409, REQUEST_REFUSALS.copilotDocumentsOnly);
 
   const prompt = buildCopilotPrompt({
     templateName: draft.name,

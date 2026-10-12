@@ -1,5 +1,9 @@
 import { cn } from "@/lib/utils";
-import { TAB, TAB_BAR_SCROLLS, TAB_LABEL } from "@/components/primitives/tab-styles";
+import {
+  TAB,
+  TAB_BAR_SCROLLS,
+  TAB_LABEL,
+} from "@/components/primitives/tab-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { COLUMNS, FOLDS, ROW, ROW_HEIGHT } from "./columns";
 import { TAB_META } from "./format-row";

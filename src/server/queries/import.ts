@@ -1,13 +1,24 @@
 import "server-only";
 import { desc, eq } from "drizzle-orm";
 import { describeImport } from "@/domain/import";
-import type { CompareSource, ImportKind, ImportOriginalRef, ImportOriginalView } from "@/domain/import-types";
+import type {
+  CompareSource,
+  ImportKind,
+  ImportOriginalRef,
+  ImportOriginalView,
+} from "@/domain/import-types";
 import { canSeeSpace } from "@/domain/permissions";
 import type { Viewer } from "@/domain/types";
 import { db } from "@/server/db/client";
 import { teams, templates, uploads, users } from "@/server/db/schema/ucomp";
 import { decodeText } from "@/server/import/sniff";
-import { defaultUploadsRoot, kindOfPath, readCompareHtml, readOriginal, readReport } from "@/server/import/store";
+import {
+  defaultUploadsRoot,
+  kindOfPath,
+  readCompareHtml,
+  readOriginal,
+  readReport,
+} from "@/server/import/store";
 
 // An imported template's original (Phase 7a): the cheap ref the workspace carries, and what the
 // rail's Original tab and the file route read. The original belongs to the template
@@ -22,7 +33,14 @@ const refColumns = {
   uploadedByName: users.name,
 };
 
-type RefRow = { uploadId: string; filename: string; path: string; size: number; createdAt: Date; uploadedByName: string };
+type RefRow = {
+  uploadId: string;
+  filename: string;
+  path: string;
+  size: number;
+  createdAt: Date;
+  uploadedByName: string;
+};
 
 function toRef(row: RefRow, kind: ImportKind): ImportOriginalRef {
   return {
@@ -36,7 +54,9 @@ function toRef(row: RefRow, kind: ImportKind): ImportOriginalRef {
 }
 
 /** The template's imported original (the newest, should there ever be more), or null. */
-export async function getImportOriginalRef(templateId: string): Promise<ImportOriginalRef | null> {
+export async function getImportOriginalRef(
+  templateId: string,
+): Promise<ImportOriginalRef | null> {
   const row = await db
     .select(refColumns)
     .from(uploads)
@@ -55,7 +75,10 @@ interface VisibleUpload {
 }
 
 /** An upload the viewer may see: it belongs to a template in a space they can see. */
-async function visibleUpload(viewer: Viewer, uploadId: string): Promise<VisibleUpload | null> {
+async function visibleUpload(
+  viewer: Viewer,
+  uploadId: string,
+): Promise<VisibleUpload | null> {
   const row = await db
     .select({ ...refColumns, teamSlug: teams.slug })
     .from(uploads)
@@ -99,7 +122,11 @@ export async function getImportOriginalView(
     if (html === null) return null;
     source = { kind: "docx", html };
   } else if (upload.ref.kind === "pdf") {
-    source = { kind: "pdf", fileUrl: `/api/imports/${uploadId}/file`, pages: report.pages ?? 0 };
+    source = {
+      kind: "pdf",
+      fileUrl: `/api/imports/${uploadId}/file`,
+      pages: report.pages ?? 0,
+    };
   } else {
     const bytes = await readOriginal(upload.path, root);
     const text = bytes ? decodeText(bytes) : null;

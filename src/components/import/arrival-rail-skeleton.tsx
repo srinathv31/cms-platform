@@ -16,10 +16,20 @@ const noSubscribe = () => () => {};
 export function ArrivalRailSkeleton({ narrow }: { narrow: React.ReactNode }) {
   // Server and hydration: the normal skeleton. A client navigation (how an import arrives) asks the
   // cookie. It is set just before that navigation and taken on arrival, so any waiting one is this page's.
-  const arriving = useSyncExternalStore(noSubscribe, () => peekJustImported() !== null, () => false);
+  const arriving = useSyncExternalStore(
+    noSubscribe,
+    () => peekJustImported() !== null,
+    () => false,
+  );
   if (!arriving) return narrow;
   return (
-    <div aria-hidden data-slot="rail" data-preview="" data-view="original" className={WS.rail}>
+    <div
+      aria-hidden
+      data-slot="rail"
+      data-preview=""
+      data-view="original"
+      className={WS.rail}
+    >
       <div className={WS.railInner}>
         <div className="flex h-11 items-center gap-6 border-b border-hairline">
           <Skeleton className="h-3.5 w-14" />

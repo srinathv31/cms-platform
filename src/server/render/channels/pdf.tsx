@@ -1,13 +1,47 @@
 import "server-only";
 
-import { Circle, Document, Link, Page, Path, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import {
+  Circle,
+  Document,
+  Link,
+  Page,
+  Path,
+  Svg,
+  Text,
+  View,
+  renderToBuffer,
+} from "@react-pdf/renderer";
 import { Fragment, type ReactElement, type ReactNode } from "react";
-import type { RenderBlock, RenderDoc, RenderTable, RenderTableCell, RenderTableRow } from "@/domain/render/types";
+import type {
+  RenderBlock,
+  RenderDoc,
+  RenderTable,
+  RenderTableCell,
+  RenderTableRow,
+} from "@/domain/render/types";
 import { roundLabel } from "@/domain/rounds";
 import { MAX_TABLE_COLUMNS } from "@/editor/model/table-grid";
 import { GlyphCheck, loadFonts, measure } from "./pdf-fonts";
-import { CALLOUT, CONTENT_AREA, CONTENT_WIDTH, HAIRLINE, INK, LIST, SPACE, TABLE, TYPE, lineBox, styles, type TypeSpec } from "./pdf-styles";
-import { faceOf, prepareText, type PreparedInline, type PreparedText } from "./pdf-text";
+import {
+  CALLOUT,
+  CONTENT_AREA,
+  CONTENT_WIDTH,
+  HAIRLINE,
+  INK,
+  LIST,
+  SPACE,
+  TABLE,
+  TYPE,
+  lineBox,
+  styles,
+  type TypeSpec,
+} from "./pdf-styles";
+import {
+  faceOf,
+  prepareText,
+  type PreparedInline,
+  type PreparedText,
+} from "./pdf-text";
 
 // The PDF channel: a RenderDoc becomes US Letter pages with real, selectable text and embedded
 // fonts. Server-only; @react-pdf never reaches the client.
@@ -51,21 +85,29 @@ export class UnrenderableCharactersError extends Error {
   readonly characters: readonly string[];
 
   constructor(characters: readonly string[]) {
-    super(`The PDF fonts can't draw ${characters.length} of the document's characters.`);
+    super(
+      `The PDF fonts can't draw ${characters.length} of the document's characters.`,
+    );
     this.name = "UnrenderableCharactersError";
     this.characters = characters;
   }
 }
 
 /** Renders a resolved document to PDF bytes. Throws UnrenderableCharactersError before any layout. */
-export async function renderPdf(doc: RenderDoc, options: PdfOptions): Promise<Uint8Array> {
+export async function renderPdf(
+  doc: RenderDoc,
+  options: PdfOptions,
+): Promise<Uint8Array> {
   const createdAt = wholeSeconds(options.createdAt);
   await loadFonts();
   const glyphs = new GlyphCheck();
   const tree = buildDocument(doc, createdAt, glyphs);
-  if (glyphs.missing.length > 0) throw new UnrenderableCharactersError(glyphs.missing);
+  if (glyphs.missing.length > 0)
+    throw new UnrenderableCharactersError(glyphs.missing);
   const buffer = await renderToBuffer(tree);
-  return withModDate(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength));
+  return withModDate(
+    new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+  );
 }
 
 const REACT_PDF_MOD_KEY = "/ModificationDate";
@@ -78,9 +120,14 @@ const PDF_MOD_KEY = "/ModDate".padEnd(REACT_PDF_MOD_KEY.length, " ");
  * The bytes are react-pdf's own buffer, changed in place.
  */
 function withModDate(bytes: Uint8Array): Uint8Array {
-  const text = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("latin1");
+  const text = Buffer.from(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  ).toString("latin1");
   const trailer = text.lastIndexOf("\ntrailer\n");
-  const info = trailer < 0 ? undefined : /\/Info (\d+) 0 R/.exec(text.slice(trailer))?.[1];
+  const info =
+    trailer < 0 ? undefined : /\/Info (\d+) 0 R/.exec(text.slice(trailer))?.[1];
   const start = info === undefined ? -1 : text.indexOf(`\n${info} 0 obj\n`);
   const end = start < 0 ? -1 : text.indexOf("\nendobj", start);
   const key = end < 0 ? -1 : text.indexOf(`\n${REACT_PDF_MOD_KEY} `, start);
@@ -91,7 +138,8 @@ function withModDate(bytes: Uint8Array): Uint8Array {
 
 function wholeSeconds(at: Date): Date {
   const ms = at instanceof Date ? at.getTime() : Number.NaN;
-  if (!Number.isFinite(ms)) throw new TypeError("renderPdf needs a valid createdAt date.");
+  if (!Number.isFinite(ms))
+    throw new TypeError("renderPdf needs a valid createdAt date.");
   return new Date(Math.floor(ms / 1000) * 1000);
 }
 
@@ -99,10 +147,15 @@ function wholeSeconds(at: Date): Date {
  * "UC-4F7K2Q · v2", "UC-4F7K2Q · Draft" for an unsubmitted draft, or "UC-4F7K2Q · v3 · Round 2" for a
  * preview of a round whose label names it (`RenderDoc.round`).
  */
-export function footerLabel(doc: Pick<RenderDoc, "templateId" | "versionNumber" | "round">): string {
-  const version = doc.versionNumber === null ? "Draft" : `v${doc.versionNumber}`;
+export function footerLabel(
+  doc: Pick<RenderDoc, "templateId" | "versionNumber" | "round">,
+): string {
+  const version =
+    doc.versionNumber === null ? "Draft" : `v${doc.versionNumber}`;
   const label = `${doc.templateId} · ${version}`;
-  return doc.round === undefined ? label : `${label} · ${roundLabel(doc.round)}`;
+  return doc.round === undefined
+    ? label
+    : `${label} · ${roundLabel(doc.round)}`;
 }
 
 /** Every digit and word the footer's page numbers can use. */
@@ -129,7 +182,11 @@ function buildDocument(doc: RenderDoc, createdAt: Date, glyphs: GlyphCheck) {
         {blocks}
         <View style={styles.footer} fixed>
           <Text>{label}</Text>
-          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          <Text
+            render={({ pageNumber, totalPages }) =>
+              `Page ${pageNumber} of ${totalPages}`
+            }
+          />
         </View>
       </Page>
     </Document>
@@ -180,22 +237,38 @@ function flow(blocks: readonly RenderBlock[], glyphs: GlyphCheck): ReactNode[] {
       // the start of what the intro introduces, so neither is stranded above a block that moved.
       const intro = laid[i + 1];
       out.push(
-        <View key={key} wrap={false} minPresenceAhead={keepAheadOf(laid, i + 1)}>
+        <View
+          key={key}
+          wrap={false}
+          minPresenceAhead={keepAheadOf(laid, i + 1)}
+        >
           {item.render(0, 0)}
           {intro.render(gapBetween(item.block, intro.block), 0)}
         </View>,
       );
       i += 1;
     } else {
-      out.push(<Fragment key={key}>{item.render(0, keepAheadOf(laid, i))}</Fragment>);
+      out.push(
+        <Fragment key={key}>{item.render(0, keepAheadOf(laid, i))}</Fragment>,
+      );
     }
     const prev = laid[i];
     const next = laid[i + 1];
     if (!next) continue;
-    out.push(<View key={`gap${i}`} style={{ paddingTop: gapBetween(prev.block, next.block) }} />);
+    out.push(
+      <View
+        key={`gap${i}`}
+        style={{ paddingTop: gapBetween(prev.block, next.block) }}
+      />,
+    );
     if (next.block.type === "table" && repeatsHeader(next.block.rows)) {
       // Never leave a table's (repeating) header row alone at a page bottom.
-      out.push(<View key={`keep${i}`} minPresenceAhead={Math.min(MAX_KEEP, next.head + 2)} />);
+      out.push(
+        <View
+          key={`keep${i}`}
+          minPresenceAhead={Math.min(MAX_KEEP, next.head + 2)}
+        />,
+      );
     }
   }
   return out;
@@ -212,8 +285,16 @@ function introduces(laid: readonly Laid[], j: number): boolean {
   const intro = laid[j];
   const next = laid[j + 1];
   if (!intro || !next || intro.block.type !== "paragraph") return false;
-  if (intro.height > INTRO_LINES * lineBox(TYPE.body) + 1 || intro.head < intro.height) return false;
-  return next.block.type === "table" || next.block.type === "list" || next.block.type === "callout";
+  if (
+    intro.height > INTRO_LINES * lineBox(TYPE.body) + 1 ||
+    intro.head < intro.height
+  )
+    return false;
+  return (
+    next.block.type === "table" ||
+    next.block.type === "list" ||
+    next.block.type === "callout"
+  );
 }
 
 /**
@@ -223,12 +304,17 @@ function introduces(laid: readonly Laid[], j: number): boolean {
  */
 function keepAheadOf(laid: readonly Laid[], i: number): number {
   const type = laid[i].block.type;
-  if (!laid[i + 1] || !(type === "heading" || (type === "paragraph" && introduces(laid, i)))) return 0;
+  if (
+    !laid[i + 1] ||
+    !(type === "heading" || (type === "paragraph" && introduces(laid, i)))
+  )
+    return 0;
   let ahead = 0;
   for (let j = i + 1; j < laid.length; j += 1) {
     ahead += gapBetween(laid[j - 1].block, laid[j].block) + laid[j].head;
     if (laid[j].block.type === "heading") continue;
-    if (introduces(laid, j)) ahead += gapBetween(laid[j].block, laid[j + 1].block) + laid[j + 1].head;
+    if (introduces(laid, j))
+      ahead += gapBetween(laid[j].block, laid[j + 1].block) + laid[j + 1].head;
     break;
   }
   return Math.min(MAX_KEEP, ahead + lineBox(TYPE.body)); // a line of slack for estimate error
@@ -239,7 +325,8 @@ function gapBetween(prev: RenderBlock, next: RenderBlock): number {
   if (prev.type === "heading") return SPACE.afterHeading[prev.level];
   if (next.type === "heading") return SPACE.beforeHeading[next.level];
   if (prev.type === "rule" || next.type === "rule") return SPACE.rule;
-  if (prev.type === "paragraph" && next.type === "paragraph") return SPACE.paragraph;
+  if (prev.type === "paragraph" && next.type === "paragraph")
+    return SPACE.paragraph;
   return SPACE.block;
 }
 
@@ -267,10 +354,13 @@ function lay(block: RenderBlock, ctx: Ctx): Laid {
 
 /** Blocks inside a list item, cell or callout: tighter spacing, no keep rules of their own. */
 function stack(laid: readonly Laid[]): ReactNode[] {
-  return laid.map((item, i) => <Fragment key={i}>{item.render(i === 0 ? 0 : SPACE.inner, 0)}</Fragment>);
+  return laid.map((item, i) => (
+    <Fragment key={i}>{item.render(i === 0 ? 0 : SPACE.inner, 0)}</Fragment>
+  ));
 }
 
-const stackHeight = (laid: readonly Laid[]) => laid.reduce((h, item, i) => h + item.height + (i > 0 ? SPACE.inner : 0), 0);
+const stackHeight = (laid: readonly Laid[]) =>
+  laid.reduce((h, item, i) => h + item.height + (i > 0 ? SPACE.inner : 0), 0);
 
 // ── Text ─────────────────────────────────────────────────────────────────────
 
@@ -298,7 +388,8 @@ function inlineNodes(inlines: readonly PreparedInline[]): ReactNode[] {
         </Link>
       );
     }
-    if (!item.bold && !item.italic && !item.underline && !hasOwn) return item.text;
+    if (!item.bold && !item.italic && !item.underline && !hasOwn)
+      return item.text;
     return (
       <Text key={i} style={{ ...marks, ...own }}>
         {item.text}
@@ -318,7 +409,9 @@ const LINE_HOLDER = "\u00A0";
 function lineNodes(inlines: readonly PreparedInline[]): ReactNode {
   if (inlines.length === 0) return LINE_HOLDER;
   const nodes = inlineNodes(inlines);
-  return inlines[inlines.length - 1]!.kind === "break" ? [...nodes, LINE_HOLDER] : nodes;
+  return inlines[inlines.length - 1]!.kind === "break"
+    ? [...nodes, LINE_HOLDER]
+    : nodes;
 }
 
 const textStyle = (spec: TypeSpec) => ({
@@ -328,9 +421,17 @@ const textStyle = (spec: TypeSpec) => ({
   lineHeight: spec.lineHeight,
 });
 
-function layParagraph(block: Extract<RenderBlock, { type: "paragraph" }>, ctx: Ctx, bold = false): Laid {
+function layParagraph(
+  block: Extract<RenderBlock, { type: "paragraph" }>,
+  ctx: Ctx,
+  bold = false,
+): Laid {
   const spec = ctx.spec;
-  const content = bold ? block.content.map((r) => (r.type === "text" ? { ...r, bold: true as const } : r)) : block.content;
+  const content = bold
+    ? block.content.map((r) =>
+        r.type === "text" ? { ...r, bold: true as const } : r,
+      )
+    : block.content;
   const { inlines, lines } = prepareText(content, spec, ctx.width, ctx.glyphs);
   return {
     block,
@@ -338,16 +439,29 @@ function layParagraph(block: Extract<RenderBlock, { type: "paragraph" }>, ctx: C
     head: (lines <= 3 ? lines : 2) * lineBox(spec),
     height: lines * lineBox(spec),
     render: (above) => (
-      <Text style={[textStyle(spec), { marginTop: above }]} orphans={2} widows={2} hyphenationPenalty={NEVER_BREAK}>
+      <Text
+        style={[textStyle(spec), { marginTop: above }]}
+        orphans={2}
+        widows={2}
+        hyphenationPenalty={NEVER_BREAK}
+      >
         {lineNodes(inlines)}
       </Text>
     ),
   };
 }
 
-function layHeading(block: Extract<RenderBlock, { type: "heading" }>, ctx: Ctx): Laid {
+function layHeading(
+  block: Extract<RenderBlock, { type: "heading" }>,
+  ctx: Ctx,
+): Laid {
   const spec = HEADING_SPEC[block.level];
-  const { inlines, lines } = prepareText(block.content, spec, ctx.width, ctx.glyphs);
+  const { inlines, lines } = prepareText(
+    block.content,
+    spec,
+    ctx.width,
+    ctx.glyphs,
+  );
   const height = lines * lineBox(spec);
   return {
     block,
@@ -372,18 +486,39 @@ const KEEP_ITEM_LINES = 5;
 const PLAIN = { bold: false, italic: false } as const;
 
 /** A list item's marker, set as given: whole when it fits its column, otherwise wrapped there, bare. */
-function prepareMarker(marker: string, spec: TypeSpec, room: number, glyphs: GlyphCheck): PreparedText {
+function prepareMarker(
+  marker: string,
+  spec: TypeSpec,
+  room: number,
+  glyphs: GlyphCheck,
+): PreparedText {
   const fits = measure(marker, faceOf(spec, PLAIN), spec.size) <= room;
-  return prepareText([{ type: "text", text: marker }], spec, fits ? Infinity : room, glyphs);
+  return prepareText(
+    [{ type: "text", text: marker }],
+    spec,
+    fits ? Infinity : room,
+    glyphs,
+  );
 }
 
-function layList(block: Extract<RenderBlock, { type: "list" }>, ctx: Ctx): Laid {
+function layList(
+  block: Extract<RenderBlock, { type: "list" }>,
+  ctx: Ctx,
+): Laid {
   const spec = ctx.spec;
   const width = Math.max(0, ctx.width);
-  const widest = Math.max(0, ...block.items.map((item) => measure(item.marker, faceOf(spec, PLAIN), spec.size)));
+  const widest = Math.max(
+    0,
+    ...block.items.map((item) =>
+      measure(item.marker, faceOf(spec, PLAIN), spec.size),
+    ),
+  );
   // Hanging indent: markers right-aligned in their own column, text aligned after it. The column
   // never takes more than half the box (a deep list in a narrow cell keeps room for its text).
-  const column = Math.min(Math.max(LIST.minMarker, Math.ceil(widest + LIST.markerGap)), width / 2);
+  const column = Math.min(
+    Math.max(LIST.minMarker, Math.ceil(widest + LIST.markerGap)),
+    width / 2,
+  );
   const gap = Math.min(LIST.markerGap, column / 3);
   // The body gets an explicit width, not flex-grow: nested flex rows that size from their content
   // make react-pdf's layout (Yoga) exponential in the nesting depth.
@@ -394,19 +529,42 @@ function layList(block: Extract<RenderBlock, { type: "list" }>, ctx: Ctx): Laid 
     const laid = item.content.map((b) => lay(b, inner));
     const height = Math.max(marker.lines * lineBox(spec), stackHeight(laid));
     const nested = item.content.some((b) => b.type === "list");
-    return { marker, laid, height, keep: !nested && height <= KEEP_ITEM_LINES * lineBox(spec) + 1 };
+    return {
+      marker,
+      laid,
+      height,
+      keep: !nested && height <= KEEP_ITEM_LINES * lineBox(spec) + 1,
+    };
   });
   const first = items[0];
 
   return {
     block,
-    head: first ? (first.keep ? first.height : Math.max(first.marker.lines * lineBox(spec), first.laid[0]?.head ?? 0)) : 0,
-    height: items.reduce((h, item, i) => h + item.height + (i > 0 ? SPACE.listItem : 0), 0),
+    head: first
+      ? first.keep
+        ? first.height
+        : Math.max(first.marker.lines * lineBox(spec), first.laid[0]?.head ?? 0)
+      : 0,
+    height: items.reduce(
+      (h, item, i) => h + item.height + (i > 0 ? SPACE.listItem : 0),
+      0,
+    ),
     render: (above) => (
       <View style={{ marginTop: above }}>
         {items.map((item, i) => (
-          <View key={i} style={[styles.listItem, { marginTop: i > 0 ? SPACE.listItem : 0 }]} wrap={!item.keep}>
-            <Text style={[textStyle(spec), styles.marker, { width: column, paddingRight: gap }]} hyphenationPenalty={NEVER_BREAK}>
+          <View
+            key={i}
+            style={[styles.listItem, { marginTop: i > 0 ? SPACE.listItem : 0 }]}
+            wrap={!item.keep}
+          >
+            <Text
+              style={[
+                textStyle(spec),
+                styles.marker,
+                { width: column, paddingRight: gap },
+              ]}
+              hyphenationPenalty={NEVER_BREAK}
+            >
               {inlineNodes(item.marker.inlines)}
             </Text>
             <View style={{ width: inner.width }}>{stack(item.laid)}</View>
@@ -421,7 +579,9 @@ function layList(block: Extract<RenderBlock, { type: "list" }>, ctx: Ctx): Laid 
 
 /** The first row is all header cells and there's more below it: it repeats across pages. */
 const repeatsHeader = (rows: readonly RenderTableRow[]) =>
-  rows.length > 1 && rows[0].cells.length > 0 && rows[0].cells.every((c) => c.header);
+  rows.length > 1 &&
+  rows[0].cells.length > 0 &&
+  rows[0].cells.every((c) => c.header);
 
 interface GridCell {
   /** null: covered by a rowspan from the row above. */
@@ -433,7 +593,9 @@ interface GridCell {
 
 /** `value` as an integer from `min` to `max`; anything else is `min`. */
 function bounded(value: number, min: number, max: number): number {
-  return Number.isInteger(value) ? Math.min(Math.max(value, min), Math.max(min, max)) : min;
+  return Number.isInteger(value)
+    ? Math.min(Math.max(value, min), Math.max(min, max))
+    : min;
 }
 
 /**
@@ -490,20 +652,28 @@ const SPLIT_ROW = 0.6 * CONTENT_AREA;
  * after a row that keeps with the next. A run taller than KEEP_ROWS falls back to single rows.
  * Returns runs of row indices, in order.
  */
-export function keepRuns(rows: readonly { height: number; keepWithNext: boolean }[]): number[][] {
+export function keepRuns(
+  rows: readonly { height: number; keepWithNext: boolean }[],
+): number[][] {
   const n = rows.length;
-  const canBreakBefore = (i: number) => i >= TABLE_ORPHANS && n - i >= TABLE_WIDOWS && !rows[i - 1].keepWithNext;
+  const canBreakBefore = (i: number) =>
+    i >= TABLE_ORPHANS && n - i >= TABLE_WIDOWS && !rows[i - 1].keepWithNext;
   const runs: number[][] = [];
   for (let i = 0; i < n; i += 1) {
     if (i === 0 || canBreakBefore(i)) runs.push([i]);
     else runs[runs.length - 1].push(i);
   }
   return runs.flatMap((run) =>
-    run.length > 1 && run.reduce((h, i) => h + rows[i].height, 0) > KEEP_ROWS ? run.map((i) => [i]) : [run],
+    run.length > 1 && run.reduce((h, i) => h + rows[i].height, 0) > KEEP_ROWS
+      ? run.map((i) => [i])
+      : [run],
   );
 }
 
-function layTable(block: Extract<RenderBlock, { type: "table" }>, ctx: Ctx): Laid {
+function layTable(
+  block: Extract<RenderBlock, { type: "table" }>,
+  ctx: Ctx,
+): Laid {
   const spec = TYPE.table;
   const { columns, rows } = grid(block);
   const unit = Math.max(0, ctx.width) / columns; // equal columns, like the editor's fixed table layout
@@ -515,21 +685,39 @@ function layTable(block: Extract<RenderBlock, { type: "table" }>, ctx: Ctx): Lai
       const rules = HAIRLINE * (k === 0 ? 2 : 1);
       // A narrow cell (a table in a list in a 12-column table) gives up padding before text room.
       const padX = Math.min(TABLE.padX, width / 4);
-      const cellCtx: Ctx = { ...ctx, width: Math.max(0, width - 2 * padX - rules), spec };
+      const cellCtx: Ctx = {
+        ...ctx,
+        width: Math.max(0, width - 2 * padX - rules),
+        spec,
+      };
       const header = g.cell?.header === true;
-      const laid = (g.cell?.content ?? []).map((b) => (header && b.type === "paragraph" ? layParagraph(b, cellCtx, true) : lay(b, cellCtx)));
+      const laid = (g.cell?.content ?? []).map((b) =>
+        header && b.type === "paragraph"
+          ? layParagraph(b, cellCtx, true)
+          : lay(b, cellCtx),
+      );
       return { g, width, padX, header, laid, height: stackHeight(laid) };
     });
     // Rows overlap by a hairline, so each adds one.
-    const height = Math.max(lineBox(spec), ...laidCells.map((c) => c.height)) + 2 * TABLE.padY + HAIRLINE;
+    const height =
+      Math.max(lineBox(spec), ...laidCells.map((c) => c.height)) +
+      2 * TABLE.padY +
+      HAIRLINE;
     // A sub-header row (all header cells) and a row whose rowspan continues keep with the next.
-    const keepWithNext = cells.some((g) => g.open) || (r > 0 && block.rows[r].cells.length > 0 && block.rows[r].cells.every((c) => c.header));
+    const keepWithNext =
+      cells.some((g) => g.open) ||
+      (r > 0 &&
+        block.rows[r].cells.length > 0 &&
+        block.rows[r].cells.every((c) => c.header));
     return { laidCells, height, keepWithNext };
   });
 
   const bodyStart = repeat ? 1 : 0;
-  const runs = keepRuns(laidRows.slice(bodyStart)).map((run) => run.map((i) => i + bodyStart));
-  const runHeight = (run: readonly number[]) => run.reduce((h, r) => h + laidRows[r].height, 0);
+  const runs = keepRuns(laidRows.slice(bodyStart)).map((run) =>
+    run.map((i) => i + bodyStart),
+  );
+  const runHeight = (run: readonly number[]) =>
+    run.reduce((h, r) => h + laidRows[r].height, 0);
   const height = laidRows.reduce((h, row) => h + row.height, HAIRLINE);
   // No break is allowed between the body rows (3 or fewer, or all tied): the table never splits.
   const whole = runs.length <= 1 && height <= KEEP_ROWS;
@@ -567,7 +755,9 @@ function layTable(block: Extract<RenderBlock, { type: "table" }>, ctx: Ctx): Lai
   return {
     block,
     // What must fit for the table to start on a page: the header row and the first run of rows.
-    head: whole ? height : (repeat ? laidRows[0].height : 0) + runHeight(runs[0] ?? []) + HAIRLINE,
+    head: whole
+      ? height
+      : (repeat ? laidRows[0].height : 0) + runHeight(runs[0] ?? []) + HAIRLINE,
     height,
     render: (above) => (
       <View style={{ marginTop: above }} wrap={!whole}>
@@ -577,7 +767,11 @@ function layTable(block: Extract<RenderBlock, { type: "table" }>, ctx: Ctx): Lai
             rowView(run[0], run[0] > 0)
           ) : (
             // A run moves to the next page whole, under the repeated header.
-            <View key={`run${run[0]}`} wrap={false} style={run[0] > 0 ? styles.rowAfterFirst : {}}>
+            <View
+              key={`run${run[0]}`}
+              wrap={false}
+              style={run[0] > 0 ? styles.rowAfterFirst : {}}
+            >
               {run.map((r, i) => rowView(r, i > 0))}
             </View>
           ),
@@ -592,11 +786,22 @@ function layTable(block: Extract<RenderBlock, { type: "table" }>, ctx: Ctx): Lai
 /** Callouts up to this tall (points) move to the next page whole. */
 const KEEP_CALLOUT = 200;
 
-function layCallout(block: Extract<RenderBlock, { type: "callout" }>, ctx: Ctx): Laid {
+function layCallout(
+  block: Extract<RenderBlock, { type: "callout" }>,
+  ctx: Ctx,
+): Laid {
   const spec = TYPE.callout;
-  const inner: Ctx = { ...ctx, width: Math.max(0, ctx.width - CALLOUT.padLeft - CALLOUT.padRight - 2 * HAIRLINE), spec };
+  const inner: Ctx = {
+    ...ctx,
+    width: Math.max(
+      0,
+      ctx.width - CALLOUT.padLeft - CALLOUT.padRight - 2 * HAIRLINE,
+    ),
+    spec,
+  };
   const laid = block.content.map((b) => lay(b, inner));
-  const height = stackHeight(laid) + CALLOUT.padTop + CALLOUT.padBottom + 2 * HAIRLINE;
+  const height =
+    stackHeight(laid) + CALLOUT.padTop + CALLOUT.padBottom + 2 * HAIRLINE;
   const keep = height <= KEEP_CALLOUT;
   const iconTop = CALLOUT.padTop + (lineBox(spec) - CALLOUT.iconSize) / 2;
   return {
@@ -616,9 +821,26 @@ function layCallout(block: Extract<RenderBlock, { type: "callout" }>, ctx: Ctx):
 function infoGlyph(top: number) {
   return (
     <Svg viewBox="0 0 24 24" style={[styles.calloutIcon, { top }]}>
-      <Circle cx="12" cy="12" r="10" stroke={INK.calloutGlyph} strokeWidth={1.9} fill="none" />
-      <Path d="M12 16v-4" stroke={INK.calloutGlyph} strokeWidth={1.9} strokeLinecap="round" />
-      <Path d="M12 8h.01" stroke={INK.calloutGlyph} strokeWidth={2.4} strokeLinecap="round" />
+      <Circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke={INK.calloutGlyph}
+        strokeWidth={1.9}
+        fill="none"
+      />
+      <Path
+        d="M12 16v-4"
+        stroke={INK.calloutGlyph}
+        strokeWidth={1.9}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M12 8h.01"
+        stroke={INK.calloutGlyph}
+        strokeWidth={2.4}
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }

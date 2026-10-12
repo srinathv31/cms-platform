@@ -5,7 +5,14 @@ import { z } from "zod";
 import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { can } from "@/domain/permissions";
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { Channel, ChannelFamily, JSONContent, Variable, VersionState, Viewer } from "@/domain/types";
+import type {
+  Channel,
+  ChannelFamily,
+  JSONContent,
+  Variable,
+  VersionState,
+  Viewer,
+} from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
@@ -56,17 +63,22 @@ export async function loadVersionsToCompare(
   input: { templateId: string; from: string | null; to: string | null },
 ): Promise<ReadResult<ComparePair>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
+  if (!parsed.success)
+    return refusal(400, REQUEST_REFUSALS.templateUnavailable);
   const { templateId, from, to } = parsed.data;
 
   const template = await db
-    .select({ teamId: templates.teamId, contentTypeId: templates.contentTypeId })
+    .select({
+      teamId: templates.teamId,
+      contentTypeId: templates.contentTypeId,
+    })
     .from(templates)
     .where(eq(templates.id, templateId))
     .limit(1)
     .then((rows) => rows[0]);
   if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
-  if (!can(viewer, "template.view", { teamId: template.teamId }).ok) return refusal(403, REQUEST_REFUSALS.templateUnavailable);
+  if (!can(viewer, "template.view", { teamId: template.teamId }).ok)
+    return refusal(403, REQUEST_REFUSALS.templateUnavailable);
 
   const [rows, family, rules] = await Promise.all([
     db
@@ -83,7 +95,12 @@ export async function loadVersionsToCompare(
         variables: versions.variables,
       })
       .from(versions)
-      .where(and(eq(versions.templateId, templateId), inArray(versions.id, [from, to]))),
+      .where(
+        and(
+          eq(versions.templateId, templateId),
+          inArray(versions.id, [from, to]),
+        ),
+      ),
     loadFamily(db, template.contentTypeId),
     loadMessageRules(db, template.contentTypeId),
   ]);
@@ -101,6 +118,7 @@ export async function loadVersionsToCompare(
   };
   const older = pick(from);
   const newer = pick(to);
-  if (!older || !newer) return refusal(404, REQUEST_REFUSALS.versionUnavailable);
+  if (!older || !newer)
+    return refusal(404, REQUEST_REFUSALS.versionUnavailable);
   return { ok: true, family, from: older, to: newer };
 }

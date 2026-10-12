@@ -12,15 +12,23 @@ import { numberOf, trimmed, teamApproversExcept, notify } from "./helpers";
 import { REFUSALS } from "./refusals";
 import type { Outcome, ReviewVersion } from "./types";
 
-export type StartRevokeResult = Outcome<{ changes: { revoke: RevokeRecord }; effects: LifecycleEffect[] }>;
+export type StartRevokeResult = Outcome<{
+  changes: { revoke: RevokeRecord };
+  effects: LifecycleEffect[];
+}>;
 export type ConfirmRevokeResult = Outcome<{
   changes: { state: "revoked"; revoke: RevokeRecord };
   effects: LifecycleEffect[];
 }>;
-export type CancelRevokeResult = Outcome<{ changes: { revoke: null }; effects: LifecycleEffect[] }>;
+export type CancelRevokeResult = Outcome<{
+  changes: { revoke: null };
+  effects: LifecycleEffect[];
+}>;
 
 /** True while a revoke has been started and not yet confirmed or cancelled. */
-export function revokePending(version: { revoke: RevokeRecord | null }): boolean {
+export function revokePending(version: {
+  revoke: RevokeRecord | null;
+}): boolean {
   return version.revoke !== null && !version.revoke.confirmedAt;
 }
 
@@ -39,7 +47,8 @@ export function startRevoke(input: {
   const { version, actorId, now } = input;
 
   if (version.state === "revoked") return refuse(REFUSALS.alreadyRevoked);
-  if (version.state !== "active" && version.state !== "superseded") return refuse(REFUSALS.notRevocable);
+  if (version.state !== "active" && version.state !== "superseded")
+    return refuse(REFUSALS.notRevocable);
   if (revokePending(version)) return refuse(REFUSALS.revokePending);
   const reason = trimmed(input.reason);
   if (!reason) return refuse(REFUSALS.giveReason);
@@ -47,9 +56,15 @@ export function startRevoke(input: {
   const number = numberOf(version);
   return {
     ok: true,
-    changes: { revoke: { reason, startedBy: actorId, startedAt: now.toISOString() } },
+    changes: {
+      revoke: { reason, startedBy: actorId, startedAt: now.toISOString() },
+    },
     effects: [
-      { kind: "audit", action: "version.revoke_started", details: { number, reason } },
+      {
+        kind: "audit",
+        action: "version.revoke_started",
+        details: { number, reason },
+      },
       notify({
         notification: "revoke_started",
         to: teamApproversExcept(actorId),
@@ -85,7 +100,11 @@ export function confirmRevoke(input: {
 
   const number = numberOf(version);
   const wasActive = version.state === "active";
-  const revoke: RevokeRecord = { ...started, confirmedBy: actorId, confirmedAt: now.toISOString() };
+  const revoke: RevokeRecord = {
+    ...started,
+    confirmedBy: actorId,
+    confirmedAt: now.toISOString(),
+  };
   const versions = { to: "versions", templateId: version.templateId } as const;
   const title = `${actorName} confirmed the revoke of ${templateName} v${number}.`;
 
@@ -93,7 +112,12 @@ export function confirmRevoke(input: {
     {
       kind: "audit",
       action: "version.revoked",
-      details: { number, reason: started.reason, startedBy: started.startedBy, wasActive },
+      details: {
+        number,
+        reason: started.reason,
+        startedBy: started.startedBy,
+        wasActive,
+      },
     },
     {
       kind: "consumer_notice",
@@ -106,7 +130,13 @@ export function confirmRevoke(input: {
       },
     },
     // The approvers who were asked to confirm or cancel, the one who started it included.
-    notify({ notification: "version_revoked", to: teamApproversExcept(actorId), title, body: started.reason, link: versions }),
+    notify({
+      notification: "version_revoked",
+      to: teamApproversExcept(actorId),
+      title,
+      body: started.reason,
+      link: versions,
+    }),
   ];
   if (version.submittedBy && version.submittedBy !== actorId) {
     effects.push(
@@ -129,7 +159,11 @@ export function confirmRevoke(input: {
  * keeps rendering, so the two-person rule that guards confirming isn't needed here. The caller checks
  * the approver permission.
  */
-export function cancelRevoke(input: { version: ReviewVersion; actorId: string; now: Date }): CancelRevokeResult {
+export function cancelRevoke(input: {
+  version: ReviewVersion;
+  actorId: string;
+  now: Date;
+}): CancelRevokeResult {
   const { version, actorId } = input;
 
   const pending = pendingRevoke(version);
@@ -154,9 +188,15 @@ export function cancelRevoke(input: { version: ReviewVersion; actorId: string; n
   };
 }
 
-function pendingRevoke(version: ReviewVersion): ({ ok: true; revoke: RevokeRecord }) | Refused {
+function pendingRevoke(
+  version: ReviewVersion,
+): { ok: true; revoke: RevokeRecord } | Refused {
   if (version.state === "revoked") return refuse(REFUSALS.alreadyRevoked);
-  if ((version.state !== "active" && version.state !== "superseded") || !version.revoke || version.revoke.confirmedAt) {
+  if (
+    (version.state !== "active" && version.state !== "superseded") ||
+    !version.revoke ||
+    version.revoke.confirmedAt
+  ) {
     return refuse(REFUSALS.noRevokePending);
   }
   return { ok: true, revoke: version.revoke };

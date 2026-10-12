@@ -13,8 +13,19 @@
 
 import { rolesOn } from "./permissions";
 import { refusal, refuse } from "./refusals";
-import type { ApprovalStage, Person, Recipients, StepView, VersionStage } from "./review-types";
-import type { ApproverRule, PermissionResult, VersionState, Viewer } from "./types";
+import type {
+  ApprovalStage,
+  Person,
+  Recipients,
+  StepView,
+  VersionStage,
+} from "./review-types";
+import type {
+  ApproverRule,
+  PermissionResult,
+  VersionState,
+  Viewer,
+} from "./types";
 
 /**
  * Release 1's chain, used while a content type has no stages configured. Its stage id, "default", is
@@ -22,11 +33,18 @@ import type { ApproverRule, PermissionResult, VersionState, Viewer } from "./typ
  * content type has a chain of its own, so those versions stay decidable.
  */
 export const DEFAULT_CHAIN: readonly ApprovalStage[] = [
-  { id: "default", position: 0, name: "Team approver", rule: { kind: "team_role", role: "approver" } },
+  {
+    id: "default",
+    position: 0,
+    name: "Team approver",
+    rule: { kind: "team_role", role: "approver" },
+  },
 ];
 
 /** The chain in approval order (by position), whatever order the rows came in. */
-export function orderedStages(chain: readonly ApprovalStage[]): ApprovalStage[] {
+export function orderedStages(
+  chain: readonly ApprovalStage[],
+): ApprovalStage[] {
   return [...chain].sort((a, b) => a.position - b.position);
 }
 
@@ -41,7 +59,10 @@ export function recordStages(chain: readonly ApprovalStage[]): VersionStage[] {
  * The stages a version goes through, in its own order: the ones it recorded at submit. A version that
  * has recorded none (a draft) would go through the chain as it is now.
  */
-export function ownStages(recorded: readonly VersionStage[] | null, chain: readonly ApprovalStage[]): VersionStage[] {
+export function ownStages(
+  recorded: readonly VersionStage[] | null,
+  chain: readonly ApprovalStage[],
+): VersionStage[] {
   return recorded ? [...recorded] : recordStages(chain);
 }
 
@@ -59,8 +80,12 @@ export function stageOf(
 ): ApprovalStage | null {
   const recorded = stages[position];
   if (!recorded) return null;
-  const live = chain.find((stage) => stage.id === recorded.id) ?? DEFAULT_CHAIN.find((stage) => stage.id === recorded.id);
-  return live ? { id: recorded.id, position, name: recorded.name, rule: live.rule } : null;
+  const live =
+    chain.find((stage) => stage.id === recorded.id) ??
+    DEFAULT_CHAIN.find((stage) => stage.id === recorded.id);
+  return live
+    ? { id: recorded.id, position, name: recorded.name, rule: live.rule }
+    : null;
 }
 
 /** The stage a version waits on (or that sent it back), as `stageOf` reads it. */
@@ -84,8 +109,14 @@ export interface RecordedDecision {
  * on it counts, whatever stage it is recorded against. That holds for decisions the 0005 migration
  * matched to a stage by position, which may name the stage the version waits on now.
  */
-export function approvedThisRound(decisions: readonly RecordedDecision[]): string[] {
-  return [...new Set(decisions.filter((d) => d.decision === "approved").map((d) => d.actorId))];
+export function approvedThisRound(
+  decisions: readonly RecordedDecision[],
+): string[] {
+  return [
+    ...new Set(
+      decisions.filter((d) => d.decision === "approved").map((d) => d.actorId),
+    ),
+  ];
 }
 
 /**
@@ -93,12 +124,19 @@ export function approvedThisRound(decisions: readonly RecordedDecision[]): strin
  * ahead of it in their own stages. Removing a stage some version still needs is refused.
  */
 export function versionsNeeding(
-  inReview: readonly { stages: readonly VersionStage[] | null; currentStage: number }[],
+  inReview: readonly {
+    stages: readonly VersionStage[] | null;
+    currentStage: number;
+  }[],
   chain: readonly ApprovalStage[],
 ): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const version of inReview) {
-    const ahead = new Set(ownStages(version.stages, chain).slice(Math.max(version.currentStage, 0)).map((s) => s.id));
+    const ahead = new Set(
+      ownStages(version.stages, chain)
+        .slice(Math.max(version.currentStage, 0))
+        .map((s) => s.id),
+    );
     for (const id of ahead) counts[id] = (counts[id] ?? 0) + 1;
   }
   return counts;
@@ -108,19 +146,34 @@ export function versionsNeeding(
 
 /** Why the viewer can't decide the stage a version waits on. */
 export const STAGE_REFUSALS = {
-  waitingOn: refusal("waiting_on_stage", (stage: string) => `Waiting on ${stage}.`),
+  waitingOn: refusal(
+    "waiting_on_stage",
+    (stage: string) => `Waiting on ${stage}.`,
+  ),
 } as const;
 
 /**
  * Whether the viewer is who the stage's rule names: a team role held (actively) on the template's
  * team, or one named user. The reason names the stage the version is waiting on.
  */
-export function canActOnStage(viewer: Viewer, stage: ApprovalStage, teamId: string): PermissionResult {
-  return ruleMatches(viewer, stage.rule, teamId) ? { ok: true } : refuse(STAGE_REFUSALS.waitingOn(stage.name));
+export function canActOnStage(
+  viewer: Viewer,
+  stage: ApprovalStage,
+  teamId: string,
+): PermissionResult {
+  return ruleMatches(viewer, stage.rule, teamId)
+    ? { ok: true }
+    : refuse(STAGE_REFUSALS.waitingOn(stage.name));
 }
 
-function ruleMatches(viewer: Viewer, rule: ApproverRule, teamId: string): boolean {
-  return rule.kind === "user" ? viewer.userId === rule.userId : rolesOn(viewer, teamId).includes(rule.role);
+function ruleMatches(
+  viewer: Viewer,
+  rule: ApproverRule,
+  teamId: string,
+): boolean {
+  return rule.kind === "user"
+    ? viewer.userId === rule.userId
+    : rolesOn(viewer, teamId).includes(rule.role);
 }
 
 /**
@@ -136,8 +189,15 @@ export function stageRecipients(
   writers: readonly string[],
   approved: readonly string[] = [],
 ): Recipients | null {
-  if (stage.rule.kind === "user") return approved.includes(stage.rule.userId) ? null : { kind: "user", userId: stage.rule.userId };
-  return { kind: "team_role", role: stage.rule.role, exceptUserIds: [...new Set([...writers, ...approved])] };
+  if (stage.rule.kind === "user")
+    return approved.includes(stage.rule.userId)
+      ? null
+      : { kind: "user", userId: stage.rule.userId };
+  return {
+    kind: "team_role",
+    role: stage.rule.role,
+    exceptUserIds: [...new Set([...writers, ...approved])],
+  };
 }
 
 // ── The stepper ──────────────────────────────────────────────────────────────
@@ -151,7 +211,11 @@ export interface StageDecision {
 }
 
 /** States a version reaches only after every stage approved it. */
-const APPROVED_STATES: ReadonlySet<VersionState> = new Set(["active", "superseded", "revoked"]);
+const APPROVED_STATES: ReadonlySet<VersionState> = new Set([
+  "active",
+  "superseded",
+  "revoked",
+]);
 
 /**
  * One step per stage of the version's own stages (`ownStages`), in its order and with the names it
@@ -172,16 +236,24 @@ export function stepperState(
 
   return stages.map((stage, index): StepView => {
     const step = { position: index, name: stage.name };
-    const decided = (kind: StageDecision["decision"]) => latest(decisions, stage.id, kind);
+    const decided = (kind: StageDecision["decision"]) =>
+      latest(decisions, stage.id, kind);
 
-    if (APPROVED_STATES.has(state)) return withDecision(step, "done", decided("approved"));
+    if (APPROVED_STATES.has(state))
+      return withDecision(step, "done", decided("approved"));
     if (state === "in_review") {
-      if (index < currentStage) return withDecision(step, "done", decided("approved"));
-      return { ...step, status: index === currentStage ? "current" : "waiting" };
+      if (index < currentStage)
+        return withDecision(step, "done", decided("approved"));
+      return {
+        ...step,
+        status: index === currentStage ? "current" : "waiting",
+      };
     }
     if (state === "changes_requested") {
-      if (index < currentStage) return withDecision(step, "done", decided("approved"));
-      if (index === currentStage) return withDecision(step, "returned", decided("changes_requested"));
+      if (index < currentStage)
+        return withDecision(step, "done", decided("approved"));
+      if (index === currentStage)
+        return withDecision(step, "returned", decided("changes_requested"));
     }
     return { ...step, status: "waiting" };
   });
@@ -194,7 +266,10 @@ function latest(
 ): StageDecision | undefined {
   return decisions
     .filter((d) => d.stageId === stageId && d.decision === kind)
-    .reduce<StageDecision | undefined>((best, d) => (best === undefined || d.at > best.at ? d : best), undefined);
+    .reduce<StageDecision | undefined>(
+      (best, d) => (best === undefined || d.at > best.at ? d : best),
+      undefined,
+    );
 }
 
 function withDecision(
@@ -202,5 +277,7 @@ function withDecision(
   status: StepView["status"],
   decision: StageDecision | undefined,
 ): StepView {
-  return decision ? { ...step, status, decidedBy: decision.by, decidedAt: decision.at } : { ...step, status };
+  return decision
+    ? { ...step, status, decidedBy: decision.by, decidedAt: decision.at }
+    : { ...step, status };
 }

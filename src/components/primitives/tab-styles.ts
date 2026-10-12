@@ -6,7 +6,8 @@
 // tab's box, so it can't run into the underline.
 
 /** A tab's box: 44px tall, 15px text. */
-export const TAB = "group/tab relative -mb-px flex h-11 items-center text-[15px] whitespace-nowrap outline-none";
+export const TAB =
+  "group/tab relative -mb-px flex h-11 items-center text-[15px] whitespace-nowrap outline-none";
 /** The chosen tab. */
 export const TAB_ACTIVE = "font-medium text-text";
 /** Every other tab. */
@@ -15,7 +16,8 @@ export const TAB_IDLE = "text-text-muted hover:text-text";
 export const TAB_LABEL =
   "-mx-1.5 flex items-center gap-2 rounded-md px-1.5 py-0.5 group-focus-visible/tab:ring-2 group-focus-visible/tab:ring-ring";
 /** The 2px underline under the chosen tab. */
-export const TAB_UNDERLINE = "absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-text";
+export const TAB_UNDERLINE =
+  "absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-text";
 /**
  * A bar of tabs wider than a narrow canvas (under 26rem, a window under about 470px) scrolls inside itself rather
  * than push the canvas sideways (reflow, decision 0045). The 1px of padding keeps the tab's -1px margin, which puts

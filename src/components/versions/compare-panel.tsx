@@ -8,7 +8,13 @@ import { RedlineDocument } from "@/components/redline/redline-document";
 import { redlineSummary } from "@/components/redline/blocks";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScrollRegion } from "@/components/primitives/scroll-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -29,7 +35,8 @@ import type { CompareOption } from "@/server/queries/versions";
 // diff never runs backwards and no combination is empty. They list every round, and open on the two
 // newest versions (`openingPair`). Each pair is read from GET /api/templates/[templateId]/compare.
 
-type Loaded = ({ key: string; ok: true } & ComparePair) | { key: string; ok: false };
+type Loaded =
+  ({ key: string; ok: true } & ComparePair) | { key: string; ok: false };
 
 // One line at every width: the pickers and the switch keep their size, and the summary, which is the
 // one part that can be long, gives way (it truncates, and says all of it on hover). In a window under 26rem
@@ -42,7 +49,8 @@ const PICKER = "flex shrink-0 items-center gap-4 max-[26rem]:w-full";
 /** The redline's summary, with a rename counted first. */
 function withRename(counts: RedlineDoc["counts"], renamed: boolean): string {
   if (!renamed) return redlineSummary(counts);
-  const changed = counts.added + counts.removed + counts.changed + counts.moved > 0;
+  const changed =
+    counts.added + counts.removed + counts.changed + counts.moved > 0;
   return changed ? `Renamed, ${redlineSummary(counts)}` : "Renamed";
 }
 
@@ -63,14 +71,23 @@ function VersionSelect({
   return (
     <Select value={value} onValueChange={(next) => next && onChange(next)}>
       {/* Wide enough for a round's label ("v3 · Round 2"); the list is as wide as its longest option. */}
-      <SelectTrigger ref={triggerRef} aria-labelledby={labelId} className="h-8 w-36 shrink-0 bg-surface max-[26rem]:w-auto max-[26rem]:flex-1">
+      <SelectTrigger
+        ref={triggerRef}
+        aria-labelledby={labelId}
+        className="h-8 w-36 shrink-0 bg-surface max-[26rem]:w-auto max-[26rem]:flex-1"
+      >
         <SelectValue>{(id: string) => byId.get(id)?.label ?? ""}</SelectValue>
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false} className="w-auto min-w-44 p-1">
+      <SelectContent
+        alignItemWithTrigger={false}
+        className="w-auto min-w-44 p-1"
+      >
         {options.map((o) => (
           <SelectItem key={o.id} value={o.id}>
             <span className="font-medium">{o.label}</span>
-            <span className="text-text-muted">{STATUS_META[o.state].label}</span>
+            <span className="text-text-muted">
+              {STATUS_META[o.state].label}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -83,13 +100,22 @@ function VersionSelect({
  * draft included), so a version's sent-back rounds aren't what it compares first. With fewer than two
  * heads (a first version on its second round), the two newest rows.
  */
-export function openingPair(options: readonly CompareOption[]): { fromId: string; toId: string } {
+export function openingPair(options: readonly CompareOption[]): {
+  fromId: string;
+  toId: string;
+} {
   const heads = options.filter((o) => o.head);
   const [to, from] = heads.length >= 2 ? heads : options;
   return { fromId: from!.id, toId: to!.id };
 }
 
-export default function ComparePanel({ templateId, options }: { templateId: string; options: CompareOption[] }) {
+export default function ComparePanel({
+  templateId,
+  options,
+}: {
+  templateId: string;
+  options: CompareOption[];
+}) {
   // `options` is newest first: index 0 is the newest, so "older" means a higher index.
   const [fromId, setFromId] = useState(() => openingPair(options).fromId);
   const [toId, setToId] = useState(() => openingPair(options).toId);
@@ -114,7 +140,17 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
     readTemplate<ComparePair>(templateId, "compare", { from: fromId, to: toId })
       .then((result) => {
         if (!live) return;
-        setLoaded(result.ok ? { key, ok: true, family: result.family, from: result.from, to: result.to } : { key, ok: false });
+        setLoaded(
+          result.ok
+            ? {
+                key,
+                ok: true,
+                family: result.family,
+                from: result.from,
+                to: result.to,
+              }
+            : { key, ok: false },
+        );
       })
       .catch(() => live && setLoaded({ key, ok: false }));
     return () => {
@@ -123,43 +159,77 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
   }, [templateId, fromId, toId, key]);
 
   const ready = loaded?.key === key ? loaded : null;
-  const redline = useMemo(() => (ready?.ok ? diffDocuments(ready.from.body, ready.to.body) : null), [ready]);
+  const redline = useMemo(
+    () => (ready?.ok ? diffDocuments(ready.from.body, ready.to.body) : null),
+    [ready],
+  );
   // Each channel's own fields, over the registry, and the SMS footer each version sends: a change counts with the body's.
-  const fields = useMemo(() => (ready?.ok ? diffChannelFields(ready.from, ready.to) : null), [ready]);
+  const fields = useMemo(
+    () => (ready?.ok ? diffChannelFields(ready.from, ready.to) : null),
+    [ready],
+  );
   // A message (an Alert) has no body: its fields are all there is to compare. Its content type says so.
   const message = ready?.ok ? ready.family === "message" : false;
   // The name is versioned, so a rename between the two shows with the redline, above the document, and
   // the summary counts it ("Renamed", "Renamed, 2 added and 1 changed") rather than saying "No changes".
   const rename = ready?.ok ? nameChange(ready.from.name, ready.to.name) : null;
-  const summary = redline && fields ? withRename(addCounts(redline.counts, fields.counts), rename !== null) : "";
+  const summary =
+    redline && fields
+      ? withRename(addCounts(redline.counts, fields.counts), rename !== null)
+      : "";
   const variables = useMemo<Variable[]>(() => {
     if (!ready?.ok) return [];
     const known = new Set(ready.to.variables.map((v) => v.key));
-    return [...ready.to.variables, ...ready.from.variables.filter((v) => !known.has(v.key))];
+    return [
+      ...ready.to.variables,
+      ...ready.from.variables.filter((v) => !known.has(v.key)),
+    ];
   }, [ready]);
 
   function pickFrom(id: string) {
     const index = options.findIndex((o) => o.id === id);
     setFromId(id);
     // The pair must read forward: if To is no newer than the new From, step To to the version after it.
-    if (options.findIndex((o) => o.id === toId) >= index) setToId(options[index - 1].id);
+    if (options.findIndex((o) => o.id === toId) >= index)
+      setToId(options[index - 1].id);
   }
 
   return (
     <>
       <div className={CONTROLS}>
         <div className={PICKER}>
-          <span id={fromLabel} className="shrink-0 text-[13px] text-text-muted max-[26rem]:w-8">
+          <span
+            id={fromLabel}
+            className="shrink-0 text-[13px] text-text-muted max-[26rem]:w-8"
+          >
             From
           </span>
-          <VersionSelect triggerRef={fromTrigger} labelId={fromLabel} value={fromId} options={fromOptions} onChange={pickFrom} />
+          <VersionSelect
+            triggerRef={fromTrigger}
+            labelId={fromLabel}
+            value={fromId}
+            options={fromOptions}
+            onChange={pickFrom}
+          />
         </div>
-        <ArrowRight aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-text-subtle max-[26rem]:hidden" />
+        <ArrowRight
+          aria-hidden
+          strokeWidth={1.75}
+          className="size-4 shrink-0 text-text-subtle max-[26rem]:hidden"
+        />
         <div className={PICKER}>
-          <span id={toLabel} className="shrink-0 text-[13px] text-text-muted max-[26rem]:w-8">
+          <span
+            id={toLabel}
+            className="shrink-0 text-[13px] text-text-muted max-[26rem]:w-8"
+          >
             To
           </span>
-          <VersionSelect labelId={toLabel} value={toId} options={toOptions} onChange={setToId} />
+          <VersionSelect
+            labelId={toLabel}
+            value={toId}
+            options={toOptions}
+            onChange={setToId}
+          />
         </div>
         <div className="ml-auto flex min-w-0 items-center gap-4 max-[26rem]:ml-0 max-[26rem]:w-full max-[26rem]:justify-between">
           {redline ? (
@@ -172,8 +242,15 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
             </span>
           ) : null}
           <div className="flex shrink-0 items-center gap-2">
-            <Switch id={switchId} checked={changesOnly} onCheckedChange={setChangesOnly} />
-            <Label htmlFor={switchId} className="text-[13px] font-normal whitespace-nowrap text-text">
+            <Switch
+              id={switchId}
+              checked={changesOnly}
+              onCheckedChange={setChangesOnly}
+            />
+            <Label
+              htmlFor={switchId}
+              className="text-[13px] font-normal whitespace-nowrap text-text"
+            >
               Changes only
             </Label>
           </div>
@@ -204,22 +281,36 @@ export default function ComparePanel({ templateId, options }: { templateId: stri
                   headingLevel={3}
                   changesOnly={changesOnly}
                   footer={fields.footer}
-                  className={cn("[--ucomp-doc-gutter:3.5rem] max-[26rem]:[--ucomp-doc-gutter:2.5rem]", !message && "mb-6")}
+                  className={cn(
+                    "[--ucomp-doc-gutter:3.5rem] max-[26rem]:[--ucomp-doc-gutter:2.5rem]",
+                    !message && "mb-6",
+                  )}
                 />
               ) : null}
               {message ? null : (
-                <RedlineDocument doc={redline} variables={variables} changesOnly={changesOnly} className="[--ucomp-doc-gutter:3.5rem] max-[26rem]:[--ucomp-doc-gutter:2.5rem]" />
+                <RedlineDocument
+                  doc={redline}
+                  variables={variables}
+                  changesOnly={changesOnly}
+                  className="[--ucomp-doc-gutter:3.5rem] max-[26rem]:[--ucomp-doc-gutter:2.5rem]"
+                />
               )}
             </>
           ) : ready && !ready.ok ? (
             <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-[14px] text-text-muted">
               <p>Couldn&apos;t load these versions.</p>
-              <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
+              <Button
+                variant="outline"
+                onClick={() => setAttempt((n) => n + 1)}
+              >
                 Try again
               </Button>
             </div>
           ) : (
-            <div aria-hidden className="mx-auto flex max-w-[47.5rem] flex-col gap-3 pt-2">
+            <div
+              aria-hidden
+              className="mx-auto flex max-w-[47.5rem] flex-col gap-3 pt-2"
+            >
               <Skeleton className="h-6 w-48" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-4/5" />

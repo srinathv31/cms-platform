@@ -10,7 +10,11 @@ export const SingleLine = Extension.create({
   priority: 50,
 
   addKeyboardShortcuts() {
-    return { Enter: () => true, "Shift-Enter": () => true, "Mod-Enter": () => true };
+    return {
+      Enter: () => true,
+      "Shift-Enter": () => true,
+      "Mod-Enter": () => true,
+    };
   },
 
   addProseMirrorPlugins() {
@@ -19,7 +23,8 @@ export const SingleLine = Extension.create({
         key: new PluginKey("singleLinePaste"),
         props: {
           transformPastedText: (text) => text.replace(/\s*[\r\n]+\s*/g, " "),
-          transformPasted: (slice, view) => flattenToLine(slice, view.state.schema),
+          transformPasted: (slice, view) =>
+            flattenToLine(slice, view.state.schema),
         },
       }),
     ];

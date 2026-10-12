@@ -31,11 +31,20 @@ export const REASONS = {
   ownVersion: refusal("submitted_version", "You submitted this version."),
   /** Maker-checker for everyone else who wrote it: started the draft or saved an edit to it. */
   wroteVersion: refusal("wrote_version", "You wrote part of this version."),
-  ownRevoke: refusal("own_revoke", "You started this revoke. Another approver must confirm it."),
-  ownRequest: refusal("own_request", "You can't decide your own access request."),
+  ownRevoke: refusal(
+    "own_revoke",
+    "You started this revoke. Another approver must confirm it.",
+  ),
+  ownRequest: refusal(
+    "own_request",
+    "You can't decide your own access request.",
+  ),
   ownAccess: refusal("own_access", "You can't change your own access."),
   /** The Auditor is read-only everywhere: no team role, request or approval gives them more. */
-  auditorReadOnly: refusal("auditor_read_only", "Auditors have read-only access and can't hold team roles."),
+  auditorReadOnly: refusal(
+    "auditor_read_only",
+    "Auditors have read-only access and can't hold team roles.",
+  ),
 } as const;
 
 // ── Grants ────────────────────────────────────────────────────
@@ -44,7 +53,13 @@ const SEE: readonly Action[] = ["template.view", "integration.view"];
 
 const TEAM_GRANTS: Record<TeamRole, readonly Action[]> = {
   viewer: [...SEE],
-  author: [...SEE, "template.create", "draft.edit", "version.submit", "review.comment"],
+  author: [
+    ...SEE,
+    "template.create",
+    "draft.edit",
+    "version.submit",
+    "review.comment",
+  ],
   approver: [
     ...SEE,
     "review.comment",
@@ -53,7 +68,12 @@ const TEAM_GRANTS: Record<TeamRole, readonly Action[]> = {
     "version.revoke.start",
     "version.revoke.confirm",
   ],
-  team_admin: [...SEE, "team.manageMembers", "team.decideAccessRequest", "audit.view"],
+  team_admin: [
+    ...SEE,
+    "team.manageMembers",
+    "team.decideAccessRequest",
+    "audit.view",
+  ],
 };
 
 /** Platform roles apply to every team and to "All teams". Neither one can edit content. */
@@ -80,7 +100,11 @@ const AUDITOR_ONLY: readonly Action[] = PLATFORM_GRANTS.auditor;
  * platform role): a suspended or lapsed person with nowhere to sign in to acts on nothing. An Auditor
  * stays read-only even when named.
  */
-const NAMED_APPROVER: readonly Action[] = ["template.view", "version.decide", "review.comment"];
+const NAMED_APPROVER: readonly Action[] = [
+  "template.view",
+  "version.decide",
+  "review.comment",
+];
 
 // ── Guards ────────────────────────────────────────────────────
 
@@ -90,10 +114,13 @@ const GUARDS: Partial<Record<Action, Guard>> = {
   // Maker-checker: nobody approves their own work.
   "version.decide": (v, r) => makerCheckerRefusal(v.userId, r),
   // Two-person revoke: the confirmer must be a different approver.
-  "version.revoke.confirm": (v, r) => (r.revokeStartedBy === v.userId ? REASONS.ownRevoke : null),
-  "team.decideAccessRequest": (v, r) => (r.requesterId === v.userId ? REASONS.ownRequest : null),
+  "version.revoke.confirm": (v, r) =>
+    r.revokeStartedBy === v.userId ? REASONS.ownRevoke : null,
+  "team.decideAccessRequest": (v, r) =>
+    r.requesterId === v.userId ? REASONS.ownRequest : null,
   // Nobody changes their own roles, removes, suspends, keeps, reinstates or recertifies themselves.
-  "team.manageMembers": (v, r) => (r.subjectUserId === v.userId ? REASONS.ownAccess : null),
+  "team.manageMembers": (v, r) =>
+    r.subjectUserId === v.userId ? REASONS.ownAccess : null,
 };
 
 /**
@@ -114,14 +141,22 @@ export function makerCheckerRefusal(
 
 // ── The check ─────────────────────────────────────────────────
 
-export function can(viewer: Viewer, action: Action, resource: PermissionResource = {}): PermissionResult {
+export function can(
+  viewer: Viewer,
+  action: Action,
+  resource: PermissionResource = {},
+): PermissionResult {
   const teamId = teamIdOf(resource);
   const blocked = GUARDS[action]?.(viewer, resource);
   // A self-block explains itself to anyone who can see the item, role or not:
   // the submitting author sees Approve disabled with "You submitted this version." (build plan, maker-checker),
   // and a co-author sees why they can't decide what they wrote.
-  if (blocked && granted(viewer, "template.view", teamId)) return refuse(blocked);
-  if (!granted(viewer, action, teamId) && !namedApprover(viewer, action, resource, teamId)) {
+  if (blocked && granted(viewer, "template.view", teamId))
+    return refuse(blocked);
+  if (
+    !granted(viewer, action, teamId) &&
+    !namedApprover(viewer, action, resource, teamId)
+  ) {
     return refuse(REASONS.generic);
   }
   return blocked ? refuse(blocked) : { ok: true };
@@ -142,17 +177,31 @@ export class PermissionError extends Error {
 }
 
 /** Throws a `PermissionError` carrying the refusal's code and reason when `can` says no. */
-export function assertCan(viewer: Viewer, action: Action, resource?: PermissionResource): void {
+export function assertCan(
+  viewer: Viewer,
+  action: Action,
+  resource?: PermissionResource,
+): void {
   const result = can(viewer, action, resource);
   if (!result.ok) throw new PermissionError(action, result);
 }
 
-function granted(viewer: Viewer, action: Action, teamId: string | null): boolean {
+function granted(
+  viewer: Viewer,
+  action: Action,
+  teamId: string | null,
+): boolean {
   if (viewer.platformRole === "auditor") return AUDITOR_ONLY.includes(action);
   if (EVERYONE.includes(action)) return true;
-  if (viewer.platformRole && PLATFORM_GRANTS[viewer.platformRole].includes(action)) return true;
+  if (
+    viewer.platformRole &&
+    PLATFORM_GRANTS[viewer.platformRole].includes(action)
+  )
+    return true;
   if (teamId === null) return false; // cross-team context: platform roles only
-  return rolesOn(viewer, teamId).some((role) => TEAM_GRANTS[role].includes(action));
+  return rolesOn(viewer, teamId).some((role) =>
+    TEAM_GRANTS[role].includes(action),
+  );
 }
 
 /** A user the version's current stage names, opening, deciding or commenting on it (any team). */
@@ -174,8 +223,12 @@ function namedApprover(
  * stage: Platform Admin has no approve power (build plan), so naming one gives them nothing until
  * they hold a team role somewhere.
  */
-export function hasActiveTeamAccess(viewer: Pick<Viewer, "memberships">): boolean {
-  return viewer.memberships.some((m) => m.status === "active" && m.roles.length > 0);
+export function hasActiveTeamAccess(
+  viewer: Pick<Viewer, "memberships">,
+): boolean {
+  return viewer.memberships.some(
+    (m) => m.status === "active" && m.roles.length > 0,
+  );
 }
 
 /** null, undefined and "all" all mean the cross-team context. */
@@ -215,7 +268,8 @@ export function spacesFor(
 ): Space[] {
   const teams = new Map<string, string>();
   for (const m of viewer.memberships) {
-    if (m.status === "active" && m.roles.length > 0) teams.set(m.teamSlug, m.teamName);
+    if (m.status === "active" && m.roles.length > 0)
+      teams.set(m.teamSlug, m.teamName);
   }
   if (isCrossTeam(viewer)) for (const t of allTeams) teams.set(t.slug, t.name);
 

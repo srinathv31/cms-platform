@@ -2,15 +2,34 @@ import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { DEFAULT_CHAIN, canActOnStage, currentStageOf, type RecordedDecision } from "@/domain/approval-chain";
+import {
+  DEFAULT_CHAIN,
+  canActOnStage,
+  currentStageOf,
+  type RecordedDecision,
+} from "@/domain/approval-chain";
 import { commentAnchors } from "@/domain/comments";
 import { DAY_MS } from "@/domain/dates";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
-import { DEFAULT_SMS_MAX_PARTS, type MessageTypeRules } from "@/domain/platform-config/limits";
+import {
+  DEFAULT_SMS_MAX_PARTS,
+  type MessageTypeRules,
+} from "@/domain/platform-config/limits";
 import { refuse } from "@/domain/refusals";
-import type { ApprovalStage, ConsumerUsage, Person } from "@/domain/review-types";
-import { contentTypeFamily, type Channel, type ChannelFamily, type JSONContent, type PermissionResult, type Viewer } from "@/domain/types";
+import type {
+  ApprovalStage,
+  ConsumerUsage,
+  Person,
+} from "@/domain/review-types";
+import {
+  contentTypeFamily,
+  type Channel,
+  type ChannelFamily,
+  type JSONContent,
+  type PermissionResult,
+  type Viewer,
+} from "@/domain/types";
 import { roundsOf } from "@/domain/rounds";
 import type { Db } from "@/server/db/client";
 import { db } from "@/server/db/client";
@@ -39,14 +58,26 @@ export type People = ReadonlyMap<string, Person>;
 /** Every user as a `Person` (the table is small: personas plus a few seeded colleagues). */
 export const getPeople = cache(async (): Promise<People> => {
   const rows = await db
-    .select({ id: users.id, name: users.name, initials: users.initials, hue: users.avatarHue })
+    .select({
+      id: users.id,
+      name: users.name,
+      initials: users.initials,
+      hue: users.avatarHue,
+    })
     .from(users);
   return new Map(rows.map((r) => [r.id, r]));
 });
 
 /** The person, or a stand-in built from the id when the user row is gone. */
 export function personOf(people: People, id: string): Person {
-  return people.get(id) ?? { id, name: id, initials: id.slice(0, 2).toUpperCase(), hue: 0 };
+  return (
+    people.get(id) ?? {
+      id,
+      name: id,
+      initials: id.slice(0, 2).toUpperCase(),
+      hue: 0,
+    }
+  );
 }
 
 // ── Dates ─────────────────────────────────────────────────────
@@ -55,7 +86,9 @@ export function iso(date: Date): string {
   return date.toISOString();
 }
 
-export function isoOrUndefined(date: Date | null | undefined): string | undefined {
+export function isoOrUndefined(
+  date: Date | null | undefined,
+): string | undefined {
   return date ? date.toISOString() : undefined;
 }
 
@@ -64,19 +97,28 @@ export function isoOrUndefined(date: Date | null | undefined): string | undefine
 export interface TemplateAccess {
   space: SpaceContext;
   /** `name` is the CMS's name for the template (`currentName`): its open draft's, otherwise its newest version's. */
-  template: { id: string; name: string; teamId: string; teamSlug: string; teamName: string; contentTypeId: string };
+  template: {
+    id: string;
+    name: string;
+    teamId: string;
+    teamSlug: string;
+    teamName: string;
+    contentTypeId: string;
+  };
 }
 
 /**
  * The template, as seen from a space: 404 when it doesn't exist, belongs to another team's space, or
  * sits on a team the viewer can't see (the same rule as the workspace header).
  */
-export const requireTemplate = cache(async (spaceSlug: string, templateId: string): Promise<TemplateAccess> => {
-  const space = await requireSpace(spaceSlug);
-  const template = await findTemplate(templateId);
-  if (!template || !seesInSpace(space, template)) notFound();
-  return { space, template };
-});
+export const requireTemplate = cache(
+  async (spaceSlug: string, templateId: string): Promise<TemplateAccess> => {
+    const space = await requireSpace(spaceSlug);
+    const template = await findTemplate(templateId);
+    if (!template || !seesInSpace(space, template)) notFound();
+    return { space, template };
+  },
+);
 
 function findTemplate(templateId: string) {
   return db
@@ -96,8 +138,12 @@ function findTemplate(templateId: string) {
 }
 
 /** The template belongs to the space (or the space is "All teams"), and the viewer sees its team. */
-function seesInSpace(space: SpaceContext, template: { teamSlug: string }): boolean {
-  if (space.slug !== ALL_SPACE && template.teamSlug !== space.slug) return false;
+function seesInSpace(
+  space: SpaceContext,
+  template: { teamSlug: string },
+): boolean {
+  if (space.slug !== ALL_SPACE && template.teamSlug !== space.slug)
+    return false;
   return canSeeSpace(space.viewer, template.teamSlug);
 }
 
@@ -124,20 +170,28 @@ export const requireReviewVersion = cache(
   ): Promise<TemplateAccess & { version: ReviewVersionRow }> => {
     const space = await requireSpace(spaceSlug);
     const template = await findTemplate(templateId);
-    if (!template || !Number.isInteger(versionNumber) || versionNumber < 1) notFound();
+    if (!template || !Number.isInteger(versionNumber) || versionNumber < 1)
+      notFound();
     if (round !== null && (!Number.isInteger(round) || round < 1)) notFound();
     const version = await findRound(db, template.id, versionNumber, round);
     if (!version || version.number === null) notFound();
     if (seesInSpace(space, template)) return { space, template, version };
-    if (await namedOnVersion(space.viewer, template, version)) return { space, template, version };
+    if (await namedOnVersion(space.viewer, template, version))
+      return { space, template, version };
     if (round === null) {
       const rows = await db
         .select()
         .from(versions)
-        .where(and(eq(versions.templateId, template.id), eq(versions.number, versionNumber)));
+        .where(
+          and(
+            eq(versions.templateId, template.id),
+            eq(versions.number, versionNumber),
+          ),
+        );
       for (const earlier of roundsOf(rows, versionNumber)) {
         if (earlier.id === version.id) continue;
-        if (await namedOnVersion(space.viewer, template, earlier)) return { space, template, version: earlier };
+        if (await namedOnVersion(space.viewer, template, earlier))
+          return { space, template, version: earlier };
       }
     }
     notFound();
@@ -149,11 +203,18 @@ export const requireReviewVersion = cache(
  * `requireReviewVersion` lets them in by: the template's team in its space, or someone the round's stage
  * names or who decided it. A screen links to another round only when this holds, so it never links to a 404.
  */
-export async function opensRound(access: TemplateAccess, versionId: string): Promise<boolean> {
+export async function opensRound(
+  access: TemplateAccess,
+  versionId: string,
+): Promise<boolean> {
   const { space, template } = access;
   if (seesInSpace(space, template)) return true;
-  const version = await db.query.versions.findFirst({ where: eq(versions.id, versionId) });
-  return version !== undefined && namedOnVersion(space.viewer, template, version);
+  const version = await db.query.versions.findFirst({
+    where: eq(versions.id, versionId),
+  });
+  return (
+    version !== undefined && namedOnVersion(space.viewer, template, version)
+  );
 }
 
 async function namedOnVersion(
@@ -162,13 +223,27 @@ async function namedOnVersion(
   version: ReviewVersionRow,
 ): Promise<boolean> {
   if (version.state === "in_review") {
-    const stage = currentStageOf(version, await loadChain(db, template.contentTypeId));
-    if (can(viewer, "template.view", { teamId: template.teamId, stageApproverIds: stageApproverIds(stage) }).ok) return true;
+    const stage = currentStageOf(
+      version,
+      await loadChain(db, template.contentTypeId),
+    );
+    if (
+      can(viewer, "template.view", {
+        teamId: template.teamId,
+        stageApproverIds: stageApproverIds(stage),
+      }).ok
+    )
+      return true;
   }
   const decided = await db
     .select({ id: approvals.id })
     .from(approvals)
-    .where(and(eq(approvals.versionId, version.id), eq(approvals.actorId, viewer.userId)))
+    .where(
+      and(
+        eq(approvals.versionId, version.id),
+        eq(approvals.actorId, viewer.userId),
+      ),
+    )
     .limit(1);
   return decided.length > 0;
 }
@@ -178,9 +253,17 @@ async function namedOnVersion(
 type Reader = Pick<Db, "select">;
 
 /** The content type's stages in order (configuration, not code). Never empty. */
-export async function loadChain(reader: Reader, contentTypeId: string): Promise<ApprovalStage[]> {
+export async function loadChain(
+  reader: Reader,
+  contentTypeId: string,
+): Promise<ApprovalStage[]> {
   const rows = await reader
-    .select({ id: approvalStages.id, position: approvalStages.position, name: approvalStages.name, rule: approvalStages.approverRule })
+    .select({
+      id: approvalStages.id,
+      position: approvalStages.position,
+      name: approvalStages.name,
+      rule: approvalStages.approverRule,
+    })
     .from(approvalStages)
     .where(eq(approvalStages.contentTypeId, contentTypeId))
     .orderBy(asc(approvalStages.position));
@@ -191,7 +274,10 @@ export async function loadChain(reader: Reader, contentTypeId: string): Promise<
  * The template's family, from its content type (`contentTypeFamily`): a document or an alert. Never read
  * from a version's channels, which are the author's to change.
  */
-export async function loadFamily(reader: Reader, contentTypeId: string): Promise<ChannelFamily> {
+export async function loadFamily(
+  reader: Reader,
+  contentTypeId: string,
+): Promise<ChannelFamily> {
   const [row] = await reader
     .select({ allowedChannels: contentTypes.allowedChannels })
     .from(contentTypes)
@@ -201,9 +287,15 @@ export async function loadFamily(reader: Reader, contentTypeId: string): Promise
 }
 
 /** The content type's SMS footer and part budget, which submit measures a message with. */
-export async function loadMessageRules(reader: Reader, contentTypeId: string): Promise<MessageTypeRules> {
+export async function loadMessageRules(
+  reader: Reader,
+  contentTypeId: string,
+): Promise<MessageTypeRules> {
   const [row] = await reader
-    .select({ smsFooter: contentTypes.smsFooter, smsMaxParts: contentTypes.smsMaxParts })
+    .select({
+      smsFooter: contentTypes.smsFooter,
+      smsMaxParts: contentTypes.smsMaxParts,
+    })
     .from(contentTypes)
     .where(eq(contentTypes.id, contentTypeId))
     .limit(1);
@@ -211,47 +303,65 @@ export async function loadMessageRules(reader: Reader, contentTypeId: string): P
 }
 
 /** Every content type's chain at once (the queue spans templates of several types). */
-export const getChains = cache(async (): Promise<ReadonlyMap<string, ApprovalStage[]>> => {
-  const rows = await db
-    .select({
-      contentTypeId: approvalStages.contentTypeId,
-      id: approvalStages.id,
-      position: approvalStages.position,
-      name: approvalStages.name,
-      rule: approvalStages.approverRule,
-    })
-    .from(approvalStages)
-    .orderBy(asc(approvalStages.position));
-  const chains = new Map<string, ApprovalStage[]>();
-  for (const { contentTypeId, ...stage } of rows) {
-    const chain = chains.get(contentTypeId);
-    if (chain) chain.push(stage);
-    else chains.set(contentTypeId, [stage]);
-  }
-  return chains;
-});
+export const getChains = cache(
+  async (): Promise<ReadonlyMap<string, ApprovalStage[]>> => {
+    const rows = await db
+      .select({
+        contentTypeId: approvalStages.contentTypeId,
+        id: approvalStages.id,
+        position: approvalStages.position,
+        name: approvalStages.name,
+        rule: approvalStages.approverRule,
+      })
+      .from(approvalStages)
+      .orderBy(asc(approvalStages.position));
+    const chains = new Map<string, ApprovalStage[]>();
+    for (const { contentTypeId, ...stage } of rows) {
+      const chain = chains.get(contentTypeId);
+      if (chain) chain.push(stage);
+      else chains.set(contentTypeId, [stage]);
+    }
+    return chains;
+  },
+);
 
-export function chainFor(chains: ReadonlyMap<string, ApprovalStage[]>, contentTypeId: string): ApprovalStage[] {
-  return chains.get(contentTypeId) ?? DEFAULT_CHAIN.map((stage) => ({ ...stage }));
+export function chainFor(
+  chains: ReadonlyMap<string, ApprovalStage[]>,
+  contentTypeId: string,
+): ApprovalStage[] {
+  return (
+    chains.get(contentTypeId) ?? DEFAULT_CHAIN.map((stage) => ({ ...stage }))
+  );
 }
 
 /**
  * The users a stage names (`{kind:"user"}` rules): they may open, decide and comment on the version
  * waiting on it, on any team (`PermissionResource.stageApproverIds`). Empty for a team-role stage.
  */
-export function stageApproverIds(stage: ApprovalStage | null | undefined): string[] {
+export function stageApproverIds(
+  stage: ApprovalStage | null | undefined,
+): string[] {
   return stage?.rule.kind === "user" ? [stage.rule.userId] : [];
 }
 
 /** Each version's decisions, by stage id (the "two stages need two people" guard reads them). */
-export async function loadDecisions(reader: Reader, versionIds: readonly string[]): Promise<Map<string, RecordedDecision[]>> {
+export async function loadDecisions(
+  reader: Reader,
+  versionIds: readonly string[],
+): Promise<Map<string, RecordedDecision[]>> {
   const byVersion = new Map<string, RecordedDecision[]>();
   if (versionIds.length === 0) return byVersion;
   const rows = await reader
-    .select({ versionId: approvals.versionId, stageId: approvals.stageId, actorId: approvals.actorId, decision: approvals.decision })
+    .select({
+      versionId: approvals.versionId,
+      stageId: approvals.stageId,
+      actorId: approvals.actorId,
+      decision: approvals.decision,
+    })
     .from(approvals)
     .where(inArray(approvals.versionId, [...versionIds]));
-  for (const { versionId, ...decision } of rows) byVersion.set(versionId, [...(byVersion.get(versionId) ?? []), decision]);
+  for (const { versionId, ...decision } of rows)
+    byVersion.set(versionId, [...(byVersion.get(versionId) ?? []), decision]);
   return byVersion;
 }
 
@@ -283,7 +393,9 @@ export function decideCheck(
   if (!input.stage) return refuse(REFUSALS.stageMissing);
   const onStage = canActOnStage(viewer, input.stage, input.teamId);
   if (!onStage.ok) return onStage;
-  return input.approvedBy?.includes(viewer.userId) ? refuse(REFUSALS.approvedEarlierStage) : onStage;
+  return input.approvedBy?.includes(viewer.userId)
+    ? refuse(REFUSALS.approvedEarlierStage)
+    : onStage;
 }
 
 // ── Render-log usage ──────────────────────────────────────────
@@ -293,7 +405,11 @@ export function decideCheck(
  * only, previews excluded, failed renders included (they still show the consumer is on that version).
  * Newest version first, then by consumer name.
  */
-export async function loadConsumerUsage(reader: Reader, templateId: string, nowDate: Date): Promise<ConsumerUsage[]> {
+export async function loadConsumerUsage(
+  reader: Reader,
+  templateId: string,
+  nowDate: Date,
+): Promise<ConsumerUsage[]> {
   const since = nowDate.getTime() - 30 * DAY_MS;
   const rows = await reader
     .select({
@@ -305,7 +421,13 @@ export async function loadConsumerUsage(reader: Reader, templateId: string, nowD
     })
     .from(renderLog)
     .innerJoin(consumers, eq(consumers.id, renderLog.consumerId))
-    .where(and(eq(renderLog.templateId, templateId), eq(renderLog.isPreview, false), isNotNull(renderLog.versionNumber)))
+    .where(
+      and(
+        eq(renderLog.templateId, templateId),
+        eq(renderLog.isPreview, false),
+        isNotNull(renderLog.versionNumber),
+      ),
+    )
     .groupBy(consumers.id, renderLog.versionNumber);
 
   return rows
@@ -316,7 +438,11 @@ export async function loadConsumerUsage(reader: Reader, templateId: string, nowD
       lastRenderAt: new Date(Number(r.lastRenderAt)).toISOString(),
       renders30d: Number(r.renders30d ?? 0),
     }))
-    .sort((a, b) => b.versionNumber - a.versionNumber || a.consumerName.localeCompare(b.consumerName));
+    .sort(
+      (a, b) =>
+        b.versionNumber - a.versionNumber ||
+        a.consumerName.localeCompare(b.consumerName),
+    );
 }
 
 // ── Documents ─────────────────────────────────────────────────
@@ -325,7 +451,10 @@ export async function loadConsumerUsage(reader: Reader, templateId: string, nowD
  * Where a thread on this version can anchor, in reading order (`commentAnchors`): the fields of its
  * channels that are on, then every block id in its body.
  */
-export function anchorIdsOf(version: { body: JSONContent | null | undefined; channels: readonly Channel[] }): string[] {
+export function anchorIdsOf(version: {
+  body: JSONContent | null | undefined;
+  channels: readonly Channel[];
+}): string[] {
   return commentAnchors(blockIdsOf(version.body), version.channels);
 }
 

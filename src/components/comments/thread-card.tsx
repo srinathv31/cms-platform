@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Check, ChevronRight, RotateCcw } from "lucide-react";
 import { AnimatePresence, m } from "motion/react";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
@@ -37,7 +43,15 @@ function showsFocusRing(target: EventTarget): boolean {
 
 // ── Pieces ───────────────────────────────────────────────────────
 
-function Quote({ text, onClick, block = false }: { text: string; onClick?: () => void; block?: boolean }) {
+function Quote({
+  text,
+  onClick,
+  block = false,
+}: {
+  text: string;
+  onClick?: () => void;
+  block?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -56,24 +70,51 @@ function Quote({ text, onClick, block = false }: { text: string; onClick?: () =>
 }
 
 /** What a card is about: the quoted text, else (a comment on a whole block) the start of the block's text. */
-function Anchor({ quote, snippet, onClick }: { quote?: string | null; snippet?: string | null; onClick?: () => void }) {
+function Anchor({
+  quote,
+  snippet,
+  onClick,
+}: {
+  quote?: string | null;
+  snippet?: string | null;
+  onClick?: () => void;
+}) {
   if (quote) return <Quote text={quote} onClick={onClick} />;
   if (snippet) return <Quote text={snippet} onClick={onClick} block />;
   return null;
 }
 
-function CommentRow({ comment, nowMs }: { comment: CommentView; nowMs: number | null }) {
+function CommentRow({
+  comment,
+  nowMs,
+}: {
+  comment: CommentView;
+  nowMs: number | null;
+}) {
   return (
     <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2.5">
-      <UserAvatar initials={comment.author.initials} hue={comment.author.hue} size="sm" />
+      <UserAvatar
+        initials={comment.author.initials}
+        hue={comment.author.hue}
+        size="sm"
+      />
       <div className="min-w-0">
         <div className="flex min-h-6 items-center gap-2">
-          <span className="truncate text-[13.5px] leading-6 font-medium text-text">{comment.author.name}</span>
-          <time dateTime={comment.createdAt} className="shrink-0 text-[12.5px] leading-6 text-text-subtle">
-            {nowMs === null ? "" : formatAgo(comment.createdAt, nowMs, { dateFrom: 14 })}
+          <span className="truncate text-[13.5px] leading-6 font-medium text-text">
+            {comment.author.name}
+          </span>
+          <time
+            dateTime={comment.createdAt}
+            className="shrink-0 text-[12.5px] leading-6 text-text-subtle"
+          >
+            {nowMs === null
+              ? ""
+              : formatAgo(comment.createdAt, nowMs, { dateFrom: 14 })}
           </time>
         </div>
-        <p className="mt-0.5 text-[14px] leading-[1.45] break-words whitespace-pre-wrap text-text">{comment.body}</p>
+        <p className="mt-0.5 text-[14px] leading-[1.45] break-words whitespace-pre-wrap text-text">
+          {comment.body}
+        </p>
       </div>
     </div>
   );
@@ -144,7 +185,8 @@ export function ComposerBox({
   );
 }
 
-const QUIET_BUTTON = "shrink-0 gap-1.5 px-2 text-[13px] text-text-muted hover:text-text";
+const QUIET_BUTTON =
+  "shrink-0 gap-1.5 px-2 text-[13px] text-text-muted hover:text-text";
 
 function Refusal({ reason }: { reason: string | null }) {
   if (!reason) return null;
@@ -206,7 +248,8 @@ export function ThreadCard({
 
   // Closing the reply (posted or cancelled) puts focus back on the field that opened it.
   useEffect(() => {
-    if (wasReplying.current && !replying) trigger.current?.focus({ preventScroll: true });
+    if (wasReplying.current && !replying)
+      trigger.current?.focus({ preventScroll: true });
     wasReplying.current = replying;
   }, [replying]);
 
@@ -242,30 +285,48 @@ export function ThreadCard({
       data-active={active ? "" : undefined}
       // Not a tab stop: the list moves focus here (a new thread's card) and it can be focused from script.
       tabIndex={-1}
-      aria-label={isChange ? "Change request" : thread.quote ? `Comment on “${thread.quote}”` : wholeAnchorLabel(thread.blockId)}
+      aria-label={
+        isChange
+          ? "Change request"
+          : thread.quote
+            ? `Comment on “${thread.quote}”`
+            : wholeAnchorLabel(thread.blockId)
+      }
       onClick={(event) => {
         if (!onSelect || !selectable) return;
-        if ((event.target as HTMLElement).closest("button, textarea, input, a")) return;
+        if ((event.target as HTMLElement).closest("button, textarea, input, a"))
+          return;
         onSelect();
       }}
       // The keyboard path to a thread: focus arriving in its card (the quote, Reply, Resolve) selects it, so the
       // document follows. A mouse press on Resolve doesn't (it isn't focus-visible): the document stays where it is.
       onFocusCapture={(event) => {
-        if (onSelect && selectable && !active && showsFocusRing(event.target)) onSelect();
+        if (onSelect && selectable && !active && showsFocusRing(event.target))
+          onSelect();
       }}
       className={cn(
         "relative min-w-0 rounded-xl border bg-surface p-3.5 outline-none transition-[border-color,box-shadow] duration-(--dur-base) focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring",
-        active ? "border-warning-border ring-1 ring-warning-border" : "border-hairline",
+        active
+          ? "border-warning-border ring-1 ring-warning-border"
+          : "border-hairline",
         className,
       )}
     >
       {isChange ? (
         <div className="mb-3 flex items-center gap-2">
           <StatusBadge state="changes_requested" />
-          {thread.originLabel ? <span className="text-[13px] text-text-muted">on {thread.originLabel}</span> : null}
+          {thread.originLabel ? (
+            <span className="text-[13px] text-text-muted">
+              on {thread.originLabel}
+            </span>
+          ) : null}
         </div>
       ) : null}
-      <Anchor quote={thread.quote} snippet={snippet} onClick={onSelect && selectable ? onSelect : undefined} />
+      <Anchor
+        quote={thread.quote}
+        snippet={snippet}
+        onClick={onSelect && selectable ? onSelect : undefined}
+      />
       <div className="flex flex-col gap-3">
         {thread.comments.map((comment) => (
           <CommentRow key={comment.id} comment={comment} nowMs={nowMs} />
@@ -280,11 +341,17 @@ export function ThreadCard({
                   Resolved by {thread.resolvedBy?.name ?? "someone"}
                 </div>
                 {thread.resolvedAt && nowMs !== null ? (
-                  <div className="text-[12.5px] leading-5 text-text-subtle">{formatAgo(thread.resolvedAt, nowMs, { dateFrom: 14 })}</div>
+                  <div className="text-[12.5px] leading-5 text-text-subtle">
+                    {formatAgo(thread.resolvedAt, nowMs, { dateFrom: 14 })}
+                  </div>
                 ) : null}
               </div>
               {canComment ? (
-                <Button variant="ghost" className={QUIET_BUTTON} onClick={() => void onReopen(thread.id)}>
+                <Button
+                  variant="ghost"
+                  className={QUIET_BUTTON}
+                  onClick={() => void onReopen(thread.id)}
+                >
                   <RotateCcw data-icon="inline-start" strokeWidth={1.75} />
                   Reopen
                 </Button>
@@ -436,7 +503,10 @@ export function ResolvedGroup({
         <ChevronRight
           aria-hidden
           strokeWidth={1.75}
-          className={cn("size-4 transition-transform duration-(--dur-base)", open && "rotate-90")}
+          className={cn(
+            "size-4 transition-transform duration-(--dur-base)",
+            open && "rotate-90",
+          )}
         />
         Resolved ({count})
       </button>

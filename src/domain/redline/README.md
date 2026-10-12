@@ -14,16 +14,16 @@ rules](../README.md#rules).
 
 In reading order: the entry points, then the engine from the bottom up, in the order a diff uses it.
 
-| File | Holds | Exports |
-| --- | --- | --- |
-| [document.ts](document.ts) | The entry: the redline of a document against its base, the "Changes only" views, and a rename. | `diffDocuments`, `changesOnly`, `groupUnchanged`, `nameChange` |
-| [channel-fields.ts](channel-fields.ts) | A version's channel fields, redlined one at a time with the same engine, and their footer. | `diffChannelFields`, `addCounts` |
-| [context.ts](context.ts) | What the diff carries between steps: the per-call caches (content keys, word bags) and what a node diff returns. | `createCx`, `Cx`, `Diffed` |
-| [nodes.ts](nodes.ts) | Reading and marking TipTap nodes: the keys that decide whether two nodes are the same, and the marks that show a node inserted or deleted. | `nodeKey`, `contentKey`, `kindKey`, `topLevel`, `uniqueIds`, `markAll`, `withMark` |
-| [similarity.ts](similarity.ts) | How alike two blocks are: the word overlap that pairs a block with its edited self when ids can't. | `textSimilarity`, `rowSimilarity` |
-| [align.ts](align.ts) | How blocks line up: by id, then by content and similarity, then the longest run that keeps its order. | `align`, `TOP_LEVEL`, `LIST_ITEMS`, `INNER_BLOCKS`, `TABLE_ROWS` |
-| [block-diff.ts](block-diff.ts) | How a paired block differs: its children line up and are diffed recursively, or a changed kind is marked whole. | `diffNode` |
-| [inline-diff.ts](inline-diff.ts) | How a textblock differs: a word diff of its inline content. | `diffTextblock` |
+| File                                   | Holds                                                                                                                                      | Exports                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [document.ts](document.ts)             | The entry: the redline of a document against its base, the "Changes only" views, and a rename.                                             | `diffDocuments`, `changesOnly`, `groupUnchanged`, `nameChange`                     |
+| [channel-fields.ts](channel-fields.ts) | A version's channel fields, redlined one at a time with the same engine, and their footer.                                                 | `diffChannelFields`, `addCounts`                                                   |
+| [context.ts](context.ts)               | What the diff carries between steps: the per-call caches (content keys, word bags) and what a node diff returns.                           | `createCx`, `Cx`, `Diffed`                                                         |
+| [nodes.ts](nodes.ts)                   | Reading and marking TipTap nodes: the keys that decide whether two nodes are the same, and the marks that show a node inserted or deleted. | `nodeKey`, `contentKey`, `kindKey`, `topLevel`, `uniqueIds`, `markAll`, `withMark` |
+| [similarity.ts](similarity.ts)         | How alike two blocks are: the word overlap that pairs a block with its edited self when ids can't.                                         | `textSimilarity`, `rowSimilarity`                                                  |
+| [align.ts](align.ts)                   | How blocks line up: by id, then by content and similarity, then the longest run that keeps its order.                                      | `align`, `TOP_LEVEL`, `LIST_ITEMS`, `INNER_BLOCKS`, `TABLE_ROWS`                   |
+| [block-diff.ts](block-diff.ts)         | How a paired block differs: its children line up and are diffed recursively, or a changed kind is marked whole.                            | `diffNode`                                                                         |
+| [inline-diff.ts](inline-diff.ts)       | How a textblock differs: a word diff of its inline content.                                                                                | `diffTextblock`                                                                    |
 
 Tests sit beside each stage and call the entry points (`diffDocuments`, `diffChannelFields`), the way the review screen does.
 [fixtures.ts](fixtures.ts) holds the builders for TipTap documents and the readers that check a redline is faithful.

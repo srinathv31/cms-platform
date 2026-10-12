@@ -48,7 +48,10 @@ export function useActionRun(failure: string = GENERIC_FAILURE) {
   const sending = useRef(false);
 
   /** Starts the action unless one is already out; says whether it started. */
-  function run<T = Record<never, never>>(action: () => Promise<ActionResult<T>>, handlers: RunHandlers<T> = {}): boolean {
+  function run<T = Record<never, never>>(
+    action: () => Promise<ActionResult<T>>,
+    handlers: RunHandlers<T> = {},
+  ): boolean {
     if (sending.current) return false;
     sending.current = true;
     setError(null);

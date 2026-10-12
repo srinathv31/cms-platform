@@ -17,7 +17,12 @@ interface PdfPageProps {
  * One page: a sheet of paper with the page's exact aspect ratio, so it holds its place before it is
  * drawn. React owns the box and its label; its children belong to the controller.
  */
-export const PdfPage = memo(function PdfPage({ index, count, size, register }: PdfPageProps) {
+export const PdfPage = memo(function PdfPage({
+  index,
+  count,
+  size,
+  register,
+}: PdfPageProps) {
   const ref = useCallback(
     (el: HTMLDivElement | null) => {
       register(index, el);
@@ -32,7 +37,10 @@ export const PdfPage = memo(function PdfPage({ index, count, size, register }: P
       role="group"
       aria-label={`Page ${index + 1} of ${count}`}
       data-page-number={index + 1}
-      className={cn(styles.page, "relative w-full bg-white ring-1 ring-hairline")}
+      className={cn(
+        styles.page,
+        "relative w-full bg-white ring-1 ring-hairline",
+      )}
       style={
         {
           aspectRatio: `${size.width} / ${size.height}`,

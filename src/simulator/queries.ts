@@ -2,8 +2,20 @@ import "server-only";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { z } from "zod";
-import type { ApiChannel, ApiContract, ApiNotice, ApiTemplateDetail, ApiTemplateSummary } from "@/contracts/api-v1";
-import { simCustomers, simDeliveries, simLinks, simNoticeReads, simOffers } from "@/server/db/schema/sim";
+import type {
+  ApiChannel,
+  ApiContract,
+  ApiNotice,
+  ApiTemplateDetail,
+  ApiTemplateSummary,
+} from "@/contracts/api-v1";
+import {
+  simCustomers,
+  simDeliveries,
+  simLinks,
+  simNoticeReads,
+  simOffers,
+} from "@/server/db/schema/sim";
 import { assertNever } from "./assert-never";
 import { simDb } from "./db";
 import { SIM_FIELDS, simField } from "./fields";
@@ -61,7 +73,12 @@ export const customerRecord = (c: CustomerRow): SimCustomerRecord => ({
   lastPurchase: c.lastPurchase ?? null,
 });
 
-export const offerRecord = (o: OfferRow): SimOfferRecord => ({ id: o.id, name: o.name, headline: o.headline, terms: o.terms ?? null });
+export const offerRecord = (o: OfferRow): SimOfferRecord => ({
+  id: o.id,
+  name: o.name,
+  headline: o.headline,
+  terms: o.terms ?? null,
+});
 
 export const customerRow = (c: CustomerRow): SimCustomerRow => ({
   id: c.id,
@@ -75,8 +92,12 @@ export const customerRow = (c: CustomerRow): SimCustomerRow => ({
 });
 
 /** The link as Coral stores it plus what UCOMP says about the pinned version today. */
-export function linkSummaryOf(link: LinkRow, detail: ApiTemplateDetail | null): SimLinkSummary {
-  const pinned = detail?.versions.find((v) => v.number === link.pinnedVersion) ?? null;
+export function linkSummaryOf(
+  link: LinkRow,
+  detail: ApiTemplateDetail | null,
+): SimLinkSummary {
+  const pinned =
+    detail?.versions.find((v) => v.number === link.pinnedVersion) ?? null;
   return {
     templateId: link.templateId,
     templateName: detail?.name ?? link.templateName,
@@ -101,19 +122,38 @@ interface LinkState {
 }
 
 /** GET the template at the pinned version; when a newer version is Active, GET the diff from the pin. */
-export async function loadLinkState(api: UcompApi, link: LinkRow): Promise<LinkState> {
-  const detail = await api.getTemplate(link.templateId, { version: link.pinnedVersion });
-  if (!detail.ok) return { summary: linkSummaryOf(link, null), contract: null, upgrade: null, error: detail.error };
+export async function loadLinkState(
+  api: UcompApi,
+  link: LinkRow,
+): Promise<LinkState> {
+  const detail = await api.getTemplate(link.templateId, {
+    version: link.pinnedVersion,
+  });
+  if (!detail.ok)
+    return {
+      summary: linkSummaryOf(link, null),
+      contract: null,
+      upgrade: null,
+      error: detail.error,
+    };
 
   const active = detail.data.activeVersion;
   let upgrade: SimUpgrade | null = null;
   let error: SimApiError | null = null;
   if (active !== null && active > link.pinnedVersion) {
-    const since = await api.getTemplate(link.templateId, { since: link.pinnedVersion });
-    if (since.ok && since.data.changes) upgrade = { toVersion: active, diff: since.data.changes };
+    const since = await api.getTemplate(link.templateId, {
+      since: link.pinnedVersion,
+    });
+    if (since.ok && since.data.changes)
+      upgrade = { toVersion: active, diff: since.data.changes };
     else if (!since.ok) error = since.error;
   }
-  return { summary: linkSummaryOf(link, detail.data), contract: detail.data.contract, upgrade, error };
+  return {
+    summary: linkSummaryOf(link, detail.data),
+    contract: detail.data.contract,
+    upgrade,
+    error,
+  };
 }
 
 /** At most this many pages of notices per load (10,000 notices); more is treated as a bad answer. */
@@ -129,20 +169,38 @@ export const MAX_NOTICE_PAGES = 50;
 export async function allNotices(
   api: UcompApi,
   templateId?: string,
-): Promise<{ ok: true; notices: ApiNotice[] } | { ok: false; error: SimApiError }> {
+): Promise<
+  { ok: true; notices: ApiNotice[] } | { ok: false; error: SimApiError }
+> {
   const notices: ApiNotice[] = [];
   let after: string | undefined;
   for (let pages = 1; pages <= MAX_NOTICE_PAGES; pages++) {
     const page = await api.listNotices({ templateId, limit: 200, after });
     if (!page.ok) return page;
-    if (!page.data.hasMore) return { ok: true, notices: [...notices, ...page.data.notices] };
+    if (!page.data.hasMore)
+      return { ok: true, notices: [...notices, ...page.data.notices] };
     if (page.data.notices.length === 0) {
-      return { ok: false, error: { status: 200, code: "bad_response", message: "Stencil sent an empty page of notices that said more follow." } };
+      return {
+        ok: false,
+        error: {
+          status: 200,
+          code: "bad_response",
+          message:
+            "Stencil sent an empty page of notices that said more follow.",
+        },
+      };
     }
     notices.push(...page.data.notices);
     after = page.data.nextCursor;
   }
-  return { ok: false, error: { status: 200, code: "bad_response", message: `Stencil sent more than ${MAX_NOTICE_PAGES} pages of notices.` } };
+  return {
+    ok: false,
+    error: {
+      status: 200,
+      code: "bad_response",
+      message: `Stencil sent more than ${MAX_NOTICE_PAGES} pages of notices.`,
+    },
+  };
 }
 
 /** Coral's notices, newest first, with Coral's read state and linked offers. */
@@ -156,23 +214,26 @@ async function loadNotices(
   const newestFirst = [...list.notices].reverse();
   const ids = newestFirst.map((n) => n.id);
   const reads = ids.length
-    ? await simDb.select({ id: simNoticeReads.noticeId }).from(simNoticeReads).where(inArray(simNoticeReads.noticeId, ids))
+    ? await simDb
+        .select({ id: simNoticeReads.noticeId })
+        .from(simNoticeReads)
+        .where(inArray(simNoticeReads.noticeId, ids))
     : [];
   const read = new Set(reads.map((r) => r.id));
-  const notices = newestFirst.map(
-    (n): SimNoticeView => ({
-      id: n.id,
-      kind: n.kind,
-      createdAt: n.createdAt,
-      templateId: n.template.id,
-      templateName: n.template.name,
-      versionNumber: n.versionNumber,
-      message: n.message,
-      lines: n.changes.map((c) => c.text),
-      read: read.has(n.id),
-      offerIds: links.filter((l) => l.templateId === n.template.id).map((l) => l.offerId),
-    }),
-  );
+  const notices = newestFirst.map((n): SimNoticeView => ({
+    id: n.id,
+    kind: n.kind,
+    createdAt: n.createdAt,
+    templateId: n.template.id,
+    templateName: n.template.name,
+    versionNumber: n.versionNumber,
+    message: n.message,
+    lines: n.changes.map((c) => c.text),
+    read: read.has(n.id),
+    offerIds: links
+      .filter((l) => l.templateId === n.template.id)
+      .map((l) => l.offerId),
+  }));
   return { notices, error: null };
 }
 
@@ -191,7 +252,11 @@ async function latestBatchId(offerId: string): Promise<string | null> {
 /** One send, rows in the order sent (delivery ids carry the send order). */
 export async function loadBatch(batchId: string): Promise<SimBatch | null> {
   const rows = await simDb
-    .select({ d: simDeliveries, firstName: simCustomers.firstName, lastName: simCustomers.lastName })
+    .select({
+      d: simDeliveries,
+      firstName: simCustomers.firstName,
+      lastName: simCustomers.lastName,
+    })
     .from(simDeliveries)
     .leftJoin(simCustomers, eq(simCustomers.id, simDeliveries.customerId))
     .where(eq(simDeliveries.batchId, batchId))
@@ -208,10 +273,18 @@ export async function loadBatch(batchId: string): Promise<SimBatch | null> {
     if (d.status === "delivered") delivered++;
     let row = byCustomer.get(d.customerId);
     if (!row) {
-      row = { customerId: d.customerId, customerName: firstName === null ? d.customerId : `${firstName} ${lastName}`, results: [] };
+      row = {
+        customerId: d.customerId,
+        customerName:
+          firstName === null ? d.customerId : `${firstName} ${lastName}`,
+        results: [],
+      };
       byCustomer.set(d.customerId, row);
     }
-    const sms = d.channel === "sms" && d.status === "delivered" ? parseSms(d.output) : null;
+    const sms =
+      d.channel === "sms" && d.status === "delivered"
+        ? parseSms(d.output)
+        : null;
     row.results.push({
       deliveryId: d.id,
       channel: d.channel,
@@ -222,7 +295,10 @@ export async function loadBatch(batchId: string): Promise<SimBatch | null> {
       sms: sms ? { encoding: sms.encoding, parts: sms.parts } : null,
     });
   }
-  for (const row of byCustomer.values()) row.results.sort((a, b) => channels.indexOf(a.channel) - channels.indexOf(b.channel));
+  for (const row of byCustomer.values())
+    row.results.sort(
+      (a, b) => channels.indexOf(a.channel) - channels.indexOf(b.channel),
+    );
   const first = rows[0].d;
   return {
     id: batchId,
@@ -259,22 +335,29 @@ export async function getSimHome(): Promise<SimHome> {
 
   const [cards, inbox] = await Promise.all([
     Promise.all(
-      offers.map(async (offer): Promise<{ card: SimOfferCard; error: SimApiError | null }> => {
-        const link = links.find((l) => l.offerId === offer.id) ?? null;
-        const [state, lastSend] = await Promise.all([link ? loadLinkState(api, link) : null, lastSendOf(offer.id)]);
-        return {
-          card: {
-            id: offer.id,
-            kind: offer.kind,
-            name: offer.name,
-            headline: offer.headline,
-            link: state?.summary ?? null,
-            upgrade: state?.upgrade ?? null,
-            lastSend,
-          },
-          error: state?.error ?? null,
-        };
-      }),
+      offers.map(
+        async (
+          offer,
+        ): Promise<{ card: SimOfferCard; error: SimApiError | null }> => {
+          const link = links.find((l) => l.offerId === offer.id) ?? null;
+          const [state, lastSend] = await Promise.all([
+            link ? loadLinkState(api, link) : null,
+            lastSendOf(offer.id),
+          ]);
+          return {
+            card: {
+              id: offer.id,
+              kind: offer.kind,
+              name: offer.name,
+              headline: offer.headline,
+              link: state?.summary ?? null,
+              upgrade: state?.upgrade ?? null,
+              lastSend,
+            },
+            error: state?.error ?? null,
+          };
+        },
+      ),
     ),
     loadNotices(api, links),
   ]);
@@ -289,18 +372,35 @@ export async function getSimHome(): Promise<SimHome> {
 
 // ── /sim/offers/[offerId] ────────────────────────────────────────────────────
 
-export function mappingRows(contract: ApiContract, mapping: Readonly<Record<string, string>>): SimMappingRow[] {
+export function mappingRows(
+  contract: ApiContract,
+  mapping: Readonly<Record<string, string>>,
+): SimMappingRow[] {
   return contract.variables.map((v) => {
-    const field = simField(Object.hasOwn(mapping, v.key) ? mapping[v.key] : null);
-    return { key: v.key, label: v.label, type: v.type, required: v.required, field: field?.path ?? null, fieldLabel: field?.label ?? null };
+    const field = simField(
+      Object.hasOwn(mapping, v.key) ? mapping[v.key] : null,
+    );
+    return {
+      key: v.key,
+      label: v.label,
+      type: v.type,
+      required: v.required,
+      field: field?.path ?? null,
+      fieldLabel: field?.label ?? null,
+    };
   });
 }
 
 /** Null when the offer doesn't exist (the page calls notFound()). */
-export async function getSimOfferPage(offerId: string): Promise<SimOfferPage | null> {
+export async function getSimOfferPage(
+  offerId: string,
+): Promise<SimOfferPage | null> {
   await connection();
   const api = await ucompApi();
-  const [offer] = await simDb.select().from(simOffers).where(eq(simOffers.id, offerId));
+  const [offer] = await simDb
+    .select()
+    .from(simOffers)
+    .where(eq(simOffers.id, offerId));
   if (!offer) return null;
   const [[link], customers, batchId] = await Promise.all([
     simDb.select().from(simLinks).where(eq(simLinks.offerId, offerId)),
@@ -310,7 +410,9 @@ export async function getSimOfferPage(offerId: string): Promise<SimOfferPage | n
 
   const [state, inbox, lastBatch] = await Promise.all([
     link ? loadLinkState(api, link) : null,
-    link ? loadNotices(api, [link], link.templateId) : { notices: [], error: null },
+    link
+      ? loadNotices(api, [link], link.templateId)
+      : { notices: [], error: null },
     batchId ? loadBatch(batchId) : null,
   ]);
 
@@ -318,13 +420,29 @@ export async function getSimOfferPage(offerId: string): Promise<SimOfferPage | n
   if (state?.contract) {
     const missing = missingRequired(state.contract.variables, link!.mapping);
     if (missing.length > 0) {
-      blocked = { missing: missing.map((v) => ({ key: v.key, label: v.label })), sentence: blockedSentence(missing) };
+      blocked = {
+        missing: missing.map((v) => ({ key: v.key, label: v.label })),
+        sentence: blockedSentence(missing),
+      };
     }
   }
 
   return {
-    offer: { id: offer.id, kind: offer.kind, name: offer.name, headline: offer.headline, terms: offer.terms ?? null },
-    link: state ? { ...state.summary, mapping: state.contract ? mappingRows(state.contract, link!.mapping) : [] } : null,
+    offer: {
+      id: offer.id,
+      kind: offer.kind,
+      name: offer.name,
+      headline: offer.headline,
+      terms: offer.terms ?? null,
+    },
+    link: state
+      ? {
+          ...state.summary,
+          mapping: state.contract
+            ? mappingRows(state.contract, link!.mapping)
+            : [],
+        }
+      : null,
     upgrade: state?.upgrade ?? null,
     blocked,
     customers: customers.map(customerRow),
@@ -336,19 +454,32 @@ export async function getSimOfferPage(offerId: string): Promise<SimOfferPage | n
 
 // ── /sim/offers/[offerId]/link ───────────────────────────────────────────────
 
-const NO_ACTIVE: SimApiError = { status: 200, code: "no_active_version", message: "This template has no Active version to link." };
+const NO_ACTIVE: SimApiError = {
+  status: 200,
+  code: "no_active_version",
+  message: "This template has no Active version to link.",
+};
 
 /**
  * The link / relink flow. With `templateId` (the ?template= the person chose): that template at its
  * Active version, a suggested mapping (carrying the current one over), and, when relinking the same
  * template to a newer version, the contract changes since the pin. Null when the offer doesn't exist.
  */
-export async function getSimLinkFlow(offerId: string, templateId?: string | null): Promise<SimLinkFlow | null> {
+export async function getSimLinkFlow(
+  offerId: string,
+  templateId?: string | null,
+): Promise<SimLinkFlow | null> {
   await connection();
   const api = await ucompApi();
-  const [offer] = await simDb.select().from(simOffers).where(eq(simOffers.id, offerId));
+  const [offer] = await simDb
+    .select()
+    .from(simOffers)
+    .where(eq(simOffers.id, offerId));
   if (!offer) return null;
-  const [link] = await simDb.select().from(simLinks).where(eq(simLinks.offerId, offerId));
+  const [link] = await simDb
+    .select()
+    .from(simLinks)
+    .where(eq(simLinks.offerId, offerId));
 
   const [state, chosen] = await Promise.all([
     link ? loadLinkState(api, link) : null,
@@ -360,14 +491,20 @@ export async function getSimLinkFlow(offerId: string, templateId?: string | null
   if (chosen && !chosen.ok) apiError = chosen.error;
   else if (chosen?.ok) {
     const template = chosen.data;
-    if (template.activeVersion === null || template.contract === null) apiError = NO_ACTIVE;
+    if (template.activeVersion === null || template.contract === null)
+      apiError = NO_ACTIVE;
     else {
       const relinking = link?.templateId === template.id;
       let diff = null;
       if (relinking && template.activeVersion > link.pinnedVersion) {
-        diff = state?.upgrade?.toVersion === template.activeVersion ? state.upgrade.diff : null;
+        diff =
+          state?.upgrade?.toVersion === template.activeVersion
+            ? state.upgrade.diff
+            : null;
         if (!diff) {
-          const since = await api.getTemplate(template.id, { since: link.pinnedVersion });
+          const since = await api.getTemplate(template.id, {
+            since: link.pinnedVersion,
+          });
           if (since.ok) diff = since.data.changes ?? null;
           else apiError = since.error;
         }
@@ -376,33 +513,52 @@ export async function getSimLinkFlow(offerId: string, templateId?: string | null
         template,
         version: template.activeVersion,
         variables: template.contract.variables,
-        mapping: suggestMapping(template.contract.variables, link?.mapping ?? {}, diff?.items ?? []),
+        mapping: suggestMapping(
+          template.contract.variables,
+          link?.mapping ?? {},
+          diff?.items ?? [],
+        ),
         diff,
       };
     }
   }
 
-  return { offer: { id: offer.id, kind: offer.kind, name: offer.name }, current: state?.summary ?? null, candidate, fields: SIM_FIELDS, apiError };
+  return {
+    offer: { id: offer.id, kind: offer.kind, name: offer.name },
+    current: state?.summary ?? null,
+    candidate,
+    fields: SIM_FIELDS,
+    apiError,
+  };
 }
 
 // ── Deliveries ───────────────────────────────────────────────────────────────
 
-export const deliveryFileHref = (deliveryId: string) => `/sim/deliveries/${encodeURIComponent(deliveryId)}/file`;
+export const deliveryFileHref = (deliveryId: string) =>
+  `/sim/deliveries/${encodeURIComponent(deliveryId)}/file`;
 
 /** A stored JSON output, or null when it isn't JSON with `key` a string (old or hand-edited data). */
-function parseOutput<T>(output: string | null, key: keyof T & string): T | null {
+function parseOutput<T>(
+  output: string | null,
+  key: keyof T & string,
+): T | null {
   if (!output) return null;
   try {
     const value = JSON.parse(output) as T;
-    return typeof (value as Record<string, unknown> | null)?.[key] === "string" ? value : null;
+    return typeof (value as Record<string, unknown> | null)?.[key] === "string"
+      ? value
+      : null;
   } catch {
     return null;
   }
 }
 
-const parseEmail = (output: string | null) => parseOutput<EmailOutput>(output, "html");
-const parsePush = (output: string | null) => parseOutput<SimPush>(output, "title");
-const parseSms = (output: string | null) => parseOutput<Omit<SimSms, "deliveryId" | "at">>(output, "text");
+const parseEmail = (output: string | null) =>
+  parseOutput<EmailOutput>(output, "html");
+const parsePush = (output: string | null) =>
+  parseOutput<SimPush>(output, "title");
+const parseSms = (output: string | null) =>
+  parseOutput<Omit<SimSms, "deliveryId" | "at">>(output, "text");
 
 /**
  * The customer's thread with Coral's short code: every text delivered to them, from any offer or alert,
@@ -410,32 +566,55 @@ const parseSms = (output: string | null) => parseOutput<Omit<SimSms, "deliveryId
  * SQLite's rowid (the order the rows went in, as a send writes its batch in one insert) breaks the tie. The
  * id can't: a batch's ids start with a random key.
  */
-async function smsThread(customerId: string, upTo: DeliveryRow): Promise<SimSms[]> {
+async function smsThread(
+  customerId: string,
+  upTo: DeliveryRow,
+): Promise<SimSms[]> {
   const rows = await simDb
-    .select({ id: simDeliveries.id, at: simDeliveries.at, output: simDeliveries.output })
+    .select({
+      id: simDeliveries.id,
+      at: simDeliveries.at,
+      output: simDeliveries.output,
+    })
     .from(simDeliveries)
-    .where(and(eq(simDeliveries.customerId, customerId), eq(simDeliveries.channel, "sms"), eq(simDeliveries.status, "delivered")))
+    .where(
+      and(
+        eq(simDeliveries.customerId, customerId),
+        eq(simDeliveries.channel, "sms"),
+        eq(simDeliveries.status, "delivered"),
+      ),
+    )
     .orderBy(asc(simDeliveries.at), asc(sql`rowid`));
   const thread: SimSms[] = [];
   for (const row of rows) {
     const sms = parseSms(row.output);
-    if (sms) thread.push({ deliveryId: row.id, at: row.at.toISOString(), ...sms });
+    if (sms)
+      thread.push({ deliveryId: row.id, at: row.at.toISOString(), ...sms });
     if (row.id === upTo.id) break;
   }
   return thread;
 }
 
 /** The customer view of one delivery; null when there's no such delivery. */
-export async function getSimDeliveryView(deliveryId: string): Promise<SimDeliveryView | null> {
+export async function getSimDeliveryView(
+  deliveryId: string,
+): Promise<SimDeliveryView | null> {
   const [row] = await simDb
-    .select({ d: simDeliveries, customer: simCustomers, offerName: simOffers.name })
+    .select({
+      d: simDeliveries,
+      customer: simCustomers,
+      offerName: simOffers.name,
+    })
     .from(simDeliveries)
     .leftJoin(simCustomers, eq(simCustomers.id, simDeliveries.customerId))
     .leftJoin(simOffers, eq(simOffers.id, simDeliveries.offerId))
     .where(eq(simDeliveries.id, deliveryId));
   if (!row) return null;
   const { d, customer } = row;
-  const [link] = await simDb.select().from(simLinks).where(eq(simLinks.offerId, d.offerId));
+  const [link] = await simDb
+    .select()
+    .from(simLinks)
+    .where(eq(simLinks.offerId, d.offerId));
 
   const src = deliveryFileHref(d.id);
   let view: SimDeliveryView["view"] = null;
@@ -449,16 +628,32 @@ export async function getSimDeliveryView(deliveryId: string): Promise<SimDeliver
         break;
       case "email": {
         const email = parseEmail(d.output);
-        view = { kind: "inbox", src, from: CORAL_SENDER, subject: email?.subject ?? "", preheader: email?.preheader ?? "" };
+        view = {
+          kind: "inbox",
+          src,
+          from: CORAL_SENDER,
+          subject: email?.subject ?? "",
+          preheader: email?.preheader ?? "",
+        };
         break;
       }
       case "push": {
         const push = parsePush(d.output);
-        if (push) view = { kind: "push", appName: CORAL_APP, platform: d.platform ?? customer?.platform ?? "ios", push };
+        if (push)
+          view = {
+            kind: "push",
+            appName: CORAL_APP,
+            platform: d.platform ?? customer?.platform ?? "ios",
+            push,
+          };
         break;
       }
       case "sms":
-        view = { kind: "sms", sender: CORAL_SHORT_CODE, thread: await smsThread(d.customerId, d) };
+        view = {
+          kind: "sms",
+          sender: CORAL_SHORT_CODE,
+          thread: await smsThread(d.customerId, d),
+        };
         break;
       default:
         assertNever(d.channel, "channel");
@@ -468,10 +663,23 @@ export async function getSimDeliveryView(deliveryId: string): Promise<SimDeliver
   return {
     id: d.id,
     customer: customer
-      ? { name: `${customer.firstName} ${customer.lastName}`, email: customer.email, phone: customer.phone, platform: customer.platform }
-      : { name: d.customerId, email: "", phone: "", platform: d.platform ?? "ios" },
+      ? {
+          name: `${customer.firstName} ${customer.lastName}`,
+          email: customer.email,
+          phone: customer.phone,
+          platform: customer.platform,
+        }
+      : {
+          name: d.customerId,
+          email: "",
+          phone: "",
+          platform: d.platform ?? "ios",
+        },
     offerName: row.offerName ?? d.offerId,
-    templateName: link && link.templateId === d.templateId ? link.templateName : (d.templateId ?? ""),
+    templateName:
+      link && link.templateId === d.templateId
+        ? link.templateName
+        : (d.templateId ?? ""),
     versionNumber: d.versionNumber ?? 0,
     channel: d.channel,
     at: d.at.toISOString(),
@@ -482,43 +690,92 @@ export async function getSimDeliveryView(deliveryId: string): Promise<SimDeliver
 }
 
 /** GET /sim/deliveries/{id}/view: the customer view of one delivery, or a 400 or 404 with the sentence to show. */
-export async function readSimDeliveryView(deliveryId: unknown): Promise<SimRead<{ view: SimDeliveryView }>> {
+export async function readSimDeliveryView(
+  deliveryId: unknown,
+): Promise<SimRead<{ view: SimDeliveryView }>> {
   const parsed = z.string().min(1).max(64).safeParse(deliveryId);
   const view = parsed.success ? await getSimDeliveryView(parsed.data) : null;
-  return view ? { ok: true, view } : { ok: false, reason: "That delivery doesn't exist.", status: parsed.success ? 404 : 400 };
+  return view
+    ? { ok: true, view }
+    : {
+        ok: false,
+        reason: "That delivery doesn't exist.",
+        status: parsed.success ? 404 : 400,
+      };
 }
 
 /**
  * GET /sim/templates/search?q=: the Active templates Stencil lists for `q` (every one for an empty `q`). The
  * API's own sentence when it refuses or can't be reached.
  */
-export async function searchSimTemplates(q: unknown): Promise<SimRead<{ results: ApiTemplateSummary[] }>> {
-  const parsed = z.string().max(200).safeParse(q ?? "");
-  if (!parsed.success) return { ok: false, reason: "Search for a template name or ID.", status: 400 };
-  const result = await (await ucompApi()).searchTemplates({ q: parsed.data, limit: 20 });
-  return result.ok ? { ok: true, results: result.data.results } : { ok: false, reason: result.error.message, status: 502 };
+export async function searchSimTemplates(
+  q: unknown,
+): Promise<SimRead<{ results: ApiTemplateSummary[] }>> {
+  const parsed = z
+    .string()
+    .max(200)
+    .safeParse(q ?? "");
+  if (!parsed.success)
+    return {
+      ok: false,
+      reason: "Search for a template name or ID.",
+      status: 400,
+    };
+  const result = await (
+    await ucompApi()
+  ).searchTemplates({ q: parsed.data, limit: 20 });
+  return result.ok
+    ? { ok: true, results: result.data.results }
+    : { ok: false, reason: result.error.message, status: 502 };
 }
 
 /** What /sim/deliveries/[id]/file serves: the stored output as the customer received it. */
-export async function loadDeliveryFile(
-  deliveryId: string,
-): Promise<{ contentType: string; body: string | Uint8Array<ArrayBuffer>; filename: string } | null> {
-  const [d]: DeliveryRow[] = await simDb.select().from(simDeliveries).where(eq(simDeliveries.id, deliveryId));
+export async function loadDeliveryFile(deliveryId: string): Promise<{
+  contentType: string;
+  body: string | Uint8Array<ArrayBuffer>;
+  filename: string;
+} | null> {
+  const [d]: DeliveryRow[] = await simDb
+    .select()
+    .from(simDeliveries)
+    .where(eq(simDeliveries.id, deliveryId));
   if (!d || d.status !== "delivered" || !d.output) return null;
-  const name = `${d.templateId ?? "delivery"}-v${d.versionNumber ?? 0}-${d.channel}`.replace(/[^\w.-]/g, "_");
+  const name =
+    `${d.templateId ?? "delivery"}-v${d.versionNumber ?? 0}-${d.channel}`.replace(
+      /[^\w.-]/g,
+      "_",
+    );
   switch (d.channel) {
     case "pdf":
-      return { contentType: "application/pdf", body: new Uint8Array(Buffer.from(d.output, "base64")), filename: `${name}.pdf` };
+      return {
+        contentType: "application/pdf",
+        body: new Uint8Array(Buffer.from(d.output, "base64")),
+        filename: `${name}.pdf`,
+      };
     case "web":
-      return { contentType: "text/html; charset=utf-8", body: d.output, filename: `${name}.html` };
+      return {
+        contentType: "text/html; charset=utf-8",
+        body: d.output,
+        filename: `${name}.html`,
+      };
     case "email": {
       const email = parseEmail(d.output);
-      return email ? { contentType: "text/html; charset=utf-8", body: email.html, filename: `${name}.html` } : null;
+      return email
+        ? {
+            contentType: "text/html; charset=utf-8",
+            body: email.html,
+            filename: `${name}.html`,
+          }
+        : null;
     }
     // What Stencil answered, as Coral keeps it: a phone shows these, so the file is the JSON.
     case "push":
     case "sms":
-      return { contentType: "application/json; charset=utf-8", body: d.output, filename: `${name}.json` };
+      return {
+        contentType: "application/json; charset=utf-8",
+        body: d.output,
+        filename: `${name}.json`,
+      };
     default:
       return assertNever(d.channel, "channel");
   }

@@ -9,7 +9,8 @@
 // (Tailwind needs the class names written out, so the two breakpoints are spelled twice.)
 export { ROW } from "@/components/library/columns";
 
-export const COLUMNS = "grid-cols-[minmax(0,1fr)_8.5rem_7.5rem_7.5rem] @max-[42.5rem]/canvas:grid-cols-1";
+export const COLUMNS =
+  "grid-cols-[minmax(0,1fr)_8.5rem_7.5rem_7.5rem] @max-[42.5rem]/canvas:grid-cols-1";
 export const COLUMNS_DECIDED =
   "grid-cols-[minmax(0,1fr)_8.5rem_7.5rem_7.5rem_11rem] @max-[55.5rem]/canvas:grid-cols-1";
 

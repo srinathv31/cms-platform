@@ -43,7 +43,10 @@ export function RetryButton({
   retry,
   className,
   ...props
-}: { retry: () => void } & Omit<ComponentProps<typeof Button>, "onClick" | "children">) {
+}: { retry: () => void } & Omit<
+  ComponentProps<typeof Button>,
+  "onClick" | "children"
+>) {
   const [pending, start] = useTransition();
   return (
     <Button
@@ -56,15 +59,36 @@ export function RetryButton({
       }}
     >
       <span className={cn(pending && "invisible")}>Try again</span>
-      {pending ? <Spinner aria-hidden role="presentation" className="absolute size-3.5" /> : null}
+      {pending ? (
+        <Spinner
+          aria-hidden
+          role="presentation"
+          className="absolute size-3.5"
+        />
+      ) : null}
     </Button>
   );
 }
 
 /** The id the server's log line carries, for support. Only a server error has one. */
-export function ErrorDigest({ digest, className }: { digest?: string; className?: string }) {
+export function ErrorDigest({
+  digest,
+  className,
+}: {
+  digest?: string;
+  className?: string;
+}) {
   if (!digest) return null;
-  return <p className={cn("text-[12px] leading-4 text-text-muted tabular-nums", className)}>Error ID {digest}</p>;
+  return (
+    <p
+      className={cn(
+        "text-[12px] leading-4 text-text-muted tabular-nums",
+        className,
+      )}
+    >
+      Error ID {digest}
+    </p>
+  );
 }
 
 /** A page that threw: the page's title says so, with Back to library and the screen's one black button, Try again. */
@@ -84,7 +108,11 @@ export function PageError({ error, retry }: RouteErrorProps) {
           >
             Back to library
           </Button>
-          <RetryButton retry={retry} size="lg" className="h-10 rounded-full px-5 text-[14px]" />
+          <RetryButton
+            retry={retry}
+            size="lg"
+            className="h-10 rounded-full px-5 text-[14px]"
+          />
         </>
       }
     >

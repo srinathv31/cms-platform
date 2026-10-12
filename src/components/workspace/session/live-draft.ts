@@ -11,7 +11,10 @@
 
 import { useSyncExternalStore } from "react";
 import { createStore } from "zustand/vanilla";
-import type { ChannelFieldId, ChannelFieldValues } from "@/domain/channel-fields";
+import type {
+  ChannelFieldId,
+  ChannelFieldValues,
+} from "@/domain/channel-fields";
 import type { JSONContent, SampleSet } from "@/domain/types";
 
 export interface LiveDraft {
@@ -30,7 +33,10 @@ interface LiveDraftState {
 }
 
 export function createLiveDraft(initial: LiveDraftState): LiveDraft {
-  const store = createStore<LiveDraftState>()(() => ({ fields: initial.fields, sampleSets: initial.sampleSets }));
+  const store = createStore<LiveDraftState>()(() => ({
+    fields: initial.fields,
+    sampleSets: initial.sampleSets,
+  }));
   return {
     // The listener is called with no arguments (zustand passes it the state), once per change.
     subscribe(listener) {
@@ -56,10 +62,18 @@ export function createLiveDraft(initial: LiveDraftState): LiveDraft {
 
 /** The channel fields as typed. */
 export function useLiveFields(draft: LiveDraft): ChannelFieldValues {
-  return useSyncExternalStore(draft.subscribe, draft.getFields, draft.getFields);
+  return useSyncExternalStore(
+    draft.subscribe,
+    draft.getFields,
+    draft.getFields,
+  );
 }
 
 /** The sample sets as edited. */
 export function useLiveSampleSets(draft: LiveDraft): SampleSet[] {
-  return useSyncExternalStore(draft.subscribe, draft.getSampleSets, draft.getSampleSets);
+  return useSyncExternalStore(
+    draft.subscribe,
+    draft.getSampleSets,
+    draft.getSampleSets,
+  );
 }

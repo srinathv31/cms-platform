@@ -6,7 +6,12 @@ import type { ApiTemplateDetail } from "@/domain/golive-types";
 import type { VariableType } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { compareCodePoints, readNoticeCursor, readSearchCursor, type SearchKey } from "@/domain/golive/cursor";
+import {
+  compareCodePoints,
+  readNoticeCursor,
+  readSearchCursor,
+  type SearchKey,
+} from "@/domain/golive/cursor";
 import { BUSINESS_ZONE_KEY } from "@/server/business-zone";
 import { takeNoticeSeqs } from "@/server/effects";
 import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
@@ -46,13 +51,20 @@ beforeAll(async () => {
 
 const id = (key: string) => ids[key]!;
 
-async function detail(key: string, opts: { version?: number; since?: number } = {}, at = BASE): Promise<ApiTemplateDetail> {
+async function detail(
+  key: string,
+  opts: { version?: number; since?: number } = {},
+  at = BASE,
+): Promise<ApiTemplateDetail> {
   const result = await getTemplateDetail(ids[key] ?? key, opts, at);
   if (!result.ok) throw new Error(`${key}: ${result.error.message}`);
   return result.detail;
 }
 
-async function detailError(key: string, opts: { version?: number; since?: number } = {}) {
+async function detailError(
+  key: string,
+  opts: { version?: number; since?: number } = {},
+) {
   const result = await getTemplateDetail(ids[key] ?? key, opts, BASE);
   if (result.ok) throw new Error(`${key} answered 200`);
   return result.error;
@@ -62,22 +74,41 @@ async function detailError(key: string, opts: { version?: number; since?: number
 
 describe("requireConsumer", () => {
   it("a registered consumer, trimmed", async () => {
-    expect(await requireConsumer(" coral ")).toEqual({ ok: true, consumer: { id: "coral", name: "Coral" } });
-    expect(await requireConsumer("deposits-online")).toMatchObject({ ok: true, consumer: { id: "deposits-online" } });
+    expect(await requireConsumer(" coral ")).toEqual({
+      ok: true,
+      consumer: { id: "coral", name: "Coral" },
+    });
+    expect(await requireConsumer("deposits-online")).toMatchObject({
+      ok: true,
+      consumer: { id: "deposits-online" },
+    });
   });
 
   it("none is consumer_required; an unknown one is unknown_consumer", async () => {
     for (const header of [null, "", "   "]) {
-      expect(await requireConsumer(header)).toEqual({ ok: false, error: { code: "consumer_required", message: "X-Consumer-Id is required." } });
+      expect(await requireConsumer(header)).toEqual({
+        ok: false,
+        error: {
+          code: "consumer_required",
+          message: "X-Consumer-Id is required.",
+        },
+      });
     }
-    expect(await requireConsumer("acme")).toEqual({ ok: false, error: { code: "unknown_consumer", message: 'Consumer "acme" isn\'t registered.' } });
+    expect(await requireConsumer("acme")).toEqual({
+      ok: false,
+      error: {
+        code: "unknown_consumer",
+        message: 'Consumer "acme" isn\'t registered.',
+      },
+    });
   });
 });
 
 // ── Search ───────────────────────────────────────────────────────────────────
 
 /** One page's results. */
-const search = async (q: string, limit = 20) => (await searchActiveTemplates(q, limit)).results;
+const search = async (q: string, limit = 20) =>
+  (await searchActiveTemplates(q, limit)).results;
 
 /** A paging loop that runs this long is a bug: fail rather than hang. */
 const MAX_PAGES = 100;
@@ -108,8 +139,12 @@ describe("searchActiveTemplates", () => {
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .where(eq(versions.state, "active"));
-    expect(results.map((r) => r.id).sort()).toEqual(active.map((a) => a.id).sort());
-    expect(results.map((r) => r.name)).toEqual(byCodePoint(results.map((r) => r.name)));
+    expect(results.map((r) => r.id).sort()).toEqual(
+      active.map((a) => a.id).sort(),
+    );
+    expect(results.map((r) => r.name)).toEqual(
+      byCodePoint(results.map((r) => r.name)),
+    );
     expect(results.map((r) => r.id)).not.toContain(id("annual-fee-waiver"));
   });
 
@@ -131,8 +166,17 @@ describe("searchActiveTemplates", () => {
   it("finds an id in any case, with or without UC-", async () => {
     const full = id("cash-back");
     const code = full.slice(3);
-    for (const q of [full, full.toLowerCase(), code, code.toLowerCase(), ` ${full} `]) {
-      expect((await search(q)).map((r) => r.id), q).toEqual([full]);
+    for (const q of [
+      full,
+      full.toLowerCase(),
+      code,
+      code.toLowerCase(),
+      ` ${full} `,
+    ]) {
+      expect(
+        (await search(q)).map((r) => r.id),
+        q,
+      ).toEqual([full]);
     }
     expect(templateIdFromQuery("uc-4f7k2q")).toBe("UC-4F7K2Q");
     expect(templateIdFromQuery("4f7k2q")).toBe("UC-4F7K2Q");
@@ -144,7 +188,9 @@ describe("searchActiveTemplates", () => {
   });
 
   it("matches every word of the name, any case", async () => {
-    expect((await search("TERMS balance")).map((r) => r.id)).toEqual([id("balance-transfer")]);
+    expect((await search("TERMS balance")).map((r) => r.id)).toEqual([
+      id("balance-transfer"),
+    ]);
     expect(await search("balance savings")).toEqual([]);
   });
 
@@ -152,21 +198,40 @@ describe("searchActiveTemplates", () => {
     const names = (await search("rate")).map((r) => r.name);
     expect(names[0]).toBe("Rate Change Notice");
     expect(names.slice(1)).toEqual(byCodePoint(names.slice(1)));
-    expect(names).toEqual(expect.arrayContaining(["High-Yield Savings — Rate Disclosure", "Statement Insert — Rate Change"]));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "High-Yield Savings — Rate Disclosure",
+        "Statement Insert — Rate Change",
+      ]),
+    );
     expect(await search("rate", 1)).toHaveLength(1);
   });
 
   it("orders names by code point, not by the server's locale: a lower-case name comes after every capital", async () => {
-    const live = and(eq(versions.templateId, id("cash-back")), eq(versions.state, "active"));
-    const [template] = await db.select({ id: versions.templateId, name: versions.name }).from(versions).where(live);
+    const live = and(
+      eq(versions.templateId, id("cash-back")),
+      eq(versions.state, "active"),
+    );
+    const [template] = await db
+      .select({ id: versions.templateId, name: versions.name })
+      .from(versions)
+      .where(live);
     // "cash Back…" sorts after "Statement…" by code point; any locale collation puts it among the C's.
-    await db.update(versions).set({ name: `c${template!.name.slice(1)}` }).where(live);
+    await db
+      .update(versions)
+      .set({ name: `c${template!.name.slice(1)}` })
+      .where(live);
     try {
       const names = (await search("", 50)).map((r) => r.name);
       expect(names.at(-1)).toBe(`c${template!.name.slice(1)}`);
       expect(names).toEqual(byCodePoint(names));
       for (const limit of [1, 2, 3]) {
-        expect((await searchPages("", limit)).flatMap((p) => p.results.map((r) => r.name)), `by ${limit}`).toEqual(names);
+        expect(
+          (await searchPages("", limit)).flatMap((p) =>
+            p.results.map((r) => r.name),
+          ),
+          `by ${limit}`,
+        ).toEqual(names);
       }
     } finally {
       await db.update(versions).set({ name: template!.name }).where(live);
@@ -179,8 +244,15 @@ describe("searchActiveTemplates", () => {
       expect(all.length, q).toBeGreaterThan(1);
       for (const limit of [1, 2, 3]) {
         const pages = await searchPages(q, limit);
-        expect(pages.flatMap((p) => p.results.map((r) => r.id)), `${q} by ${limit}`).toEqual(all.map((r) => r.id));
-        expect(pages.slice(0, -1).every((p) => p.hasMore && p.results.length === limit)).toBe(true);
+        expect(
+          pages.flatMap((p) => p.results.map((r) => r.id)),
+          `${q} by ${limit}`,
+        ).toEqual(all.map((r) => r.id));
+        expect(
+          pages
+            .slice(0, -1)
+            .every((p) => p.hasMore && p.results.length === limit),
+        ).toBe(true);
         expect(pages.at(-1)!.hasMore).toBe(false);
       }
     }
@@ -193,21 +265,40 @@ describe("searchActiveTemplates", () => {
       .select({ id: versions.id })
       .from(versions)
       .where(and(eq(versions.templateId, gone), eq(versions.state, "active")));
-    await db.update(versions).set({ state: "superseded" }).where(eq(versions.id, active!.id));
+    await db
+      .update(versions)
+      .set({ state: "superseded" })
+      .where(eq(versions.id, active!.id));
     try {
       const after = readSearchCursor(first!.nextCursor, "");
       expect(after.ok).toBe(true);
-      const again = await searchActiveTemplates("", 3, after.ok ? after.value : null);
-      expect(again.results.map((r) => r.id)).toEqual(second!.results.map((r) => r.id));
+      const again = await searchActiveTemplates(
+        "",
+        3,
+        after.ok ? after.value : null,
+      );
+      expect(again.results.map((r) => r.id)).toEqual(
+        second!.results.map((r) => r.id),
+      );
     } finally {
-      await db.update(versions).set({ state: "active" }).where(eq(versions.id, active!.id));
+      await db
+        .update(versions)
+        .set({ state: "active" })
+        .where(eq(versions.id, active!.id));
     }
   });
 
   it("an empty answer still has a cursor: no more results, and it reads back as the start", async () => {
     const empty = await searchActiveTemplates("balance savings", 20);
-    expect(empty).toEqual({ results: [], hasMore: false, nextCursor: expect.any(String) });
-    expect(readSearchCursor(empty.nextCursor, "balance savings")).toEqual({ ok: true, value: null });
+    expect(empty).toEqual({
+      results: [],
+      hasMore: false,
+      nextCursor: expect.any(String),
+    });
+    expect(readSearchCursor(empty.nextCursor, "balance savings")).toEqual({
+      ok: true,
+      value: null,
+    });
   });
 });
 
@@ -216,21 +307,58 @@ describe("searchActiveTemplates", () => {
 describe("getTemplateDetail", () => {
   // The name is versioned: "the template" is named by the Active version, else by what still renders.
   it("names the template by the Active version; after a revoke by the version that still renders, then by the newest", async () => {
-    const versionOf = (number: number) => and(eq(versions.templateId, id("balance-transfer")), eq(versions.number, number));
-    const [v1, v2] = await Promise.all([1, 2].map((n) => db.query.versions.findFirst({ where: versionOf(n) }).then((v) => v!)));
-    await db.update(versions).set({ name: "Balance Transfer Intro — Card Terms" }).where(versionOf(2));
+    const versionOf = (number: number) =>
+      and(
+        eq(versions.templateId, id("balance-transfer")),
+        eq(versions.number, number),
+      );
+    const [v1, v2] = await Promise.all(
+      [1, 2].map((n) =>
+        db.query.versions.findFirst({ where: versionOf(n) }).then((v) => v!),
+      ),
+    );
+    await db
+      .update(versions)
+      .set({ name: "Balance Transfer Intro — Card Terms" })
+      .where(versionOf(2));
     try {
-      expect((await detail("balance-transfer")).name, "v2 is Active").toBe("Balance Transfer Intro — Card Terms");
+      expect((await detail("balance-transfer")).name, "v2 is Active").toBe(
+        "Balance Transfer Intro — Card Terms",
+      );
 
-      const revoke = { reason: "Test", startedBy: "jordan", startedAt: BASE.toISOString(), confirmedBy: "alex", confirmedAt: BASE.toISOString() };
-      await db.update(versions).set({ state: "revoked", revoke }).where(versionOf(2));
-      expect((await detail("balance-transfer")).name, "v2 revoked: v1 still renders").toBe("Balance Transfer Intro — Terms");
+      const revoke = {
+        reason: "Test",
+        startedBy: "jordan",
+        startedAt: BASE.toISOString(),
+        confirmedBy: "alex",
+        confirmedAt: BASE.toISOString(),
+      };
+      await db
+        .update(versions)
+        .set({ state: "revoked", revoke })
+        .where(versionOf(2));
+      expect(
+        (await detail("balance-transfer")).name,
+        "v2 revoked: v1 still renders",
+      ).toBe("Balance Transfer Intro — Terms");
 
-      await db.update(versions).set({ sunsetAt: new Date(BASE.getTime() - DAY) }).where(versionOf(1));
-      expect((await detail("balance-transfer")).name, "nothing renders: the newest released").toBe("Balance Transfer Intro — Card Terms");
+      await db
+        .update(versions)
+        .set({ sunsetAt: new Date(BASE.getTime() - DAY) })
+        .where(versionOf(1));
+      expect(
+        (await detail("balance-transfer")).name,
+        "nothing renders: the newest released",
+      ).toBe("Balance Transfer Intro — Card Terms");
     } finally {
-      await db.update(versions).set({ name: v2.name, state: v2.state, revoke: v2.revoke }).where(versionOf(2));
-      await db.update(versions).set({ sunsetAt: v1.sunsetAt }).where(versionOf(1));
+      await db
+        .update(versions)
+        .set({ name: v2.name, state: v2.state, revoke: v2.revoke })
+        .where(versionOf(2));
+      await db
+        .update(versions)
+        .set({ sunsetAt: v1.sunsetAt })
+        .where(versionOf(1));
     }
   });
 
@@ -244,22 +372,41 @@ describe("getTemplateDetail", () => {
       asOf: BASE.toISOString(),
       activeVersion: 2,
     });
-    expect(d.versions.map((v) => [v.number, v.state, v.renders, v.sunsetPassed])).toEqual([
+    expect(
+      d.versions.map((v) => [v.number, v.state, v.renders, v.sunsetPassed]),
+    ).toEqual([
       [2, "active", true, false],
       [1, "superseded", true, false],
     ]);
     expect(d.versions[1]!.sunsetAt).not.toBeNull();
     expect(d.versions[1]!.supersededAt).not.toBeNull();
-    expect(d.contract).toMatchObject({ version: 2, state: "active", channels: ["pdf", "web"] });
-    expect(d.contract!.variables.map((v) => v.key)).toEqual(["first_name", "last_name", "purchase_apr", "home_state", "offer_end_date"]);
-    expect(d.contract!.jsonSchema.required).toEqual(["first_name", "last_name", "purchase_apr", "home_state"]);
+    expect(d.contract).toMatchObject({
+      version: 2,
+      state: "active",
+      channels: ["pdf", "web"],
+    });
+    expect(d.contract!.variables.map((v) => v.key)).toEqual([
+      "first_name",
+      "last_name",
+      "purchase_apr",
+      "home_state",
+      "offer_end_date",
+    ]);
+    expect(d.contract!.jsonSchema.required).toEqual([
+      "first_name",
+      "last_name",
+      "purchase_apr",
+      "home_state",
+    ]);
     expect(d.changes).toBeUndefined();
   });
 
   it("a Superseded version's contract can be read by number", async () => {
     const d = await detail("balance-transfer", { version: 1 });
     expect(d.contract).toMatchObject({ version: 1, state: "superseded" });
-    expect(d.contract!.jsonSchema.$id).toBe(`https://stencil.example/schemas/${id("balance-transfer")}/v1/values.json`);
+    expect(d.contract!.jsonSchema.$id).toBe(
+      `https://stencil.example/schemas/${id("balance-transfer")}/v1/values.json`,
+    );
     expect(d.activeVersion).toBe(2);
   });
 
@@ -269,50 +416,101 @@ describe("getTemplateDetail", () => {
       since: 1,
       to: 2,
       breaking: false,
-      items: [{ kind: "added", key: "offer_end_date", breaking: false, text: "v2 adds optional `offer_end_date` (Date)." }],
+      items: [
+        {
+          kind: "added",
+          key: "offer_end_date",
+          breaking: false,
+          text: "v2 adds optional `offer_end_date` (Date).",
+        },
+      ],
       newRequired: [],
     });
-    expect((await detail("holiday-points", { since: 1, version: 2 })).changes!.items.map((i) => i.kind)).toEqual(["label_changed"]);
+    expect(
+      (
+        await detail("holiday-points", { since: 1, version: 2 })
+      ).changes!.items.map((i) => i.kind),
+    ).toEqual(["label_changed"]);
   });
 
   it("past its sunset a Superseded version no longer renders", async () => {
-    const d = await detail("balance-transfer", {}, new Date(BASE.getTime() + 22 * DAY));
-    expect(d.versions[1]).toMatchObject({ number: 1, sunsetPassed: true, renders: false });
+    const d = await detail(
+      "balance-transfer",
+      {},
+      new Date(BASE.getTime() + 22 * DAY),
+    );
+    expect(d.versions[1]).toMatchObject({
+      number: 1,
+      sunsetPassed: true,
+      renders: false,
+    });
   });
 
   it("sends a sunset's day and zone beside its instant, and nulls for a version with none", async () => {
     const d = await detail("balance-transfer");
     const sunset = d.versions[1]!;
     expect(sunset.zone).toBe("America/New_York");
-    expect(sunset.sunsetDay, "the day in the zone, which the instant's UTC date can't be trusted for").toBe(sunsetDay(new Date(sunset.sunsetAt!), "America/New_York"));
-    expect(d.versions[0]).toMatchObject({ number: 2, sunsetAt: null, sunsetDay: null, zone: null });
+    expect(
+      sunset.sunsetDay,
+      "the day in the zone, which the instant's UTC date can't be trusted for",
+    ).toBe(sunsetDay(new Date(sunset.sunsetAt!), "America/New_York"));
+    expect(d.versions[0]).toMatchObject({
+      number: 2,
+      sunsetAt: null,
+      sunsetDay: null,
+      zone: null,
+    });
 
     // 00:00 on March 1 in Pacific is 08:00Z the same day; in Eastern, 05:00Z.
-    const versionOf = and(eq(versions.templateId, id("balance-transfer")), eq(versions.number, 1));
+    const versionOf = and(
+      eq(versions.templateId, id("balance-transfer")),
+      eq(versions.number, 1),
+    );
     const before = sunset.sunsetAt;
-    await db.update(versions).set({ sunsetAt: new Date("2027-03-01T05:00:00.000Z") }).where(versionOf);
+    await db
+      .update(versions)
+      .set({ sunsetAt: new Date("2027-03-01T05:00:00.000Z") })
+      .where(versionOf);
     try {
-      expect((await detail("balance-transfer")).versions[1]).toMatchObject({ sunsetAt: "2027-03-01T05:00:00.000Z", sunsetDay: "2027-03-01", zone: "America/New_York" });
-      await db.insert(settings).values({ key: BUSINESS_ZONE_KEY, value: "America/Los_Angeles" });
-      expect((await detail("balance-transfer")).versions[1], "its day is read in the zone now in force (decision 0017)").toMatchObject({
+      expect((await detail("balance-transfer")).versions[1]).toMatchObject({
+        sunsetAt: "2027-03-01T05:00:00.000Z",
+        sunsetDay: "2027-03-01",
+        zone: "America/New_York",
+      });
+      await db
+        .insert(settings)
+        .values({ key: BUSINESS_ZONE_KEY, value: "America/Los_Angeles" });
+      expect(
+        (await detail("balance-transfer")).versions[1],
+        "its day is read in the zone now in force (decision 0017)",
+      ).toMatchObject({
         sunsetAt: "2027-03-01T05:00:00.000Z",
         sunsetDay: "2027-02-28",
         zone: "America/Los_Angeles",
       });
     } finally {
       await db.delete(settings).where(eq(settings.key, BUSINESS_ZONE_KEY));
-      await db.update(versions).set({ sunsetAt: new Date(before!) }).where(versionOf);
+      await db
+        .update(versions)
+        .set({ sunsetAt: new Date(before!) })
+        .where(versionOf);
     }
   });
 
   it("a Revoked version is listed with its date, and its contract can still be read", async () => {
     const d = await detail("holiday-points", { version: 1 });
-    expect(d.versions.find((v) => v.number === 1)).toMatchObject({ state: "revoked", renders: false, revokedAt: expect.any(String) });
+    expect(d.versions.find((v) => v.number === 1)).toMatchObject({
+      state: "revoked",
+      renders: false,
+      revokedAt: expect.any(String),
+    });
     expect(d.contract).toMatchObject({ version: 1, state: "revoked" });
   });
 
   it("versions in review never show", async () => {
-    expect((await detail("cash-back")).versions.map((v) => v.number)).toEqual([2, 1]);
+    expect((await detail("cash-back")).versions.map((v) => v.number)).toEqual([
+      2, 1,
+    ]);
   });
 
   it("rounds never show: a number is its released row, and nothing a consumer reads names a round", async () => {
@@ -322,38 +520,76 @@ describe("getTemplateDetail", () => {
       [2, "active"],
       [1, "superseded"],
     ]);
-    expect((await detail("high-yield-savings", { version: 2 })).contract).toMatchObject({ version: 2, state: "active" });
+    expect(
+      (await detail("high-yield-savings", { version: 2 })).contract,
+    ).toMatchObject({ version: 2, state: "active" });
     expect(JSON.stringify(d)).not.toMatch(/"round"/i);
     const { notices } = await listNotices("coral", { limit: 200 });
     expect(JSON.stringify(notices)).not.toMatch(/"round"/i);
   });
 
   it("with nothing Active: activeVersion and contract are null (unless a version is named)", async () => {
-    const where = and(eq(versions.templateId, id("rate-change-notice")), eq(versions.number, 1));
-    await db.update(versions).set({ state: "revoked", revoke: { reason: "Test", startedBy: "jordan", startedAt: BASE.toISOString(), confirmedBy: "alex", confirmedAt: BASE.toISOString() } }).where(where);
+    const where = and(
+      eq(versions.templateId, id("rate-change-notice")),
+      eq(versions.number, 1),
+    );
+    await db
+      .update(versions)
+      .set({
+        state: "revoked",
+        revoke: {
+          reason: "Test",
+          startedBy: "jordan",
+          startedAt: BASE.toISOString(),
+          confirmedBy: "alex",
+          confirmedAt: BASE.toISOString(),
+        },
+      })
+      .where(where);
     try {
       const d = await detail("rate-change-notice", { since: 1 });
       expect(d).toMatchObject({ activeVersion: null, contract: null });
       expect(d.changes).toBeUndefined();
-      expect((await detail("rate-change-notice", { version: 1 })).contract).toMatchObject({ version: 1, state: "revoked" });
+      expect(
+        (await detail("rate-change-notice", { version: 1 })).contract,
+      ).toMatchObject({ version: 1, state: "revoked" });
     } finally {
-      await db.update(versions).set({ state: "active", revoke: null }).where(where);
+      await db
+        .update(versions)
+        .set({ state: "active", revoke: null })
+        .where(where);
     }
   });
 
   it("errors: unknown or unreleased template, unknown version, unreleased version, since not lower", async () => {
-    expect(await detailError("UC-ZZZZZZ")).toEqual({ code: "template_not_found", message: "Template UC-ZZZZZZ doesn't exist." });
-    expect(await detailError("annual-fee-waiver")).toEqual({ code: "template_not_found", message: `Template ${id("annual-fee-waiver")} doesn't exist.` });
-    expect(await detailError("balance-transfer", { version: 9 })).toEqual({ code: "version_not_found", message: `Template ${id("balance-transfer")} has no version 9.` });
+    expect(await detailError("UC-ZZZZZZ")).toEqual({
+      code: "template_not_found",
+      message: "Template UC-ZZZZZZ doesn't exist.",
+    });
+    expect(await detailError("annual-fee-waiver")).toEqual({
+      code: "template_not_found",
+      message: `Template ${id("annual-fee-waiver")} doesn't exist.`,
+    });
+    expect(await detailError("balance-transfer", { version: 9 })).toEqual({
+      code: "version_not_found",
+      message: `Template ${id("balance-transfer")} has no version 9.`,
+    });
     expect(await detailError("cash-back", { version: 3 })).toEqual({
       code: "version_not_released",
       message: "Version 3 is in review. Version 2 is active.",
       details: { version: 3, activeVersion: 2 },
     });
-    const order = { code: "bad_request", message: "since must be lower than version." };
+    const order = {
+      code: "bad_request",
+      message: "since must be lower than version.",
+    };
     expect(await detailError("balance-transfer", { since: 2 })).toEqual(order);
-    expect(await detailError("balance-transfer", { version: 1, since: 2 })).toEqual(order);
-    expect(await detailError("balance-transfer", { version: 1, since: 1 })).toEqual(order);
+    expect(
+      await detailError("balance-transfer", { version: 1, since: 2 }),
+    ).toEqual(order);
+    expect(
+      await detailError("balance-transfer", { version: 1, since: 1 }),
+    ).toEqual(order);
   });
 });
 
@@ -370,39 +606,63 @@ const JUNK: Record<VariableType, unknown> = {
 
 describe("Channel rules", () => {
   it("a channel the content type no longer allows isn't advertised anywhere (the render route refuses it)", async () => {
-    const [disclosure] = await db.select().from(schema.contentTypes).where(eq(schema.contentTypes.key, "disclosure"));
+    const [disclosure] = await db
+      .select()
+      .from(schema.contentTypes)
+      .where(eq(schema.contentTypes.key, "disclosure"));
     const before = disclosure!.allowedChannels;
-    await db.update(schema.contentTypes).set({ allowedChannels: ["pdf", "email"] }).where(eq(schema.contentTypes.id, disclosure!.id));
+    await db
+      .update(schema.contentTypes)
+      .set({ allowedChannels: ["pdf", "email"] })
+      .where(eq(schema.contentTypes.id, disclosure!.id));
     try {
       const [balance] = await search(id("balance-transfer"));
       expect(balance!.channels).toEqual(["pdf"]);
       const d = await detail("balance-transfer");
       expect(d.contract!.channels).toEqual(["pdf"]);
       expect(d.versions.every((v) => !v.channels.includes("web"))).toBe(true);
-      expect((await detail("balance-transfer", { version: 1 })).contract!.channels).not.toContain("web");
+      expect(
+        (await detail("balance-transfer", { version: 1 })).contract!.channels,
+      ).not.toContain("web");
     } finally {
-      await db.update(schema.contentTypes).set({ allowedChannels: before }).where(eq(schema.contentTypes.id, disclosure!.id));
+      await db
+        .update(schema.contentTypes)
+        .set({ allowedChannels: before })
+        .where(eq(schema.contentTypes.id, disclosure!.id));
     }
-    expect((await detail("balance-transfer")).contract!.channels).toEqual(["pdf", "web"]);
+    expect((await detail("balance-transfer")).contract!.channels).toEqual([
+      "pdf",
+      "web",
+    ]);
   });
 });
 
 describe("JSON Schema against the seed", () => {
   it("every released version's samples validate against its schema; JUNK in any variable doesn't", async () => {
-    const released = (await db.select().from(versions).where(isNotNull(versions.number))).filter((v) =>
-      ["active", "superseded", "revoked"].includes(v.state),
-    );
+    const released = (
+      await db.select().from(versions).where(isNotNull(versions.number))
+    ).filter((v) => ["active", "superseded", "revoked"].includes(v.state));
     expect(released.length).toBeGreaterThanOrEqual(10);
     for (const v of released) {
       const d = await detail(v.templateId, { version: v.number! });
       const validator = z.fromJSONSchema(d.contract!.jsonSchema as never);
-      const samples = Object.fromEntries(v.variables.map((x) => [x.key, x.sample]));
-      expect(validator.safeParse(samples).success, `${v.templateId} v${v.number} samples`).toBe(true);
+      const samples = Object.fromEntries(
+        v.variables.map((x) => [x.key, x.sample]),
+      );
+      expect(
+        validator.safeParse(samples).success,
+        `${v.templateId} v${v.number} samples`,
+      ).toBe(true);
       // The example the contract lists is the sample.
-      expect(d.contract!.variables.map((x) => x.example)).toEqual(v.variables.map((x) => x.sample));
+      expect(d.contract!.variables.map((x) => x.example)).toEqual(
+        v.variables.map((x) => x.sample),
+      );
       for (const variable of v.variables) {
         const junk = { ...samples, [variable.key]: JUNK[variable.type] };
-        expect(validator.safeParse(junk).success, `${v.templateId} v${v.number} ${variable.key}`).toBe(false);
+        expect(
+          validator.safeParse(junk).success,
+          `${v.templateId} v${v.number} ${variable.key}`,
+        ).toBe(false);
       }
     }
   });
@@ -414,31 +674,45 @@ describe("JSON Schema against the seed", () => {
 const EPOCH = BASE.toISOString();
 
 /** The seq a notice cursor continues after (the test's own cursors always read). */
-function seqOf(page: NoticePage, list: { consumerId: string; templateId: string | null }): number {
+function seqOf(
+  page: NoticePage,
+  list: { consumerId: string; templateId: string | null },
+): number {
   const read = readNoticeCursor(page.nextCursor, { ...list, epoch: EPOCH });
   if (!read.ok) throw new Error(read.error.message);
   return read.value;
 }
 
 /** A consumer polling: every page from `after`, `limit` at a time, until hasMore is false. */
-async function pollAll(consumerId: string, limit: number, after = 0, templateId?: string) {
+async function pollAll(
+  consumerId: string,
+  limit: number,
+  after = 0,
+  templateId?: string,
+) {
   const list = { consumerId, templateId: templateId ?? null };
   const pages: NoticePage[] = [];
   while (pages.length < MAX_PAGES) {
     const page = await listNotices(consumerId, { after, templateId, limit });
     pages.push(page);
     after = seqOf(page, list);
-    if (!page.hasMore) return { pages, notices: pages.flatMap((p) => p.notices), after };
+    if (!page.hasMore)
+      return { pages, notices: pages.flatMap((p) => p.notices), after };
   }
   throw new Error(`notices didn't end within ${MAX_PAGES} pages`);
 }
 
 /** Coral's notice rows in the order they were written. */
 const coralRows = () =>
-  db.select().from(consumerNotices).where(eq(consumerNotices.consumerId, "coral")).orderBy(asc(consumerNotices.seq));
+  db
+    .select()
+    .from(consumerNotices)
+    .where(eq(consumerNotices.consumerId, "coral"))
+    .orderBy(asc(consumerNotices.seq));
 
 /** Takes `count` notice numbers the way writeEffects does, and returns the first. */
-const takeSeqs = (count: number) => db.transaction((tx) => takeNoticeSeqs(tx, count));
+const takeSeqs = (count: number) =>
+  db.transaction((tx) => takeNoticeSeqs(tx, count));
 
 /** A live-shaped revoke notice for Coral, written at `at` with number `seq`. */
 const revokeRow = (noticeId: string, seq: number, at: Date) => ({
@@ -448,7 +722,12 @@ const revokeRow = (noticeId: string, seq: number, at: Date) => ({
   templateId: id("cash-back"),
   versionId: "v_test",
   kind: "revoked" as const,
-  payload: { templateName: "Cash Back Welcome Bonus — Terms", versionNumber: 2, reason: "Test", activeVersion: null },
+  payload: {
+    templateName: "Cash Back Welcome Bonus — Terms",
+    versionNumber: 2,
+    reason: "Test",
+    activeVersion: null,
+  },
   createdAt: at,
 });
 
@@ -461,31 +740,71 @@ describe("listNotices", () => {
     const times = notices.map((n) => n.createdAt);
     expect(times).toEqual([...times].sort());
 
-    const sunset = notices.find((n) => n.kind === "sunset_scheduled" && n.template.id === id("balance-transfer"))!;
-    expect(sunset).toMatchObject({ versionNumber: 1, activeVersion: 2, reason: null, zone: "America/New_York" });
-    expect(sunset.sunsetDay, "the day the seed picked, in the zone").toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(sunset.message).toMatch(/^Balance Transfer Intro — Terms v1 stops rendering on \w+ \d+, \d{4}\. Move to v2\.$/);
+    const sunset = notices.find(
+      (n) =>
+        n.kind === "sunset_scheduled" &&
+        n.template.id === id("balance-transfer"),
+    )!;
+    expect(sunset).toMatchObject({
+      versionNumber: 1,
+      activeVersion: 2,
+      reason: null,
+      zone: "America/New_York",
+    });
+    expect(sunset.sunsetDay, "the day the seed picked, in the zone").toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
+    expect(sunset.message).toMatch(
+      /^Balance Transfer Intro — Terms v1 stops rendering on \w+ \d+, \d{4}\. Move to v2\.$/,
+    );
 
-    const fresh = notices.find((n) => n.kind === "new_version" && n.template.id === id("balance-transfer"))!;
-    expect(fresh).toMatchObject({ versionNumber: 2, activeVersion: 2, message: "Balance Transfer Intro — Terms v2 is available. It adds the optional variable offer_end_date." });
+    const fresh = notices.find(
+      (n) =>
+        n.kind === "new_version" && n.template.id === id("balance-transfer"),
+    )!;
+    expect(fresh).toMatchObject({
+      versionNumber: 2,
+      activeVersion: 2,
+      message:
+        "Balance Transfer Intro — Terms v2 is available. It adds the optional variable offer_end_date.",
+    });
   });
 
   it("a seeded revoke gets the version that was Active then", async () => {
-    const { notices } = await listNotices("coral", { templateId: id("holiday-points"), limit: 50 });
+    const { notices } = await listNotices("coral", {
+      templateId: id("holiday-points"),
+      limit: 50,
+    });
     expect(notices.map((n) => n.kind)).toEqual(["new_version", "revoked"]);
-    expect(notices[1]).toMatchObject({ kind: "revoked", versionNumber: 1, activeVersion: 2, reason: "Wrong bonus amount", message: "Holiday Points Promo — Terms v1 was revoked: Wrong bonus amount." });
+    expect(notices[1]).toMatchObject({
+      kind: "revoked",
+      versionNumber: 1,
+      activeVersion: 2,
+      reason: "Wrong bonus amount",
+      message:
+        "Holiday Points Promo — Terms v1 was revoked: Wrong bonus amount.",
+    });
   });
 
   it("filters by template and by count; other consumers' notices never show", async () => {
-    const forBalance = await listNotices("coral", { templateId: id("balance-transfer"), limit: 50 });
-    expect(forBalance.notices.map((n) => n.kind)).toEqual(["new_version", "sunset_scheduled"]);
+    const forBalance = await listNotices("coral", {
+      templateId: id("balance-transfer"),
+      limit: 50,
+    });
+    expect(forBalance.notices.map((n) => n.kind)).toEqual([
+      "new_version",
+      "sunset_scheduled",
+    ]);
 
     const all = (await listNotices("coral", { limit: 50 })).notices;
     const two = await listNotices("coral", { limit: 2 });
-    expect(two.notices.map((n) => n.id)).toEqual(all.slice(0, 2).map((n) => n.id));
+    expect(two.notices.map((n) => n.id)).toEqual(
+      all.slice(0, 2).map((n) => n.id),
+    );
     expect(two.hasMore).toBe(true);
 
-    const deposits = (await listNotices("deposits-online", { limit: 50 })).notices;
+    const deposits = (await listNotices("deposits-online", { limit: 50 }))
+      .notices;
     expect(deposits.length).toBeGreaterThan(0);
     expect(deposits.every((n) => !all.some((c) => c.id === n.id))).toBe(true);
   });
@@ -495,8 +814,15 @@ describe("listNotices", () => {
     expect(ids.length).toBeGreaterThan(2);
     for (const limit of [1, 2, 3, 200]) {
       const { pages, notices } = await pollAll("coral", limit);
-      expect(notices.map((n) => n.id), `by ${limit}`).toEqual(ids);
-      expect(pages.slice(0, -1).every((p) => p.hasMore && p.notices.length === limit)).toBe(true);
+      expect(
+        notices.map((n) => n.id),
+        `by ${limit}`,
+      ).toEqual(ids);
+      expect(
+        pages
+          .slice(0, -1)
+          .every((p) => p.hasMore && p.notices.length === limit),
+      ).toBe(true);
       expect(pages.at(-1)!.hasMore).toBe(false);
     }
   });
@@ -509,13 +835,20 @@ describe("listNotices", () => {
 
     const at = new Date(BASE.getTime() + 90_000);
     const first = await takeSeqs(2);
-    await db.insert(consumerNotices).values([revokeRow("cn_poll_a", first, at), revokeRow("cn_poll_b", first + 1, at)]);
+    await db
+      .insert(consumerNotices)
+      .values([
+        revokeRow("cn_poll_a", first, at),
+        revokeRow("cn_poll_b", first + 1, at),
+      ]);
     try {
       const next = await pollAll("coral", 50, end);
       expect(next.notices.map((n) => n.id)).toEqual(["cn_poll_a", "cn_poll_b"]);
       expect((await pollAll("coral", 50, next.after)).notices).toEqual([]);
     } finally {
-      await db.delete(consumerNotices).where(inArray(consumerNotices.id, ["cn_poll_a", "cn_poll_b"]));
+      await db
+        .delete(consumerNotices)
+        .where(inArray(consumerNotices.id, ["cn_poll_a", "cn_poll_b"]));
     }
   });
 
@@ -525,19 +858,32 @@ describe("listNotices", () => {
     const { after: end } = await pollAll("coral", 50);
     const at = new Date(BASE.getTime() + 120_000);
     const first = await takeSeqs(5);
-    const batch = ["cn_same_z", "cn_same_a", "cn_same_m", "cn_same_b", "cn_same_y"];
-    await db.insert(consumerNotices).values(batch.map((noticeId, i) => revokeRow(noticeId, first + i, at)));
+    const batch = [
+      "cn_same_z",
+      "cn_same_a",
+      "cn_same_m",
+      "cn_same_b",
+      "cn_same_y",
+    ];
+    await db
+      .insert(consumerNotices)
+      .values(batch.map((noticeId, i) => revokeRow(noticeId, first + i, at)));
     try {
       for (const limit of [1, 2, 3, 4]) {
         const { notices } = await pollAll("coral", limit, end);
-        expect(notices.map((n) => n.id), `by ${limit}`).toEqual(batch);
+        expect(
+          notices.map((n) => n.id),
+          `by ${limit}`,
+        ).toEqual(batch);
       }
       // From the start too: the whole outbox once, in order.
       const all = (await pollAll("coral", 2)).notices.map((n) => n.id);
       expect(all).toEqual((await coralRows()).map((r) => r.id));
       expect(new Set(all).size).toBe(all.length);
     } finally {
-      await db.delete(consumerNotices).where(inArray(consumerNotices.id, batch));
+      await db
+        .delete(consumerNotices)
+        .where(inArray(consumerNotices.id, batch));
     }
   });
 
@@ -545,30 +891,65 @@ describe("listNotices", () => {
     // Two actions read the clock, then commit in the other order. A cursor on time would skip the
     // second commit; seq is the commit order.
     const { after: end } = await pollAll("coral", 50);
-    await db.insert(consumerNotices).values(revokeRow("cn_clock_late", await takeSeqs(1), new Date(BASE.getTime() + 150_000)));
+    await db
+      .insert(consumerNotices)
+      .values(
+        revokeRow(
+          "cn_clock_late",
+          await takeSeqs(1),
+          new Date(BASE.getTime() + 150_000),
+        ),
+      );
     try {
       const seen = await pollAll("coral", 50, end);
       expect(seen.notices.map((n) => n.id)).toEqual(["cn_clock_late"]);
-      await db.insert(consumerNotices).values(revokeRow("cn_clock_early", await takeSeqs(1), new Date(BASE.getTime() + 149_000)));
-      expect((await pollAll("coral", 50, seen.after)).notices.map((n) => n.id)).toEqual(["cn_clock_early"]);
+      await db
+        .insert(consumerNotices)
+        .values(
+          revokeRow(
+            "cn_clock_early",
+            await takeSeqs(1),
+            new Date(BASE.getTime() + 149_000),
+          ),
+        );
+      expect(
+        (await pollAll("coral", 50, seen.after)).notices.map((n) => n.id),
+      ).toEqual(["cn_clock_early"]);
     } finally {
-      await db.delete(consumerNotices).where(inArray(consumerNotices.id, ["cn_clock_late", "cn_clock_early"]));
+      await db
+        .delete(consumerNotices)
+        .where(
+          inArray(consumerNotices.id, ["cn_clock_late", "cn_clock_early"]),
+        );
     }
   });
 
   it("deleting the newest notices never hands their numbers out again: a consumer past them still gets the next one", async () => {
     const at = new Date(BASE.getTime() + 160_000);
-    await db.insert(consumerNotices).values([revokeRow("cn_gone_a", await takeSeqs(1), at), revokeRow("cn_gone_b", await takeSeqs(1), at)]);
+    await db
+      .insert(consumerNotices)
+      .values([
+        revokeRow("cn_gone_a", await takeSeqs(1), at),
+        revokeRow("cn_gone_b", await takeSeqs(1), at),
+      ]);
     // The consumer reads both, then a cleanup (as the e2e helpers do) deletes them.
     const { after: past } = await pollAll("coral", 50);
-    await db.delete(consumerNotices).where(inArray(consumerNotices.id, ["cn_gone_a", "cn_gone_b"]));
+    await db
+      .delete(consumerNotices)
+      .where(inArray(consumerNotices.id, ["cn_gone_a", "cn_gone_b"]));
     const next = await takeSeqs(1);
     expect(next).toBe(past + 1);
-    await db.insert(consumerNotices).values(revokeRow("cn_after_cleanup", next, at));
+    await db
+      .insert(consumerNotices)
+      .values(revokeRow("cn_after_cleanup", next, at));
     try {
-      expect((await pollAll("coral", 50, past)).notices.map((n) => n.id)).toEqual(["cn_after_cleanup"]);
+      expect(
+        (await pollAll("coral", 50, past)).notices.map((n) => n.id),
+      ).toEqual(["cn_after_cleanup"]);
     } finally {
-      await db.delete(consumerNotices).where(eq(consumerNotices.id, "cn_after_cleanup"));
+      await db
+        .delete(consumerNotices)
+        .where(eq(consumerNotices.id, "cn_after_cleanup"));
     }
   });
 
@@ -579,17 +960,31 @@ describe("listNotices", () => {
     expect(pages).toHaveLength(2);
     const list = { consumerId: "coral", templateId, epoch: EPOCH };
     expect(readNoticeCursor(pages[0]!.nextCursor, list).ok).toBe(true);
-    expect(readNoticeCursor(pages[0]!.nextCursor, { ...list, templateId: null }).ok).toBe(false);
+    expect(
+      readNoticeCursor(pages[0]!.nextCursor, { ...list, templateId: null }).ok,
+    ).toBe(false);
   });
 
   it("cursors carry the outbox's epoch, the seed's seeded_at: one from before a reset is refused", async () => {
     expect(await noticeEpoch()).toBe(EPOCH);
     const { nextCursor } = await listNotices("coral", { limit: 1 });
     const list = { consumerId: "coral", templateId: null };
-    expect(readNoticeCursor(nextCursor, { ...list, epoch: EPOCH })).toEqual({ ok: true, value: expect.any(Number) });
-    expect(readNoticeCursor(nextCursor, { ...list, epoch: "2026-12-01T00:00:00.000Z" })).toEqual({
+    expect(readNoticeCursor(nextCursor, { ...list, epoch: EPOCH })).toEqual({
+      ok: true,
+      value: expect.any(Number),
+    });
+    expect(
+      readNoticeCursor(nextCursor, {
+        ...list,
+        epoch: "2026-12-01T00:00:00.000Z",
+      }),
+    ).toEqual({
       ok: false,
-      error: { code: "bad_request", message: "after is from before the notices were reset. Start again without after." },
+      error: {
+        code: "bad_request",
+        message:
+          "after is from before the notices were reset. Start again without after.",
+      },
     });
   });
 
@@ -607,29 +1002,52 @@ describe("listNotices", () => {
         templateName: "Cash Back Welcome Bonus — Terms",
         versionNumber: 3,
         activeVersion: 3,
-        contractChanges: [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }],
+        contractChanges: [
+          {
+            kind: "added",
+            key: "annual_fee",
+            breaking: true,
+            type: "currency",
+            required: true,
+          },
+        ],
         contractLines: ["v3 adds required `annual_fee` (Currency)."],
       },
       createdAt: at,
     });
     try {
-      const { notices: [latest] } = await listNotices("coral", { after: end, limit: 1 });
+      const {
+        notices: [latest],
+      } = await listNotices("coral", { after: end, limit: 1 });
       expect(latest).toEqual({
         id: "cn_live_test",
         kind: "new_version",
         createdAt: at.toISOString(),
-        template: { id: id("cash-back"), name: "Cash Back Welcome Bonus — Terms" },
+        template: {
+          id: id("cash-back"),
+          name: "Cash Back Welcome Bonus — Terms",
+        },
         versionNumber: 3,
         activeVersion: 3,
         sunsetAt: null,
         sunsetDay: null,
         zone: null,
         reason: null,
-        changes: [{ kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." }],
-        message: "Cash Back Welcome Bonus — Terms v3 is available. It adds the required variable annual_fee.",
+        changes: [
+          {
+            kind: "added",
+            key: "annual_fee",
+            breaking: true,
+            text: "v3 adds required `annual_fee` (Currency).",
+          },
+        ],
+        message:
+          "Cash Back Welcome Bonus — Terms v3 is available. It adds the required variable annual_fee.",
       });
     } finally {
-      await db.delete(consumerNotices).where(eq(consumerNotices.id, "cn_live_test"));
+      await db
+        .delete(consumerNotices)
+        .where(eq(consumerNotices.id, "cn_live_test"));
     }
   });
 });

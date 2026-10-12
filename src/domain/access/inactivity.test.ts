@@ -9,9 +9,15 @@ describe("inactivity", () => {
 
   it("runs from the latest of last sign-in, date added, and the last Keep", () => {
     expect(inactivityAnchor(m(ago(95))).getTime()).toBe(ago(95).getTime());
-    expect(inactivityAnchor(m(null, { addedAt: ago(10) })).getTime()).toBe(ago(10).getTime());
-    expect(inactivityAnchor(m(ago(95), { addedAt: ago(20) })).getTime()).toBe(ago(20).getTime());
-    expect(inactivityAnchor(m(ago(95), { inactivityKeptAt: ago(3) })).getTime()).toBe(ago(3).getTime());
+    expect(inactivityAnchor(m(null, { addedAt: ago(10) })).getTime()).toBe(
+      ago(10).getTime(),
+    );
+    expect(inactivityAnchor(m(ago(95), { addedAt: ago(20) })).getTime()).toBe(
+      ago(20).getTime(),
+    );
+    expect(
+      inactivityAnchor(m(ago(95), { inactivityKeptAt: ago(3) })).getTime(),
+    ).toBe(ago(3).getTime());
   });
 
   it("is ok one millisecond before 90 days", () => {
@@ -36,7 +42,9 @@ describe("inactivity", () => {
 
   it("someone who never signed in counts from the day they were added", () => {
     expect(inactivity(m(null, { addedAt: ago(0) }), at(89)).state).toBe("ok");
-    expect(inactivity(m(null, { addedAt: ago(0) }), at(90)).state).toBe("flagged");
+    expect(inactivity(m(null, { addedAt: ago(0) }), at(90)).state).toBe(
+      "flagged",
+    );
   });
 
   it("a Keep restarts the clock", () => {

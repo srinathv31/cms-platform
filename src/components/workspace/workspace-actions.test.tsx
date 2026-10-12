@@ -10,21 +10,39 @@ import type { SubmitSummary } from "@/domain/submit-types";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import type { ActionResult } from "@/domain/review-types";
 import type { SaveFields } from "./autosave/autosave-scheduler";
-import { createWorkspaceSession, type WorkspaceSession } from "./session/session-store";
+import {
+  createWorkspaceSession,
+  type WorkspaceSession,
+} from "./session/session-store";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let session: WorkspaceSession;
 
 const server = vi.hoisted(() => ({
   /** The submit-summary route as the browser reaches it: handed the URL fetched, it gives the body (or the network fails). */
-  summaryRoute: vi.fn<(url: string) => Promise<ActionResult<{ summary: SubmitSummary }>>>(),
-  submitVersion: vi.fn<(input: { templateId: string; note?: string | null; rev: number }) => Promise<ActionResult<{ number: number }>>>(),
+  summaryRoute:
+    vi.fn<(url: string) => Promise<ActionResult<{ summary: SubmitSummary }>>>(),
+  submitVersion:
+    vi.fn<
+      (input: {
+        templateId: string;
+        note?: string | null;
+        rev: number;
+      }) => Promise<ActionResult<{ number: number }>>
+    >(),
 }));
 
-vi.mock("next/navigation", () => ({ unstable_rethrow: () => undefined, useSelectedLayoutSegment: () => null }));
+vi.mock("next/navigation", () => ({
+  unstable_rethrow: () => undefined,
+  useSelectedLayoutSegment: () => null,
+}));
 vi.mock("@/server/actions/templates", () => ({ startDraft: vi.fn() }));
-vi.mock("@/server/actions/review", () => ({ submitVersion: server.submitVersion }));
+vi.mock("@/server/actions/review", () => ({
+  submitVersion: server.submitVersion,
+}));
 vi.stubGlobal(
   "fetch",
   vi.fn(async (url: string) => {
@@ -67,15 +85,26 @@ let root: Root;
 let container: HTMLElement;
 let save: ReturnType<typeof vi.fn<(fields: SaveFields) => void>>;
 
-const submitButton = () => document.body.querySelector<HTMLButtonElement>("button[aria-label='Submit for review']")!;
-const dialog = () => document.body.querySelector<HTMLElement>("[data-slot='scrim-dialog-content']");
+const submitButton = () =>
+  document.body.querySelector<HTMLButtonElement>(
+    "button[aria-label='Submit for review']",
+  )!;
+const dialog = () =>
+  document.body.querySelector<HTMLElement>(
+    "[data-slot='scrim-dialog-content']",
+  );
 const button = (name: RegExp) =>
-  [...document.body.querySelectorAll<HTMLButtonElement>("button")].find((b) => name.test(b.textContent ?? "")) ?? null;
+  [...document.body.querySelectorAll<HTMLButtonElement>("button")].find((b) =>
+    name.test(b.textContent ?? ""),
+  ) ?? null;
 const click = (el: HTMLElement) => act(async () => el.click());
-const tick = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+const tick = () =>
+  act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 
 beforeEach(async () => {
-  server.summaryRoute.mockReset().mockResolvedValue({ ok: true, summary: summary() });
+  server.summaryRoute
+    .mockReset()
+    .mockResolvedValue({ ok: true, summary: summary() });
   server.submitVersion.mockReset().mockResolvedValue({ ok: true, number: 3 });
   session = createWorkspaceSession();
   session.bind({ versionId: "v_1", rev: 0 });
@@ -99,15 +128,21 @@ describe("the page while Submit reads the summary", () => {
     session.attach(save, pending.flush);
 
     await click(submitButton());
-    expect(session.getInert(), "read-only before the flush resolves").toBe(true);
+    expect(session.getInert(), "read-only before the flush resolves").toBe(
+      true,
+    );
     expect(pending.flush).toHaveBeenCalledTimes(1);
     expect(server.summaryRoute).not.toHaveBeenCalled();
 
     await pending.settle();
     await tick();
-    expect(server.summaryRoute).toHaveBeenCalledWith(`/api/templates/${TEMPLATE}/submit-summary`);
+    expect(server.summaryRoute).toHaveBeenCalledWith(
+      `/api/templates/${TEMPLATE}/submit-summary`,
+    );
     expect(dialog()?.textContent).toContain("Submit v3 for review");
-    expect(session.getInert(), "still inert while the dialog is open").toBe(true);
+    expect(session.getInert(), "still inert while the dialog is open").toBe(
+      true,
+    );
   });
 
   it("is editable again when the dialog is cancelled", async () => {
@@ -120,21 +155,34 @@ describe("the page while Submit reads the summary", () => {
   });
 
   it("is editable again, with the reason at the button, when the summary can't be read", async () => {
-    server.summaryRoute.mockResolvedValueOnce({ ok: false, code: "already_in_review", reason: "This version is already in review." });
+    server.summaryRoute.mockResolvedValueOnce({
+      ok: false,
+      code: "already_in_review",
+      reason: "This version is already in review.",
+    });
     await click(submitButton());
     await tick();
     expect(session.getInert()).toBe(false);
     expect(dialog()).toBeNull();
-    expect(document.body.querySelector("[role='alert']")?.textContent).toBe("This version is already in review.");
+    expect(document.body.querySelector("[role='alert']")?.textContent).toBe(
+      "This version is already in review.",
+    );
   });
 
   it("is editable again, with the reason at the button, when the pending save failed", async () => {
-    session.attach(save, async () => session.publishStatus({ status: "error", error: "Not saved. Check your connection." }));
+    session.attach(save, async () =>
+      session.publishStatus({
+        status: "error",
+        error: "Not saved. Check your connection.",
+      }),
+    );
     await click(submitButton());
     await tick();
     expect(session.getInert()).toBe(false);
     expect(server.summaryRoute).not.toHaveBeenCalled();
-    expect(document.body.querySelector("[role='alert']")?.textContent).toBe("Not saved. Check your connection.");
+    expect(document.body.querySelector("[role='alert']")?.textContent).toBe(
+      "Not saved. Check your connection.",
+    );
   });
 
   it("is editable again when the summary read throws", async () => {
@@ -142,15 +190,20 @@ describe("the page while Submit reads the summary", () => {
     await click(submitButton());
     await tick();
     expect(session.getInert()).toBe(false);
-    expect(document.body.querySelector("[role='alert']")?.textContent).toBe("Couldn't open the submit dialog. Try again.");
+    expect(document.body.querySelector("[role='alert']")?.textContent).toBe(
+      "Couldn't open the submit dialog. Try again.",
+    );
   });
 });
 
 describe("once saving has stopped for good", () => {
-  const REASON = "Your latest changes can't be saved — this draft changed elsewhere.";
+  const REASON =
+    "Your latest changes can't be saved — this draft changed elsewhere.";
 
   async function stop() {
-    await act(async () => session.publishStatus({ status: "error", error: REASON, stopped: true }));
+    await act(async () =>
+      session.publishStatus({ status: "error", error: REASON, stopped: true }),
+    );
     await act(async () => root.render(<SubmitButton templateId={TEMPLATE} />));
   }
 
@@ -164,7 +217,9 @@ describe("once saving has stopped for good", () => {
     expect(blocked.textContent).toContain("Submit");
     // Focusable, so a keyboard user reaches it and hears why: the reason describes it.
     expect(blocked.hasAttribute("disabled")).toBe(false);
-    const described = document.getElementById(blocked.getAttribute("aria-describedby")!);
+    const described = document.getElementById(
+      blocked.getAttribute("aria-describedby")!,
+    );
     expect(described?.textContent).toBe(REASON);
   });
 
@@ -186,7 +241,10 @@ describe("once saving has stopped for good", () => {
     await stop();
     const after = submitButton();
     expect(after.className).toContain("bg-primary");
-    for (const name of className.split(" ").filter((name) => /^(h-|px-|@max)/.test(name))) expect(after.className).toContain(name);
+    for (const name of className
+      .split(" ")
+      .filter((name) => /^(h-|px-|@max)/.test(name)))
+      expect(after.className).toContain(name);
     expect(after.textContent).toBe(textContent);
   });
 
@@ -196,7 +254,9 @@ describe("once saving has stopped for good", () => {
     await act(async () => root.render(<SubmitButton templateId={TEMPLATE} />));
     const blocked = submitButton();
     expect(blocked.getAttribute("aria-disabled")).toBe("true");
-    const described = document.getElementById(blocked.getAttribute("aria-describedby")!);
+    const described = document.getElementById(
+      blocked.getAttribute("aria-describedby")!,
+    );
     expect(described?.textContent).toBe("Unavailable until this tab loads.");
   });
 });
@@ -211,9 +271,16 @@ describe("submitting", () => {
     await click(button(/^Submit v3$/)!);
     await tick();
     expect(flush, "a last flush before the submit").toHaveBeenCalledTimes(1);
-    expect(server.submitVersion).toHaveBeenCalledWith({ templateId: TEMPLATE, note: undefined, rev: 4 });
+    expect(server.submitVersion).toHaveBeenCalledWith({
+      templateId: TEMPLATE,
+      note: undefined,
+      rev: 4,
+    });
     expect(dialog()).toBeNull();
-    expect(session.getInert(), "nothing can be typed into the version being frozen").toBe(true);
+    expect(
+      session.getInert(),
+      "nothing can be typed into the version being frozen",
+    ).toBe(true);
 
     // The refreshed page has no draft, and no Submit button: it lets go as it goes.
     await act(async () => root.render(null));
@@ -245,7 +312,10 @@ describe("submitting", () => {
       const draftRow = statusRow("draft");
       await submitAndGo();
       await tick();
-      expect(document.activeElement, "not while the row still reads Draft").not.toBe(draftRow);
+      expect(
+        document.activeElement,
+        "not while the row still reads Draft",
+      ).not.toBe(draftRow);
 
       const inReview = statusRow("in_review");
       await tick();
@@ -275,32 +345,53 @@ describe("submitting", () => {
   it("refuses inside the dialog, without submitting, when the last flush fails", async () => {
     await click(submitButton());
     await tick();
-    session.attach(save, async () => session.publishStatus({ status: "error", error: "Not saved. Check your connection." }));
+    session.attach(save, async () =>
+      session.publishStatus({
+        status: "error",
+        error: "Not saved. Check your connection.",
+      }),
+    );
     await click(button(/^Submit v3$/)!);
     await tick();
     expect(server.submitVersion).not.toHaveBeenCalled();
-    expect(dialog()?.querySelector("[role='alert']")?.textContent).toBe("Not saved. Check your connection.");
+    expect(dialog()?.querySelector("[role='alert']")?.textContent).toBe(
+      "Not saved. Check your connection.",
+    );
     expect(session.getInert()).toBe(true);
   });
 
   it("offers to refresh a summary the draft has moved past, reads it again, and submits the new rev", async () => {
     await click(submitButton());
     await tick();
-    server.submitVersion.mockResolvedValueOnce({ ok: false, ...REFUSALS.summaryStale });
+    server.submitVersion.mockResolvedValueOnce({
+      ok: false,
+      ...REFUSALS.summaryStale,
+    });
     await click(button(/^Submit v3$/)!);
     await tick();
-    expect(dialog()?.querySelector("[role='alert']")?.textContent).toBe(REFUSALS.summaryStale.reason);
+    expect(dialog()?.querySelector("[role='alert']")?.textContent).toBe(
+      REFUSALS.summaryStale.reason,
+    );
     expect(session.getInert()).toBe(true);
 
-    server.summaryRoute.mockResolvedValueOnce({ ok: true, summary: summary({ rev: 6 }) });
+    server.summaryRoute.mockResolvedValueOnce({
+      ok: true,
+      summary: summary({ rev: 6 }),
+    });
     await click(button(/^Refresh summary$/)!);
     await tick();
     expect(server.summaryRoute).toHaveBeenCalledTimes(2);
-    expect(server.summaryRoute).toHaveBeenLastCalledWith(`/api/templates/${TEMPLATE}/submit-summary`);
+    expect(server.summaryRoute).toHaveBeenLastCalledWith(
+      `/api/templates/${TEMPLATE}/submit-summary`,
+    );
 
     await click(button(/^Submit v3$/)!);
     await tick();
-    expect(server.submitVersion).toHaveBeenLastCalledWith({ templateId: TEMPLATE, note: undefined, rev: 6 });
+    expect(server.submitVersion).toHaveBeenLastCalledWith({
+      templateId: TEMPLATE,
+      note: undefined,
+      rev: 6,
+    });
     expect(dialog()).toBeNull();
   });
 });

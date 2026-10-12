@@ -9,9 +9,22 @@ import type { DeviceTextSize } from "../types";
 export type AndroidTextStyle = "title" | "body" | "label" | "message";
 
 /** [size, line height] in dp per font scale. */
-const RAMP: Record<DeviceTextSize, Record<AndroidTextStyle, readonly [number, number]>> = {
-  default: { title: [16, 22], body: [14, 20], label: [12, 16], message: [16, 22] },
-  large: { title: [21, 28], body: [18, 26], label: [16, 21], message: [21, 28] },
+const RAMP: Record<
+  DeviceTextSize,
+  Record<AndroidTextStyle, readonly [number, number]>
+> = {
+  default: {
+    title: [16, 22],
+    body: [14, 20],
+    label: [12, 16],
+    message: [16, 22],
+  },
+  large: {
+    title: [21, 28],
+    body: [18, 26],
+    label: [16, 21],
+    message: [21, 28],
+  },
   ax: { title: [30, 41], body: [28, 40], label: [24, 32], message: [30, 41] },
 };
 
@@ -23,18 +36,36 @@ const TRACKING: Record<AndroidTextStyle, number> = {
   message: 0.009,
 };
 
-export function androidMetrics(style: AndroidTextStyle, textSize: DeviceTextSize): { size: number; lineHeight: number } {
+export function androidMetrics(
+  style: AndroidTextStyle,
+  textSize: DeviceTextSize,
+): { size: number; lineHeight: number } {
   const [size, lineHeight] = RAMP[textSize][style];
   return { size, lineHeight };
 }
 
 /** The CSS for a Material role at a font scale. */
-export function androidText(style: AndroidTextStyle, textSize: DeviceTextSize): CSSProperties {
+export function androidText(
+  style: AndroidTextStyle,
+  textSize: DeviceTextSize,
+): CSSProperties {
   const { size, lineHeight } = androidMetrics(style, textSize);
-  return { fontSize: pt(size), lineHeight: pt(lineHeight), letterSpacing: `${TRACKING[style]}em` };
+  return {
+    fontSize: pt(size),
+    lineHeight: pt(lineHeight),
+    letterSpacing: `${TRACKING[style]}em`,
+  };
 }
 
 /** Text that doesn't follow the font scale (the lock clock, the shade's header): a size and line height in dp. */
-export function androidFixed(size: number, lineHeight: number, tracking = 0): CSSProperties {
-  return { fontSize: pt(size), lineHeight: pt(lineHeight), letterSpacing: `${tracking}em` };
+export function androidFixed(
+  size: number,
+  lineHeight: number,
+  tracking = 0,
+): CSSProperties {
+  return {
+    fontSize: pt(size),
+    lineHeight: pt(lineHeight),
+    letterSpacing: `${tracking}em`,
+  };
 }

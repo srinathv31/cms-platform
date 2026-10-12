@@ -12,8 +12,11 @@ async function busy<T>(run: () => Promise<T>): Promise<T> {
     try {
       return await run();
     } catch (error) {
-      const text = String((error as { code?: unknown; message?: unknown })?.code ?? "") + String((error as Error)?.message ?? "");
-      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text)) throw error;
+      const text =
+        String((error as { code?: unknown; message?: unknown })?.code ?? "") +
+        String((error as Error)?.message ?? "");
+      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text))
+        throw error;
       await new Promise((resolve) => setTimeout(resolve, 40 * 2 ** attempt));
     }
   }
@@ -21,12 +24,20 @@ async function busy<T>(run: () => Promise<T>): Promise<T> {
 
 export async function rowsOf(db: Client, sql: string, args: InValue[] = []) {
   const result = await busy(() => db.execute({ sql, args }));
-  return result.rows.map((row) => Object.fromEntries(result.columns.map((column) => [column, row[column] as InValue])));
+  return result.rows.map((row) =>
+    Object.fromEntries(
+      result.columns.map((column) => [column, row[column] as InValue]),
+    ),
+  );
 }
 
 /** Deletes one template (by id) with its versions, uploads (rows and folders), comments, audit events and notifications. */
 export async function removeTemplate(db: Client, id: string) {
-  const uploads = await rowsOf(db, "SELECT id FROM uploads WHERE template_id = ?", [id]);
+  const uploads = await rowsOf(
+    db,
+    "SELECT id FROM uploads WHERE template_id = ?",
+    [id],
+  );
   const own = "(SELECT id FROM versions WHERE template_id = ?)";
   const threads = "(SELECT id FROM comment_threads WHERE template_id = ?)";
   const statements: [string, InValue[]][] = [
@@ -42,9 +53,14 @@ export async function removeTemplate(db: Client, id: string) {
     ["DELETE FROM uploads WHERE template_id = ?", [id]],
     ["DELETE FROM templates WHERE id = ?", [id]],
   ];
-  for (const [sql, args] of statements) await busy(() => db.execute({ sql, args }));
+  for (const [sql, args] of statements)
+    await busy(() => db.execute({ sql, args }));
   for (const upload of uploads) {
     const folder = String(upload.id);
-    if (/^[\w-]{8,}$/.test(folder)) await rm(path.join(E2E_UPLOADS_DIR, folder), { recursive: true, force: true });
+    if (/^[\w-]{8,}$/.test(folder))
+      await rm(path.join(E2E_UPLOADS_DIR, folder), {
+        recursive: true,
+        force: true,
+      });
   }
 }

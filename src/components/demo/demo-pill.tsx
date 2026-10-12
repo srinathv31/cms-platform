@@ -27,7 +27,13 @@ import {
 import { advanceClockAction, resetDemoAction } from "@/server/actions/demo";
 import { rememberSimReturn } from "./back-to-ucomp";
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="flex flex-col gap-3 border-t border-dashed border-hairline-strong px-5 py-5">
       <h3 className="caps-label">{label}</h3>
@@ -76,23 +82,32 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger
-        className="fixed right-5 bottom-5 z-40 inline-flex h-8 items-center gap-2 rounded-full border border-dashed border-hairline-strong bg-surface px-3.5 text-xs font-medium text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:ring-2 focus-visible:ring-ring"
-      >
+      <SheetTrigger className="fixed right-5 bottom-5 z-40 inline-flex h-8 items-center gap-2 rounded-full border border-dashed border-hairline-strong bg-surface px-3.5 text-xs font-medium text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:ring-2 focus-visible:ring-ring">
         <Clapperboard aria-hidden strokeWidth={1.75} className="size-3.5" />
         Demo
       </SheetTrigger>
-      <SheetContent side="right" className="w-[22rem] gap-0 border-l border-dashed border-hairline-strong sm:max-w-[22rem]">
+      <SheetContent
+        side="right"
+        className="w-[22rem] gap-0 border-l border-dashed border-hairline-strong sm:max-w-[22rem]"
+      >
         <SheetHeader className="px-5 pt-5 pb-5">
-          <SheetTitle className="font-sans text-[15px] font-medium">Demo</SheetTitle>
-          <SheetDescription className="sr-only">Tools for running the demo. Not part of the product.</SheetDescription>
+          <SheetTitle className="font-sans text-[15px] font-medium">
+            Demo
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            Tools for running the demo. Not part of the product.
+          </SheetDescription>
         </SheetHeader>
 
         <Section label="Data">
           <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
             <AlertDialogTrigger
               render={
-                <Button variant="outline" size="lg" className="justify-start gap-2.5 bg-surface px-3" />
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="justify-start gap-2.5 bg-surface px-3"
+                />
               }
             >
               <RotateCcw aria-hidden strokeWidth={1.75} />
@@ -100,9 +115,12 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle className="font-sans">Reset demo?</AlertDialogTitle>
+                <AlertDialogTitle className="font-sans">
+                  Reset demo?
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Every template, review and change returns to the starting data, and you continue as Maya Chen.
+                  Every template, review and change returns to the starting
+                  data, and you continue as Maya Chen.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -127,10 +145,22 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
         <Section label="Clock">
           {clock}
           <div className="flex gap-2">
-            <Button variant="outline" size="lg" disabled={pending} onClick={() => advance(1)} className="bg-surface">
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={pending}
+              onClick={() => advance(1)}
+              className="bg-surface"
+            >
               +1 day
             </Button>
-            <Button variant="outline" size="lg" disabled={pending} onClick={() => advance(15)} className="bg-surface">
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={pending}
+              onClick={() => advance(15)}
+              className="bg-surface"
+            >
               +15 days
             </Button>
           </div>
@@ -154,7 +184,13 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
               aria-label="Days to advance"
               className="h-9 w-24 bg-surface"
             />
-            <Button type="submit" variant="outline" size="lg" disabled={pending || !customValid} className="bg-surface">
+            <Button
+              type="submit"
+              variant="outline"
+              size="lg"
+              disabled={pending || !customValid}
+              className="bg-surface"
+            >
               Advance
             </Button>
           </form>

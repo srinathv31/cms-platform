@@ -49,7 +49,9 @@ describe("nextTabbable", () => {
   });
 
   it("is null at the end of the page", () => {
-    const get = page(`<button>Before</button><div id="field" contenteditable="true"></div>`);
+    const get = page(
+      `<button>Before</button><div id="field" contenteditable="true"></div>`,
+    );
     expect(nextTabbable(get("field"))).toBeNull();
   });
 });

@@ -8,7 +8,8 @@ const search = vi.hoisted(() => vi.fn());
 vi.mock("next/server", () => ({ connection: vi.fn(async () => {}) }));
 vi.mock("@/simulator/queries", () => ({ searchSimTemplates: search }));
 
-const get = (query = "") => GET(new Request(`http://localhost/sim/templates/search${query}`));
+const get = (query = "") =>
+  GET(new Request(`http://localhost/sim/templates/search${query}`));
 
 beforeEach(() => search.mockReset());
 
@@ -20,7 +21,10 @@ describe("GET /sim/templates/search", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("private, no-store");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
-    expect(await res.json()).toEqual({ ok: true, results: [{ id: "UC-TEST01" }] });
+    expect(await res.json()).toEqual({
+      ok: true,
+      results: [{ id: "UC-TEST01" }],
+    });
   });
 
   it("asks for every template without a q", async () => {
@@ -30,12 +34,23 @@ describe("GET /sim/templates/search", () => {
   });
 
   it("answers a refusal with its status and only its sentence", async () => {
-    search.mockResolvedValue({ ok: false, reason: "Search for a template name or ID.", status: 400 });
+    search.mockResolvedValue({
+      ok: false,
+      reason: "Search for a template name or ID.",
+      status: 400,
+    });
     const res = await get(`?q=${"x".repeat(201)}`);
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ ok: false, reason: "Search for a template name or ID." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      reason: "Search for a template name or ID.",
+    });
 
-    search.mockResolvedValue({ ok: false, reason: "Stencil couldn't be reached.", status: 502 });
+    search.mockResolvedValue({
+      ok: false,
+      reason: "Stencil couldn't be reached.",
+      status: 502,
+    });
     expect((await get("?q=a")).status).toBe(502);
   });
 });

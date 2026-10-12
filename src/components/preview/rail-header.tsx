@@ -37,7 +37,9 @@ export function railHeaderViews({
   return [
     ...(preview ? [VIEWS[0]] : []),
     ...(original ? [{ value: "original" as const, label: "Original" }] : []),
-    ...(comments === null ? [] : [{ value: "comments" as const, label: "Comments", count: comments }]),
+    ...(comments === null
+      ? []
+      : [{ value: "comments" as const, label: "Comments", count: comments }]),
     VIEWS[1],
   ];
 }
@@ -82,7 +84,10 @@ export function RailHeader({
   children?: ReactNode;
 }) {
   return (
-    <div data-slot="rail-header" className="flex h-11 shrink-0 items-start gap-3 border-b border-hairline">
+    <div
+      data-slot="rail-header"
+      className="flex h-11 shrink-0 items-start gap-3 border-b border-hairline"
+    >
       <TabsPrimitive.Root
         value={value}
         onValueChange={(next) => {
@@ -91,7 +96,10 @@ export function RailHeader({
         }}
         className="shrink-0"
       >
-        <TabsPrimitive.List aria-label="Rail" className="-mb-px flex h-11 gap-6">
+        <TabsPrimitive.List
+          aria-label="Rail"
+          className="-mb-px flex h-11 gap-6"
+        >
           {views.map((view) => {
             const active = view.value === value;
             return (
@@ -103,13 +111,29 @@ export function RailHeader({
               >
                 <span className={LABEL}>
                   {/* The medium weight is wider: an unseen copy of the label holds the room for it, so the tabs don't shift when they swap. */}
-                  <span className={cn("col-start-1 row-start-1 flex items-baseline gap-1.5", active && "font-medium")}>
+                  <span
+                    className={cn(
+                      "col-start-1 row-start-1 flex items-baseline gap-1.5",
+                      active && "font-medium",
+                    )}
+                  >
                     {view.label}
-                    {view.count ? <span className="text-[13px] font-normal text-text-subtle tabular-nums">{view.count}</span> : null}
+                    {view.count ? (
+                      <span className="text-[13px] font-normal text-text-subtle tabular-nums">
+                        {view.count}
+                      </span>
+                    ) : null}
                   </span>
-                  <span aria-hidden className="invisible col-start-1 row-start-1 flex items-baseline gap-1.5 font-medium">
+                  <span
+                    aria-hidden
+                    className="invisible col-start-1 row-start-1 flex items-baseline gap-1.5 font-medium"
+                  >
                     {view.label}
-                    {view.count ? <span className="text-[13px] tabular-nums">{view.count}</span> : null}
+                    {view.count ? (
+                      <span className="text-[13px] tabular-nums">
+                        {view.count}
+                      </span>
+                    ) : null}
                   </span>
                 </span>
                 {active ? (

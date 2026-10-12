@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RefusalCode } from "@/domain/refusals";
-import type { DraftPatch, DraftSaveResponse, JSONContent } from "@/domain/types";
+import type {
+  DraftPatch,
+  DraftSaveResponse,
+  JSONContent,
+} from "@/domain/types";
 import {
   OFFLINE,
   RETRYING,
@@ -12,10 +16,23 @@ import {
   type SendOptions,
 } from "./autosave-scheduler";
 
-const doc = (text: string): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
-const saved = (rev: number): DraftSaveResponse => ({ ok: true, rev, savedAt: "2026-10-04T10:00:00.000Z" });
-const refused = (code: RefusalCode, reason = "msg", rev?: number): DraftSaveResponse =>
-  rev === undefined ? { ok: false, code, reason } : { ok: false, code, rev, reason };
+const doc = (text: string): JSONContent => ({
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+const saved = (rev: number): DraftSaveResponse => ({
+  ok: true,
+  rev,
+  savedAt: "2026-10-04T10:00:00.000Z",
+});
+const refused = (
+  code: RefusalCode,
+  reason = "msg",
+  rev?: number,
+): DraftSaveResponse =>
+  rev === undefined
+    ? { ok: false, code, reason }
+    : { ok: false, code, rev, reason };
 
 interface Call {
   patch: DraftPatch;
@@ -36,7 +53,13 @@ function setup(options: Partial<AutosaveOptions> = {}) {
     sessionKey: SESSION,
     send: (patch, sendOptions) =>
       new Promise<DraftSaveResponse>((resolve, reject) => {
-        calls.push({ patch, options: sendOptions, at: Date.now() - start, resolve, reject });
+        calls.push({
+          patch,
+          options: sendOptions,
+          at: Date.now() - start,
+          resolve,
+          reject,
+        });
       }),
     ...options,
   });
@@ -66,11 +89,18 @@ afterEach(() => {
 
 describe("mergeFields", () => {
   it("lets later values win per field and keeps the rest", () => {
-    expect(mergeFields({ body: doc("a"), name: "A" }, { body: doc("b") })).toEqual({ body: doc("b"), name: "A" });
+    expect(
+      mergeFields({ body: doc("a"), name: "A" }, { body: doc("b") }),
+    ).toEqual({ body: doc("b"), name: "A" });
   });
 
   it("ignores undefined but takes null", () => {
-    expect(mergeFields({ name: "A", "email.subject": doc("s") }, { name: undefined, "email.subject": null })).toEqual({
+    expect(
+      mergeFields(
+        { name: "A", "email.subject": doc("s") },
+        { name: undefined, "email.subject": null },
+      ),
+    ).toEqual({
       name: "A",
       "email.subject": null,
     });
@@ -85,45 +115,80 @@ describe("mergeFields", () => {
 
 describe("failureMessage", () => {
   it("says the same thing for each refusal, in a few words", () => {
-    expect(failureMessage({ code: "draft_changed", reason: "x" })).toBe("Your latest changes can't be saved — this draft changed elsewhere.");
-    expect(failureMessage({ code: "invalid_input", reason: "The name must be 1 to 120 characters." })).toBe(
-      "Not saved. The name must be 1 to 120 characters.",
+    expect(failureMessage({ code: "draft_changed", reason: "x" })).toBe(
+      "Your latest changes can't be saved — this draft changed elsewhere.",
     );
+    expect(
+      failureMessage({
+        code: "invalid_input",
+        reason: "The name must be 1 to 120 characters.",
+      }),
+    ).toBe("Not saved. The name must be 1 to 120 characters.");
   });
 
   it("says plainly that what wasn't saved never will be, when saving stops, with no instruction (Reload is a control)", () => {
-    for (const code of ["draft_changed", "generic", "version_not_draft", "version_gone"] as const) {
-      expect(failureMessage({ code, reason: "x" }), code).toMatch(/^Your latest changes can't be saved — /);
-      expect(failureMessage({ code, reason: "x" }), code).not.toMatch(/reload/i);
+    for (const code of [
+      "draft_changed",
+      "generic",
+      "version_not_draft",
+      "version_gone",
+    ] as const) {
+      expect(failureMessage({ code, reason: "x" }), code).toMatch(
+        /^Your latest changes can't be saved — /,
+      );
+      expect(failureMessage({ code, reason: "x" }), code).not.toMatch(
+        /reload/i,
+      );
     }
   });
 
   it("branches on the code: another sentence for the same code changes nothing", () => {
-    expect(failureMessage({ code: "generic", reason: "Not allowed, sorry." })).toBe(
+    expect(
+      failureMessage({ code: "generic", reason: "Not allowed, sorry." }),
+    ).toBe(
       "Your latest changes can't be saved — you can no longer edit this draft.",
     );
-    expect(failureMessage({ code: "version_gone", reason: "Gone." })).toBe("Your latest changes can't be saved — this draft no longer exists.");
+    expect(failureMessage({ code: "version_gone", reason: "Gone." })).toBe(
+      "Your latest changes can't be saved — this draft no longer exists.",
+    );
   });
 
   it("shows the server's sentence for a refusal of the patch, and for a code it doesn't know", () => {
-    expect(failureMessage({ code: "channel_unavailable", reason: "That channel isn't available for this content type." })).toBe(
-      "Not saved. That channel isn't available for this content type.",
-    );
-    expect(failureMessage({ code: "a_new_code" as RefusalCode, reason: "Something new." })).toBe(
-      "Your latest changes can't be saved. Something new.",
-    );
+    expect(
+      failureMessage({
+        code: "channel_unavailable",
+        reason: "That channel isn't available for this content type.",
+      }),
+    ).toBe("Not saved. That channel isn't available for this content type.");
+    expect(
+      failureMessage({
+        code: "a_new_code" as RefusalCode,
+        reason: "Something new.",
+      }),
+    ).toBe("Your latest changes can't be saved. Something new.");
   });
 });
 
 describe("stopsSaving", () => {
   it("is false for the refusals of the patch itself, which the next change can fix", () => {
-    for (const code of ["invalid_input", "draft_too_large", "no_channels", "channel_unavailable"] as const) {
+    for (const code of [
+      "invalid_input",
+      "draft_too_large",
+      "no_channels",
+      "channel_unavailable",
+    ] as const) {
       expect(stopsSaving({ code }), code).toBe(false);
     }
   });
 
   it("is true for every other code, so a refusal nobody planned for never overwrites silently", () => {
-    for (const code of ["draft_changed", "generic", "version_not_draft", "version_gone", "a_new_code"] as RefusalCode[]) {
+    for (const code of [
+      "draft_changed",
+      "generic",
+      "version_not_draft",
+      "version_gone",
+      "a_new_code",
+    ] as RefusalCode[]) {
       expect(stopsSaving({ code }), code).toBe(true);
     }
   });
@@ -146,7 +211,11 @@ describe("a plain save", () => {
     expect(calls).toHaveLength(0);
     await tick(1);
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.patch).toEqual({ body: doc("hello"), rev: 3, sessionKey: SESSION });
+    expect(calls[0]!.patch).toEqual({
+      body: doc("hello"),
+      rev: 3,
+      sessionKey: SESSION,
+    });
     expect(calls[0]!.options).toEqual({ keepalive: false });
   });
 
@@ -216,7 +285,13 @@ describe("debounce and max wait", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.at).toBe(1800);
-    expect(calls[0]!.patch).toEqual({ body: doc("three"), name: "Keep", variables: [], rev: 3, sessionKey: SESSION });
+    expect(calls[0]!.patch).toEqual({
+      body: doc("three"),
+      name: "Keep",
+      variables: [],
+      rev: 3,
+      sessionKey: SESSION,
+    });
   });
 
   it("sends at 5 s at the latest while the author keeps typing", async () => {
@@ -262,7 +337,12 @@ describe("one request at a time", () => {
     // The change is already older than the debounce, so it goes straight out.
     await tick(0);
     expect(calls).toHaveLength(2);
-    expect(calls[1]!.patch).toEqual({ body: doc("second"), name: "N", rev: 4, sessionKey: SESSION });
+    expect(calls[1]!.patch).toEqual({
+      body: doc("second"),
+      name: "N",
+      rev: 4,
+      sessionKey: SESSION,
+    });
     expect(autosave.getState().status).toBe("saving");
 
     await answer(saved(5));
@@ -320,7 +400,11 @@ describe("network failures", () => {
     expect(calls).toHaveLength(1);
     await tick(1);
     expect(calls).toHaveLength(2);
-    expect(calls[1]!.patch).toEqual({ body: doc("keep me"), rev: 3, sessionKey: SESSION });
+    expect(calls[1]!.patch).toEqual({
+      body: doc("keep me"),
+      rev: 3,
+      sessionKey: SESSION,
+    });
     // The error stays on screen during the retry rather than flickering to "Saving…".
     expect(autosave.getState()).toEqual({ status: "error", error: RETRYING });
 
@@ -357,7 +441,13 @@ describe("network failures", () => {
     autosave.save({ body: doc("new"), variables: [] }); // typed while the request was out
     await fail();
     await tick(1000);
-    expect(calls[1]!.patch).toEqual({ body: doc("new"), name: "Name", variables: [], rev: 3, sessionKey: SESSION });
+    expect(calls[1]!.patch).toEqual({
+      body: doc("new"),
+      name: "Name",
+      variables: [],
+      rev: 3,
+      sessionKey: SESSION,
+    });
   });
 
   it("carries changes made while waiting to retry into the retry", async () => {
@@ -370,7 +460,10 @@ describe("network failures", () => {
     expect(autosave.getState()).toEqual({ status: "error", error: RETRYING });
     await tick(700);
     expect(calls).toHaveLength(2);
-    expect(calls[1]!.patch).toMatchObject({ name: "A", body: doc("typed during backoff") });
+    expect(calls[1]!.patch).toMatchObject({
+      name: "A",
+      body: doc("typed during backoff"),
+    });
   });
 
   it("starts a fresh round of retries when the author types after giving up", async () => {
@@ -388,7 +481,10 @@ describe("network failures", () => {
     expect(autosave.getState().status).toBe("unsaved");
     await tick(800);
     expect(calls).toHaveLength(5);
-    expect(calls[4]!.patch).toMatchObject({ name: "A", body: doc("back online") });
+    expect(calls[4]!.patch).toMatchObject({
+      name: "A",
+      body: doc("back online"),
+    });
     await fail();
     expect(autosave.getState().error).toBe(RETRYING); // the budget is full again
     await tick(1000);
@@ -422,7 +518,11 @@ describe("editing sessions", () => {
   };
 
   /** Saves one change at the current time and answers it. */
-  async function saveAndAnswer(h: ReturnType<typeof setup>, name: string, rev: number) {
+  async function saveAndAnswer(
+    h: ReturnType<typeof setup>,
+    name: string,
+    rev: number,
+  ) {
     h.autosave.save({ name });
     await h.tick(800);
     await h.answer(saved(rev));
@@ -472,7 +572,11 @@ describe("editing sessions", () => {
     await saveAndAnswer(h, "B", 5); // t = 20 min
     await h.tick(25 * MIN);
     await saveAndAnswer(h, "C", 6); // 25 min after B, 45 min after A
-    expect(h.calls.map((c) => c.patch.sessionKey)).toEqual([SESSION, SESSION, SESSION]);
+    expect(h.calls.map((c) => c.patch.sessionKey)).toEqual([
+      SESSION,
+      SESSION,
+      SESSION,
+    ]);
     await h.tick(31 * MIN);
     await saveAndAnswer(h, "D", 7);
     expect(h.calls[3]!.patch.sessionKey).toBe("rotated-1");
@@ -488,7 +592,11 @@ describe("editing sessions", () => {
     await h.tick(1000);
     await h.fail();
     await h.tick(2000);
-    expect(h.calls.slice(1).map((c) => c.patch.sessionKey)).toEqual(["rotated-1", "rotated-1", "rotated-1"]);
+    expect(h.calls.slice(1).map((c) => c.patch.sessionKey)).toEqual([
+      "rotated-1",
+      "rotated-1",
+      "rotated-1",
+    ]);
     expect(made).toBe(1);
   });
 
@@ -588,24 +696,47 @@ describe("a request that never comes back", () => {
 
 describe("answers that stop saving", () => {
   it.each([
-    ["draft_changed", "Your latest changes can't be saved — this draft changed elsewhere."],
-    ["generic", "Your latest changes can't be saved — you can no longer edit this draft."],
-    ["version_not_draft", "Your latest changes can't be saved — this version is no longer a draft."],
-    ["version_gone", "Your latest changes can't be saved — this draft no longer exists."],
-  ] as const)("%s: shows the message, says it has stopped, and never sends again", async (code, text) => {
-    const { autosave, calls, tick, answer } = setup();
-    autosave.save({ body: doc("mine") });
-    await tick(800);
-    await answer(refused(code, "server words", 9));
+    [
+      "draft_changed",
+      "Your latest changes can't be saved — this draft changed elsewhere.",
+    ],
+    [
+      "generic",
+      "Your latest changes can't be saved — you can no longer edit this draft.",
+    ],
+    [
+      "version_not_draft",
+      "Your latest changes can't be saved — this version is no longer a draft.",
+    ],
+    [
+      "version_gone",
+      "Your latest changes can't be saved — this draft no longer exists.",
+    ],
+  ] as const)(
+    "%s: shows the message, says it has stopped, and never sends again",
+    async (code, text) => {
+      const { autosave, calls, tick, answer } = setup();
+      autosave.save({ body: doc("mine") });
+      await tick(800);
+      await answer(refused(code, "server words", 9));
 
-    expect(autosave.getState()).toEqual({ status: "error", error: text, stopped: true });
+      expect(autosave.getState()).toEqual({
+        status: "error",
+        error: text,
+        stopped: true,
+      });
 
-    autosave.save({ body: doc("more typing") });
-    await autosave.flush();
-    await tick(120_000);
-    expect(calls).toHaveLength(1);
-    expect(autosave.getState()).toEqual({ status: "error", error: text, stopped: true });
-  });
+      autosave.save({ body: doc("more typing") });
+      await autosave.flush();
+      await tick(120_000);
+      expect(calls).toHaveLength(1);
+      expect(autosave.getState()).toEqual({
+        status: "error",
+        error: text,
+        stopped: true,
+      });
+    },
+  );
 
   it("tells listeners once when it stops, and keeps the same state object after", async () => {
     const { autosave, tick, answer } = setup();
@@ -631,8 +762,13 @@ describe("answers that stop saving", () => {
     await fail();
     expect(autosave.getState()).toEqual({ status: "error", error: RETRYING });
     await tick(1_000);
-    await answer(refused("invalid_input", "The name must be 1 to 120 characters."));
-    expect(autosave.getState()).toEqual({ status: "error", error: "Not saved. The name must be 1 to 120 characters." });
+    await answer(
+      refused("invalid_input", "The name must be 1 to 120 characters."),
+    );
+    expect(autosave.getState()).toEqual({
+      status: "error",
+      error: "Not saved. The name must be 1 to 120 characters.",
+    });
   });
 
   it("does not adopt the rev from a conflict (that would overwrite the other edit)", async () => {
@@ -649,8 +785,13 @@ describe("answers that stop saving", () => {
     const { autosave, calls, tick, answer } = setup();
     autosave.save({ name: "x".repeat(200), body: doc("fine") });
     await tick(800);
-    await answer(refused("invalid_input", "The name must be 1 to 120 characters."));
-    expect(autosave.getState()).toEqual({ status: "error", error: "Not saved. The name must be 1 to 120 characters." });
+    await answer(
+      refused("invalid_input", "The name must be 1 to 120 characters."),
+    );
+    expect(autosave.getState()).toEqual({
+      status: "error",
+      error: "Not saved. The name must be 1 to 120 characters.",
+    });
 
     await tick(120_000);
     expect(calls).toHaveLength(1);
@@ -660,7 +801,12 @@ describe("answers that stop saving", () => {
     await tick(800);
     expect(calls).toHaveLength(2);
     // The corrected name replaces the bad one; the body that was held back goes with it.
-    expect(calls[1]!.patch).toEqual({ name: "Short again", body: doc("fine"), rev: 3, sessionKey: SESSION });
+    expect(calls[1]!.patch).toEqual({
+      name: "Short again",
+      body: doc("fine"),
+      rev: 3,
+      sessionKey: SESSION,
+    });
     await answer(saved(4));
     expect(autosave.getState()).toEqual({ status: "saved" });
   });

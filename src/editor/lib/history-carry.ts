@@ -10,9 +10,20 @@
 // event, of the range that differs) but each lands on the same document. Plain ProseMirror; no
 // React.
 
-import { closeHistory, redo, redoDepth, undo, undoDepth } from "@tiptap/pm/history";
+import {
+  closeHistory,
+  redo,
+  redoDepth,
+  undo,
+  undoDepth,
+} from "@tiptap/pm/history";
 import type { Node as PMNode } from "@tiptap/pm/model";
-import { EditorState, TextSelection, type Command, type Plugin } from "@tiptap/pm/state";
+import {
+  EditorState,
+  TextSelection,
+  type Command,
+  type Plugin,
+} from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 
 export interface HistoryCarry {
@@ -26,11 +37,17 @@ export interface HistoryCarry {
 
 /** The undo history plugin (its key is "history$"; the module doesn't export it). */
 function historyPlugin(state: EditorState): Plugin | undefined {
-  return state.plugins.find((plugin) => (plugin as unknown as { key: string }).key.startsWith("history$"));
+  return state.plugins.find((plugin) =>
+    (plugin as unknown as { key: string }).key.startsWith("history$"),
+  );
 }
 
 /** The documents `command` steps through until it has nothing left, on `state` (no side effects). */
-function walk(state: EditorState, command: Command, depth: (state: EditorState) => number): PMNode[] {
+function walk(
+  state: EditorState,
+  command: Command,
+  depth: (state: EditorState) => number,
+): PMNode[] {
   const docs: PMNode[] = [];
   let current = state;
   while (depth(current) > 0) {
@@ -53,7 +70,11 @@ export function captureHistory(state: EditorState): HistoryCarry | null {
   // binding restores deleted variables when undo brings their chips back).
   const lean = state.reconfigure({ plugins: [plugin] });
   if (undoDepth(lean) === 0 && redoDepth(lean) === 0) return null;
-  return { doc: state.doc, back: walk(lean, undo, undoDepth), forward: walk(lean, redo, redoDepth) };
+  return {
+    doc: state.doc,
+    back: walk(lean, undo, undoDepth),
+    forward: walk(lean, redo, redoDepth),
+  };
 }
 
 /** `state` changed into `target` as one history event, its selection at the change (where undo puts the caret). */
@@ -69,10 +90,13 @@ function stepTo(state: EditorState, target: PMNode): EditorState | null {
     endA += overlap;
     endB += overlap;
   }
-  const at = state.apply(state.tr.setSelection(TextSelection.near(state.doc.resolve(start))));
+  const at = state.apply(
+    state.tr.setSelection(TextSelection.near(state.doc.resolve(start))),
+  );
   let tr = at.tr.replace(start, endA, target.slice(start, endB));
   // The slice may not fit back exactly where it came from: then the whole document is the step.
-  if (!tr.doc.eq(target)) tr = at.tr.replaceWith(0, at.doc.content.size, target.content);
+  if (!tr.doc.eq(target))
+    tr = at.tr.replaceWith(0, at.doc.content.size, target.content);
   return at.apply(closeHistory(tr));
 }
 
@@ -99,7 +123,11 @@ function rebuild(view: EditorView, carry: HistoryCarry): boolean {
   if (!convert(carry.doc).eq(state.doc)) return false;
 
   // Oldest first: back to front, then the current document, then what redo goes forward to.
-  const chain = [...carry.back.map(convert).reverse(), state.doc, ...carry.forward.map(convert)];
+  const chain = [
+    ...carry.back.map(convert).reverse(),
+    state.doc,
+    ...carry.forward.map(convert),
+  ];
   let lean = EditorState.create({ schema, doc: chain[0], plugins: [plugin] });
   for (const doc of chain.slice(1)) {
     const next = stepTo(lean, doc);
@@ -110,9 +138,18 @@ function rebuild(view: EditorView, carry: HistoryCarry): boolean {
   for (let i = 0; i < carry.forward.length; i++) {
     if (!undo(lean, (tr) => (lean = lean.apply(tr)))) return false;
   }
-  if (!lean.doc.eq(state.doc) || undoDepth(lean) !== carry.back.length || redoDepth(lean) !== carry.forward.length) return false;
+  if (
+    !lean.doc.eq(state.doc) ||
+    undoDepth(lean) !== carry.back.length ||
+    redoDepth(lean) !== carry.forward.length
+  )
+    return false;
 
   // The history plugin takes a transaction carrying `{ historyState }` under its key as its new state.
-  view.dispatch(state.tr.setMeta(plugin, { historyState: plugin.getState(lean) }).setMeta("addToHistory", false));
+  view.dispatch(
+    state.tr
+      .setMeta(plugin, { historyState: plugin.getState(lean) })
+      .setMeta("addToHistory", false),
+  );
   return true;
 }

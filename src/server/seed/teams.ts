@@ -2,7 +2,11 @@ import type { TeamRole } from "@/domain/types";
 import type { SeedCtx } from "./context";
 import { userName } from "./people";
 
-export const TEAM_IDS = ["coral-offers", "deposits", "card-statements"] as const;
+export const TEAM_IDS = [
+  "coral-offers",
+  "deposits",
+  "card-statements",
+] as const;
 export type TeamId = (typeof TEAM_IDS)[number];
 
 const TEAMS: {
@@ -19,7 +23,8 @@ const TEAMS: {
   {
     id: "coral-offers",
     name: "Coral Offers",
-    description: "Card offer disclosures: balance transfers, cash back and promotional terms.",
+    description:
+      "Card offer disclosures: balance transfers, cash back and promotional terms.",
     icon: "credit-card",
     createdDaysAgo: 420,
     appName: "Coral",
@@ -28,7 +33,8 @@ const TEAMS: {
   {
     id: "deposits",
     name: "Deposits",
-    description: "Savings and checking disclosures: rates, fees and account terms.",
+    description:
+      "Savings and checking disclosures: rates, fees and account terms.",
     icon: "piggy-bank",
     createdDaysAgo: 395,
     appName: "Deposits Online",
@@ -37,7 +43,8 @@ const TEAMS: {
   {
     id: "card-statements",
     name: "Card Statements",
-    description: "Statement inserts: rate changes, enrollment notices and annual notices.",
+    description:
+      "Statement inserts: rate changes, enrollment notices and annual notices.",
     icon: "receipt-text",
     createdDaysAgo: 380,
     appName: "Card Center",
@@ -58,21 +65,94 @@ interface Member {
 // Matches the persona table in the build plan. Morgan has no membership on purpose. Dana Park (Legal)
 // views Coral Offers so a "Legal reviewer" stage that names her can be demoed (Phase 6).
 export const MEMBERS: Member[] = [
-  { user: "alex", team: "coral-offers", roles: ["team_admin", "approver"], addedDaysAgo: 400, addedBy: "riley" },
-  { user: "jordan", team: "coral-offers", roles: ["approver"], addedDaysAgo: 380, addedBy: "alex" },
-  { user: "maya", team: "coral-offers", roles: ["author"], addedDaysAgo: 370, addedBy: "alex" },
-  { user: "priya", team: "coral-offers", roles: ["author"], addedDaysAgo: 340, addedBy: "alex" },
-  { user: "sam", team: "coral-offers", roles: ["viewer"], addedDaysAgo: 300, addedBy: "alex" },
+  {
+    user: "alex",
+    team: "coral-offers",
+    roles: ["team_admin", "approver"],
+    addedDaysAgo: 400,
+    addedBy: "riley",
+  },
+  {
+    user: "jordan",
+    team: "coral-offers",
+    roles: ["approver"],
+    addedDaysAgo: 380,
+    addedBy: "alex",
+  },
+  {
+    user: "maya",
+    team: "coral-offers",
+    roles: ["author"],
+    addedDaysAgo: 370,
+    addedBy: "alex",
+  },
+  {
+    user: "priya",
+    team: "coral-offers",
+    roles: ["author"],
+    addedDaysAgo: 340,
+    addedBy: "alex",
+  },
+  {
+    user: "sam",
+    team: "coral-offers",
+    roles: ["viewer"],
+    addedDaysAgo: 300,
+    addedBy: "alex",
+  },
   // Last signed in 95 days ago: flagged 5 days ago, suspended automatically 25 days from now.
-  { user: "devon", team: "coral-offers", roles: ["viewer"], addedDaysAgo: 250, addedBy: "alex", flaggedDaysAgo: 5 },
-  { user: "dana", team: "coral-offers", roles: ["viewer"], addedDaysAgo: 60, addedBy: "alex" },
+  {
+    user: "devon",
+    team: "coral-offers",
+    roles: ["viewer"],
+    addedDaysAgo: 250,
+    addedBy: "alex",
+    flaggedDaysAgo: 5,
+  },
+  {
+    user: "dana",
+    team: "coral-offers",
+    roles: ["viewer"],
+    addedDaysAgo: 60,
+    addedBy: "alex",
+  },
 
-  { user: "naomi", team: "deposits", roles: ["team_admin", "approver"], addedDaysAgo: 380, addedBy: "riley" },
-  { user: "eli", team: "deposits", roles: ["author"], addedDaysAgo: 370, addedBy: "naomi" },
-  { user: "priya", team: "deposits", roles: ["viewer"], addedDaysAgo: 120, addedBy: "naomi" },
+  {
+    user: "naomi",
+    team: "deposits",
+    roles: ["team_admin", "approver"],
+    addedDaysAgo: 380,
+    addedBy: "riley",
+  },
+  {
+    user: "eli",
+    team: "deposits",
+    roles: ["author"],
+    addedDaysAgo: 370,
+    addedBy: "naomi",
+  },
+  {
+    user: "priya",
+    team: "deposits",
+    roles: ["viewer"],
+    addedDaysAgo: 120,
+    addedBy: "naomi",
+  },
 
-  { user: "hana", team: "card-statements", roles: ["team_admin", "approver"], addedDaysAgo: 360, addedBy: "riley" },
-  { user: "marcus", team: "card-statements", roles: ["author"], addedDaysAgo: 350, addedBy: "hana" },
+  {
+    user: "hana",
+    team: "card-statements",
+    roles: ["team_admin", "approver"],
+    addedDaysAgo: 360,
+    addedBy: "riley",
+  },
+  {
+    user: "marcus",
+    team: "card-statements",
+    roles: ["author"],
+    addedDaysAgo: 350,
+    addedBy: "hana",
+  },
 ];
 
 export function seedTeams(ctx: SeedCtx) {
@@ -108,10 +188,12 @@ export function seedTeams(ctx: SeedCtx) {
       addedBy: m.addedBy,
       statusChangedAt: null,
       statusReason: null,
-      inactivityFlaggedAt: m.flaggedDaysAgo === undefined ? null : ctx.at(m.flaggedDaysAgo),
+      inactivityFlaggedAt:
+        m.flaggedDaysAgo === undefined ? null : ctx.at(m.flaggedDaysAgo),
       inactivityKeptAt: null,
     });
-    for (const role of m.roles) ctx.sink.membershipRoles.push({ membershipId: id, role });
+    for (const role of m.roles)
+      ctx.sink.membershipRoles.push({ membershipId: id, role });
     ctx.sink.auditEvents.push({
       id: ctx.id("ae"),
       at: ctx.at(m.addedDaysAgo),
@@ -129,4 +211,5 @@ export const recertSubjectIds = (team: TeamId) =>
     .map((m) => m.user)
     .sort();
 
-export const flaggedMembers = (team: TeamId) => MEMBERS.filter((m) => m.team === team && m.flaggedDaysAgo !== undefined);
+export const flaggedMembers = (team: TeamId) =>
+  MEMBERS.filter((m) => m.team === team && m.flaggedDaysAgo !== undefined);

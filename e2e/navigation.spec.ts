@@ -46,13 +46,20 @@ test.afterAll(() => {
 
 const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const libraryHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Library" });
+const libraryHeading = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: "Library" });
 
-const rowLink = (page: Page, name: string) => page.getByRole("link", { name: new RegExp(`^${escapeRe(name)}`) });
+const rowLink = (page: Page, name: string) =>
+  page.getByRole("link", { name: new RegExp(`^${escapeRe(name)}`) });
 
 /** The workspace's tab bar. Hidden pages keep their own, so role queries (which skip hidden) see one. */
-const tab = (page: Page, label: "Content" | "Versions" | "Usage" | "Activity") =>
-  page.getByRole("navigation", { name: "Template" }).getByRole("link", { name: label });
+const tab = (
+  page: Page,
+  label: "Content" | "Versions" | "Usage" | "Activity",
+) =>
+  page
+    .getByRole("navigation", { name: "Template" })
+    .getByRole("link", { name: label });
 
 /**
  * Waits until the point on `target` (its centre, or `at` from its top left) is not covered by another
@@ -67,10 +74,16 @@ async function untilUncovered(target: Locator, at?: { x: number; y: number }) {
       () =>
         target.evaluate((el, offset) => {
           const r = el.getBoundingClientRect();
-          const hit = document.elementFromPoint(r.left + (offset?.x ?? r.width / 2), r.top + (offset?.y ?? r.height / 2));
+          const hit = document.elementFromPoint(
+            r.left + (offset?.x ?? r.width / 2),
+            r.top + (offset?.y ?? r.height / 2),
+          );
           return !!hit && (hit === el || el.contains(hit));
         }, at),
-      { message: "the target is not covered (a page transition is still running)" },
+      {
+        message:
+          "the target is not covered (a page transition is still running)",
+      },
     )
     .toBe(true);
 }
@@ -83,14 +96,23 @@ async function press(clicks: ClickCounter, target: Locator) {
 
 /** No error page: Next's own ("This page couldn't load", curly apostrophe) is what a crashed route shows. */
 async function expectNoErrorPage(page: Page, what: string) {
-  await expect(page.getByText(/This page couldn.t load/), `${what}: not the error page`).toHaveCount(0);
+  await expect(
+    page.getByText(/This page couldn.t load/),
+    `${what}: not the error page`,
+  ).toHaveCount(0);
 }
 
 /** The Library, shown (not the hidden copy Next keeps behind another page), with its rows live. */
 async function expectLibraryShown(page: Page, what: string) {
   await expect(page, `${what}: the Library's address`).toHaveURL(LIBRARY_URL);
-  await expect(libraryHeading(page), `${what}: the Library's heading`).toBeVisible();
-  await expect(rowLink(page, DRAFT).filter({ visible: true }), `${what}: its rows`).toBeVisible();
+  await expect(
+    libraryHeading(page),
+    `${what}: the Library's heading`,
+  ).toBeVisible();
+  await expect(
+    rowLink(page, DRAFT).filter({ visible: true }),
+    `${what}: its rows`,
+  ).toBeVisible();
   await expectNoErrorPage(page, what);
 }
 
@@ -107,7 +129,10 @@ async function caretBlock(page: Page) {
 async function expectEditorTakesTyping(page: Page, what: string) {
   const ed = await liveEditor(page);
   await expect(ed, `${what}: exactly one document on screen`).toHaveCount(1);
-  await expect(ed, `${what}: it is editable`).toHaveAttribute("contenteditable", "true");
+  await expect(ed, `${what}: it is editable`).toHaveAttribute(
+    "contenteditable",
+    "true",
+  );
 
   const paragraph = ed.locator("p").first();
   const box = (await paragraph.boundingBox())!;
@@ -115,17 +140,29 @@ async function expectEditorTakesTyping(page: Page, what: string) {
   await untilUncovered(paragraph, end);
   await paragraph.click({ position: end, delay: 90 });
   await page.keyboard.press("End");
-  await expect.poll(async () => (await caret(page)).focused, { message: `${what}: the document takes focus` }).toBe(true);
+  await expect
+    .poll(async () => (await caret(page)).focused, {
+      message: `${what}: the document takes focus`,
+    })
+    .toBe(true);
 
   const before = await caretBlock(page);
   await page.keyboard.type(TYPED, { delay: 18 });
   await expect
-    .poll(() => caretBlock(page), { message: `${what}: the typed characters arrive` })
+    .poll(() => caretBlock(page), {
+      message: `${what}: the typed characters arrive`,
+    })
     .toHaveLength(before.length + TYPED.length);
-  expect(await caretBlock(page), `${what}: they are the ones typed`).toContain(TYPED);
+  expect(await caretBlock(page), `${what}: they are the ones typed`).toContain(
+    TYPED,
+  );
 
   for (let i = 0; i < TYPED.length; i++) await page.keyboard.press("Backspace");
-  await expect.poll(() => caretBlock(page), { message: `${what}: removing them restores the text` }).toBe(before);
+  await expect
+    .poll(() => caretBlock(page), {
+      message: `${what}: removing them restores the text`,
+    })
+    .toBe(before);
   await expectNoErrorPage(page, what);
 }
 
@@ -137,23 +174,45 @@ async function expectBlockHandleOnHover(page: Page, what: string) {
     await page.mouse.move(box.x + box.width / 2, box.y - 30);
     await page.mouse.move(box.x + 40, box.y + box.height / 2, { steps: 8 });
     await page.mouse.move(box.x + 60, box.y + box.height / 2 + 1, { steps: 4 });
-    await expect(page.getByRole("button", { name: "Insert block below" })).toBeVisible({ timeout: 700 });
+    await expect(
+      page.getByRole("button", { name: "Insert block below" }),
+    ).toBeVisible({ timeout: 700 });
   }, `${what}: the block handle shows on hover`).toPass({ timeout: 10_000 });
-  await expect(page.getByLabel("Drag to move block, or click for options"), `${what}: with its grip`).toBeVisible();
+  await expect(
+    page.getByLabel("Drag to move block, or click for options"),
+    `${what}: with its grip`,
+  ).toBeVisible();
 }
 
 /** The draft's Content tab is what is on screen, live and typeable, with its block handle. */
-async function expectContentShown(page: Page, contentUrl: string, what: string) {
+async function expectContentShown(
+  page: Page,
+  contentUrl: string,
+  what: string,
+) {
   await expect(page, `${what}: the draft's address`).toHaveURL(contentUrl);
-  await expect(tab(page, "Content"), `${what}: the Content tab is the current one`).toHaveAttribute("aria-current", "page");
+  await expect(
+    tab(page, "Content"),
+    `${what}: the Content tab is the current one`,
+  ).toHaveAttribute("aria-current", "page");
   await expectEditorTakesTyping(page, what);
   await expectBlockHandleOnHover(page, what);
 }
 
-async function expectVersionsShown(page: Page, versionsUrl: string, what: string) {
+async function expectVersionsShown(
+  page: Page,
+  versionsUrl: string,
+  what: string,
+) {
   await expect(page, `${what}: the Versions address`).toHaveURL(versionsUrl);
-  await expect(tab(page, "Versions"), `${what}: the Versions tab is the current one`).toHaveAttribute("aria-current", "page");
-  await expect(page.locator('[data-slot="versions"]').filter({ visible: true }), `${what}: its page`).toBeVisible();
+  await expect(
+    tab(page, "Versions"),
+    `${what}: the Versions tab is the current one`,
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.locator('[data-slot="versions"]').filter({ visible: true }),
+    `${what}: its page`,
+  ).toBeVisible();
   await expectNoErrorPage(page, what);
 }
 
@@ -162,7 +221,9 @@ async function expectVersionsShown(page: Page, versionsUrl: string, what: string
 // ───────────────────────────────────────────────────────────────────────────
 
 test.describe("Back and Forward on a Draft", () => {
-  test("Library → Draft → Back → Forward, three times: the editor is alive every time it is shown again", async ({ page }) => {
+  test("Library → Draft → Back → Forward, three times: the editor is alive every time it is shown again", async ({
+    page,
+  }) => {
     test.setTimeout(150_000);
     await asPersona(page, "maya");
     await openLibrary(page);
@@ -171,7 +232,11 @@ test.describe("Back and Forward on a Draft", () => {
     await press(clicks, rowLink(page, DRAFT));
     await expect(page).toHaveURL(TEMPLATE_URL);
     const contentUrl = page.url();
-    await expectContentShown(page, contentUrl, "the draft, opened from the Library");
+    await expectContentShown(
+      page,
+      contentUrl,
+      "the draft, opened from the Library",
+    );
 
     for (const cycle of [1, 2, 3]) {
       await page.goBack();
@@ -192,7 +257,11 @@ test.describe("Back and Forward on a Draft", () => {
     await expect(page).toHaveURL(TEMPLATE_URL);
     const contentUrl = page.url();
     const versionsUrl = `${contentUrl}/versions`;
-    await expectContentShown(page, contentUrl, "the draft, opened from the Library");
+    await expectContentShown(
+      page,
+      contentUrl,
+      "the draft, opened from the Library",
+    );
 
     await press(clicks, tab(page, "Versions"));
     await expectVersionsShown(page, versionsUrl, "the Versions tab, opened");
@@ -222,8 +291,16 @@ interface Position {
 
 const historyPosition = (page: Page): Promise<Position> =>
   page.evaluate(() => {
-    const nav = (window as unknown as { navigation: { currentEntry: { index: number }; entries(): unknown[] } }).navigation;
-    return { length: history.length, index: nav.currentEntry.index, entries: nav.entries().length };
+    const nav = (
+      window as unknown as {
+        navigation: { currentEntry: { index: number }; entries(): unknown[] };
+      }
+    ).navigation;
+    return {
+      length: history.length,
+      index: nav.currentEntry.index,
+      entries: nav.entries().length,
+    };
   });
 
 /** The name field: focused, editable, all of its text selected. */
@@ -238,7 +315,12 @@ async function expectNameSelected(page: Page, text: string) {
     end: el.selectionEnd,
     length: el.value.length,
   }));
-  expect(selection).toEqual({ active: true, start: 0, end: text.length, length: text.length });
+  expect(selection).toEqual({
+    active: true,
+    start: 0,
+    end: text.length,
+    length: text.length,
+  });
 }
 
 /**
@@ -261,13 +343,17 @@ async function createFromStarter(page: Page, card: RegExp, name: string) {
   // The live document swaps in after hydration; the name keeps its focus and selection through that.
   await liveEditor(page);
   await expectNameSelected(page, name);
-  expect(page.url(), "the address is still the template's own").toMatch(TEMPLATE_URL);
+  expect(page.url(), "the address is still the template's own").toMatch(
+    TEMPLATE_URL,
+  );
 
   return { before, after: await historyPosition(page), clicks };
 }
 
 test.describe("creating a template is one history entry", () => {
-  test("three creates from fresh Libraries: the history grows by one, and one Back is the Library", async ({ page }) => {
+  test("three creates from fresh Libraries: the history grows by one, and one Back is the Library", async ({
+    page,
+  }) => {
     test.setTimeout(180_000);
     await asPersona(page, "maya");
 
@@ -284,43 +370,86 @@ test.describe("creating a template is one history entry", () => {
       // would only replace its entry, and keep that template ahead.)
       if (i > 0) await page.goto("about:blank");
       await openLibrary(page);
-      const { before, after, clicks } = await createFromStarter(page, starter.card, starter.name);
+      const { before, after, clicks } = await createFromStarter(
+        page,
+        starter.card,
+        starter.name,
+      );
       const what = `create ${i + 1} (${starter.name})`;
 
-      expect(clicks.count, `${what}: clicks from the Library to the name`).toBe(2);
-      expect(after.length - before.length, `${what}: history.length grew by exactly one`).toBe(1);
-      expect(after.index - before.index, `${what}: one entry on top of the Library`).toBe(1);
-      expect(after.entries, `${what}: nothing ahead of the new entry`).toBe(after.index + 1);
+      expect(clicks.count, `${what}: clicks from the Library to the name`).toBe(
+        2,
+      );
+      expect(
+        after.length - before.length,
+        `${what}: history.length grew by exactly one`,
+      ).toBe(1);
+      expect(
+        after.index - before.index,
+        `${what}: one entry on top of the Library`,
+      ).toBe(1);
+      expect(after.entries, `${what}: nothing ahead of the new entry`).toBe(
+        after.index + 1,
+      );
 
       await page.goBack();
       await expectLibraryShown(page, `${what}: one Back`);
-      expect(new URL(page.url()).search, `${what}: the Library's own address`).toBe("");
+      expect(
+        new URL(page.url()).search,
+        `${what}: the Library's own address`,
+      ).toBe("");
       const back = await historyPosition(page);
-      expect(back.index, `${what}: Back stepped exactly one entry`).toBe(before.index);
+      expect(back.index, `${what}: Back stepped exactly one entry`).toBe(
+        before.index,
+      );
       expect(back.length, `${what}: and added none`).toBe(after.length);
     }
   });
 
-  test("create again straight after a Back: still one entry, still one Back", async ({ page }) => {
+  test("create again straight after a Back: still one entry, still one Back", async ({
+    page,
+  }) => {
     test.setTimeout(150_000);
     await asPersona(page, "maya");
     await openLibrary(page);
 
     // The first create, then Back: the Library is now the page Next re-showed, with the template ahead of it.
-    const first = await createFromStarter(page, /^Card offer terms/, "Card offer terms");
-    expect(first.after.index - first.before.index, "the first create: one entry").toBe(1);
+    const first = await createFromStarter(
+      page,
+      /^Card offer terms/,
+      "Card offer terms",
+    );
+    expect(
+      first.after.index - first.before.index,
+      "the first create: one entry",
+    ).toBe(1);
     await page.goBack();
     await expectLibraryShown(page, "Back from the first create");
 
     // The second create replaces the entry ahead: the history is no longer, and Back is the Library again.
-    const second = await createFromStarter(page, /^Rate change notice/, "Rate change notice");
-    expect(second.after.index - second.before.index, "the second create: one entry on top of the Library").toBe(1);
-    expect(second.after.entries, "nothing ahead of it").toBe(second.after.index + 1);
-    expect(second.after.length, "the entry ahead of the Library was replaced, not kept beside it").toBe(second.before.length);
+    const second = await createFromStarter(
+      page,
+      /^Rate change notice/,
+      "Rate change notice",
+    );
+    expect(
+      second.after.index - second.before.index,
+      "the second create: one entry on top of the Library",
+    ).toBe(1);
+    expect(second.after.entries, "nothing ahead of it").toBe(
+      second.after.index + 1,
+    );
+    expect(
+      second.after.length,
+      "the entry ahead of the Library was replaced, not kept beside it",
+    ).toBe(second.before.length);
 
     await page.goBack();
     await expectLibraryShown(page, "one Back from the second create");
-    expect((await historyPosition(page)).index, "one entry back, the Library").toBe(second.before.index);
+    expect(
+      (await historyPosition(page)).index,
+      "one entry back, the Library",
+    ).toBe(second.before.index);
   });
 });
 
@@ -337,16 +466,19 @@ const TEMPLATE_OFFSET = 150;
 /** Offsets are compared to within this many pixels (fractional scroll positions on a scaled display). */
 const SLACK = 2;
 
-const canvas = (page: Page): Locator => page.locator('[data-slot="canvas-scroll"]');
+const canvas = (page: Page): Locator =>
+  page.locator('[data-slot="canvas-scroll"]');
 const canvasTop = (page: Page) => canvas(page).evaluate((el) => el.scrollTop);
-const canvasRange = (page: Page) => canvas(page).evaluate((el) => el.scrollHeight - el.clientHeight);
+const canvasRange = (page: Page) =>
+  canvas(page).evaluate((el) => el.scrollHeight - el.clientHeight);
 
 /** Lets the browser run a few frames: scroll events, layout effects and restores all land within them. */
 const frames = (page: Page, count = 3) =>
   page.evaluate(
     (n) =>
       new Promise<void>((resolve) => {
-        const next = (left: number) => (left === 0 ? resolve() : requestAnimationFrame(() => next(left - 1)));
+        const next = (left: number) =>
+          left === 0 ? resolve() : requestAnimationFrame(() => next(left - 1));
         next(n);
       }),
     count,
@@ -355,19 +487,36 @@ const frames = (page: Page, count = 3) =>
 /** Scrolls the canvas the way the reader leaves it, and waits until the page has seen the position. */
 async function scrollCanvasTo(page: Page, top: number) {
   const range = await canvasRange(page);
-  expect(range, `the page can scroll to ${top}px (it has ${range}px to scroll)`).toBeGreaterThanOrEqual(top + 10);
-  await canvas(page).evaluate((el, to) => el.scrollTo({ top: to, behavior: "instant" }), top);
+  expect(
+    range,
+    `the page can scroll to ${top}px (it has ${range}px to scroll)`,
+  ).toBeGreaterThanOrEqual(top + 10);
+  await canvas(page).evaluate(
+    (el, to) => el.scrollTo({ top: to, behavior: "instant" }),
+    top,
+  );
   await frames(page);
   await expectCanvasAt(page, top, "after scrolling");
 }
 
 /** The canvas is at `top` (within a couple of pixels), and is still there a few frames later. */
 async function expectCanvasAt(page: Page, top: number, what: string) {
-  await expect.poll(() => canvasTop(page), { message: `${what}: canvas scrollTop ≥ ${top - SLACK}` }).toBeGreaterThanOrEqual(top - SLACK);
-  await expect.poll(() => canvasTop(page), { message: `${what}: canvas scrollTop ≤ ${top + SLACK}` }).toBeLessThanOrEqual(top + SLACK);
+  await expect
+    .poll(() => canvasTop(page), {
+      message: `${what}: canvas scrollTop ≥ ${top - SLACK}`,
+    })
+    .toBeGreaterThanOrEqual(top - SLACK);
+  await expect
+    .poll(() => canvasTop(page), {
+      message: `${what}: canvas scrollTop ≤ ${top + SLACK}`,
+    })
+    .toBeLessThanOrEqual(top + SLACK);
   await frames(page);
   const settled = await canvasTop(page);
-  expect(Math.abs(settled - top), `${what}: canvas scrollTop is still ${top} a few frames later (it is ${settled})`).toBeLessThanOrEqual(SLACK);
+  expect(
+    Math.abs(settled - top),
+    `${what}: canvas scrollTop is still ${top} a few frames later (it is ${settled})`,
+  ).toBeLessThanOrEqual(SLACK);
 }
 
 /**
@@ -377,10 +526,15 @@ async function expectCanvasAt(page: Page, top: number, what: string) {
 async function visibleRow(page: Page): Promise<{ href: string; name: string }> {
   const row = await canvas(page).evaluate((el) => {
     const view = el.getBoundingClientRect();
-    for (const a of el.querySelectorAll<HTMLAnchorElement>("main ul > li > a[href*='/templates/']")) {
+    for (const a of el.querySelectorAll<HTMLAnchorElement>(
+      "main ul > li > a[href*='/templates/']",
+    )) {
       const r = a.getBoundingClientRect();
       if (r.width > 0 && r.top >= view.top + 4 && r.bottom <= view.bottom - 4) {
-        return { href: a.getAttribute("href")!, name: a.innerText.split("\n")[0]!.trim() };
+        return {
+          href: a.getAttribute("href")!,
+          name: a.innerText.split("\n")[0]!.trim(),
+        };
       }
     }
     return null;
@@ -392,7 +546,9 @@ async function visibleRow(page: Page): Promise<{ href: string; name: string }> {
 test.describe("canvas scroll", () => {
   test.use({ viewport: SHORT_VIEWPORT });
 
-  test("opening a template starts at the top; Back restores the Library, Forward restores the template", async ({ page }) => {
+  test("opening a template starts at the top; Back restores the Library, Forward restores the template", async ({
+    page,
+  }) => {
     test.setTimeout(150_000);
     await asPersona(page, "maya");
     await openLibrary(page);
@@ -402,32 +558,53 @@ test.describe("canvas scroll", () => {
 
     const row = await visibleRow(page);
     const clicks = clickCounter();
-    await press(clicks, page.locator(`a[href="${row.href}"]`).filter({ visible: true }));
+    await press(
+      clicks,
+      page.locator(`a[href="${row.href}"]`).filter({ visible: true }),
+    );
     await expect(page).toHaveURL(new RegExp(`${escapeRe(row.href)}$`));
     await expect(tab(page, "Content")).toHaveAttribute("aria-current", "page");
     await liveEditor(page);
-    await expectCanvasAt(page, 0, `${row.name}, opened from a Library scrolled to ${LIBRARY_OFFSET}`);
+    await expectCanvasAt(
+      page,
+      0,
+      `${row.name}, opened from a Library scrolled to ${LIBRARY_OFFSET}`,
+    );
 
     // Where the reader leaves the template.
     await scrollCanvasTo(page, TEMPLATE_OFFSET);
 
     await page.goBack();
     await expectLibraryShown(page, "Back");
-    await expectCanvasAt(page, LIBRARY_OFFSET, "Back: the Library is where it was left");
+    await expectCanvasAt(
+      page,
+      LIBRARY_OFFSET,
+      "Back: the Library is where it was left",
+    );
 
     await page.goForward();
     await expect(page).toHaveURL(new RegExp(`${escapeRe(row.href)}$`));
     await expect(tab(page, "Content")).toHaveAttribute("aria-current", "page");
     await liveEditor(page);
-    await expectCanvasAt(page, TEMPLATE_OFFSET, "Forward: the template is where it was left");
+    await expectCanvasAt(
+      page,
+      TEMPLATE_OFFSET,
+      "Forward: the template is where it was left",
+    );
 
     // And once more round, in case the first restore only held by luck.
     await page.goBack();
     await expectLibraryShown(page, "Back, again");
-    await expectCanvasAt(page, LIBRARY_OFFSET, "Back, again: the Library is where it was left");
+    await expectCanvasAt(
+      page,
+      LIBRARY_OFFSET,
+      "Back, again: the Library is where it was left",
+    );
   });
 
-  test("a workspace tab switch starts at the top, and Back returns to where the Content tab was left", async ({ page }) => {
+  test("a workspace tab switch starts at the top, and Back returns to where the Content tab was left", async ({
+    page,
+  }) => {
     test.setTimeout(150_000);
     await asPersona(page, "maya");
     await openLibrary(page);
@@ -444,34 +621,60 @@ test.describe("canvas scroll", () => {
     await press(clicks, tab(page, "Versions"));
     await expect(page).toHaveURL(`${contentUrl}/versions`);
     await expect(tab(page, "Versions")).toHaveAttribute("aria-current", "page");
-    await expectCanvasAt(page, 0, "the Versions tab, opened from a scrolled Content tab");
+    await expectCanvasAt(
+      page,
+      0,
+      "the Versions tab, opened from a scrolled Content tab",
+    );
 
     await page.goBack();
     await expect(page).toHaveURL(contentUrl);
     await expect(tab(page, "Content")).toHaveAttribute("aria-current", "page");
     await liveEditor(page);
-    await expectCanvasAt(page, TEMPLATE_OFFSET, "Back: the Content tab is where it was left");
+    await expectCanvasAt(
+      page,
+      TEMPLATE_OFFSET,
+      "Back: the Content tab is where it was left",
+    );
   });
 
-  test("the settings modal opening over the Library does not move it", async ({ page }) => {
+  test("the settings modal opening over the Library does not move it", async ({
+    page,
+  }) => {
     test.setTimeout(150_000);
     await asPersona(page, "alex");
     await openLibrary(page);
     await scrollCanvasTo(page, LIBRARY_OFFSET);
 
     const clicks = clickCounter();
-    await press(clicks, page.locator('[data-slot="sidebar-footer"]').getByRole("link", { name: "Settings" }));
+    await press(
+      clicks,
+      page
+        .locator('[data-slot="sidebar-footer"]')
+        .getByRole("link", { name: "Settings" }),
+    );
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(page).toHaveURL(/\/coral-offers\/settings\/members$/);
-    await expectCanvasAt(page, LIBRARY_OFFSET, "the settings modal open: the Library behind it");
+    await expectCanvasAt(
+      page,
+      LIBRARY_OFFSET,
+      "the settings modal open: the Library behind it",
+    );
     // (The page behind a modal is inert, so it is not in the accessibility tree: find the heading by tag.)
-    await expect(page.locator("main h1", { hasText: "Library" }).filter({ visible: true }), "the Library is still the page behind the modal").toBeVisible();
+    await expect(
+      page.locator("main h1", { hasText: "Library" }).filter({ visible: true }),
+      "the Library is still the page behind the modal",
+    ).toBeVisible();
 
     // Moving between the modal's own sections is not a page change either.
     await clicks.click(dialog.getByRole("link", { name: "Recertification" }));
     await expect(page).toHaveURL(/\/settings\/recertification$/);
-    await expectCanvasAt(page, LIBRARY_OFFSET, "another settings section: the Library behind it");
+    await expectCanvasAt(
+      page,
+      LIBRARY_OFFSET,
+      "another settings section: the Library behind it",
+    );
 
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();

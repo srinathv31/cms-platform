@@ -40,7 +40,15 @@ const author: Viewer = {
   initials: "MP",
   title: "Author",
   platformRole: null,
-  memberships: [{ teamId: "coral-offers", teamSlug: "coral-offers", teamName: "Coral Offers", roles: ["author"], status: "active" }],
+  memberships: [
+    {
+      teamId: "coral-offers",
+      teamSlug: "coral-offers",
+      teamName: "Coral Offers",
+      roles: ["author"],
+      status: "active",
+    },
+  ],
 };
 
 let db: Db;
@@ -59,13 +67,18 @@ beforeEach(() => {
 const Input = z.object({ key: z.string().min(1).max(32), value: z.string() });
 type Input = z.infer<typeof Input>;
 
-const stored = async (key: string) => (await db.select().from(settings).where(eq(settings.key, key)))[0]?.value;
+const stored = async (key: string) =>
+  (await db.select().from(settings).where(eq(settings.key, key)))[0]?.value;
 
 /** An action that writes the input to `settings`, as Platform Admin, with the steps given swapped in. */
-function write(raw: unknown, over: Partial<ActionSteps<Input, void, { key: string }>> = {}) {
+function write(
+  raw: unknown,
+  over: Partial<ActionSteps<Input, void, { key: string }>> = {},
+) {
   return serverAction<Input, void, { key: string }>(raw, {
     input: Input,
-    authorize: ({ viewer }) => check(viewer, "platform.manage", { teamId: null }),
+    authorize: ({ viewer }) =>
+      check(viewer, "platform.manage", { teamId: null }),
     transaction: async (tx, { input }) => {
       await tx.insert(settings).values({ key: input.key, value: input.value });
       return { ok: true, key: input.key };
@@ -87,7 +100,9 @@ describe("serverAction", () => {
         },
         transaction: async (tx, { input, now: at }) => {
           order.push(`transaction at ${at.toISOString()}`);
-          await tx.insert(settings).values({ key: input.key, value: input.value });
+          await tx
+            .insert(settings)
+            .values({ key: input.key, value: input.value });
           return { ok: true, key: input.key };
         },
         after: (answer, { now: at }) => {
@@ -97,7 +112,11 @@ describe("serverAction", () => {
       },
     );
     expect(result).toEqual({ ok: true, key: "kit_ok" });
-    expect(order).toEqual(["authorize riley kit_ok", `transaction at ${env.now.toISOString()}`, "after"]);
+    expect(order).toEqual([
+      "authorize riley kit_ok",
+      `transaction at ${env.now.toISOString()}`,
+      "after",
+    ]);
     expect(after).toHaveBeenCalledWith({ ok: true, key: "kit_ok" }, env.now);
     expect(await stored("kit_ok")).toBe("written");
     expect(now).toHaveBeenCalledTimes(1);
@@ -105,18 +124,32 @@ describe("serverAction", () => {
 
   it("refuses input that doesn't parse, before anything is read", async () => {
     const authorize = vi.fn();
-    expect(await write({ key: "", value: "x" }, { authorize })).toEqual({ ok: false, ...REQUEST_REFUSALS.invalidInput() });
-    expect(await write(undefined, { authorize })).toEqual({ ok: false, ...REQUEST_REFUSALS.invalidInput() });
+    expect(await write({ key: "", value: "x" }, { authorize })).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.invalidInput(),
+    });
+    expect(await write(undefined, { authorize })).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.invalidInput(),
+    });
     expect(authorize).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
 
   it("answers input that doesn't parse with the action's own refusal, fixed or from the parser's problem", async () => {
-    expect(await write({ key: 7 }, { invalid: REQUEST_REFUSALS.notificationGone })).toEqual({
+    expect(
+      await write({ key: 7 }, { invalid: REQUEST_REFUSALS.notificationGone }),
+    ).toEqual({
       ok: false,
       ...REQUEST_REFUSALS.notificationGone,
     });
-    const worded = await write({ key: "" }, { invalid: (error) => REQUEST_REFUSALS.invalidInput(error.issues[0]?.message) });
+    const worded = await write(
+      { key: "" },
+      {
+        invalid: (error) =>
+          REQUEST_REFUSALS.invalidInput(error.issues[0]?.message),
+      },
+    );
     expect(worded).toMatchObject({ ok: false, code: "invalid_input" });
     if (worded.ok) return;
     expect(worded.reason).not.toBe(REQUEST_REFUSALS.invalidInput().reason);
@@ -125,7 +158,9 @@ describe("serverAction", () => {
   it("returns a permission refusal from `check`, and writes nothing", async () => {
     vi.mocked(getViewer).mockResolvedValue(author);
     const after = vi.fn();
-    expect(await write({ key: "kit_forbidden", value: "x" }, { after })).toEqual({ ok: false, ...REASONS.generic });
+    expect(
+      await write({ key: "kit_forbidden", value: "x" }, { after }),
+    ).toEqual({ ok: false, ...REASONS.generic });
     expect(await stored("kit_forbidden")).toBeUndefined();
     expect(after).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
@@ -137,7 +172,12 @@ describe("serverAction", () => {
     expect(
       await write(
         { key: "kit_permit", value: "x" },
-        { authorize: ({ viewer }) => permit(canComment(viewer, { teamId: "coral-offers", version: active })) },
+        {
+          authorize: ({ viewer }) =>
+            permit(
+              canComment(viewer, { teamId: "coral-offers", version: active }),
+            ),
+        },
       ),
     ).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });
     expect(await stored("kit_permit")).toBeUndefined();
@@ -149,14 +189,19 @@ describe("serverAction", () => {
       { key: "kit_refused", value: "x" },
       {
         transaction: async (tx, { input }) => {
-          await tx.insert(settings).values({ key: input.key, value: input.value });
+          await tx
+            .insert(settings)
+            .values({ key: input.key, value: input.value });
           refuse(REFUSALS.notInReview);
         },
         after,
       },
     );
     expect(result).toEqual({ ok: false, ...REFUSALS.notInReview });
-    expect(await stored("kit_refused"), "the write before the refusal is rolled back").toBeUndefined();
+    expect(
+      await stored("kit_refused"),
+      "the write before the refusal is rolled back",
+    ).toBeUndefined();
     expect(after).not.toHaveBeenCalled();
   });
 
@@ -165,7 +210,9 @@ describe("serverAction", () => {
       { key: "kit_returned", value: "x" },
       {
         transaction: async (tx, { input }) => {
-          await tx.insert(settings).values({ key: input.key, value: input.value });
+          await tx
+            .insert(settings)
+            .values({ key: input.key, value: input.value });
           return { ok: false, ...REFUSALS.noRevokePending };
         },
       },
@@ -181,8 +228,13 @@ describe("serverAction", () => {
       {
         transaction: async (tx, { input }) => {
           attempts += 1;
-          await tx.insert(settings).values({ key: input.key, value: input.value });
-          if (attempts === 1) throw Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+          await tx
+            .insert(settings)
+            .values({ key: input.key, value: input.value });
+          if (attempts === 1)
+            throw Object.assign(new Error("database is locked"), {
+              code: "SQLITE_BUSY",
+            });
           return { ok: true, key: input.key };
         },
       },
@@ -190,7 +242,10 @@ describe("serverAction", () => {
     expect(result).toEqual({ ok: true, key: "kit_busy" });
     expect(attempts).toBe(2);
     expect(await stored("kit_busy")).toBe("second try");
-    expect(now, "the clock is read once, not per attempt").toHaveBeenCalledTimes(1);
+    expect(
+      now,
+      "the clock is read once, not per attempt",
+    ).toHaveBeenCalledTimes(1);
   });
 
   it("throws a bug, from the transaction or from authorize, and writes nothing", async () => {
@@ -200,18 +255,31 @@ describe("serverAction", () => {
         { key: "kit_bug", value: "x" },
         {
           transaction: async (tx, { input }) => {
-            await tx.insert(settings).values({ key: input.key, value: input.value });
+            await tx
+              .insert(settings)
+              .values({ key: input.key, value: input.value });
             throw bug;
           },
         },
       ),
     ).rejects.toBe(bug);
     expect(await stored("kit_bug")).toBeUndefined();
-    await expect(write({ key: "kit_bug", value: "x" }, { authorize: () => { throw bug; } })).rejects.toBe(bug);
+    await expect(
+      write(
+        { key: "kit_bug", value: "x" },
+        {
+          authorize: () => {
+            throw bug;
+          },
+        },
+      ),
+    ).rejects.toBe(bug);
   });
 
   it("lets what `after` throws through, as Next's redirect must be, once the write has committed", async () => {
-    const redirect = Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/somewhere;307;" });
+    const redirect = Object.assign(new Error("NEXT_REDIRECT"), {
+      digest: "NEXT_REDIRECT;replace;/somewhere;307;",
+    });
     await expect(
       write(
         { key: "kit_redirect", value: "x" },

@@ -22,7 +22,8 @@ function Bar(props: ComponentProps<"div">) {
   const publish = useCallback((bar: HTMLDivElement) => {
     const grid = bar.parentElement;
     if (!grid) return;
-    const measure = () => grid.style.setProperty("--decision-bar-h", `${bar.offsetHeight}px`);
+    const measure = () =>
+      grid.style.setProperty("--decision-bar-h", `${bar.offsetHeight}px`);
     const observer = new ResizeObserver(measure);
     observer.observe(bar);
     measure();
@@ -31,7 +32,9 @@ function Bar(props: ComponentProps<"div">) {
       grid.style.removeProperty("--decision-bar-h");
     };
   }, []);
-  return <div ref={publish} data-slot="decision-bar" className={RV.bar} {...props} />;
+  return (
+    <div ref={publish} data-slot="decision-bar" className={RV.bar} {...props} />
+  );
 }
 
 export function DecisionBar({
@@ -56,7 +59,10 @@ export function DecisionBar({
     // The rail's line is the status (it is announced and takes focus); this one only shows it.
     return decidedHere && row.kind === "line" ? (
       <Bar>
-        <p aria-hidden className="min-w-0 truncate text-[14px] leading-6 text-text-muted">
+        <p
+          aria-hidden
+          className="min-w-0 truncate text-[14px] leading-6 text-text-muted"
+        >
           {row.text}
         </p>
       </Bar>
@@ -67,13 +73,25 @@ export function DecisionBar({
     const reasonId = "decision-bar-blocked";
     return (
       <Bar role="group" aria-label="Decide">
-        <BlockedButton variant="default" reason={access.reason} describedBy={reasonId}>
+        <BlockedButton
+          variant="default"
+          reason={access.reason}
+          describedBy={reasonId}
+        >
           Approve
         </BlockedButton>
-        <BlockedButton className="bg-surface" reason={access.reason} describedBy={reasonId}>
+        <BlockedButton
+          className="bg-surface"
+          reason={access.reason}
+          describedBy={reasonId}
+        >
           Request changes
         </BlockedButton>
-        <p id={reasonId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted @max-[26rem]/canvas:whitespace-normal" title={access.reason}>
+        <p
+          id={reasonId}
+          className="min-w-0 truncate text-[13px] leading-5 text-text-muted @max-[26rem]/canvas:whitespace-normal"
+          title={access.reason}
+        >
           {access.reason}
         </p>
       </Bar>
@@ -83,17 +101,31 @@ export function DecisionBar({
   return (
     <Bar role="group" aria-label="Decide">
       {approveBlocked ? (
-        <BlockedButton variant="default" reason={approveBlocked} describedBy={waitId}>
+        <BlockedButton
+          variant="default"
+          reason={approveBlocked}
+          describedBy={waitId}
+        >
           Approve
         </BlockedButton>
       ) : (
-        <Button onClick={(event) => onApprove(event.currentTarget)}>Approve</Button>
+        <Button onClick={(event) => onApprove(event.currentTarget)}>
+          Approve
+        </Button>
       )}
-      <Button variant="outline" className="bg-surface" onClick={(event) => onRequest(event.currentTarget)}>
+      <Button
+        variant="outline"
+        className="bg-surface"
+        onClick={(event) => onRequest(event.currentTarget)}
+      >
         Request changes
       </Button>
       {approveBlocked ? (
-        <p id={waitId} className="min-w-0 truncate text-[13px] leading-5 text-text-muted @max-[26rem]/canvas:whitespace-normal" title={approveBlocked}>
+        <p
+          id={waitId}
+          className="min-w-0 truncate text-[13px] leading-5 text-text-muted @max-[26rem]/canvas:whitespace-normal"
+          title={approveBlocked}
+        >
           {approveBlocked}
         </p>
       ) : null}

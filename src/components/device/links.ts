@@ -2,7 +2,8 @@
 // ("https://coral.example/pay", "coral.example/pay"). The kit shows it underlined and not clickable, as
 // a phone shows a link from an unknown sender. A trailing full stop or bracket isn't part of the link.
 
-const LINK = /\b(?:https?:\/\/[^\s<>"]+|(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/[^\s<>"]*)?)/gi;
+const LINK =
+  /\b(?:https?:\/\/[^\s<>"]+|(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/[^\s<>"]*)?)/gi;
 const TRAILING = /[.,;:!?'")\]]+$/;
 
 export interface TextRun {

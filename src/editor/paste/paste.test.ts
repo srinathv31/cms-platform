@@ -16,13 +16,41 @@ import { createEditorRootRuntime } from "../state/editor-root";
 import { chipsInJSON, variableKeys } from "./chips";
 import { normalizePastedHtml } from "./normalize-html";
 
-const fixture = (name: string) => readFileSync(resolve(process.cwd(), "src/editor/paste/__fixtures__", name), "utf8");
+const fixture = (name: string) =>
+  readFileSync(
+    resolve(process.cwd(), "src/editor/paste/__fixtures__", name),
+    "utf8",
+  );
 
 const KNOWN: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
-  { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95" },
-  { key: "offer_end_date", label: "Offer end date", type: "date", required: true, sample: "2027-03-04" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "purchase_apr",
+    label: "Purchase APR",
+    type: "percent",
+    required: true,
+    sample: "21.99",
+  },
+  {
+    key: "annual_fee",
+    label: "Annual fee",
+    type: "currency",
+    required: true,
+    sample: "95",
+  },
+  {
+    key: "offer_end_date",
+    label: "Offer end date",
+    type: "date",
+    required: true,
+    sample: "2027-03-04",
+  },
 ];
 
 const editors: Editor[] = [];
@@ -31,14 +59,32 @@ afterEach(() => {
 });
 
 /** `"lines"`: an inline field that keeps its line breaks (an SMS message). */
-function mount(kind: "body" | "inline" | "lines" = "body", content?: JSONContent) {
+function mount(
+  kind: "body" | "inline" | "lines" = "body",
+  content?: JSONContent,
+) {
   const root = createEditorRootRuntime({ variables: KNOWN });
   const fieldKind: "body" | "inline" = kind === "body" ? "body" : "inline";
-  root.registerField({ id: "f", label: kind === "body" ? "Document" : "Email subject", kind: fieldKind });
-  const options = { store: root.variables, binding: { fieldId: "f", kind: fieldKind, root, chip: createChipPopoverStore() } };
+  root.registerField({
+    id: "f",
+    label: kind === "body" ? "Document" : "Email subject",
+    kind: fieldKind,
+  });
+  const options = {
+    store: root.variables,
+    binding: {
+      fieldId: "f",
+      kind: fieldKind,
+      root,
+      chip: createChipPopoverStore(),
+    },
+  };
   const editor = new Editor({
     element: document.createElement("div"),
-    extensions: kind === "body" ? editorExtensions(options) : inlineFieldExtensions(options, kind === "lines" ? "lines" : "line"),
+    extensions:
+      kind === "body"
+        ? editorExtensions(options)
+        : inlineFieldExtensions(options, kind === "lines" ? "lines" : "line"),
     content: content ?? { type: "doc", content: [{ type: "paragraph" }] },
   });
   editors.push(editor);
@@ -52,27 +98,34 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 type Shape = string | Shape[] | { [type: string]: Shape[] };
 
 function inline(content: JSONContent[] | undefined): string {
-  return (content ?? [])
-    .map((node) => {
-      if (node.type === "variable") {
-        const chip = `{{${node.attrs?.key}}}`;
-        const marks = (node.marks ?? []).map((m) => m.type);
-        return marks.includes("bold") ? `**${chip}**` : marks.includes("italic") ? `_${chip}_` : chip;
-      }
-      if (node.type === "hardBreak") return "\\n";
-      let text = node.text ?? "";
-      for (const mark of node.marks ?? []) {
-        if (mark.type === "bold") text = `**${text}**`;
-        else if (mark.type === "italic") text = `_${text}_`;
-        else if (mark.type === "underline") text = `__${text}__`;
-        else if (mark.type === "link") text = `[${text}](${mark.attrs?.href})`;
-      }
-      return text;
-    })
-    .join("")
-    // Adjacent runs with the same mark read as one.
-    .replace(/\*\*\*\*/g, "")
-    .replace(/__(?=_)/g, "__");
+  return (
+    (content ?? [])
+      .map((node) => {
+        if (node.type === "variable") {
+          const chip = `{{${node.attrs?.key}}}`;
+          const marks = (node.marks ?? []).map((m) => m.type);
+          return marks.includes("bold")
+            ? `**${chip}**`
+            : marks.includes("italic")
+              ? `_${chip}_`
+              : chip;
+        }
+        if (node.type === "hardBreak") return "\\n";
+        let text = node.text ?? "";
+        for (const mark of node.marks ?? []) {
+          if (mark.type === "bold") text = `**${text}**`;
+          else if (mark.type === "italic") text = `_${text}_`;
+          else if (mark.type === "underline") text = `__${text}__`;
+          else if (mark.type === "link")
+            text = `[${text}](${mark.attrs?.href})`;
+        }
+        return text;
+      })
+      .join("")
+      // Adjacent runs with the same mark read as one.
+      .replace(/\*\*\*\*/g, "")
+      .replace(/__(?=_)/g, "__")
+  );
 }
 
 function shape(node: JSONContent): Shape {
@@ -85,12 +138,24 @@ function shape(node: JSONContent): Shape {
     case "orderedList":
     case "table":
     case "tableRow":
-      return { [node.type === "bulletList" ? "ul" : node.type === "orderedList" ? "ol" : node.type === "table" ? "table" : "tr"]: (node.content ?? []).map(shape) };
+      return {
+        [node.type === "bulletList"
+          ? "ul"
+          : node.type === "orderedList"
+            ? "ol"
+            : node.type === "table"
+              ? "table"
+              : "tr"]: (node.content ?? []).map(shape),
+      };
     case "listItem":
       return (node.content ?? []).map(shape);
     case "tableHeader":
     case "tableCell":
-      return { [node.type === "tableHeader" ? "th" : "td"]: (node.content ?? []).map(shape) };
+      return {
+        [node.type === "tableHeader" ? "th" : "td"]: (node.content ?? []).map(
+          shape,
+        ),
+      };
     default:
       return node.type ?? "?";
   }
@@ -108,14 +173,26 @@ const doc = (editor: Editor) => {
 describe("normalizePastedHtml", () => {
   it("strips Word's styles, classes, spans, fonts, o:p, comments and fragment markers", () => {
     const html = normalizePastedHtml(fixture("word-windows.html"));
-    for (const junk of ["mso-", "class=", "style=", "<span", "<o:p", "<!--", "StartFragment", "font-family", "<font", "width="]) {
+    for (const junk of [
+      "mso-",
+      "class=",
+      "style=",
+      "<span",
+      "<o:p",
+      "<!--",
+      "StartFragment",
+      "font-family",
+      "<font",
+      "width=",
+    ]) {
       expect(html).not.toContain(junk);
     }
     expect(html).toContain("<h1>Cash Rewards Card offer</h1>");
   });
 
   it("leaves HTML copied from the editor itself alone", () => {
-    const own = '<p data-pm-slice="1 1 []">Hi <span data-variable="first_name" class="x">First name</span></p>';
+    const own =
+      '<p data-pm-slice="1 1 []">Hi <span data-variable="first_name" class="x">First name</span></p>';
     expect(normalizePastedHtml(own)).toBe(own);
   });
 
@@ -123,11 +200,47 @@ describe("normalizePastedHtml", () => {
     const { editor } = mount("body", {
       type: "doc",
       content: [
-        { type: "paragraph", content: [{ type: "text", text: "Intro " }, { type: "variable", attrs: { key: "first_name" } }] },
-        { type: "orderedList", attrs: { start: 3 }, content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Third" }] }] }] },
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Intro " },
+            { type: "variable", attrs: { key: "first_name" } },
+          ],
+        },
+        {
+          type: "orderedList",
+          attrs: { start: 3 },
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Third" }],
+                },
+              ],
+            },
+          ],
+        },
         {
           type: "table",
-          content: [{ type: "tableRow", content: [{ type: "tableCell", attrs: { colspan: 2 }, content: [{ type: "paragraph", content: [{ type: "text", text: "Wide" }] }] }] }],
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableCell",
+                  attrs: { colspan: 2 },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Wide" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
         },
       ],
     });
@@ -135,13 +248,18 @@ describe("normalizePastedHtml", () => {
     const at = (text: string) => {
       let pos = -1;
       state.doc.descendants((node, offset) => {
-        if (pos < 0 && node.isText && node.text?.includes(text)) pos = offset + node.text.indexOf(text);
+        if (pos < 0 && node.isText && node.text?.includes(text))
+          pos = offset + node.text.indexOf(text);
       });
       return pos;
     };
-    const whole = view.serializeForClipboard(new AllSelection(state.doc).content()).dom.innerHTML;
+    const whole = view.serializeForClipboard(
+      new AllSelection(state.doc).content(),
+    ).dom.innerHTML;
     // From inside the list item to inside the cell: an open slice, which carries its context.
-    const open = view.serializeForClipboard(TextSelection.create(state.doc, at("hird"), at("ide")).content()).dom.innerHTML;
+    const open = view.serializeForClipboard(
+      TextSelection.create(state.doc, at("hird"), at("ide")).content(),
+    ).dom.innerHTML;
     expect(whole).toMatch(/^<p data-pm-slice="0 0 \[\]">/);
     expect(open).toMatch(/^<ol start="3" data-pm-slice="3 4 \[\]">/);
 
@@ -172,14 +290,20 @@ describe("normalizePastedHtml", () => {
 
   it("cleans the same HTML pasted into the editor: the list starts at 1", () => {
     const { editor } = mount();
-    editor.view.pasteHTML('<p>About data-pm-slice</p><ol start="5"><li>Five</li></ol>');
-    const list = (editor.getJSON().content ?? []).find((node) => node.type === "orderedList");
+    editor.view.pasteHTML(
+      '<p>About data-pm-slice</p><ol start="5"><li>Five</li></ol>',
+    );
+    const list = (editor.getJSON().content ?? []).find(
+      (node) => node.type === "orderedList",
+    );
     expect(list?.attrs?.start).toBe(1);
   });
 
   it("drops empty &nbsp; paragraphs, colors and images; keeps bold from styles", () => {
     expect(
-      normalizePastedHtml('<p style="color:red"><span style="font-weight:700">Bold</span> <img src="x.png"> text</p><p>&nbsp;</p>'),
+      normalizePastedHtml(
+        '<p style="color:red"><span style="font-weight:700">Bold</span> <img src="x.png"> text</p><p>&nbsp;</p>',
+      ),
     ).toBe("<p><strong>Bold</strong>  text</p>");
   });
 });
@@ -196,7 +320,10 @@ describe("paste from Word for Windows", () => {
       "h2: Offer details",
       {
         ul: [
-          ["p: A variable purchase APR of {{purchase_apr}}.", { ul: [["p: Based on the Prime Rate."]] }],
+          [
+            "p: A variable purchase APR of {{purchase_apr}}.",
+            { ul: [["p: Based on the Prime Rate."]] },
+          ],
           ["p: Cash back that **never expires**."],
         ],
       },
@@ -204,7 +331,12 @@ describe("paste from Word for Windows", () => {
       "h2: Rates and fees",
       {
         table: [
-          { tr: [{ th: ["p: **Interest rates and fees**"] }, { th: ["p: **Terms**"] }] },
+          {
+            tr: [
+              { th: ["p: **Interest rates and fees**"] },
+              { th: ["p: **Terms**"] },
+            ],
+          },
           { tr: [{ td: ["p: Annual fee"] }, { td: ["p: {{annual_fee}}"] }] },
           { tr: [{ td: ["p: Late payment fee"] }, { td: ["p: Up to $41"] }] },
         ],
@@ -257,7 +389,12 @@ describe("paste from Word for Mac", () => {
       "h2: What changes",
       { ol: [["p: Your purchase APR."], ["p: Your cash advance APR."]] },
       "p: Nothing else changes:",
-      { ul: [["p: Fees stay the same."], ["p: Your __credit limit__ stays the same."]] },
+      {
+        ul: [
+          ["p: Fees stay the same."],
+          ["p: Your __credit limit__ stays the same."],
+        ],
+      },
       "h3: Fine print",
       {
         table: [
@@ -266,7 +403,9 @@ describe("paste from Word for Mac", () => {
         ],
       },
     ]);
-    const table = (editor.getJSON().content ?? []).find((n) => n.type === "table") as JSONContent;
+    const table = (editor.getJSON().content ?? []).find(
+      (n) => n.type === "table",
+    ) as JSONContent;
     expect(table.content?.[0]?.content?.[0]?.attrs?.colspan).toBe(2);
 
     // Unknown keys became optional Text variables, labelled from the key; known keys were kept.
@@ -274,8 +413,22 @@ describe("paste from Word for Mac", () => {
     const created = root.variables.getState().variables.slice(KNOWN.length);
     expect(created).toEqual([
       // Each with a fresh id of its own (variable-store.ts).
-      { id: expect.any(String), key: "new_apr", label: "New APR", type: "text", required: false, sample: "" },
-      { id: expect.any(String), key: "effective_date", label: "Effective date", type: "text", required: false, sample: "" },
+      {
+        id: expect.any(String),
+        key: "new_apr",
+        label: "New APR",
+        type: "text",
+        required: false,
+        sample: "",
+      },
+      {
+        id: expect.any(String),
+        key: "effective_date",
+        label: "Effective date",
+        type: "text",
+        required: false,
+        sample: "",
+      },
     ]);
 
     // Undo takes the paste out; the created variables stay (like an inline Create).
@@ -304,8 +457,12 @@ describe("paste from Google Docs", () => {
 describe("{{key}} in pasted text", () => {
   it("plain text: known keys and new ones become chips; invalid {{…}} stays text", async () => {
     const { editor, root } = mount();
-    editor.view.pasteText("Hi {{first_name}} and {{ promo_code }}, not {{Promo Code}} or {{9lives}}.");
-    expect(doc(editor)).toEqual(["p: Hi {{first_name}} and {{promo_code}}, not {{Promo Code}} or {{9lives}}."]);
+    editor.view.pasteText(
+      "Hi {{first_name}} and {{ promo_code }}, not {{Promo Code}} or {{9lives}}.",
+    );
+    expect(doc(editor)).toEqual([
+      "p: Hi {{first_name}} and {{promo_code}}, not {{Promo Code}} or {{9lives}}.",
+    ]);
     const json = JSON.stringify(editor.getJSON());
     expect(json).toContain('"text":", not {{Promo Code}} or {{9lives}}."');
     await flush();
@@ -324,24 +481,36 @@ describe("{{key}} in pasted text", () => {
     root.deleteVariable("annual_fee");
     editor.view.pasteText("Fee {{annual_fee}}");
     await flush();
-    expect(root.variables.getState().byKey.get("annual_fee")?.type).toBe("currency");
+    expect(root.variables.getState().byKey.get("annual_fee")?.type).toBe(
+      "currency",
+    );
   });
 
   it("a one-line field joins pasted lines with spaces and keeps chips", () => {
     const { editor } = mount("inline");
     editor.view.pasteText("Your offer\nends {{offer_end_date}}\n\nsoon");
     expect(doc(editor)).toEqual(["p: Your offer ends {{offer_end_date}} soon"]);
-    editor.commands.setContent({ type: "doc", content: [{ type: "paragraph" }] });
+    editor.commands.setContent({
+      type: "doc",
+      content: [{ type: "paragraph" }],
+    });
     editor.view.pasteHTML(fixture("word-windows.html"));
     expect(editor.state.doc.childCount).toBe(1);
-    expect(editor.state.doc.textContent.startsWith("Cash Rewards Card offer Hi ")).toBe(true);
+    expect(
+      editor.state.doc.textContent.startsWith("Cash Rewards Card offer Hi "),
+    ).toBe(true);
   });
 
   it("a field that keeps its lines pastes each line break as a hard break, blank lines included", () => {
     const { editor } = mount("lines");
     editor.view.pasteText("Your offer\nends {{offer_end_date}}\n\nsoon");
-    expect(doc(editor)).toEqual(["p: Your offer\\nends {{offer_end_date}}\\n\\nsoon"]);
-    editor.commands.setContent({ type: "doc", content: [{ type: "paragraph" }] });
+    expect(doc(editor)).toEqual([
+      "p: Your offer\\nends {{offer_end_date}}\\n\\nsoon",
+    ]);
+    editor.commands.setContent({
+      type: "doc",
+      content: [{ type: "paragraph" }],
+    });
     editor.view.pasteHTML("<p><b>Hi</b> there</p><p>Second</p>");
     expect(editor.state.doc.childCount).toBe(1);
     expect(doc(editor)).toEqual(["p: Hi there\\nSecond"]);
@@ -355,11 +524,19 @@ describe("chipsInJSON and variableKeys (import)", () => {
     const input: JSONContent = {
       type: "doc",
       content: [
-        { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "For {{first_name}}" }] },
+        {
+          type: "heading",
+          attrs: { level: 2 },
+          content: [{ type: "text", text: "For {{first_name}}" }],
+        },
         {
           type: "paragraph",
           content: [
-            { type: "text", text: "Fee {{ annual_fee }}", marks: [{ type: "bold" }] },
+            {
+              type: "text",
+              text: "Fee {{ annual_fee }}",
+              marks: [{ type: "bold" }],
+            },
             { type: "text", text: " and {{Not a key}}." },
           ],
         },
@@ -372,20 +549,39 @@ describe("chipsInJSON and variableKeys (import)", () => {
     ]);
     expect(out.content?.[1].content).toEqual([
       { type: "text", text: "Fee ", marks: [{ type: "bold" }] },
-      { type: "variable", attrs: { key: "annual_fee" }, marks: [{ type: "bold" }] },
+      {
+        type: "variable",
+        attrs: { key: "annual_fee" },
+        marks: [{ type: "bold" }],
+      },
       { type: "text", text: " and {{Not a key}}." },
     ]);
     expect(variableKeys(out)).toEqual(["first_name", "annual_fee"]);
   });
 
   it("returns the same object when there is nothing to convert", () => {
-    const input: JSONContent = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Plain" }] }] };
+    const input: JSONContent = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Plain" }] },
+      ],
+    };
     expect(chipsInJSON(input)).toBe(input);
   });
 
   it("produces JSON the schema accepts (round-trips through an editor)", () => {
     const { editor } = mount();
-    editor.commands.setContent(chipsInJSON({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Hi {{first_name}}" }] }] }));
+    editor.commands.setContent(
+      chipsInJSON({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Hi {{first_name}}" }],
+          },
+        ],
+      }),
+    );
     expect(doc(editor)).toEqual(["p: Hi {{first_name}}"]);
   });
 });

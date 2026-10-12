@@ -23,12 +23,18 @@ import { HelpPopover } from "./help-popover";
 import { NAV_ICON_STROKE, NAV_ITEMS, NAV_ROW, type NavKey } from "./nav";
 import { SidebarCard } from "./sidebar-card";
 
-const ROW_INTERACTION = "hover:bg-hover active:bg-selected data-active:bg-transparent";
+const ROW_INTERACTION =
+  "hover:bg-hover active:bg-selected data-active:bg-transparent";
 
 /** Which main-nav item the URL belongs to. Settings is a modal: it keeps whatever is behind it. */
-function activeFromPath(pathname: string, slug: string | undefined): NavKey | null {
+function activeFromPath(
+  pathname: string,
+  slug: string | undefined,
+): NavKey | null {
   if (!slug) return null;
-  const rest = pathname.startsWith(`/${slug}/`) ? pathname.slice(slug.length + 2) : "";
+  const rest = pathname.startsWith(`/${slug}/`)
+    ? pathname.slice(slug.length + 2)
+    : "";
   const first = rest.split("/")[0];
   switch (first) {
     case "library":
@@ -49,7 +55,13 @@ function activeFromPath(pathname: string, slug: string | undefined): NavKey | nu
  * with a name ("3 waiting") rather than a plain span with an `aria-label`, which no screen reader is
  * bound to read; the link then reads "Review 3 waiting". The digits stay in the DOM as its text.
  */
-function ReviewCount({ counts, slug }: { counts: Promise<Record<string, number>>; slug: string }) {
+function ReviewCount({
+  counts,
+  slug,
+}: {
+  counts: Promise<Record<string, number>>;
+  slug: string;
+}) {
   const count = use(counts)[slug] ?? 0;
   if (count <= 0) return null;
   return (
@@ -97,10 +109,16 @@ export function SidebarBody({
               return (
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
-                    render={<Link href={`/${space.slug}/${item.key}` as Route} />}
+                    render={
+                      <Link href={`/${space.slug}/${item.key}` as Route} />
+                    }
                     isActive={isActive}
                     aria-current={isActive ? "page" : undefined}
-                    className={cn(NAV_ROW, ROW_INTERACTION, isActive && "font-medium")}
+                    className={cn(
+                      NAV_ROW,
+                      ROW_INTERACTION,
+                      isActive && "font-medium",
+                    )}
                   >
                     {isActive ? (
                       <m.span
@@ -137,7 +155,11 @@ export function SidebarBody({
           {space && settingsSection ? (
             <SidebarMenuItem>
               <SidebarMenuButton
-                render={<Link href={`/${space.slug}/settings/${settingsSection}` as Route} />}
+                render={
+                  <Link
+                    href={`/${space.slug}/settings/${settingsSection}` as Route}
+                  />
+                }
                 className={cn(NAV_ROW, ROW_INTERACTION)}
               >
                 <Settings aria-hidden strokeWidth={NAV_ICON_STROKE} />

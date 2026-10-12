@@ -20,8 +20,18 @@ export interface AlertStarter {
 
 const ALERT_CHANNELS: Channel[] = ["push", "sms"];
 
-function alert(scope: string, kit: VariableKit, keys: VarKey[], channelFields: ChannelFields): AlertStarter {
-  return { body: emptyBody(scope), variables: kit.list(keys), channels: [...ALERT_CHANNELS], channelFields };
+function alert(
+  scope: string,
+  kit: VariableKit,
+  keys: VarKey[],
+  channelFields: ChannelFields,
+): AlertStarter {
+  return {
+    body: emptyBody(scope),
+    variables: kit.list(keys),
+    channels: [...ALERT_CHANNELS],
+    channelFields,
+  };
 }
 
 /** Push and SMS on, nothing written yet. */
@@ -33,9 +43,16 @@ export function paymentReminder(scope: string, kit: VariableKit): AlertStarter {
   return alert(scope, kit, ["first_name", "amount_due", "due_date"], {
     push: {
       title: inlineDoc("Your payment is due soon"),
-      body: inlineDoc("Hi {first_name}, your minimum payment of {amount_due} is due {due_date}. Pay in the app to avoid a late fee."),
+      body: inlineDoc(
+        "Hi {first_name}, your minimum payment of {amount_due} is due {due_date}. Pay in the app to avoid a late fee.",
+      ),
     },
-    sms: { text: linesDoc("Coral: Your minimum payment of {amount_due} is due {due_date}.", "Pay at coral.example/pay") },
+    sms: {
+      text: linesDoc(
+        "Coral: Your minimum payment of {amount_due} is due {due_date}.",
+        "Pay at coral.example/pay",
+      ),
+    },
   });
 }
 
@@ -44,7 +61,9 @@ export function cardActivity(scope: string, kit: VariableKit): AlertStarter {
     push: {
       title: inlineDoc("Check a recent purchase"),
       subtitle: inlineDoc("Card ending in {card_last4}"),
-      body: inlineDoc("Your card was used for {transaction_amount} at {merchant}. If it wasn't you, lock your card in the app."),
+      body: inlineDoc(
+        "Your card was used for {transaction_amount} at {merchant}. If it wasn't you, lock your card in the app.",
+      ),
     },
     sms: {
       text: linesDoc(
@@ -56,13 +75,23 @@ export function cardActivity(scope: string, kit: VariableKit): AlertStarter {
 }
 
 export function statementReady(scope: string, kit: VariableKit): AlertStarter {
-  return alert(scope, kit, ["first_name", "statement_balance", "amount_due", "due_date"], {
-    push: {
-      title: inlineDoc("Your statement is ready"),
-      body: inlineDoc(
-        "Hi {first_name}, your new statement is ready. Your balance is {statement_balance}, and your minimum payment of {amount_due} is due {due_date}.",
-      ),
+  return alert(
+    scope,
+    kit,
+    ["first_name", "statement_balance", "amount_due", "due_date"],
+    {
+      push: {
+        title: inlineDoc("Your statement is ready"),
+        body: inlineDoc(
+          "Hi {first_name}, your new statement is ready. Your balance is {statement_balance}, and your minimum payment of {amount_due} is due {due_date}.",
+        ),
+      },
+      sms: {
+        text: linesDoc(
+          "Coral: Your statement is ready. Minimum payment {amount_due} due {due_date}.",
+          "coral.example/statements",
+        ),
+      },
     },
-    sms: { text: linesDoc("Coral: Your statement is ready. Minimum payment {amount_due} due {due_date}.", "coral.example/statements") },
-  });
+  );
 }

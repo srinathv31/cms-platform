@@ -10,7 +10,10 @@ import type { ContractChange } from "./types";
 export { diffVariables, isBreaking } from "@/editor/model/contract";
 
 /** One sentence per change, in the order given (the diff lists removals last). */
-export function describeChanges(changes: readonly ContractChange[], versionNumber: number): string[] {
+export function describeChanges(
+  changes: readonly ContractChange[],
+  versionNumber: number,
+): string[] {
   return changes.map((change) => describeChange(change, versionNumber));
 }
 
@@ -23,7 +26,10 @@ export function describeChanges(changes: readonly ContractChange[], versionNumbe
  *   made_optional  v2 makes `promo_code` optional.
  *   label_changed  v2 changes the label of `annual_fee` to “Annual fee”.
  */
-export function describeChange(change: ContractChange, versionNumber: number): string {
+export function describeChange(
+  change: ContractChange,
+  versionNumber: number,
+): string {
   const v = `v${versionNumber}`;
   const key = code(change.key);
 
@@ -48,7 +54,10 @@ export function describeChange(change: ContractChange, versionNumber: number): s
 /** "Currency", "US state"; an unknown type reads as itself. */
 export function typeLabel(type: string | undefined): string {
   if (!type) return "an unknown type";
-  return (TYPE_META as Record<string, { label: string } | undefined>)[type]?.label ?? type;
+  return (
+    (TYPE_META as Record<string, { label: string } | undefined>)[type]?.label ??
+    type
+  );
 }
 
 /**

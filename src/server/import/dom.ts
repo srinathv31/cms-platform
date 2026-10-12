@@ -8,7 +8,9 @@ import { Window } from "happy-dom";
 export type ParseHtml = (html: string) => Document;
 
 /** Runs `fn` with a parser bound to a fresh Window, then closes the Window. */
-export async function withDom<T>(fn: (parse: ParseHtml) => T | Promise<T>): Promise<T> {
+export async function withDom<T>(
+  fn: (parse: ParseHtml) => T | Promise<T>,
+): Promise<T> {
   const window = new Window({
     settings: {
       disableJavaScriptFileLoading: true,
@@ -25,7 +27,10 @@ export async function withDom<T>(fn: (parse: ParseHtml) => T | Promise<T>): Prom
   try {
     const parser = new window.DOMParser();
     // happy-dom's Document is shaped like lib.dom's; the editor's normalizer is written against lib.dom.
-    return await fn((html) => parser.parseFromString(html, "text/html") as unknown as Document);
+    return await fn(
+      (html) =>
+        parser.parseFromString(html, "text/html") as unknown as Document,
+    );
   } finally {
     await window.happyDOM.close();
   }
@@ -41,14 +46,26 @@ const REF_HREF = /^#(?:comment|footnote|endnote)-\d+$/;
  * Removes mammoth's comment and footnote/endnote lists and the reference marks pointing at them,
  * and says how many there were.
  */
-export function stripNotes(root: Element): { comments: number; footnotes: number } {
-  const comments = [...root.querySelectorAll("[id]")].filter((el) => COMMENT_ID.test(el.id) && el.tagName === "DT");
-  const notes = [...root.querySelectorAll("li[id]")].filter((el) => NOTE_ID.test(el.id));
+export function stripNotes(root: Element): {
+  comments: number;
+  footnotes: number;
+} {
+  const comments = [...root.querySelectorAll("[id]")].filter(
+    (el) => COMMENT_ID.test(el.id) && el.tagName === "DT",
+  );
+  const notes = [...root.querySelectorAll("li[id]")].filter((el) =>
+    NOTE_ID.test(el.id),
+  );
 
   for (const link of [...root.querySelectorAll("a[href]")]) {
     if (!REF_HREF.test(link.getAttribute("href") ?? "")) continue;
     const parent = link.parentElement;
-    const holder = parent && parent.tagName === "SUP" && parent.textContent?.trim() === link.textContent?.trim() ? parent : link;
+    const holder =
+      parent &&
+      parent.tagName === "SUP" &&
+      parent.textContent?.trim() === link.textContent?.trim()
+        ? parent
+        : link;
     holder.remove();
   }
   for (const dt of comments) dt.closest("dl")?.remove();
@@ -58,16 +75,60 @@ export function stripNotes(root: Element): { comments: number; footnotes: number
 
 // ── The Compare view's allowlisted HTML ──────────────────────────────────────
 
-const KEEP = new Set(["p", "h1", "h2", "h3", "ul", "ol", "li", "table", "thead", "tbody", "tr", "th", "td", "strong", "em", "u"]);
-const RENAME: Record<string, string> = { h4: "h3", h5: "h3", h6: "h3", b: "strong", i: "em" };
-const DROP = new Set([
-  "head", "style", "script", "noscript", "template", "meta", "link", "title", "iframe", "object", "embed",
-  "svg", "math", "video", "audio", "canvas", "form", "input", "button", "select", "textarea",
+const KEEP = new Set([
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "ul",
+  "ol",
+  "li",
+  "table",
+  "thead",
+  "tbody",
+  "tr",
+  "th",
+  "td",
+  "strong",
+  "em",
+  "u",
 ]);
-const DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+=*$/;
+const RENAME: Record<string, string> = {
+  h4: "h3",
+  h5: "h3",
+  h6: "h3",
+  b: "strong",
+  i: "em",
+};
+const DROP = new Set([
+  "head",
+  "style",
+  "script",
+  "noscript",
+  "template",
+  "meta",
+  "link",
+  "title",
+  "iframe",
+  "object",
+  "embed",
+  "svg",
+  "math",
+  "video",
+  "audio",
+  "canvas",
+  "form",
+  "input",
+  "button",
+  "select",
+  "textarea",
+]);
+const DATA_IMAGE =
+  /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+=*$/;
 const SAFE_HREF = /^(?:https?:|mailto:)/i;
 
-const escapeText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escapeText = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const escapeAttr = (s: string) => escapeText(s).replace(/"/g, "&quot;");
 
 /**
@@ -97,7 +158,9 @@ export function allowlistHtml(root: Element, maxImageBytes: number): string {
     const inner = [...el.childNodes].map(walk).join("");
     if (tag === "a") {
       const href = el.getAttribute("href") ?? "";
-      return SAFE_HREF.test(href) ? `<a href="${escapeAttr(href)}" rel="noopener noreferrer">${inner}</a>` : inner;
+      return SAFE_HREF.test(href)
+        ? `<a href="${escapeAttr(href)}" rel="noopener noreferrer">${inner}</a>`
+        : inner;
     }
     if (!KEEP.has(tag)) return inner;
     let attrs = "";

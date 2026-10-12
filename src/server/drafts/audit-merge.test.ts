@@ -7,11 +7,17 @@ const t2 = new Date("2026-10-04T10:00:09.000Z");
 
 describe("changedFields", () => {
   it("lists the provided fields in a fixed order", () => {
-    expect(changedFields({ sampleSets: [], body: {}, name: "A" })).toEqual(["body", "name", "sampleSets"]);
+    expect(changedFields({ sampleSets: [], body: {}, name: "A" })).toEqual([
+      "body",
+      "name",
+      "sampleSets",
+    ]);
   });
 
   it("counts null (it clears a channel field) but not undefined", () => {
-    expect(changedFields({ "email.subject": null, "email.preheader": undefined })).toEqual(["email.subject"]);
+    expect(
+      changedFields({ "email.subject": null, "email.preheader": undefined }),
+    ).toEqual(["email.subject"]);
   });
 
   it("ignores everything that is not a draft field", () => {
@@ -39,13 +45,20 @@ describe("mergeDraftEdit", () => {
     expect(second.at).toBe(t1);
 
     const third = mergeDraftEdit(second, ["body"], t2, 8);
-    expect(third.details).toMatchObject({ saves: 3, fields: ["body", "variables", "name"], since: t0.toISOString(), rev: 8 });
+    expect(third.details).toMatchObject({
+      saves: 3,
+      fields: ["body", "variables", "name"],
+      since: t0.toISOString(),
+      rev: 8,
+    });
     expect(third.at).toBe(t2);
   });
 
   it("does not repeat a field", () => {
     const first = mergeDraftEdit(null, ["body"], t0, 6);
-    expect(mergeDraftEdit(first, ["body"], t1, 7).details.fields).toEqual(["body"]);
+    expect(mergeDraftEdit(first, ["body"], t1, 7).details.fields).toEqual([
+      "body",
+    ]);
   });
 
   it("does not change the row it was given", () => {
@@ -68,14 +81,30 @@ describe("mergeDraftEdit", () => {
   });
 
   it("copes with a row whose details are null or garbage", () => {
-    for (const details of [null, "text", 7, [], { saves: "many", fields: "all", since: "never" }]) {
+    for (const details of [
+      null,
+      "text",
+      7,
+      [],
+      { saves: "many", fields: "all", since: "never" },
+    ]) {
       const merged = mergeDraftEdit({ at: t0, details }, ["name"], t1, 3);
-      expect(merged.details).toEqual({ saves: 2, fields: ["name"], since: t0.toISOString(), rev: 3 });
+      expect(merged.details).toEqual({
+        saves: 2,
+        fields: ["name"],
+        since: t0.toISOString(),
+        rev: 3,
+      });
     }
   });
 
   it("drops field names it does not know", () => {
-    const merged = mergeDraftEdit({ at: t0, details: { saves: 1, fields: ["body", "rev", 5] } }, ["name"], t1, 3);
+    const merged = mergeDraftEdit(
+      { at: t0, details: { saves: 1, fields: ["body", "rev", 5] } },
+      ["name"],
+      t1,
+      3,
+    );
     expect(merged.details.fields).toEqual(["body", "name"]);
   });
 });

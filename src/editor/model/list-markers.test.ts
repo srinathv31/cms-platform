@@ -55,13 +55,16 @@ describe("formatNumber", () => {
     [18279, "18279", "aaaa", "AAAA", "18279", "18279"],
   ];
 
-  it.each(rows)("%i → %s %s %s %s %s", (n, decimal, lowerAlpha, upperAlpha, lowerRoman, upperRoman) => {
-    expect(formatNumber(n, "decimal")).toBe(decimal);
-    expect(formatNumber(n, "lower-alpha")).toBe(lowerAlpha);
-    expect(formatNumber(n, "upper-alpha")).toBe(upperAlpha);
-    expect(formatNumber(n, "lower-roman")).toBe(lowerRoman);
-    expect(formatNumber(n, "upper-roman")).toBe(upperRoman);
-  });
+  it.each(rows)(
+    "%i → %s %s %s %s %s",
+    (n, decimal, lowerAlpha, upperAlpha, lowerRoman, upperRoman) => {
+      expect(formatNumber(n, "decimal")).toBe(decimal);
+      expect(formatNumber(n, "lower-alpha")).toBe(lowerAlpha);
+      expect(formatNumber(n, "upper-alpha")).toBe(upperAlpha);
+      expect(formatNumber(n, "lower-roman")).toBe(lowerRoman);
+      expect(formatNumber(n, "upper-roman")).toBe(upperRoman);
+    },
+  );
 
   it("writes every number from 1 to 3999 as a distinct roman numeral", () => {
     const seen = new Set<string>();
@@ -75,9 +78,12 @@ describe("formatNumber", () => {
     expect(seen.size).toBe(9999);
   });
 
-  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53])("refuses %s", (n) => {
-    expect(() => formatNumber(n, "decimal")).toThrow(RangeError);
-  });
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53])(
+    "refuses %s",
+    (n) => {
+      expect(() => formatNumber(n, "decimal")).toThrow(RangeError);
+    },
+  );
 });
 
 describe("formatMarker", () => {
@@ -115,18 +121,9 @@ describe("formatMarker", () => {
 
 describe("NUMBERING_STYLES", () => {
   it("offers exactly the ten styles, in menu order", () => {
-    expect(NUMBERING_STYLES.map((s) => formatMarker(1, s.format, s.delimiter))).toEqual([
-      "1.",
-      "a.",
-      "A.",
-      "i.",
-      "I.",
-      "(1)",
-      "(a)",
-      "(i)",
-      "1)",
-      "a)",
-    ]);
+    expect(
+      NUMBERING_STYLES.map((s) => formatMarker(1, s.format, s.delimiter)),
+    ).toEqual(["1.", "a.", "A.", "i.", "I.", "(1)", "(a)", "(i)", "1)", "a)"]);
   });
 });
 
@@ -160,24 +157,35 @@ describe("resolveNumbering", () => {
     [null, "parens", 1, "(a)"],
     ["decimal", "paren-right", 2, "1)"],
     ["lower-alpha", "parens", 0, "(a)"],
-  ] as const)("%s / %s at depth %i → %s", (format, delimiter, depth, marker) => {
-    const style = resolveNumbering(format, delimiter, depth);
-    expect(formatMarker(1, style.format, style.delimiter)).toBe(marker);
-  });
+  ] as const)(
+    "%s / %s at depth %i → %s",
+    (format, delimiter, depth, marker) => {
+      const style = resolveNumbering(format, delimiter, depth);
+      expect(formatMarker(1, style.format, style.delimiter)).toBe(marker);
+    },
+  );
 });
 
 describe("orderedMarkers", () => {
   it("numbers from start, one per item", () => {
-    expect(orderedMarkers(1, 3, { format: "decimal", delimiter: "period" })).toEqual(["1.", "2.", "3."]);
-    expect(orderedMarkers(0, 2, { format: "decimal", delimiter: "period" })).toEqual(["0.", "1."]);
-    expect(orderedMarkers(25, 3, { format: "lower-alpha", delimiter: "parens" })).toEqual(["(y)", "(z)", "(aa)"]);
-    expect(orderedMarkers(3998, 3, { format: "upper-roman", delimiter: "period" })).toEqual([
-      "MMMCMXCVIII.",
-      "MMMCMXCIX.",
-      "4000.",
-    ]);
-    expect(orderedMarkers(9999, 2, { format: "decimal", delimiter: "paren-right" })).toEqual(["9999)", "10000)"]);
-    expect(orderedMarkers(1, 0, { format: "decimal", delimiter: "period" })).toEqual([]);
+    expect(
+      orderedMarkers(1, 3, { format: "decimal", delimiter: "period" }),
+    ).toEqual(["1.", "2.", "3."]);
+    expect(
+      orderedMarkers(0, 2, { format: "decimal", delimiter: "period" }),
+    ).toEqual(["0.", "1."]);
+    expect(
+      orderedMarkers(25, 3, { format: "lower-alpha", delimiter: "parens" }),
+    ).toEqual(["(y)", "(z)", "(aa)"]);
+    expect(
+      orderedMarkers(3998, 3, { format: "upper-roman", delimiter: "period" }),
+    ).toEqual(["MMMCMXCVIII.", "MMMCMXCIX.", "4000."]);
+    expect(
+      orderedMarkers(9999, 2, { format: "decimal", delimiter: "paren-right" }),
+    ).toEqual(["9999)", "10000)"]);
+    expect(
+      orderedMarkers(1, 0, { format: "decimal", delimiter: "period" }),
+    ).toEqual([]);
   });
 });
 
@@ -198,14 +206,34 @@ describe("bullets", () => {
 
 describe("guards", () => {
   it("accept exactly the stored vocabularies", () => {
-    expect(["decimal", "lower-alpha", "upper-alpha", "lower-roman", "upper-roman"].every(isMarkerFormat)).toBe(true);
-    expect([null, undefined, "", "Decimal", "lower-latin", "a", "1", 1].some(isMarkerFormat)).toBe(false);
-    expect(["period", "paren-right", "parens"].every(isMarkerDelimiter)).toBe(true);
-    expect([null, undefined, "", ".", ")", "paren", "Period"].some(isMarkerDelimiter)).toBe(false);
+    expect(
+      [
+        "decimal",
+        "lower-alpha",
+        "upper-alpha",
+        "lower-roman",
+        "upper-roman",
+      ].every(isMarkerFormat),
+    ).toBe(true);
+    expect(
+      [null, undefined, "", "Decimal", "lower-latin", "a", "1", 1].some(
+        isMarkerFormat,
+      ),
+    ).toBe(false);
+    expect(["period", "paren-right", "parens"].every(isMarkerDelimiter)).toBe(
+      true,
+    );
+    expect(
+      [null, undefined, "", ".", ")", "paren", "Period"].some(
+        isMarkerDelimiter,
+      ),
+    ).toBe(false);
   });
 
   it("accept a start from 0 to 9999", () => {
     expect([0, 1, 9999].every(isListStart)).toBe(true);
-    expect([-1, 10000, 1.5, "3", null, undefined, Number.NaN].some(isListStart)).toBe(false);
+    expect(
+      [-1, 10000, 1.5, "3", null, undefined, Number.NaN].some(isListStart),
+    ).toBe(false);
   });
 });

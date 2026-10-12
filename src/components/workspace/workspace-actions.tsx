@@ -7,8 +7,16 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { BlockedButton } from "@/components/primitives/blocked-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { startDraft } from "@/server/actions/templates";
@@ -18,7 +26,14 @@ import type { SubmitSummary } from "@/domain/submit-types";
 import type { ActionResult } from "@/domain/review-types";
 import { readTemplate } from "@/lib/template-reads";
 import type { WorkspaceSession } from "./session/session-store";
-import { useFocusTarget, usePreviewState, useRailOpen, useSaveStatus, useTabFailed, useWorkspaceSession } from "./session/workspace-session";
+import {
+  useFocusTarget,
+  usePreviewState,
+  useRailOpen,
+  useSaveStatus,
+  useTabFailed,
+  useWorkspaceSession,
+} from "./session/workspace-session";
 import { TAB_BLOCKED } from "./tab-error";
 
 /**
@@ -35,12 +50,19 @@ export function EditButton({ templateId }: { templateId: string }) {
 
   function edit() {
     // On success the action redirects, and Next follows it (`runAction` hands the redirect back).
-    run(() => startDraft({ templateId }), { onRefused: ({ reason }) => toast.error(reason) });
+    run(() => startDraft({ templateId }), {
+      onRefused: ({ reason }) => toast.error(reason),
+    });
   }
 
   if (tabFailed) {
     return (
-      <BlockedButton variant="default" size="lg" className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3" reason={TAB_BLOCKED}>
+      <BlockedButton
+        variant="default"
+        size="lg"
+        className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3"
+        reason={TAB_BLOCKED}
+      >
         <Pencil data-icon="inline-start" strokeWidth={1.75} />
         Edit
       </BlockedButton>
@@ -48,8 +70,17 @@ export function EditButton({ templateId }: { templateId: string }) {
   }
 
   return (
-    <Button size="lg" className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3" onClick={edit} disabled={pending}>
-      {pending ? <Spinner data-icon="inline-start" aria-label="Opening draft" /> : <Pencil data-icon="inline-start" strokeWidth={1.75} />}
+    <Button
+      size="lg"
+      className="px-4 @max-[53rem]/ws:@max-[28rem]/bar:px-3"
+      onClick={edit}
+      disabled={pending}
+    >
+      {pending ? (
+        <Spinner data-icon="inline-start" aria-label="Opening draft" />
+      ) : (
+        <Pencil data-icon="inline-start" strokeWidth={1.75} />
+      )}
       Edit
     </Button>
   );
@@ -69,7 +100,9 @@ async function saveFirst(session: WorkspaceSession): Promise<ActionResult> {
   // The host publishes the outcome of that flush on the next render: wait one task for it.
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
   const saved = session.getStatus();
-  return saved.status === "error" ? { ok: false, code: "failed", reason: saved.error ?? NOT_SAVED } : { ok: true };
+  return saved.status === "error"
+    ? { ok: false, code: "failed", reason: saved.error ?? NOT_SAVED }
+    : { ok: true };
 }
 
 /** How long focus waits for the header to read In review after a submit (`focusStatusRow`) before it gives up. */
@@ -84,7 +117,10 @@ const STATUS_ROW_WAIT_MS = 3000;
  */
 function focusStatusRow(session: WorkspaceSession) {
   void session.focusTargets
-    .waitFor("statusRow", { accept: (_, state) => state === "in_review", timeout: STATUS_ROW_WAIT_MS })
+    .waitFor("statusRow", {
+      accept: (_, state) => state === "in_review",
+      timeout: STATUS_ROW_WAIT_MS,
+    })
     .then((row) => {
       const active = document.activeElement;
       const free = active === null || active === document.body;
@@ -136,7 +172,11 @@ export function SubmitButton({ templateId }: { templateId: string }) {
     () => () => {
       letGoRef.current?.();
       letGoRef.current = null;
-      if (submittedAt.current !== null && performance.now() - submittedAt.current < 10_000) focusStatusRow(session);
+      if (
+        submittedAt.current !== null &&
+        performance.now() - submittedAt.current < 10_000
+      )
+        focusStatusRow(session);
     },
     [session],
   );
@@ -159,10 +199,15 @@ export function SubmitButton({ templateId }: { templateId: string }) {
    * What the dialog lists, read from the saved draft once everything typed has gone out
    * (GET /api/templates/[templateId]/submit-summary): on the click, and on "Refresh summary".
    */
-  async function readSummary(): Promise<ActionResult<{ summary: SubmitSummary }>> {
+  async function readSummary(): Promise<
+    ActionResult<{ summary: SubmitSummary }>
+  > {
     const saved = await saveFirst(session);
     if (!saved.ok) return saved;
-    return readTemplate<{ summary: SubmitSummary }>(templateId, "submit-summary");
+    return readTemplate<{ summary: SubmitSummary }>(
+      templateId,
+      "submit-summary",
+    );
   }
 
   function openDialog() {
@@ -191,16 +236,30 @@ export function SubmitButton({ templateId }: { templateId: string }) {
   // In the tightest tab bar (preview open on a 1280px window) the label closes up to "Submit". The bar's steps are in workspace-grid.ts.
   const label = (
     <span>
-      Submit<span className="@max-[28rem]/bar:hidden @max-[53rem]/ws:@max-[33rem]/bar:hidden"> for review</span>
+      Submit
+      <span className="@max-[28rem]/bar:hidden @max-[53rem]/ws:@max-[33rem]/bar:hidden">
+        {" "}
+        for review
+      </span>
     </span>
   );
   // Two things can block the button; a tab that failed to load comes first, so only one reason shows.
-  const blockedReason = tabFailed ? TAB_BLOCKED : stopped ? (stopReason ?? NOT_SAVED) : null;
+  const blockedReason = tabFailed
+    ? TAB_BLOCKED
+    : stopped
+      ? (stopReason ?? NOT_SAVED)
+      : null;
 
   return (
     <>
       {blockedReason !== null ? (
-        <BlockedButton variant="default" size="lg" className={SUBMIT_CLASS} aria-label="Submit for review" reason={blockedReason}>
+        <BlockedButton
+          variant="default"
+          size="lg"
+          className={SUBMIT_CLASS}
+          aria-label="Submit for review"
+          reason={blockedReason}
+        >
           {label}
         </BlockedButton>
       ) : (
@@ -223,7 +282,9 @@ export function SubmitButton({ templateId }: { templateId: string }) {
               />
             }
           >
-            {pending ? <Spinner data-icon="inline-start" aria-label="Opening" /> : null}
+            {pending ? (
+              <Spinner data-icon="inline-start" aria-label="Opening" />
+            ) : null}
             {label}
           </PopoverTrigger>
           <PopoverContent
@@ -255,12 +316,17 @@ export function SubmitButton({ templateId }: { templateId: string }) {
           return result;
         }}
         onSubmit={async (note) => {
-          if (!summary) return { ok: false, code: "failed", reason: SUBMIT_FAILED };
+          if (!summary)
+            return { ok: false, code: "failed", reason: SUBMIT_FAILED };
           // Anything still waiting to save goes out first. If something does, the draft has moved past
           // the summary, and the server says so rather than freezing what the dialog didn't list.
           const saved = await saveFirst(session);
           if (!saved.ok) return saved;
-          const result = await submitVersion({ templateId, note, rev: summary.rev });
+          const result = await submitVersion({
+            templateId,
+            note,
+            rev: summary.rev,
+          });
           if (result.ok) submittedAt.current = performance.now();
           return result;
         }}
@@ -305,9 +371,17 @@ export function PreviewToggle({ className }: { className?: string }) {
   );
   if (tabFailed) {
     return (
-      <BlockedButton size="lg" aria-label="Preview" aria-pressed={open} className={classes} reason={TAB_BLOCKED}>
+      <BlockedButton
+        size="lg"
+        aria-label="Preview"
+        aria-pressed={open}
+        className={classes}
+        reason={TAB_BLOCKED}
+      >
         <Eye data-icon="inline-start" strokeWidth={1.75} />
-        <span className="@max-[34rem]/bar:sr-only @max-[53rem]/ws:@max-[39rem]/bar:sr-only">Preview</span>
+        <span className="@max-[34rem]/bar:sr-only @max-[53rem]/ws:@max-[39rem]/bar:sr-only">
+          Preview
+        </span>
       </BlockedButton>
     );
   }
@@ -322,13 +396,17 @@ export function PreviewToggle({ className }: { className?: string }) {
             size="lg"
             aria-label="Preview"
             aria-pressed={open}
-            onClick={() => (open ? session.closePreview() : session.openPreview())}
+            onClick={() =>
+              open ? session.closePreview() : session.openPreview()
+            }
             className={classes}
           />
         }
       >
         <Eye data-icon="inline-start" strokeWidth={1.75} />
-        <span className="@max-[34rem]/bar:sr-only @max-[53rem]/ws:@max-[39rem]/bar:sr-only">Preview</span>
+        <span className="@max-[34rem]/bar:sr-only @max-[53rem]/ws:@max-[39rem]/bar:sr-only">
+          Preview
+        </span>
       </TooltipTrigger>
       <TooltipContent side="bottom">Preview</TooltipContent>
     </Tooltip>
@@ -359,7 +437,11 @@ export function RailToggle({ className }: { className?: string }) {
         size="icon-lg"
         aria-label="Channels and variables"
         aria-pressed={open}
-        className={cn("@min-[53rem]/ws:hidden", open && "bg-selected", className)}
+        className={cn(
+          "@min-[53rem]/ws:hidden",
+          open && "bg-selected",
+          className,
+        )}
         reason={TAB_BLOCKED}
       >
         <PanelRight strokeWidth={1.75} />
@@ -376,7 +458,11 @@ export function RailToggle({ className }: { className?: string }) {
             aria-label="Channels and variables"
             aria-pressed={open}
             onClick={() => session.setRailOpen(!open)}
-            className={cn("@min-[53rem]/ws:hidden", open && "bg-selected", className)}
+            className={cn(
+              "@min-[53rem]/ws:hidden",
+              open && "bg-selected",
+              className,
+            )}
           />
         }
       >

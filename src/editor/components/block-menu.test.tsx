@@ -13,9 +13,17 @@ import { listItemMarkers } from "../extensions/list-markers";
 import { editorExtensions } from "../schema";
 import { createVariableStore } from "../state/variable-store";
 import { byRole } from "../testing/editor";
-import { GripBlockMenu, GripTrigger, KeyboardBlockMenu, NO_NUMBERING_REASON, START_RANGE_MESSAGE } from "./block-menu";
+import {
+  GripBlockMenu,
+  GripTrigger,
+  KeyboardBlockMenu,
+  NO_NUMBERING_REASON,
+  START_RANGE_MESSAGE,
+} from "./block-menu";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let cleanup: (() => void) | null = null;
 beforeEach(() => {
@@ -28,20 +36,54 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const p = (text: string): JSONContent => ({ type: "paragraph", content: [{ type: "text", text }] });
-const li = (text: string, ...nested: JSONContent[]): JSONContent => ({ type: "listItem", content: [p(text), ...nested] });
+const p = (text: string): JSONContent => ({
+  type: "paragraph",
+  content: [{ type: "text", text }],
+});
+const li = (text: string, ...nested: JSONContent[]): JSONContent => ({
+  type: "listItem",
+  content: [p(text), ...nested],
+});
 const DOC: JSONContent = {
   type: "doc",
-  content: [p("Intro"), { type: "orderedList", attrs: { start: 1 }, content: [li("One", { type: "orderedList", content: [li("Inner")] }), li("Two")] }],
+  content: [
+    p("Intro"),
+    {
+      type: "orderedList",
+      attrs: { start: 1 },
+      content: [
+        li("One", { type: "orderedList", content: [li("Inner")] }),
+        li("Two"),
+      ],
+    },
+  ],
 };
 
 const wait = (ms = 0) => vi.advanceTimersByTimeAsync(ms);
 
 /** The grip and its menu, as the block handle wires them (a click while it closes is ignored). */
-function Grip({ editor, blockPos, onClosed }: { editor: Editor; blockPos: number; onClosed: () => void }) {
-  const [menu, setMenu] = useState<{ open: boolean; blockPos: number | null }>({ open: false, blockPos: null });
+function Grip({
+  editor,
+  blockPos,
+  onClosed,
+}: {
+  editor: Editor;
+  blockPos: number;
+  onClosed: () => void;
+}) {
+  const [menu, setMenu] = useState<{ open: boolean; blockPos: number | null }>({
+    open: false,
+    blockPos: null,
+  });
   const [grip, setGrip] = useState<HTMLElement | null>(null);
-  const onOpenChange = (open: boolean) => setMenu((m) => (open ? (m.blockPos === null ? { open: true, blockPos } : m) : { ...m, open: false }));
+  const onOpenChange = (open: boolean) =>
+    setMenu((m) =>
+      open
+        ? m.blockPos === null
+          ? { open: true, blockPos }
+          : m
+        : { ...m, open: false },
+    );
   return (
     <GripBlockMenu
       editor={editor}
@@ -68,9 +110,14 @@ function setup(which: "grip" | "keyboard", blockIndex: number) {
   const host = document.createElement("div");
   frame.append(element, host);
   document.body.appendChild(frame);
-  const editor = new Editor({ element, extensions: editorExtensions({ store: createVariableStore([]) }), content: DOC });
+  const editor = new Editor({
+    element,
+    extensions: editorExtensions({ store: createVariableStore([]) }),
+    content: DOC,
+  });
   let blockPos = 0;
-  for (let i = 0; i < blockIndex; i++) blockPos += editor.state.doc.child(i).nodeSize;
+  for (let i = 0; i < blockIndex; i++)
+    blockPos += editor.state.doc.child(i).nodeSize;
   const onClose = vi.fn();
   let root: Root;
   act(() => {
@@ -79,7 +126,11 @@ function setup(which: "grip" | "keyboard", blockIndex: number) {
       which === "grip" ? (
         <Grip editor={editor} blockPos={blockPos} onClosed={onClose} />
       ) : (
-        <KeyboardBlockMenu editor={editor} blockPos={blockPos} onClose={onClose} />
+        <KeyboardBlockMenu
+          editor={editor}
+          blockPos={blockPos}
+          onClose={onClose}
+        />
       ),
     );
   });
@@ -91,20 +142,28 @@ function setup(which: "grip" | "keyboard", blockIndex: number) {
 }
 
 /** The menu, found the way assistive technology names it. */
-const blockMenu = (frame: HTMLElement) => byRole(frame, "menu", "Block options");
-const gripOf = (frame: HTMLElement) => frame.querySelector<HTMLElement>('[aria-label="Drag to move block, or click for options"]')!;
+const blockMenu = (frame: HTMLElement) =>
+  byRole(frame, "menu", "Block options");
+const gripOf = (frame: HTMLElement) =>
+  frame.querySelector<HTMLElement>(
+    '[aria-label="Drag to move block, or click for options"]',
+  )!;
 
 /** A click on the grip: press, release, click (a press alone starts a drag, so it doesn't open the menu). */
 async function clickGrip(frame: HTMLElement, { pressOnly = false } = {}) {
   const grip = gripOf(frame);
   await act(async () => {
-    grip.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+    grip.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }),
+    );
     grip.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     await wait(20);
   });
   if (pressOnly) return;
   await act(async () => {
-    grip.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+    grip.dispatchEvent(
+      new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }),
+    );
     grip.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     grip.click();
     await wait(20);
@@ -120,9 +179,15 @@ async function openFromGrip(frame: HTMLElement) {
   expect(blockMenu(frame)).not.toBeNull();
 }
 
-const items = (frame: HTMLElement) => [...frame.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]')];
-const item = (frame: HTMLElement, name: string) => items(frame).find((el) => el.textContent?.trim().startsWith(name)) ?? null;
-const markers = (editor: Editor) => listItemMarkers(editor.state.doc).map((m) => m.marker);
+const items = (frame: HTMLElement) => [
+  ...frame.querySelectorAll<HTMLElement>(
+    '[role="menuitem"], [role="menuitemradio"]',
+  ),
+];
+const item = (frame: HTMLElement, name: string) =>
+  items(frame).find((el) => el.textContent?.trim().startsWith(name)) ?? null;
+const markers = (editor: Editor) =>
+  listItemMarkers(editor.state.doc).map((m) => m.marker);
 
 /** Activates an item the way Enter on it does: highlighted (focused) first, then a click with no pointer. */
 async function click(el: HTMLElement | null) {
@@ -139,7 +204,13 @@ async function click(el: HTMLElement | null) {
 
 async function key(el: Element, name: string) {
   await act(async () => {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: name,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     await wait(20);
   });
 }
@@ -147,21 +218,32 @@ async function key(el: Element, name: string) {
 /** Start at…, opened: the field, typing into it, and its reason. */
 async function openStartAt(frame: HTMLElement) {
   await click(item(frame, "Start at"));
-  const field = byRole(frame, "group", "Start at")?.querySelector<HTMLInputElement>("input") ?? null;
+  const field =
+    byRole(frame, "group", "Start at")?.querySelector<HTMLInputElement>(
+      "input",
+    ) ?? null;
   expect(field).not.toBeNull();
   return {
     field: field!,
     async type(value: string) {
       await act(async () => {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value);
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )!.set!.call(field, value);
         field!.dispatchEvent(new Event("input", { bubbles: true }));
       });
     },
     reason: () => {
       const id = field!.getAttribute("aria-describedby");
-      return id ? (frame.querySelector(`#${CSS.escape(id)}`)?.textContent ?? null) : null;
+      return id
+        ? (frame.querySelector(`#${CSS.escape(id)}`)?.textContent ?? null)
+        : null;
     },
-    check: () => frame.querySelector<HTMLButtonElement>('button[aria-label="Set start number"]')!,
+    check: () =>
+      frame.querySelector<HTMLButtonElement>(
+        'button[aria-label="Set start number"]',
+      )!,
   };
 }
 
@@ -198,7 +280,9 @@ describe("block menu on a numbered list", () => {
     await openFromGrip(frame);
     await click(item(frame, "Numbering"));
     expect(byRole(frame, "menu", "Numbering")).not.toBeNull();
-    const radios = [...frame.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+    const radios = [
+      ...frame.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
+    ];
     expect(radios.map((el) => el.textContent?.trim())).toEqual([
       "Default1. 2. 3.",
       "1. 2. 3.",
@@ -212,10 +296,17 @@ describe("block menu on a numbered list", () => {
       "1) 2) 3)",
       "a) b) c)",
     ]);
-    expect(radios.filter((el) => el.getAttribute("aria-checked") === "true").map((el) => el.textContent)).toEqual(["Default1. 2. 3."]);
+    expect(
+      radios
+        .filter((el) => el.getAttribute("aria-checked") === "true")
+        .map((el) => el.textContent),
+    ).toEqual(["Default1. 2. 3."]);
 
     await click(radios.find((el) => el.textContent === "(a) (b) (c)") ?? null);
-    expect(editor.state.doc.child(1).attrs).toMatchObject({ markerFormat: "lower-alpha", markerDelimiter: "parens" });
+    expect(editor.state.doc.child(1).attrs).toMatchObject({
+      markerFormat: "lower-alpha",
+      markerDelimiter: "parens",
+    });
     expect(markers(editor)).toEqual(["(a)", "a.", "(b)"]);
     await act(() => wait(50));
     expect(onClose).toHaveBeenCalled();
@@ -273,14 +364,39 @@ describe("block menu on a numbered list", () => {
     const popup = blockMenu(frame)!;
     await act(async () => {
       for (const target of [start.field, start.field.parentElement!]) {
-        target.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerType: "mouse" }));
+        target.dispatchEvent(
+          new PointerEvent("pointermove", {
+            bubbles: true,
+            pointerType: "mouse",
+          }),
+        );
         target.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
       }
       // Off the row, onto the menu's own padding, then out of the menu.
-      start.field.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, pointerType: "mouse", relatedTarget: popup }));
-      start.field.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: popup }));
-      popup.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse", relatedTarget: start.field }));
-      popup.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, pointerType: "mouse", relatedTarget: document.body }));
+      start.field.dispatchEvent(
+        new PointerEvent("pointerout", {
+          bubbles: true,
+          pointerType: "mouse",
+          relatedTarget: popup,
+        }),
+      );
+      start.field.dispatchEvent(
+        new MouseEvent("mouseout", { bubbles: true, relatedTarget: popup }),
+      );
+      popup.dispatchEvent(
+        new PointerEvent("pointerover", {
+          bubbles: true,
+          pointerType: "mouse",
+          relatedTarget: start.field,
+        }),
+      );
+      popup.dispatchEvent(
+        new PointerEvent("pointerout", {
+          bubbles: true,
+          pointerType: "mouse",
+          relatedTarget: document.body,
+        }),
+      );
       await wait(20);
     });
     expect(document.activeElement).toBe(start.field);
@@ -311,7 +427,9 @@ describe("block menu on a numbered list", () => {
     expect(byRole(frame, "group", "Start at")).toBeNull();
     expect(blockMenu(frame)).not.toBeNull();
     expect(document.activeElement).toBe(item(frame, "Start at"));
-    expect(item(frame, "Start at")?.hasAttribute("data-highlighted")).toBe(true);
+    expect(item(frame, "Start at")?.hasAttribute("data-highlighted")).toBe(
+      true,
+    );
   });
 });
 
@@ -319,7 +437,9 @@ describe("block menu elsewhere", () => {
   it("shows Numbering and Start at… disabled, with the reason", async () => {
     const { frame } = setup("grip", 0);
     await openFromGrip(frame);
-    const reason = [...frame.querySelectorAll("p")].find((el) => el.textContent === NO_NUMBERING_REASON);
+    const reason = [...frame.querySelectorAll("p")].find(
+      (el) => el.textContent === NO_NUMBERING_REASON,
+    );
     expect(reason).toBeDefined();
     for (const name of ["Numbering", "Start at"]) {
       const el = item(frame, name);
@@ -334,7 +454,9 @@ describe("keyboard opener", () => {
   it("puts a focused button in the block's gutter; Esc goes back to the text", async () => {
     const { editor, frame, onClose } = setup("keyboard", 1);
     await act(() => wait(20));
-    const button = frame.querySelector<HTMLButtonElement>('[aria-label="Block options"][aria-keyshortcuts="Alt+F10"]');
+    const button = frame.querySelector<HTMLButtonElement>(
+      '[aria-label="Block options"][aria-keyshortcuts="Alt+F10"]',
+    );
     expect(button).not.toBeNull();
     expect(document.activeElement).toBe(button);
     expect(button?.getAttribute("aria-haspopup")).toBe("menu");
@@ -347,7 +469,9 @@ describe("keyboard opener", () => {
     const { frame } = setup("keyboard", 1);
     await act(() => wait(20));
     await act(async () => {
-      frame.querySelector<HTMLButtonElement>('[aria-keyshortcuts="Alt+F10"]')!.click();
+      frame
+        .querySelector<HTMLButtonElement>('[aria-keyshortcuts="Alt+F10"]')!
+        .click();
       await wait(20);
     });
     expect(blockMenu(frame)?.textContent).toContain("Numbered list");

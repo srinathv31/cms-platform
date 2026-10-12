@@ -18,7 +18,8 @@ export type ThreadMutation =
   | { type: "resolve"; threadId: string; by: Person; at: string }
   | { type: "reopen"; threadId: string };
 
-const isAnchored = (t: ThreadView) => t.blockId !== DOCUMENT_THREAD && !t.orphaned;
+const isAnchored = (t: ThreadView) =>
+  t.blockId !== DOCUMENT_THREAD && !t.orphaned;
 
 /**
  * Puts a new thread where the server will: after the threads already on its block; else among the
@@ -57,18 +58,28 @@ export function insertThread(
   return list;
 }
 
-export function reduceThreads(threads: ThreadView[], mutation: ThreadMutation): ThreadView[] {
+export function reduceThreads(
+  threads: ThreadView[],
+  mutation: ThreadMutation,
+): ThreadView[] {
   switch (mutation.type) {
     case "add":
       return insertThread(threads, mutation.thread, mutation.blockPosition);
     case "reply":
       return threads.map((t) =>
-        t.id === mutation.threadId ? { ...t, comments: [...t.comments, mutation.comment] } : t,
+        t.id === mutation.threadId
+          ? { ...t, comments: [...t.comments, mutation.comment] }
+          : t,
       );
     case "resolve":
       return threads.map((t) =>
         t.id === mutation.threadId && t.status === "open"
-          ? { ...t, status: "resolved", resolvedBy: mutation.by, resolvedAt: mutation.at }
+          ? {
+              ...t,
+              status: "resolved",
+              resolvedBy: mutation.by,
+              resolvedAt: mutation.at,
+            }
           : t,
       );
     case "reopen":
@@ -94,7 +105,12 @@ export interface ThreadGroups {
 }
 
 export function groupThreads(threads: readonly ThreadView[]): ThreadGroups {
-  const groups: ThreadGroups = { document: [], anchored: [], orphaned: [], resolved: [] };
+  const groups: ThreadGroups = {
+    document: [],
+    anchored: [],
+    orphaned: [],
+    resolved: [],
+  };
   for (const thread of threads) {
     if (thread.status === "resolved") groups.resolved.push(thread);
     else if (thread.blockId === DOCUMENT_THREAD) groups.document.push(thread);
@@ -111,7 +127,10 @@ export function groupThreads(threads: readonly ThreadView[]): ThreadGroups {
  * the id (as the server counts them). A channel field ("email.subject") is not a block of the body, so it is
  * left out: its thread is not removed content when the body changes, and keeps the server's say.
  */
-export function liveBlockPresence(doc: JSONContent, blockIds: readonly string[]): Map<string, boolean> {
+export function liveBlockPresence(
+  doc: JSONContent,
+  blockIds: readonly string[],
+): Map<string, boolean> {
   const top = new Set<string>();
   for (const block of doc.content ?? []) {
     const id = block.attrs?.id;
@@ -141,7 +160,10 @@ export function liveBlockPresence(doc: JSONContent, blockIds: readonly string[])
   return presence;
 }
 
-export function samePresence(a: ReadonlyMap<string, boolean>, b: ReadonlyMap<string, boolean>): boolean {
+export function samePresence(
+  a: ReadonlyMap<string, boolean>,
+  b: ReadonlyMap<string, boolean>,
+): boolean {
   if (a.size !== b.size) return false;
   for (const [id, present] of a) if (b.get(id) !== present) return false;
   return true;
@@ -152,7 +174,10 @@ export function samePresence(a: ReadonlyMap<string, boolean>, b: ReadonlyMap<str
  * a thread whose block was deleted moves to "On removed content" at once, and back when undo restores
  * the block. Blocks it doesn't know keep the server's say. The same list comes back when nothing changes.
  */
-export function withBlockPresence(threads: ThreadView[], presence: ReadonlyMap<string, boolean>): ThreadView[] {
+export function withBlockPresence(
+  threads: ThreadView[],
+  presence: ReadonlyMap<string, boolean>,
+): ThreadView[] {
   if (presence.size === 0) return threads;
   let changed = false;
   const next = threads.map((thread) => {

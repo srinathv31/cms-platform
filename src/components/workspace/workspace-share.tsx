@@ -1,11 +1,22 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { IntegrationBody, IntegrationIdentity, IntegrationSkeleton } from "@/components/integration/integration-panel";
+import {
+  IntegrationBody,
+  IntegrationIdentity,
+  IntegrationSkeleton,
+} from "@/components/integration/integration-panel";
 import { ShareRing } from "@/components/signature/share-ring";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import type { IntegrationPanelData } from "@/domain/golive-types";
 import { readTemplate } from "@/lib/template-reads";
 
@@ -26,14 +37,19 @@ const TABBABLE =
  */
 function wrapTab(event: React.KeyboardEvent<HTMLElement>) {
   if (event.key !== "Tab") return;
-  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE)).filter(
-    (el) => el.getClientRects().length > 0,
-  );
+  const items = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE),
+  ).filter((el) => el.getClientRects().length > 0);
   const first = items[0];
   const last = items[items.length - 1];
   if (!first || !last) return;
   const at = document.activeElement;
-  if (event.shiftKey && (at === first || !event.currentTarget.contains(at) || at === event.currentTarget)) {
+  if (
+    event.shiftKey &&
+    (at === first ||
+      !event.currentTarget.contains(at) ||
+      at === event.currentTarget)
+  ) {
     event.preventDefault();
     last.focus();
   } else if (!event.shiftKey && at === last) {
@@ -74,19 +90,36 @@ export function WorkspaceShare({
   const load = useCallback(
     (force = false) => {
       if (inflight.current) return inflight.current;
-      const fresh = loadedAt.current.key === key && Date.now() - loadedAt.current.at < FRESH_MS;
+      const fresh =
+        loadedAt.current.key === key &&
+        Date.now() - loadedAt.current.at < FRESH_MS;
       if (fresh && !force) return Promise.resolve();
-      setState((s) => (s.key === key && s.kind === "ready" ? s : { key, kind: "loading" }));
-      const run = readTemplate<{ panel: IntegrationPanelData }>(templateId, "integration")
+      setState((s) =>
+        s.key === key && s.kind === "ready" ? s : { key, kind: "loading" },
+      );
+      const run = readTemplate<{ panel: IntegrationPanelData }>(
+        templateId,
+        "integration",
+      )
         .then((res) => {
           if (res.ok) {
             loadedAt.current = { key, at: Date.now() };
             setState({ key, kind: "ready", panel: res.panel });
           } else {
-            setState((s) => (s.key === key && s.kind === "ready" ? s : { key, kind: "error", reason: res.reason }));
+            setState((s) =>
+              s.key === key && s.kind === "ready"
+                ? s
+                : { key, kind: "error", reason: res.reason },
+            );
           }
         })
-        .catch(() => setState((s) => (s.key === key && s.kind === "ready" ? s : { key, kind: "error", reason: FAILED })))
+        .catch(() =>
+          setState((s) =>
+            s.key === key && s.kind === "ready"
+              ? s
+              : { key, kind: "error", reason: FAILED },
+          ),
+        )
         .finally(() => {
           inflight.current = null;
         });
@@ -120,15 +153,24 @@ export function WorkspaceShare({
         >
           <SheetHeader className="relative shrink-0 gap-1.5 border-b border-hairline px-7 pt-7 pb-5">
             <SheetClose
-              render={<Button variant="ghost" size="icon" className="absolute top-4 right-5" />}
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-4 right-5"
+                />
+              }
             >
               <XIcon aria-hidden strokeWidth={1.75} />
               <span className="sr-only">Close</span>
             </SheetClose>
             <div className="caps-label">Integration</div>
-            <SheetTitle className="display-lg text-text">{templateName}</SheetTitle>
+            <SheetTitle className="display-lg text-text">
+              {templateName}
+            </SheetTitle>
             <SheetDescription className="sr-only">
-              Template ID, active version and the variable contract for consumer teams.
+              Template ID, active version and the variable contract for consumer
+              teams.
             </SheetDescription>
           </SheetHeader>
           <div
@@ -144,9 +186,16 @@ export function WorkspaceShare({
             {panel ? (
               <IntegrationBody panel={panel} />
             ) : view.kind === "error" ? (
-              <div role="alert" className="flex flex-col items-start gap-3 text-[14px] text-text">
+              <div
+                role="alert"
+                className="flex flex-col items-start gap-3 text-[14px] text-text"
+              >
                 <p>{view.reason}</p>
-                <Button variant="outline" className="h-8 bg-surface px-3 text-[13px]" onClick={() => void load(true)}>
+                <Button
+                  variant="outline"
+                  className="h-8 bg-surface px-3 text-[13px]"
+                  onClick={() => void load(true)}
+                >
                   Try again
                 </Button>
               </div>

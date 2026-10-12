@@ -11,7 +11,9 @@ import { createVariableStore } from "../state/variable-store";
 import { doc, p } from "../testing/editor";
 import { TableMenu } from "./table-menu";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let cleanup: (() => void) | null = null;
 beforeEach(() => {
@@ -27,8 +29,20 @@ afterEach(() => {
 const TABLE = {
   type: "table",
   content: [
-    { type: "tableRow", content: [{ type: "tableHeader", content: [p("Fee")] }, { type: "tableHeader", content: [p("Amount")] }] },
-    { type: "tableRow", content: [{ type: "tableCell", content: [p("Annual")] }, { type: "tableCell", content: [p("$95")] }] },
+    {
+      type: "tableRow",
+      content: [
+        { type: "tableHeader", content: [p("Fee")] },
+        { type: "tableHeader", content: [p("Amount")] },
+      ],
+    },
+    {
+      type: "tableRow",
+      content: [
+        { type: "tableCell", content: [p("Annual")] },
+        { type: "tableCell", content: [p("$95")] },
+      ],
+    },
   ],
 };
 
@@ -39,7 +53,11 @@ function setup(table: object = TABLE) {
   const host = document.createElement("div");
   frame.append(element, host);
   document.body.appendChild(frame);
-  const editor = new Editor({ element, extensions: editorExtensions({ store: createVariableStore([]) }), content: doc(p("Before"), table) });
+  const editor = new Editor({
+    element,
+    extensions: editorExtensions({ store: createVariableStore([]) }),
+    content: doc(p("Before"), table),
+  });
   let root: Root;
   act(() => {
     root = createRoot(host);
@@ -52,7 +70,8 @@ function setup(table: object = TABLE) {
   return { editor, frame };
 }
 
-const trigger = (frame: HTMLElement) => frame.querySelector<HTMLButtonElement>('[aria-label="Table options"]');
+const trigger = (frame: HTMLElement) =>
+  frame.querySelector<HTMLButtonElement>('[aria-label="Table options"]');
 
 describe("TableMenu", () => {
   it("appears with the caret in a table and goes when it leaves", () => {
@@ -75,11 +94,19 @@ describe("TableMenu", () => {
       editor.commands.setTextSelection(editor.state.doc.child(0).nodeSize + 4);
     });
     act(() => {
-      editor.view.dom.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", altKey: true, bubbles: true }));
+      editor.view.dom.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "F10",
+          altKey: true,
+          bubbles: true,
+        }),
+      );
     });
     expect(document.activeElement).toBe(trigger(frame));
     act(() => {
-      trigger(frame)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      trigger(frame)!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
     });
     // TipTap focuses on the next frame.
     await vi.advanceTimersByTimeAsync(50);
@@ -98,7 +125,13 @@ describe("TableMenu", () => {
   it("at 12 columns, Insert column left and right are disabled and say why; rows can still be added", async () => {
     const wide = {
       type: "table",
-      content: [0, 1].map(() => ({ type: "tableRow", content: Array.from({ length: 12 }, () => ({ type: "tableCell", content: [p("x")] })) })),
+      content: [0, 1].map(() => ({
+        type: "tableRow",
+        content: Array.from({ length: 12 }, () => ({
+          type: "tableCell",
+          content: [p("x")],
+        })),
+      })),
     };
     const { editor, frame } = setup(wide);
     act(() => {
@@ -108,11 +141,16 @@ describe("TableMenu", () => {
       trigger(frame)!.click();
       await vi.advanceTimersByTimeAsync(0);
     });
-    const item = (label: string) => [...frame.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent?.includes(label));
+    const item = (label: string) =>
+      [...frame.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) =>
+        el.textContent?.includes(label),
+      );
     for (const label of ["Insert column left", "Insert column right"]) {
       const element = item(label);
       expect(element?.hasAttribute("data-disabled"), label).toBe(true);
-      const reason = frame.querySelector(`#${CSS.escape(element?.getAttribute("aria-describedby") ?? "")}`);
+      const reason = frame.querySelector(
+        `#${CSS.escape(element?.getAttribute("aria-describedby") ?? "")}`,
+      );
       expect(reason?.textContent).toBe("Tables can have at most 12 columns.");
     }
     expect(item("Insert row below")?.hasAttribute("data-disabled")).toBe(false);
@@ -127,7 +165,9 @@ describe("TableMenu", () => {
       trigger(frame)!.click();
       await vi.advanceTimersByTimeAsync(0);
     });
-    const insert = [...frame.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent?.includes("Insert column right"));
+    const insert = [
+      ...frame.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ].find((el) => el.textContent?.includes("Insert column right"));
     expect(insert?.hasAttribute("data-disabled")).toBe(false);
     expect(frame.textContent).not.toContain("at most 12 columns");
   });

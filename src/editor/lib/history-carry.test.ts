@@ -3,7 +3,13 @@
 // editor, with its own schema): the new one steps back and forward through the same documents.
 
 import { Editor, type JSONContent } from "@tiptap/core";
-import { closeHistory, redo, redoDepth, undo, undoDepth } from "@tiptap/pm/history";
+import {
+  closeHistory,
+  redo,
+  redoDepth,
+  undo,
+  undoDepth,
+} from "@tiptap/pm/history";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Variable } from "../model/types";
 import { editorExtensions } from "../schema";
@@ -36,7 +42,8 @@ function type(editor: Editor, value: string) {
 
 const firstLine = (editor: Editor) => editor.state.doc.child(0).textContent;
 const stepBack = (editor: Editor) => undo(editor.state, editor.view.dispatch);
-const stepForward = (editor: Editor) => redo(editor.state, editor.view.dispatch);
+const stepForward = (editor: Editor) =>
+  redo(editor.state, editor.view.dispatch);
 
 describe("history carry", () => {
   it("rebuilds undo and redo in a new editor, landing on the same documents", () => {
@@ -71,8 +78,13 @@ describe("history carry", () => {
 
   it("puts the caret back where each change was", () => {
     const before = make(doc(p("One"), p("Two")));
-    const endOfTwo = before.state.doc.child(0).nodeSize + before.state.doc.child(1).nodeSize - 1;
-    before.view.dispatch(closeHistory(before.state.tr.insertText("!", endOfTwo)));
+    const endOfTwo =
+      before.state.doc.child(0).nodeSize +
+      before.state.doc.child(1).nodeSize -
+      1;
+    before.view.dispatch(
+      closeHistory(before.state.tr.insertText("!", endOfTwo)),
+    );
 
     const after = make(before.getJSON());
     restoreHistory(after.view, captureHistory(before.state)!);
@@ -94,15 +106,37 @@ describe("history carry", () => {
   });
 
   it("walks the history without the other plugins' side effects", async () => {
-    const variables: Variable[] = [{ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }];
+    const variables: Variable[] = [
+      {
+        key: "first_name",
+        label: "First name",
+        type: "text",
+        required: true,
+        sample: "Maya",
+      },
+    ];
     const root = createEditorRootRuntime({ variables });
-    const content = doc({ type: "paragraph", content: [text("Hi "), { type: "variable", attrs: { key: "first_name" } }] });
-    root.registerField({ id: "body", label: "Document", kind: "body" }, content);
+    const content = doc({
+      type: "paragraph",
+      content: [
+        text("Hi "),
+        { type: "variable", attrs: { key: "first_name" } },
+      ],
+    });
+    root.registerField(
+      { id: "body", label: "Document", kind: "body" },
+      content,
+    );
     const editor = new Editor({
       element: document.createElement("div"),
       extensions: editorExtensions({
         store: root.variables,
-        binding: { fieldId: "body", kind: "body", root, chip: createChipPopoverStore() },
+        binding: {
+          fieldId: "body",
+          kind: "body",
+          root,
+          chip: createChipPopoverStore(),
+        },
       }),
       content,
     });

@@ -16,7 +16,13 @@ describe("channel families", () => {
   it("splits every channel into documents and messages, in CHANNELS order", () => {
     expect(CHANNELS).toEqual(["pdf", "web", "email", "push", "sms"]);
     expect([...DOCUMENT_CHANNELS, ...MESSAGE_CHANNELS]).toEqual([...CHANNELS]);
-    expect(CHANNELS.map(channelFamily)).toEqual(["document", "document", "document", "message", "message"]);
+    expect(CHANNELS.map(channelFamily)).toEqual([
+      "document",
+      "document",
+      "document",
+      "message",
+      "message",
+    ]);
     expect(familyChannels("document")).toEqual(["pdf", "web", "email"]);
     expect(familyChannels("message")).toEqual(["push", "sms"]);
   });

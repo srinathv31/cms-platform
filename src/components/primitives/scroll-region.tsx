@@ -22,7 +22,10 @@ export function ScrollRegion({
   className,
   children,
   ...props
-}: { label: string; axis?: "x" | "y" } & Omit<ComponentProps<"div">, "ref" | "role" | "aria-label" | "tabIndex">) {
+}: { label: string; axis?: "x" | "y" } & Omit<
+  ComponentProps<"div">,
+  "ref" | "role" | "aria-label" | "tabIndex"
+>) {
   const box = useRef<HTMLDivElement>(null);
   const [scrolls, setScrolls] = useState(false);
 
@@ -32,10 +35,17 @@ export function ScrollRegion({
     // Watching the box (the window changed) and its content (the table's rows changed). The first call is the
     // observer's own, right after it starts watching.
     const observer = new ResizeObserver(() =>
-      setScrolls(axis === "y" ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 1),
+      setScrolls(
+        axis === "y"
+          ? el.scrollHeight > el.clientHeight + 1
+          : el.scrollWidth > el.clientWidth + 1,
+      ),
     );
     observer.observe(el);
-    for (const child of axis === "y" ? el.children : el.querySelectorAll("table, [role=table]")) observer.observe(child);
+    for (const child of axis === "y"
+      ? el.children
+      : el.querySelectorAll("table, [role=table]"))
+      observer.observe(child);
     return () => observer.disconnect();
   }, [axis]);
 

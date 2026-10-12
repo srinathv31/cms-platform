@@ -9,10 +9,16 @@ const calls = vi.hoisted(() => ({ requireSpace: 0 }));
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   /** React's semantics: one entry per argument list, objects compared by identity. */
-  function identityCache<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  function identityCache<A extends unknown[], R>(
+    fn: (...args: A) => R,
+  ): (...args: A) => R {
     const entries: { args: A; result: R }[] = [];
     return (...args: A) => {
-      const hit = entries.find((entry) => entry.args.length === args.length && entry.args.every((arg, i) => Object.is(arg, args[i])));
+      const hit = entries.find(
+        (entry) =>
+          entry.args.length === args.length &&
+          entry.args.every((arg, i) => Object.is(arg, args[i])),
+      );
       if (hit) return hit.result;
       const result = fn(...args);
       entries.push({ args, result });

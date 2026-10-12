@@ -14,7 +14,9 @@ vi.mock("./block-handle", () => {
   throw new Error("Loading chunk block-handle failed.");
 });
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const CONTENT = doc(h2("Offer details", "offer_details"), p("Hello there"));
 const roots: Root[] = [];
@@ -29,7 +31,9 @@ async function mount(readOnly = false): Promise<HTMLElement> {
   document.body.appendChild(host);
   const root = createRoot(host);
   roots.push(root);
-  await act(async () => root.render(<DocumentEditor content={CONTENT} readOnly={readOnly} />));
+  await act(async () =>
+    root.render(<DocumentEditor content={CONTENT} readOnly={readOnly} />),
+  );
   return host;
 }
 
@@ -38,7 +42,9 @@ describe("DocumentEditor when the block handle fails to load", () => {
     const host = await mount();
     await vi.waitFor(async () => {
       await act(async () => {}); // let the failed load settle; waitFor polls until the editor is up
-      expect(host.querySelector(".ProseMirror")?.getAttribute("contenteditable")).toBe("true");
+      expect(
+        host.querySelector(".ProseMirror")?.getAttribute("contenteditable"),
+      ).toBe("true");
     });
     expect(host.textContent).toContain("Hello there");
   });
@@ -47,7 +53,9 @@ describe("DocumentEditor when the block handle fails to load", () => {
     const host = await mount();
     await vi.waitFor(async () => {
       await act(async () => {}); // let the failed load settle; waitFor polls until the editor is up
-      expect(host.querySelector(".ProseMirror")?.getAttribute("contenteditable")).toBe("true");
+      expect(
+        host.querySelector(".ProseMirror")?.getAttribute("contenteditable"),
+      ).toBe("true");
     });
   });
 });

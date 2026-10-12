@@ -31,22 +31,32 @@ async function docx() {
         styleMap: limits.styleMap,
         convertImage: mammoth.images.imgElement(async (image) => {
           images += 1;
-          return { src: `data:${image.contentType};base64,${await image.readAsBase64String()}` };
+          return {
+            src: `data:${image.contentType};base64,${await image.readAsBase64String()}`,
+          };
         }),
       },
     );
   } catch {
     return { ok: false, code: "unreadable" };
   }
-  if (result.value.length > limits.maxHtmlChars) return { ok: false, code: "tooLong" };
-  if (textLength(result.value) > limits.maxChars) return { ok: false, code: "tooLong" };
-  return { ok: true, html: result.value, messages: result.messages.map((m) => m.message), images };
+  if (result.value.length > limits.maxHtmlChars)
+    return { ok: false, code: "tooLong" };
+  if (textLength(result.value) > limits.maxChars)
+    return { ok: false, code: "tooLong" };
+  return {
+    ok: true,
+    html: result.value,
+    messages: result.messages.map((m) => m.message),
+    images,
+  };
 }
 
 // pdf.js runs with its worker in-process (docs/decisions/prototype-log.md): bundling breaks its fake-worker
 // import, so the worker module is loaded into globalThis.pdfjsWorker BEFORE pdf.js itself.
 async function pdf() {
-  globalThis.pdfjsWorker ??= await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+  globalThis.pdfjsWorker ??=
+    await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   // pdf.js takes ownership of the buffer it's given: hand it a copy.
   const task = pdfjs.getDocument({
@@ -60,9 +70,14 @@ async function pdf() {
     try {
       doc = await task.promise;
     } catch (error) {
-      return { ok: false, code: error instanceof pdfjs.PasswordException ? "pdfLocked" : "unreadable" };
+      return {
+        ok: false,
+        code:
+          error instanceof pdfjs.PasswordException ? "pdfLocked" : "unreadable",
+      };
     }
-    if (doc.numPages > limits.maxPdfPages) return { ok: false, code: "pdfPages" };
+    if (doc.numPages > limits.maxPdfPages)
+      return { ok: false, code: "pdfPages" };
 
     const pages = [];
     let chars = 0;
@@ -74,7 +89,10 @@ async function pdf() {
       for (const item of content.items) {
         if (!("str" in item) || !item.str) continue;
         // Into viewport space: y measured down from the top of the page, rotation and crop applied.
-        const [, , c, d, x, y] = pdfjs.Util.transform(viewport.transform, item.transform);
+        const [, , c, d, x, y] = pdfjs.Util.transform(
+          viewport.transform,
+          item.transform,
+        );
         const size = Math.hypot(c, d) || item.height;
         items.push({ str: item.str, x, y, w: item.width, h: size });
         chars += item.str.length;

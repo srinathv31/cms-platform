@@ -1,11 +1,20 @@
 "use client";
 
-import { useImperativeHandle, useLayoutEffect, useRef, type RefObject } from "react";
+import {
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  type RefObject,
+} from "react";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { FieldsDocument, createRedlineHandle } from "@/components/redline";
 import type { FieldRedline, FooterRedline } from "@/domain/review-types";
 import type { Variable } from "@/editor/model/types";
-import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
+import type {
+  CommentRequest,
+  DocumentEditorHandle,
+  ThreadAnchor,
+} from "@/editor/types";
 import type { ThreadView } from "@/server/queries/threads";
 
 /**
@@ -70,9 +79,14 @@ export function FieldsView({
     handleRef,
     () =>
       createRedlineHandle({
-        root: () => wrapper.current?.querySelector<HTMLElement>("[data-fields-document]") ?? null,
-        blockOfThread: (id) => latest.current.anchors.find((a) => a.id === id)?.blockId ?? null,
-        onRequestComment: (request) => latest.current.onRequestComment?.(request),
+        root: () =>
+          wrapper.current?.querySelector<HTMLElement>(
+            "[data-fields-document]",
+          ) ?? null,
+        blockOfThread: (id) =>
+          latest.current.anchors.find((a) => a.id === id)?.blockId ?? null,
+        onRequestComment: (request) =>
+          latest.current.onRequestComment?.(request),
       }),
     [],
   );
@@ -96,7 +110,9 @@ export function FieldsView({
         onActivate={onActivate}
         onRequestBlockComment={onRequestBlockComment}
         noun="field"
-        label={layout === "details" ? "Comments on the email details" : undefined}
+        label={
+          layout === "details" ? "Comments on the email details" : undefined
+        }
       />
     </div>
   );

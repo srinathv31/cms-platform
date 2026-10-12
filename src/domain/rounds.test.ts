@@ -21,23 +21,73 @@ import {
 } from "./rounds";
 import { VERSION_STATES, type VersionState } from "./types";
 
-const row = (number: number | null, round: number | null, state: VersionState): RoundRow => ({ number, round, state });
-const v = (number: number, round: number, state: VersionState): NumberedRound => ({ number, round, state });
+const row = (
+  number: number | null,
+  round: number | null,
+  state: VersionState,
+): RoundRow => ({ number, round, state });
+const v = (
+  number: number,
+  round: number,
+  state: VersionState,
+): NumberedRound => ({ number, round, state });
 const DRAFT = row(null, null, "draft");
 
 describe("labels", () => {
-  it.each<[string, NumberedRound, { style?: "chrome" | "sentence"; history?: boolean }, string]>([
+  it.each<
+    [
+      string,
+      NumberedRound,
+      { style?: "chrome" | "sentence"; history?: boolean },
+      string,
+    ]
+  >([
     ["round 1 in review: no round yet", v(2, 1, "in_review"), {}, "v2"],
     ["round 1 sent back", v(2, 1, "changes_requested"), {}, "v2 · Round 1"],
-    ["round 1 sent back, in a sentence", v(2, 1, "changes_requested"), { style: "sentence" }, "v2, round 1"],
+    [
+      "round 1 sent back, in a sentence",
+      v(2, 1, "changes_requested"),
+      { style: "sentence" },
+      "v2, round 1",
+    ],
     ["round 2 in review", v(2, 2, "in_review"), {}, "v2 · Round 2"],
-    ["round 2 in review, in a sentence", v(2, 2, "in_review"), { style: "sentence" }, "v2, round 2"],
+    [
+      "round 2 in review, in a sentence",
+      v(2, 2, "in_review"),
+      { style: "sentence" },
+      "v2, round 2",
+    ],
     ["released on round 1", v(2, 1, "active"), {}, "v2"],
-    ["released on round 3: the version consumers know", v(2, 3, "active"), {}, "v2"],
-    ["released on round 3, in the review history", v(2, 3, "active"), { history: true }, "v2 · Round 3"],
-    ["released on round 3, in a history sentence", v(2, 3, "superseded"), { history: true, style: "sentence" }, "v2, round 3"],
-    ["released on round 1, in the review history", v(2, 1, "revoked"), { history: true }, "v2"],
-    ["unreleased, history changes nothing", v(3, 1, "in_review"), { history: true }, "v3"],
+    [
+      "released on round 3: the version consumers know",
+      v(2, 3, "active"),
+      {},
+      "v2",
+    ],
+    [
+      "released on round 3, in the review history",
+      v(2, 3, "active"),
+      { history: true },
+      "v2 · Round 3",
+    ],
+    [
+      "released on round 3, in a history sentence",
+      v(2, 3, "superseded"),
+      { history: true, style: "sentence" },
+      "v2, round 3",
+    ],
+    [
+      "released on round 1, in the review history",
+      v(2, 1, "revoked"),
+      { history: true },
+      "v2",
+    ],
+    [
+      "unreleased, history changes nothing",
+      v(3, 1, "in_review"),
+      { history: true },
+      "v3",
+    ],
   ])("%s: %s", (_, version, options, label) => {
     expect(versionLabel(version, options)).toBe(label);
   });
@@ -54,8 +104,14 @@ describe("labels", () => {
     expect(roundLabel(2)).toBe("Round 2");
     expect(approvedOnRound(v(2, 3, "active"))).toBe("Approved on round 3");
     expect(approvedOnRound(v(2, 3, "superseded"))).toBe("Approved on round 3");
-    expect(approvedOnRound(v(2, 1, "active")), "the first round goes without saying").toBeNull();
-    expect(approvedOnRound(v(2, 2, "in_review")), "not approved yet").toBeNull();
+    expect(
+      approvedOnRound(v(2, 1, "active")),
+      "the first round goes without saying",
+    ).toBeNull();
+    expect(
+      approvedOnRound(v(2, 2, "in_review")),
+      "not approved yet",
+    ).toBeNull();
     expect(reviewHistoryLabel(3)).toBe("Review history (3 rounds)");
     expect(reviewHistoryLabel(1)).toBe("Review history (1 round)");
     // Its accessible name says whose history it is.
@@ -70,25 +126,53 @@ describe("nextRound", () => {
   });
 
   it("after a send-back, the same number's next round", () => {
-    expect(nextRound([row(1, 1, "changes_requested"), DRAFT])).toEqual({ number: 1, round: 2 });
-    expect(nextRound([row(1, 1, "changes_requested"), row(1, 2, "changes_requested"), DRAFT])).toEqual({ number: 1, round: 3 });
+    expect(nextRound([row(1, 1, "changes_requested"), DRAFT])).toEqual({
+      number: 1,
+      round: 2,
+    });
+    expect(
+      nextRound([
+        row(1, 1, "changes_requested"),
+        row(1, 2, "changes_requested"),
+        DRAFT,
+      ]),
+    ).toEqual({ number: 1, round: 3 });
   });
 
   it("after a release, the next number's round 1", () => {
-    expect(nextRound([row(1, 1, "active"), DRAFT])).toEqual({ number: 2, round: 1 });
-    expect(nextRound([row(1, 1, "changes_requested"), row(1, 2, "superseded"), row(2, 1, "active")])).toEqual({ number: 3, round: 1 });
+    expect(nextRound([row(1, 1, "active"), DRAFT])).toEqual({
+      number: 2,
+      round: 1,
+    });
+    expect(
+      nextRound([
+        row(1, 1, "changes_requested"),
+        row(1, 2, "superseded"),
+        row(2, 1, "active"),
+      ]),
+    ).toEqual({ number: 3, round: 1 });
   });
 
   it("counts a revoked latest version as released", () => {
-    expect(nextRound([row(1, 1, "superseded"), row(2, 1, "revoked"), DRAFT])).toEqual({ number: 3, round: 1 });
+    expect(
+      nextRound([row(1, 1, "superseded"), row(2, 1, "revoked"), DRAFT]),
+    ).toEqual({ number: 3, round: 1 });
   });
 
   it("continues a number sent back even when the draft that answers it is gone (Edit started from Active)", () => {
-    expect(nextRound([row(1, 1, "active"), row(2, 1, "changes_requested"), DRAFT])).toEqual({ number: 2, round: 2 });
+    expect(
+      nextRound([row(1, 1, "active"), row(2, 1, "changes_requested"), DRAFT]),
+    ).toEqual({ number: 2, round: 2 });
   });
 
   it("continues the highest unreleased number of a database numbered before rounds (v1 sent back, then v2)", () => {
-    expect(nextRound([row(1, 1, "changes_requested"), row(2, 1, "changes_requested"), DRAFT])).toEqual({ number: 2, round: 2 });
+    expect(
+      nextRound([
+        row(1, 1, "changes_requested"),
+        row(2, 1, "changes_requested"),
+        DRAFT,
+      ]),
+    ).toEqual({ number: 2, round: 2 });
   });
 });
 
@@ -109,28 +193,48 @@ describe("lookups and order", () => {
     expect(headOf(rows, 1)?.id).toBe("v1");
     expect(headOf(rows, 4)).toBeUndefined();
     // A released row wins over a higher round (a database numbered before rounds can't have one, but the rule holds).
-    expect(headOf([{ id: "a", ...row(1, 1, "superseded") }, { id: "b", ...row(1, 2, "changes_requested") }], 1)?.id).toBe("a");
+    expect(
+      headOf(
+        [
+          { id: "a", ...row(1, 1, "superseded") },
+          { id: "b", ...row(1, 2, "changes_requested") },
+        ],
+        1,
+      )?.id,
+    ).toBe("a");
   });
 
   it("a sent-back round links on to its number's head: a later round, or the release", () => {
     // A later round in review: "Open v3, round 2".
     const v3 = replacedBy(rows, v(3, 1, "changes_requested"));
     expect(v3?.id).toBe("v3r2");
-    expect(versionLabel(asNumbered(v3!), { style: "sentence" })).toBe("v3, round 2");
+    expect(versionLabel(asNumbered(v3!), { style: "sentence" })).toBe(
+      "v3, round 2",
+    );
     // Released since: "Open v2", the bare link.
     for (const round of [1, 2]) {
       const v2 = replacedBy(rows, v(2, round, "changes_requested"));
       expect(v2?.id, `round ${round}`).toBe("v2r3");
       expect(versionLabel(asNumbered(v2!), { style: "sentence" })).toBe("v2");
-      expect(reviewPath("deposits", "UC-ZKZSRZ", asNumbered(v2!))).toBe("/deposits/review/UC-ZKZSRZ/2");
+      expect(reviewPath("deposits", "UC-ZKZSRZ", asNumbered(v2!))).toBe(
+        "/deposits/review/UC-ZKZSRZ/2",
+      );
     }
     // Sent back again: the newer record.
-    const twice = [...rows, { id: "v4r1", ...row(4, 1, "changes_requested") }, { id: "v4r2", ...row(4, 2, "changes_requested") }];
+    const twice = [
+      ...rows,
+      { id: "v4r1", ...row(4, 1, "changes_requested") },
+      { id: "v4r2", ...row(4, 2, "changes_requested") },
+    ];
     expect(replacedBy(twice, v(4, 1, "changes_requested"))?.id).toBe("v4r2");
   });
 
   it("a round that is its number's head links nowhere: only a draft after it, in review, or released", () => {
-    const sentBack = [{ id: "v1", ...row(1, 1, "active") }, { id: "v2r1", ...row(2, 1, "changes_requested") }, { id: "d", ...DRAFT }];
+    const sentBack = [
+      { id: "v1", ...row(1, 1, "active") },
+      { id: "v2r1", ...row(2, 1, "changes_requested") },
+      { id: "d", ...DRAFT },
+    ];
     expect(replacedBy(sentBack, v(2, 1, "changes_requested"))).toBeNull();
     expect(replacedBy(rows, v(3, 2, "in_review"))).toBeNull();
     expect(replacedBy(rows, v(2, 3, "active"))).toBeNull();
@@ -138,22 +242,42 @@ describe("lookups and order", () => {
   });
 
   it("lists a number's rounds newest first", () => {
-    expect(roundsOf(rows, 2).map((r) => r.id)).toEqual(["v2r3", "v2r2", "v2r1"]);
+    expect(roundsOf(rows, 2).map((r) => r.id)).toEqual([
+      "v2r3",
+      "v2r2",
+      "v2r1",
+    ]);
     expect(roundsOf(rows, 4)).toEqual([]);
   });
 
   it("orders by number, then round, with the draft last", () => {
-    expect([...rows].sort(compareRounds).map((r) => r.id)).toEqual(["v1", "v2r1", "v2r2", "v2r3", "v3r1", "v3r2", "d"]);
+    expect([...rows].sort(compareRounds).map((r) => r.id)).toEqual([
+      "v1",
+      "v2r1",
+      "v2r2",
+      "v2r3",
+      "v3r1",
+      "v3r2",
+      "d",
+    ]);
     expect(compareRounds(DRAFT, DRAFT)).toBe(0);
     expect(compareRounds(row(2, 1, "active"), row(2, 1, "active"))).toBe(0);
   });
 
   it("knows the released states", () => {
-    expect(VERSION_STATES.filter(isReleased)).toEqual(["active", "superseded", "revoked"]);
+    expect(VERSION_STATES.filter(isReleased)).toEqual([
+      "active",
+      "superseded",
+      "revoked",
+    ]);
   });
 
   it("treats a numbered row without a round as a bug", () => {
-    expect(asNumbered(row(2, 1, "in_review"))).toEqual({ number: 2, round: 1, state: "in_review" });
+    expect(asNumbered(row(2, 1, "in_review"))).toEqual({
+      number: 2,
+      round: 1,
+      state: "in_review",
+    });
     expect(() => asNumbered(row(2, null, "in_review"))).toThrow();
     expect(() => asNumbered(DRAFT)).toThrow();
   });
@@ -161,22 +285,40 @@ describe("lookups and order", () => {
 
 describe("review links", () => {
   it("adds ?round= exactly when the label shows the round: otherwise the bare URL is that row", () => {
-    expect(reviewPath("coral-offers", "UC-4F7K2Q", v(3, 1, "in_review"))).toBe("/coral-offers/review/UC-4F7K2Q/3");
-    expect(reviewPath("coral-offers", "UC-4F7K2Q", v(3, 2, "in_review"))).toBe("/coral-offers/review/UC-4F7K2Q/3?round=2");
-    expect(reviewPath("coral-offers", "UC-4F7K2Q", v(3, 1, "changes_requested"))).toBe("/coral-offers/review/UC-4F7K2Q/3?round=1");
-    expect(reviewPath("all", "UC-4F7K2Q", v(2, 3, "active"))).toBe("/all/review/UC-4F7K2Q/2");
+    expect(reviewPath("coral-offers", "UC-4F7K2Q", v(3, 1, "in_review"))).toBe(
+      "/coral-offers/review/UC-4F7K2Q/3",
+    );
+    expect(reviewPath("coral-offers", "UC-4F7K2Q", v(3, 2, "in_review"))).toBe(
+      "/coral-offers/review/UC-4F7K2Q/3?round=2",
+    );
+    expect(
+      reviewPath("coral-offers", "UC-4F7K2Q", v(3, 1, "changes_requested")),
+    ).toBe("/coral-offers/review/UC-4F7K2Q/3?round=1");
+    expect(reviewPath("all", "UC-4F7K2Q", v(2, 3, "active"))).toBe(
+      "/all/review/UC-4F7K2Q/2",
+    );
   });
 
   it("gives a notification the same link", () => {
-    expect(reviewLink("UC-4F7K2Q", v(3, 1, "in_review"))).toEqual({ to: "review", templateId: "UC-4F7K2Q", versionNumber: 3 });
-    expect(reviewLink("UC-4F7K2Q", v(3, 2, "in_review"))).toEqual({ to: "review", templateId: "UC-4F7K2Q", versionNumber: 3, round: 2 });
+    expect(reviewLink("UC-4F7K2Q", v(3, 1, "in_review"))).toEqual({
+      to: "review",
+      templateId: "UC-4F7K2Q",
+      versionNumber: 3,
+    });
+    expect(reviewLink("UC-4F7K2Q", v(3, 2, "in_review"))).toEqual({
+      to: "review",
+      templateId: "UC-4F7K2Q",
+      versionNumber: 3,
+      round: 2,
+    });
   });
 
   it("reads ?round=: absent is the head, a whole number from 1 is a round, anything else is a 404", () => {
     expect(parseRoundParam(undefined)).toBeNull();
     expect(parseRoundParam("2")).toBe(2);
     expect(parseRoundParam("12")).toBe(12);
-    for (const raw of ["0", "x", "", "-1", "1.5", "02", " 2", "1e3"]) expect(parseRoundParam(raw), raw).toBe("invalid");
+    for (const raw of ["0", "x", "", "-1", "1.5", "02", " 2", "1e3"])
+      expect(parseRoundParam(raw), raw).toBe("invalid");
     expect(parseRoundParam(["1", "2"])).toBe("invalid");
   });
 });

@@ -27,14 +27,24 @@ export interface RedlineGap {
 }
 
 /** The redline of `next` against `base`, one entry per top-level block in reading order. */
-export function diffDocuments(base: JSONContent | null, next: JSONContent): RedlineDoc {
+export function diffDocuments(
+  base: JSONContent | null,
+  next: JSONContent,
+): RedlineDoc {
   const counts = { added: 0, removed: 0, changed: 0, moved: 0 };
   const after = topLevel(next);
   const afterIds = uniqueIds(after);
   const nextId = (j: number) => afterIds[j] ?? `next:${j}`;
 
   if (!base) {
-    return { blocks: after.map((node, j): RedlineBlock => ({ id: nextId(j), status: "unchanged", node })), counts };
+    return {
+      blocks: after.map((node, j): RedlineBlock => ({
+        id: nextId(j),
+        status: "unchanged",
+        node,
+      })),
+      counts,
+    };
   }
 
   const before = topLevel(base);
@@ -46,14 +56,22 @@ export function diffDocuments(base: JSONContent | null, next: JSONContent): Redl
   for (const e of align(cx, before, after, TOP_LEVEL)) {
     if (e.n < 0) {
       const id = beforeIds[e.b];
-      blocks.push({ id: id && !taken.has(id) ? id : `base:${e.b}`, status: "removed", node: before[e.b] });
+      blocks.push({
+        id: id && !taken.has(id) ? id : `base:${e.b}`,
+        status: "removed",
+        node: before[e.b],
+      });
       counts.removed++;
     } else if (e.b < 0) {
       blocks.push({ id: nextId(e.n), status: "added", node: after[e.n] });
       counts.added++;
     } else {
       const { node, changed } = diffNode(cx, before[e.b], after[e.n]);
-      const status: RedlineStatus = changed ? "changed" : e.moved ? "moved" : "unchanged";
+      const status: RedlineStatus = changed
+        ? "changed"
+        : e.moved
+          ? "moved"
+          : "unchanged";
       const block: RedlineBlock = { id: nextId(e.n), status, node };
       if (e.moved) block.movedFrom = e.b;
       if (status !== "unchanged") counts[status]++;
@@ -95,6 +113,11 @@ export interface NameChange {
  * The rename from `base` to `next`, or null when the name is the same or there is no base (nothing
  * Active yet). Names compare exactly, as typed: a change of case or spacing is a rename customers see.
  */
-export function nameChange(base: string | null | undefined, next: string): NameChange | null {
-  return base === null || base === undefined || base === next ? null : { from: base, to: next };
+export function nameChange(
+  base: string | null | undefined,
+  next: string,
+): NameChange | null {
+  return base === null || base === undefined || base === next
+    ? null
+    : { from: base, to: next };
 }

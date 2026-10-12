@@ -14,9 +14,12 @@ import { apiChanges } from "./contract-diff";
 
 // ── Reading a payload defensively (it's JSON from the database) ─────────────
 
-const str = (value: unknown): string | null => (typeof value === "string" && value !== "" ? value : null);
-const int = (value: unknown): number | null => (typeof value === "number" && Number.isInteger(value) ? value : null);
-const has = (payload: Record<string, unknown>, key: string) => Object.hasOwn(payload, key);
+const str = (value: unknown): string | null =>
+  typeof value === "string" && value !== "" ? value : null;
+const int = (value: unknown): number | null =>
+  typeof value === "number" && Number.isInteger(value) ? value : null;
+const has = (payload: Record<string, unknown>, key: string) =>
+  Object.hasOwn(payload, key);
 
 /** The payload's contract changes that have every field of their kind. */
 function changesOf(value: unknown): ContractChange[] {
@@ -38,8 +41,10 @@ function isoOf(value: unknown): string | null {
  */
 export function changeSummary(changes: readonly ContractChange[]): string {
   if (changes.length === 0) return "No contract changes.";
-  const keys = (kind: ContractChange["kind"], filter: (c: ContractChange) => boolean = () => true) =>
-    changes.filter((c) => c.kind === kind && filter(c)).map((c) => c.key);
+  const keys = (
+    kind: ContractChange["kind"],
+    filter: (c: ContractChange) => boolean = () => true,
+  ) => changes.filter((c) => c.kind === kind && filter(c)).map((c) => c.key);
   const clauses: string[] = [];
   const add = (list: string[], words: (keys: string) => string) => {
     if (list.length > 0) clauses.push(words(joinWithAnd(list)));
@@ -49,9 +54,16 @@ export function changeSummary(changes: readonly ContractChange[]): string {
   const required = (c: ContractChange) => c.kind === "added" && c.required;
   const addedRequired = keys("added", required);
   const addedOptional = keys("added", (c) => !required(c));
-  add(addedRequired, (l) => `adds the required ${variables(addedRequired)} ${l}`);
-  add(addedOptional, (l) => `adds the optional ${variables(addedOptional)} ${l}`);
-  for (const c of changes) if (c.kind === "key_renamed") clauses.push(`renames ${c.from} to ${c.to}`);
+  add(
+    addedRequired,
+    (l) => `adds the required ${variables(addedRequired)} ${l}`,
+  );
+  add(
+    addedOptional,
+    (l) => `adds the optional ${variables(addedOptional)} ${l}`,
+  );
+  for (const c of changes)
+    if (c.kind === "key_renamed") clauses.push(`renames ${c.from} to ${c.to}`);
   add(keys("type_changed"), (l) => `changes the type of ${l}`);
   add(keys("made_required"), (l) => `makes ${l} required`);
   add(keys("made_optional"), (l) => `makes ${l} optional`);
@@ -86,13 +98,19 @@ export function noticeView(row: NoticeRow): ApiNotice {
   // The day as recorded (00:00 on it in the business time zone is `sunsetAt`), and the zone it was read in.
   const sunsetOf = () => {
     const sunsetAt = isoOf(p.sunsetAt);
-    return { sunsetAt, sunsetDay: sunsetAt ? recordedSunsetDay(p) : null, zone: sunsetAt ? str(p.zone) : null };
+    return {
+      sunsetAt,
+      sunsetDay: sunsetAt ? recordedSunsetDay(p) : null,
+      zone: sunsetAt ? str(p.zone) : null,
+    };
   };
 
   switch (row.kind) {
     case "new_version": {
       // Live rows say which version is Active; a seeded row's new version is the Active one.
-      const activeVersion = has(p, "activeVersion") ? int(p.activeVersion) : versionNumber;
+      const activeVersion = has(p, "activeVersion")
+        ? int(p.activeVersion)
+        : versionNumber;
       const raw = changesOf(p.contractChanges);
       const changes = apiChanges(raw, versionNumber);
       const summary = changeSummary(raw);
@@ -108,19 +126,35 @@ export function noticeView(row: NoticeRow): ApiNotice {
 
     case "sunset_scheduled": {
       // Live rows: activeVersion. Seeded rows: replacedByVersionNumber.
-      const activeVersion = has(p, "activeVersion") ? int(p.activeVersion) : int(p.replacedByVersionNumber);
+      const activeVersion = has(p, "activeVersion")
+        ? int(p.activeVersion)
+        : int(p.replacedByVersionNumber);
       const sunset = sunsetOf();
-      const changes = activeVersion === null ? [] : apiChanges(changesOf(p.contractChanges), activeVersion);
-      const when = sunset.sunsetDay ? `stops rendering on ${formatLongDate(sunset.sunsetDay)}` : "will stop rendering";
+      const changes =
+        activeVersion === null
+          ? []
+          : apiChanges(changesOf(p.contractChanges), activeVersion);
+      const when = sunset.sunsetDay
+        ? `stops rendering on ${formatLongDate(sunset.sunsetDay)}`
+        : "will stop rendering";
       const move = activeVersion === null ? "" : ` Move to v${activeVersion}.`;
-      return { ...base, activeVersion, ...sunset, reason: null, changes, message: `${title} ${when}.${move}` };
+      return {
+        ...base,
+        activeVersion,
+        ...sunset,
+        reason: null,
+        changes,
+        message: `${title} ${when}.${move}`,
+      };
     }
 
     case "sunset_passed": {
       // Written by the sunset sweep, after the instant: `sunsetAt` says when renders stopped.
       const activeVersion = int(p.activeVersion);
       const sunset = sunsetOf();
-      const when = sunset.sunsetDay ? ` on ${formatLongDate(sunset.sunsetDay)}` : "";
+      const when = sunset.sunsetDay
+        ? ` on ${formatLongDate(sunset.sunsetDay)}`
+        : "";
       const move = activeVersion === null ? "" : ` Move to v${activeVersion}.`;
       return {
         ...base,
@@ -141,7 +175,9 @@ export function noticeView(row: NoticeRow): ApiNotice {
         ...noSunset,
         reason,
         changes: [],
-        message: reason ? `${title} was revoked: ${sentence(reason)}` : `${title} was revoked.`,
+        message: reason
+          ? `${title} was revoked: ${sentence(reason)}`
+          : `${title} was revoked.`,
       };
     }
   }

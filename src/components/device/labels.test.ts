@@ -5,10 +5,16 @@ import { pushScreenLabel, smsCaption } from "./labels";
 
 describe("smsCaption", () => {
   it("names the sender, and leaves out 'from' when there is none", () => {
-    expect(smsCaption("ios", "26725")).toBe("Text message from 26725, iOS-style preview");
-    expect(smsCaption("android", "26725")).toBe("Text message from 26725, Android-style preview");
+    expect(smsCaption("ios", "26725")).toBe(
+      "Text message from 26725, iOS-style preview",
+    );
+    expect(smsCaption("android", "26725")).toBe(
+      "Text message from 26725, Android-style preview",
+    );
     expect(smsCaption("ios", "")).toBe("Text message, iOS-style preview");
-    expect(smsCaption("android", "  ")).toBe("Text message, Android-style preview");
+    expect(smsCaption("android", "  ")).toBe(
+      "Text message, Android-style preview",
+    );
   });
 });
 
@@ -26,6 +32,8 @@ describe("line counts", () => {
     expect(IOS_LINES.lock.body).toBe(4);
     expect(ANDROID_LINES.lock.body).toBe(1);
     expect(ANDROID_LINES.banner).toEqual({ title: 1, subtitle: 0, body: 1 });
-    expect(Object.values(ANDROID_LINES).every((lines) => lines.subtitle === 0)).toBe(true);
+    expect(
+      Object.values(ANDROID_LINES).every((lines) => lines.subtitle === 0),
+    ).toBe(true);
   });
 });

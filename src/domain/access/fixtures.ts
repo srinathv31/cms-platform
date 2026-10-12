@@ -51,7 +51,9 @@ export function membership(
   };
 }
 
-export function recert(opts: Partial<RecertFacts> & { users?: string[] } = {}): RecertFacts {
+export function recert(
+  opts: Partial<RecertFacts> & { users?: string[] } = {},
+): RecertFacts {
   const { users = ["jordan", "maya", "sam", "devon"], ...rest } = opts;
   return {
     id: "rc_1",
@@ -60,7 +62,12 @@ export function recert(opts: Partial<RecertFacts> & { users?: string[] } = {}): 
     startsAt: ago(4),
     dueAt: at(30),
     completedAt: null,
-    items: users.map((userId) => ({ userId, decision: null, decidedBy: null, decidedAt: null })),
+    items: users.map((userId) => ({
+      userId,
+      decision: null,
+      decidedBy: null,
+      decidedAt: null,
+    })),
     ...rest,
   };
 }
@@ -72,15 +79,25 @@ export function coral(): MembershipFacts[] {
     membership("jordan", ["approver"]),
     membership("maya", ["author"]),
     membership("sam", ["viewer"], { activeDaysAgo: 1.25 }),
-    membership("devon", ["viewer"], { activeDaysAgo: 95, inactivityFlaggedAt: ago(5) }),
+    membership("devon", ["viewer"], {
+      activeDaysAgo: 95,
+      inactivityFlaggedAt: ago(5),
+    }),
   ];
 }
 
-export const audits = (effects: AccessEffect[]) => effects.filter((e): e is AccessAuditEffect => e.kind === "audit");
+export const audits = (effects: AccessEffect[]) =>
+  effects.filter((e): e is AccessAuditEffect => e.kind === "audit");
 export const notes = (effects: AccessEffect[]) =>
-  effects.filter((e): e is AccessNotificationEffect => e.kind === "notification");
+  effects.filter(
+    (e): e is AccessNotificationEffect => e.kind === "notification",
+  );
 
-export function sweepAt(now: Date, memberships: MembershipFacts[], recerts: RecertFacts[] = []): SweepResult {
+export function sweepAt(
+  now: Date,
+  memberships: MembershipFacts[],
+  recerts: RecertFacts[] = [],
+): SweepResult {
   const input: SweepInput = {
     now,
     memberships,
@@ -92,6 +109,8 @@ export function sweepAt(now: Date, memberships: MembershipFacts[], recerts: Rece
 }
 
 export function statusOf(result: SweepResult, membershipId: string) {
-  const change = result.membershipChanges.find((c) => c.kind === "update" && c.membershipId === membershipId);
+  const change = result.membershipChanges.find(
+    (c) => c.kind === "update" && c.membershipId === membershipId,
+  );
   return change?.kind === "update" ? change.set : undefined;
 }

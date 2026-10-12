@@ -12,14 +12,16 @@ import { DialogOverlay, DialogPortal } from "@/components/ui/dialog";
  * canvas. From 26rem wide up they add nothing: the dialog is as it was.
  */
 /** On the popup of a dialog whose body would scroll by itself: the popup scrolls instead, with the footer sticky. */
-export const NARROW_SHELL = "max-[26rem]:overflow-y-auto max-[26rem]:overscroll-contain max-[26rem]:p-5 max-[26rem]:pb-0";
+export const NARROW_SHELL =
+  "max-[26rem]:overflow-y-auto max-[26rem]:overscroll-contain max-[26rem]:p-5 max-[26rem]:pb-0";
 /** On the body: it grows with its content, and the popup scrolls. */
 export const NARROW_BODY = "max-[26rem]:flex-none max-[26rem]:overflow-visible";
 /** On the footer row: two lines when the buttons don't fit one, the refusal above them, stuck to the popup's bottom edge. */
 export const NARROW_FOOTER =
   "max-[26rem]:sticky max-[26rem]:bottom-0 max-[26rem]:z-10 max-[26rem]:mt-3 max-[26rem]:flex-wrap max-[26rem]:gap-y-2 max-[26rem]:bg-surface max-[26rem]:pt-3 max-[26rem]:pb-5";
 /** On the refusal in the footer: its own line, above the buttons, once it has text. */
-export const NARROW_REFUSAL = "max-[26rem]:order-first max-[26rem]:basis-full max-[26rem]:not-empty:pb-1";
+export const NARROW_REFUSAL =
+  "max-[26rem]:order-first max-[26rem]:basis-full max-[26rem]:not-empty:pb-1";
 /** On each button of a footer that can wrap: as wide as its label, sharing the line or taking its own. */
 export const NARROW_BUTTON = "max-[26rem]:flex-auto";
 
@@ -38,7 +40,12 @@ export function ScrimDialogContent({
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay className={cn("bg-scrim supports-backdrop-filter:backdrop-blur-none", instant && "data-open:animate-none!")} />
+      <DialogOverlay
+        className={cn(
+          "bg-scrim supports-backdrop-filter:backdrop-blur-none",
+          instant && "data-open:animate-none!",
+        )}
+      />
       <DialogPrimitive.Popup
         data-slot="scrim-dialog-content"
         className={cn(

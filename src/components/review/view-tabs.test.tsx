@@ -18,11 +18,14 @@ const label = (state: VersionState, number: number) => {
       summary="1 changed"
     />,
   );
-  return /<span data-slot="baseline-label"[^>]*>([^<]*)<\/span>/.exec(html)?.[1] ?? null;
+  return (
+    /<span data-slot="baseline-label"[^>]*>([^<]*)<\/span>/.exec(html)?.[1] ??
+    null
+  );
 };
 
 describe("the change switches' baseline label", () => {
-  it("reads \"vs v2\" against the Active version", () => {
+  it('reads "vs v2" against the Active version', () => {
     expect(label("active", 2)).toBe("vs v2");
   });
 
@@ -31,7 +34,9 @@ describe("the change switches' baseline label", () => {
   });
 
   it("says the version is superseded when it falls back to the newest that still renders", () => {
-    expect(baselineLabel({ number: 1, state: "superseded" })).toBe("vs v1 (superseded)");
+    expect(baselineLabel({ number: 1, state: "superseded" })).toBe(
+      "vs v1 (superseded)",
+    );
   });
 
   it("isn't shown until the changes are", () => {

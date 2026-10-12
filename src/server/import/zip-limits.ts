@@ -26,14 +26,23 @@ export const ZIP_LIMITS: Readonly<ZipLimits> = {
 const EOCD = 0x06054b50;
 const CENTRAL = 0x02014b50;
 
-export type ZipCheck = { ok: true; entries: number; totalBytes: number } | { ok: false; why: string };
+export type ZipCheck =
+  | { ok: true; entries: number; totalBytes: number }
+  | { ok: false; why: string };
 
 /** Reads the central directory and checks it against ZIP_LIMITS. Zip64 is refused (a docx under 10 MB never needs it). */
-export function checkZip(bytes: Uint8Array, limits: Readonly<ZipLimits> = ZIP_LIMITS): ZipCheck {
+export function checkZip(
+  bytes: Uint8Array,
+  limits: Readonly<ZipLimits> = ZIP_LIMITS,
+): ZipCheck {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   // The end-of-central-directory record: 22 bytes plus a comment of up to 64 KB, at the end.
   let eocd = -1;
-  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 0xffff); i--) {
+  for (
+    let i = bytes.length - 22;
+    i >= Math.max(0, bytes.length - 22 - 0xffff);
+    i--
+  ) {
     if (view.getUint32(i, true) === EOCD) {
       eocd = i;
       break;
@@ -44,22 +53,34 @@ export function checkZip(bytes: Uint8Array, limits: Readonly<ZipLimits> = ZIP_LI
   const count = view.getUint16(eocd + 10, true);
   const size = view.getUint32(eocd + 12, true);
   const offset = view.getUint32(eocd + 16, true);
-  if (count === 0xffff || size === 0xffffffff || offset === 0xffffffff) return { ok: false, why: "zip64" };
+  if (count === 0xffff || size === 0xffffffff || offset === 0xffffffff)
+    return { ok: false, why: "zip64" };
   if (count > limits.maxEntries) return { ok: false, why: `${count} entries` };
-  if (offset + size > eocd) return { ok: false, why: "central directory out of bounds" };
+  if (offset + size > eocd)
+    return { ok: false, why: "central directory out of bounds" };
 
   let at = offset;
   let total = 0;
   for (let n = 0; n < count; n++) {
-    if (at + 46 > eocd || view.getUint32(at, true) !== CENTRAL) return { ok: false, why: "broken central directory" };
+    if (at + 46 > eocd || view.getUint32(at, true) !== CENTRAL)
+      return { ok: false, why: "broken central directory" };
     const inflated = view.getUint32(at + 24, true);
     if (inflated === 0xffffffff) return { ok: false, why: "zip64" };
-    if (inflated > limits.maxEntryBytes) return { ok: false, why: `an entry of ${inflated} bytes` };
+    if (inflated > limits.maxEntryBytes)
+      return { ok: false, why: `an entry of ${inflated} bytes` };
     total += inflated;
-    if (total > limits.maxTotalBytes) return { ok: false, why: `${total}+ bytes inflated` };
-    at += 46 + view.getUint16(at + 28, true) + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+    if (total > limits.maxTotalBytes)
+      return { ok: false, why: `${total}+ bytes inflated` };
+    at +=
+      46 +
+      view.getUint16(at + 28, true) +
+      view.getUint16(at + 30, true) +
+      view.getUint16(at + 32, true);
   }
-  if (total > limits.ratioFloorBytes && total / bytes.length > limits.maxRatio) {
+  if (
+    total > limits.ratioFloorBytes &&
+    total / bytes.length > limits.maxRatio
+  ) {
     return { ok: false, why: `inflates ${Math.round(total / bytes.length)}×` };
   }
   return { ok: true, entries: count, totalBytes: total };

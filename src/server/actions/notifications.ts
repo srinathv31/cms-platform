@@ -15,7 +15,9 @@ import { refuse, serverAction } from "./kit";
 
 const MarkInput = z.object({ id: z.string().min(1).max(64) });
 
-export async function markNotificationRead(input: { id: string }): Promise<ActionResult> {
+export async function markNotificationRead(input: {
+  id: string;
+}): Promise<ActionResult> {
   let wrote = false;
   return serverAction(input, {
     input: MarkInput,
@@ -23,7 +25,10 @@ export async function markNotificationRead(input: { id: string }): Promise<Actio
     authorize: async ({ viewer, input }) => {
       const row = await db.query.notifications.findFirst({
         columns: { id: true, readAt: true },
-        where: and(eq(notifications.id, input.id), eq(notifications.userId, viewer.userId)),
+        where: and(
+          eq(notifications.id, input.id),
+          eq(notifications.userId, viewer.userId),
+        ),
       });
       // Someone else's notification reads as missing: it doesn't confirm the id exists.
       if (!row) refuse(REQUEST_REFUSALS.notificationGone);
@@ -34,7 +39,9 @@ export async function markNotificationRead(input: { id: string }): Promise<Actio
       await tx
         .update(notifications)
         .set({ readAt: now })
-        .where(and(eq(notifications.id, found.id), isNull(notifications.readAt)));
+        .where(
+          and(eq(notifications.id, found.id), isNull(notifications.readAt)),
+        );
       wrote = true;
       return { ok: true };
     },
@@ -44,7 +51,9 @@ export async function markNotificationRead(input: { id: string }): Promise<Actio
   });
 }
 
-export async function markAllNotificationsRead(): Promise<ActionResult<{ count: number }>> {
+export async function markAllNotificationsRead(): Promise<
+  ActionResult<{ count: number }>
+> {
   return serverAction(undefined, {
     input: z.undefined(),
     // The viewer's own notifications: nothing to check.
@@ -53,7 +62,12 @@ export async function markAllNotificationsRead(): Promise<ActionResult<{ count: 
       const marked = await tx
         .update(notifications)
         .set({ readAt: now })
-        .where(and(eq(notifications.userId, viewer.userId), isNull(notifications.readAt)))
+        .where(
+          and(
+            eq(notifications.userId, viewer.userId),
+            isNull(notifications.readAt),
+          ),
+        )
         .returning({ id: notifications.id });
       return { ok: true, count: marked.length };
     },

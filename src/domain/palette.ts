@@ -48,11 +48,18 @@ function score(tokens: string[], label: string, extra = ""): number | null {
  * The items that match every word, best first; equal matches keep their order. With no words, every
  * item, in order. `text` gives an item's label and the extra words it is also found by.
  */
-export function rankByQuery<T>(items: readonly T[], tokens: string[], text: (item: T) => [string, string?]): T[] {
+export function rankByQuery<T>(
+  items: readonly T[],
+  tokens: string[],
+  text: (item: T) => [string, string?],
+): T[] {
   if (tokens.length === 0) return [...items];
   return items
     .map((item, index) => ({ item, index, s: score(tokens, ...text(item)) }))
-    .filter((entry): entry is { item: T; index: number; s: number } => entry.s !== null)
+    .filter(
+      (entry): entry is { item: T; index: number; s: number } =>
+        entry.s !== null,
+    )
     .sort((a, b) => a.s - b.s || a.index - b.index)
     .map((entry) => entry.item);
 }
@@ -81,21 +88,44 @@ export interface PaletteTemplatesInput {
  * Recent: Templates is every template that matches every word, best first, the recent ones winning
  * ties, at most `PALETTE_MATCH_LIMIT`.
  */
-export function paletteTemplates({ templates, query, recentIds, currentId }: PaletteTemplatesInput): {
+export function paletteTemplates({
+  templates,
+  query,
+  recentIds,
+  currentId,
+}: PaletteTemplatesInput): {
   recent: PaletteTemplateRow[];
   templates: PaletteTemplateRow[];
 } {
   const byId = new Map(templates.map((t) => [t.id, t]));
-  const latest = recentIds.filter((id) => byId.has(id)).slice(0, PALETTE_RECENT_LIMIT);
+  const latest = recentIds
+    .filter((id) => byId.has(id))
+    .slice(0, PALETTE_RECENT_LIMIT);
   const tokens = paletteTokens(query);
 
   if (tokens.length > 0) {
     const rank = new Map(latest.map((id, i) => [id, i]));
-    const recentFirst = [...templates].sort((a, b) => (rank.get(a.id) ?? latest.length) - (rank.get(b.id) ?? latest.length));
-    return { recent: [], templates: rankByQuery(recentFirst, tokens, templateSearchText).slice(0, PALETTE_MATCH_LIMIT) };
+    const recentFirst = [...templates].sort(
+      (a, b) =>
+        (rank.get(a.id) ?? latest.length) - (rank.get(b.id) ?? latest.length),
+    );
+    return {
+      recent: [],
+      templates: rankByQuery(recentFirst, tokens, templateSearchText).slice(
+        0,
+        PALETTE_MATCH_LIMIT,
+      ),
+    };
   }
 
-  const recent = latest.filter((id) => id !== currentId).map((id) => byId.get(id)!);
+  const recent = latest
+    .filter((id) => id !== currentId)
+    .map((id) => byId.get(id)!);
   const inRecent = new Set(recent.map((t) => t.id));
-  return { recent, templates: templates.filter((t) => !inRecent.has(t.id)).slice(0, PALETTE_REST_LIMIT) };
+  return {
+    recent,
+    templates: templates
+      .filter((t) => !inRecent.has(t.id))
+      .slice(0, PALETTE_REST_LIMIT),
+  };
 }

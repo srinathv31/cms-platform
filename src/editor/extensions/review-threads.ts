@@ -19,10 +19,21 @@
 
 import { Extension, Mark, getSchema, type Extensions } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
-import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
+import {
+  Plugin,
+  PluginKey,
+  type EditorState,
+  type Transaction,
+} from "@tiptap/pm/state";
 import { Transform } from "@tiptap/pm/transform";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
-import { locateThread, normalizeQuote, textSegments, type LeafText, type ThreadRange } from "../lib/threads";
+import {
+  locateThread,
+  normalizeQuote,
+  textSegments,
+  type LeafText,
+  type ThreadRange,
+} from "../lib/threads";
 import type { JSONContent } from "../model/types";
 import type { ThreadAnchor } from "../types";
 
@@ -30,12 +41,20 @@ export const THREAD_CLASS = "ucomp-thread";
 export const THREAD_BLOCK_CLASS = "ucomp-thread-block";
 
 /** The quote highlight's attributes (live decoration and static mark). */
-export function threadTextAttrs(id: string, active: boolean): Record<string, string> {
-  return active ? { class: THREAD_CLASS, "data-thread": id, "data-active": "" } : { class: THREAD_CLASS, "data-thread": id };
+export function threadTextAttrs(
+  id: string,
+  active: boolean,
+): Record<string, string> {
+  return active
+    ? { class: THREAD_CLASS, "data-thread": id, "data-active": "" }
+    : { class: THREAD_CLASS, "data-thread": id };
 }
 
 /** The whole-block highlight's attributes (live decoration and static attribute). */
-export function threadBlockAttrs(id: string, active: boolean): Record<string, string> {
+export function threadBlockAttrs(
+  id: string,
+  active: boolean,
+): Record<string, string> {
   return active
     ? { class: THREAD_BLOCK_CLASS, "data-thread-block": id, "data-active": "" }
     : { class: THREAD_BLOCK_CLASS, "data-thread-block": id };
@@ -66,27 +85,61 @@ export interface ThreadsMeta {
 
 export const reviewThreadsKey = new PluginKey<ThreadsState>("reviewThreads");
 
-function decorate(doc: PMNode, threadId: string, range: ThreadRange, active: boolean): Decoration[] {
+function decorate(
+  doc: PMNode,
+  threadId: string,
+  range: ThreadRange,
+  active: boolean,
+): Decoration[] {
   if (range.kind === "text") {
     const segments = textSegments(doc, range.from, range.to);
     if (segments.length) {
       const spec: Spec = { threadId, kind: "text" };
-      return segments.map(([a, b]) => Decoration.inline(a, b, { nodeName: "mark", ...threadTextAttrs(threadId, active) }, spec));
+      return segments.map(([a, b]) =>
+        Decoration.inline(
+          a,
+          b,
+          { nodeName: "mark", ...threadTextAttrs(threadId, active) },
+          spec,
+        ),
+      );
     }
     // A quote made only of chips: the block carries it.
     const $from = doc.resolve(range.from);
     if ($from.depth < 1) return [];
-    return decorate(doc, threadId, { kind: "block", from: $from.before(1), to: $from.after(1) }, active);
+    return decorate(
+      doc,
+      threadId,
+      { kind: "block", from: $from.before(1), to: $from.after(1) },
+      active,
+    );
   }
   const spec: Spec = { threadId, kind: "block" };
-  return [Decoration.node(range.from, range.to, threadBlockAttrs(threadId, active), spec)];
+  return [
+    Decoration.node(
+      range.from,
+      range.to,
+      threadBlockAttrs(threadId, active),
+      spec,
+    ),
+  ];
 }
 
 function restyle(decoration: Decoration, active: boolean): Decoration {
   const spec = decoration.spec as Spec;
   return spec.kind === "block"
-    ? Decoration.node(decoration.from, decoration.to, threadBlockAttrs(spec.threadId, active), spec)
-    : Decoration.inline(decoration.from, decoration.to, { nodeName: "mark", ...threadTextAttrs(spec.threadId, active) }, spec);
+    ? Decoration.node(
+        decoration.from,
+        decoration.to,
+        threadBlockAttrs(spec.threadId, active),
+        spec,
+      )
+    : Decoration.inline(
+        decoration.from,
+        decoration.to,
+        { nodeName: "mark", ...threadTextAttrs(spec.threadId, active) },
+        spec,
+      );
 }
 
 function byThread(set: DecorationSet): Map<string, Decoration[]> {
@@ -101,7 +154,10 @@ function byThread(set: DecorationSet): Map<string, Decoration[]> {
 }
 
 function sameAnchor(a: ThreadAnchor, b: ThreadAnchor): boolean {
-  return a.blockId === b.blockId && normalizeQuote(a.quote) === normalizeQuote(b.quote);
+  return (
+    a.blockId === b.blockId &&
+    normalizeQuote(a.quote) === normalizeQuote(b.quote)
+  );
 }
 
 /** All highlights from scratch, reusing the (mapped) ones of threads whose anchor didn't change. */
@@ -126,7 +182,12 @@ function build(
   return all.length ? DecorationSet.create(doc, all) : DecorationSet.empty;
 }
 
-function withMeta(prev: ThreadsState, meta: ThreadsMeta, doc: PMNode, leafText: LeafText): ThreadsState {
+function withMeta(
+  prev: ThreadsState,
+  meta: ThreadsMeta,
+  doc: PMNode,
+  leafText: LeafText,
+): ThreadsState {
   const threads = meta.threads ? drawnThreads(meta.threads) : prev.threads;
   const activeId = meta.activeId !== undefined ? meta.activeId : prev.activeId;
   if (!meta.threads && activeId === prev.activeId) return prev;
@@ -136,9 +197,14 @@ function withMeta(prev: ThreadsState, meta: ThreadsMeta, doc: PMNode, leafText: 
   for (const thread of threads) {
     const old = before.get(thread.id);
     const decorations = groups.get(thread.id);
-    if (old && decorations && sameAnchor(old, thread)) reuse.set(thread.id, decorations);
+    if (old && decorations && sameAnchor(old, thread))
+      reuse.set(thread.id, decorations);
   }
-  return { threads, activeId, decorations: build(doc, threads, activeId, leafText, reuse) };
+  return {
+    threads,
+    activeId,
+    decorations: build(doc, threads, activeId, leafText, reuse),
+  };
 }
 
 /** The ranges a transaction inserted or changed, in its final document. */
@@ -146,12 +212,18 @@ function changedRanges(tr: Transaction): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
   tr.mapping.maps.forEach((map, index) => {
     const rest = tr.mapping.slice(index + 1);
-    map.forEach((_oldStart, _oldEnd, start, end) => ranges.push([rest.map(start, -1), rest.map(end, 1)]));
+    map.forEach((_oldStart, _oldEnd, start, end) =>
+      ranges.push([rest.map(start, -1), rest.map(end, 1)]),
+    );
   });
   return ranges;
 }
 
-function rangesHoldBlock(doc: PMNode, ranges: Array<[number, number]>, blockId: string): boolean {
+function rangesHoldBlock(
+  doc: PMNode,
+  ranges: Array<[number, number]>,
+  blockId: string,
+): boolean {
   let found = false;
   for (const [from, to] of ranges) {
     doc.nodesBetween(from, to, (node) => {
@@ -164,7 +236,12 @@ function rangesHoldBlock(doc: PMNode, ranges: Array<[number, number]>, blockId: 
   return false;
 }
 
-function remap(prev: ThreadsState, tr: Transaction, doc: PMNode, leafText: LeafText): ThreadsState {
+function remap(
+  prev: ThreadsState,
+  tr: Transaction,
+  doc: PMNode,
+  leafText: LeafText,
+): ThreadsState {
   if (!prev.threads.length) return prev;
   let decorations = prev.decorations.map(tr.mapping, doc);
   const groups = byThread(decorations);
@@ -204,7 +281,10 @@ export function threadAt(state: EditorState, pos: number): string | null {
   let bestSize = Infinity;
   for (const decoration of plugin.decorations.find(pos, pos)) {
     const spec = decoration.spec as Spec;
-    const inside = spec.kind === "block" ? decoration.from < pos && pos < decoration.to : decoration.from <= pos && pos <= decoration.to;
+    const inside =
+      spec.kind === "block"
+        ? decoration.from < pos && pos < decoration.to
+        : decoration.from <= pos && pos <= decoration.to;
     if (!inside) continue;
     if (spec.threadId === plugin.activeId) return spec.threadId;
     const size = decoration.to - decoration.from;
@@ -217,19 +297,35 @@ export function threadAt(state: EditorState, pos: number): string | null {
 }
 
 /** The drawn highlights, for tests and hosts' debugging: one entry per decoration. */
-export function threadHighlights(state: EditorState): Array<{ threadId: string; kind: ThreadRange["kind"]; from: number; to: number; active: boolean }> {
+export function threadHighlights(state: EditorState): Array<{
+  threadId: string;
+  kind: ThreadRange["kind"];
+  from: number;
+  to: number;
+  active: boolean;
+}> {
   const plugin = reviewThreadsKey.getState(state);
   if (!plugin) return [];
   return plugin.decorations
     .find()
-    .map((d) => ({ threadId: (d.spec as Spec).threadId, kind: (d.spec as Spec).kind, from: d.from, to: d.to, active: (d.spec as Spec).threadId === plugin.activeId }))
+    .map((d) => ({
+      threadId: (d.spec as Spec).threadId,
+      kind: (d.spec as Spec).kind,
+      from: d.from,
+      to: d.to,
+      active: (d.spec as Spec).threadId === plugin.activeId,
+    }))
     .sort((a, b) => a.from - b.from || a.to - b.to);
 }
 
 /** Hands the editor new threads and/or a new active thread (not an edit: no undo step). */
 export function setReviewThreads(view: EditorView, meta: ThreadsMeta) {
   if (view.isDestroyed) return;
-  view.dispatch(view.state.tr.setMeta(reviewThreadsKey, meta).setMeta("addToHistory", false));
+  view.dispatch(
+    view.state.tr
+      .setMeta(reviewThreadsKey, meta)
+      .setMeta("addToHistory", false),
+  );
 }
 
 export interface ReviewThreadsOptions {
@@ -264,29 +360,43 @@ export const ReviewThreads = Extension.create<ReviewThreadsOptions>({
           init: (_config, state) => {
             const { threads, activeId } = initial();
             const drawn = drawnThreads(threads);
-            return { threads: drawn, activeId, decorations: build(state.doc, drawn, activeId, leafText) };
+            return {
+              threads: drawn,
+              activeId,
+              decorations: build(state.doc, drawn, activeId, leafText),
+            };
           },
           apply: (tr, prev, _oldState, state) => {
-            let next = tr.docChanged ? remap(prev, tr, state.doc, leafText) : prev;
-            const meta = tr.getMeta(reviewThreadsKey) as ThreadsMeta | undefined;
+            let next = tr.docChanged
+              ? remap(prev, tr, state.doc, leafText)
+              : prev;
+            const meta = tr.getMeta(reviewThreadsKey) as
+              ThreadsMeta | undefined;
             if (meta) next = withMeta(next, meta, state.doc, leafText);
             return next;
           },
         },
         props: {
-          decorations: (state) => reviewThreadsKey.getState(state)?.decorations ?? null,
+          decorations: (state) =>
+            reviewThreadsKey.getState(state)?.decorations ?? null,
           handleDOMEvents: {
             click: (view, event) => {
               if (!onThreadClick || event.button !== 0) return false;
-              const target = event.target instanceof Element ? event.target : (event.target as Node | null)?.parentElement;
+              const target =
+                event.target instanceof Element
+                  ? event.target
+                  : (event.target as Node | null)?.parentElement;
               // Chips have their own popover; a drag or double click selected text instead.
               if (!target || target.closest("[data-variable]")) return false;
               const selection = view.dom.ownerDocument.getSelection();
               if (selection && !selection.isCollapsed) return false;
               const mark = target.closest<HTMLElement>("[data-thread]");
-              const element = mark ?? target.closest<HTMLElement>("[data-thread-block]");
+              const element =
+                mark ?? target.closest<HTMLElement>("[data-thread-block]");
               if (!element || !view.dom.contains(element)) return false;
-              const id = element.getAttribute(mark ? "data-thread" : "data-thread-block");
+              const id = element.getAttribute(
+                mark ? "data-thread" : "data-thread-block",
+              );
               if (id) onThreadClick(id);
               return false;
             },
@@ -300,7 +410,8 @@ export const ReviewThreads = Extension.create<ReviewThreadsOptions>({
               const { state } = view;
               if (
                 state.selection.eq(prevState.selection) &&
-                reviewThreadsKey.getState(state) === reviewThreadsKey.getState(prevState)
+                reviewThreadsKey.getState(state) ===
+                  reviewThreadsKey.getState(prevState)
               ) {
                 return;
               }
@@ -334,10 +445,17 @@ export function reviewThreadMarks(blockTypes: readonly string[]): Extensions {
       inclusive: false,
       excludes: "",
       addAttributes() {
-        return { thread: { default: null, rendered: false }, active: { default: false, rendered: false } };
+        return {
+          thread: { default: null, rendered: false },
+          active: { default: false, rendered: false },
+        };
       },
       renderHTML({ mark }) {
-        return ["mark", threadTextAttrs(mark.attrs.thread as string, !!mark.attrs.active), 0];
+        return [
+          "mark",
+          threadTextAttrs(mark.attrs.thread as string, !!mark.attrs.active),
+          0,
+        ];
       },
     }),
     Extension.create({
@@ -351,7 +469,10 @@ export function reviewThreadMarks(blockTypes: readonly string[]): Extensions {
                 default: null,
                 parseHTML: () => null,
                 renderHTML: (attributes) => {
-                  const value = attributes[STATIC_ATTR] as { id: string; active: boolean } | null;
+                  const value = attributes[STATIC_ATTR] as {
+                    id: string;
+                    active: boolean;
+                  } | null;
                   return value ? threadBlockAttrs(value.id, value.active) : {};
                 },
               },
@@ -381,16 +502,29 @@ export function withThreadHighlights(
     const range = locateThread(doc, thread, leafText);
     if (!range) continue;
     const active = thread.id === activeId;
-    const segments = range.kind === "text" ? textSegments(doc, range.from, range.to) : [];
+    const segments =
+      range.kind === "text" ? textSegments(doc, range.from, range.to) : [];
     if (segments.length) {
-      const mark = schema.marks[STATIC_MARK].create({ thread: thread.id, active });
+      const mark = schema.marks[STATIC_MARK].create({
+        thread: thread.id,
+        active,
+      });
       for (const [a, b] of segments) tr.addMark(a, b, mark);
       continue;
     }
     const $from = doc.resolve(range.from);
-    const pos = range.kind === "block" ? range.from : $from.depth >= 1 ? $from.before(1) : -1;
+    const pos =
+      range.kind === "block"
+        ? range.from
+        : $from.depth >= 1
+          ? $from.before(1)
+          : -1;
     const node = pos >= 0 ? tr.doc.nodeAt(pos) : null;
-    if (node) tr.setNodeMarkup(pos, undefined, { ...node.attrs, [STATIC_ATTR]: { id: thread.id, active } });
+    if (node)
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        [STATIC_ATTR]: { id: thread.id, active },
+      });
   }
   return tr.doc;
 }

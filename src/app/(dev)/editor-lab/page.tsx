@@ -10,5 +10,11 @@ export const metadata: Metadata = { title: "Editor lab" };
 // here, on the server, with <StaticDocument>, to compare against the live editor.
 export default function EditorLabPage() {
   if (process.env.NODE_ENV === "production") notFound();
-  return <EditorLab serverPaint={<StaticDocument content={LONG_DISCLOSURE} variables={LAB_VARIABLES} />} />;
+  return (
+    <EditorLab
+      serverPaint={
+        <StaticDocument content={LONG_DISCLOSURE} variables={LAB_VARIABLES} />
+      }
+    />
+  );
 }

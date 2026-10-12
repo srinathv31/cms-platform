@@ -16,7 +16,9 @@ import { identityOf } from "../model/contract";
 import type { Variable } from "../model/types";
 import { isValidKey } from "../model/variables";
 
-export type VariableResult = { ok: true } | { ok: false; reason: "invalid_key" | "duplicate_key" | "not_found" };
+export type VariableResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid_key" | "duplicate_key" | "not_found" };
 
 export interface Tombstone {
   /** As it was, its id included: restored, it is the same variable to the contract diff. */
@@ -56,7 +58,9 @@ const NO_TOMBSTONES: ReadonlyMap<string, Tombstone> = new Map();
  */
 export function newVariableId(): string {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  const hex = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const hex = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
@@ -66,8 +70,10 @@ export function createVariableStore(
   newId: () => string = newVariableId,
 ): VariableStore {
   return createStore<VariableStoreState>()((set, get) => {
-    const commit = (variables: readonly Variable[], extra: Partial<VariableStoreState> = {}) =>
-      set({ variables, byKey: indexByKey(variables), ...extra });
+    const commit = (
+      variables: readonly Variable[],
+      extra: Partial<VariableStoreState> = {},
+    ) => set({ variables, byKey: indexByKey(variables), ...extra });
 
     return {
       variables: initial,
@@ -93,8 +99,10 @@ export function createVariableStore(
 
       create: (variable, index) => {
         const { variables, byKey, tombstones } = get();
-        if (!isValidKey(variable.key)) return { ok: false, reason: "invalid_key" };
-        if (byKey.has(variable.key)) return { ok: false, reason: "duplicate_key" };
+        if (!isValidKey(variable.key))
+          return { ok: false, reason: "invalid_key" };
+        if (byKey.has(variable.key))
+          return { ok: false, reason: "duplicate_key" };
         const next = [...variables];
         next.splice(index ?? next.length, 0, { ...variable, id: newId() });
         commit(next, { tombstones: without(tombstones, variable.key) });
@@ -110,7 +118,10 @@ export function createVariableStore(
           if (!isValidKey(nextKey)) return { ok: false, reason: "invalid_key" };
           if (byKey.has(nextKey)) return { ok: false, reason: "duplicate_key" };
         }
-        const updated = withIdentity({ ...old, ...patch, key: nextKey }, identityOf(old));
+        const updated = withIdentity(
+          { ...old, ...patch, key: nextKey },
+          identityOf(old),
+        );
         if (sameVariable(old, updated)) return OK;
         const next = variables.map((v) => (v === old ? updated : v));
         if (nextKey === key) {
@@ -141,7 +152,11 @@ export function createVariableStore(
         if (!tombstone) return { ok: false, reason: "not_found" };
         if (byKey.has(key)) return { ok: false, reason: "duplicate_key" };
         const next = [...variables];
-        next.splice(Math.min(tombstone.index, next.length), 0, tombstone.variable);
+        next.splice(
+          Math.min(tombstone.index, next.length),
+          0,
+          tombstone.variable,
+        );
         commit(next, { tombstones: without(tombstones, key) });
         return OK;
       },
@@ -160,7 +175,11 @@ function withIdentity(variable: Variable, identity: string): Variable {
 }
 
 /** { oldKey: currentKey }: every old name of a variable points at its current key. */
-function forwarded(forwards: Readonly<Record<string, string>>, from: string, to: string): Record<string, string> {
+function forwarded(
+  forwards: Readonly<Record<string, string>>,
+  from: string,
+  to: string,
+): Record<string, string> {
   const next: Record<string, string> = {};
   for (const [old, current] of Object.entries(forwards)) {
     const target = current === from ? to : current;
@@ -170,7 +189,10 @@ function forwarded(forwards: Readonly<Record<string, string>>, from: string, to:
   return next;
 }
 
-function without<V>(map: ReadonlyMap<string, V>, key: string): ReadonlyMap<string, V> {
+function without<V>(
+  map: ReadonlyMap<string, V>,
+  key: string,
+): ReadonlyMap<string, V> {
   if (!map.has(key)) return map;
   const next = new Map(map);
   next.delete(key);

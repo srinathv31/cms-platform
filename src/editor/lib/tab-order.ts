@@ -26,10 +26,16 @@ function tabbable(el: HTMLElement): boolean {
  * anything inside `skip` (the popover asking); null when there is none. Positive tab indexes are taken in
  * document order (the app sets none).
  */
-export function nextTabbable(after: Element, skip: Element | null = null): HTMLElement | null {
-  for (const el of after.ownerDocument.querySelectorAll<HTMLElement>(TABBABLE)) {
+export function nextTabbable(
+  after: Element,
+  skip: Element | null = null,
+): HTMLElement | null {
+  for (const el of after.ownerDocument.querySelectorAll<HTMLElement>(
+    TABBABLE,
+  )) {
     if (after.contains(el) || skip?.contains(el)) continue;
-    if (!(after.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+    if (!(after.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING))
+      continue;
     if (tabbable(el)) return el;
   }
   return null;

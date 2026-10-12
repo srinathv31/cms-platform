@@ -3,7 +3,11 @@
 import { Braces } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DocumentEditor } from "@/editor/components/document-editor";
@@ -11,8 +15,18 @@ import { EditorRoot } from "@/editor/components/editor-root";
 import { InlineVariableField } from "@/editor/components/inline-variable-field";
 import { VariablesPanel } from "@/editor/components/variables-panel";
 import type { JSONContent, Variable } from "@/editor/model/types";
-import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
-import { FIXTURES, LAB_THREADS, LAB_VARIABLES, type Fixture, type FixtureId } from "./fixtures";
+import type {
+  CommentRequest,
+  DocumentEditorHandle,
+  ThreadAnchor,
+} from "@/editor/types";
+import {
+  FIXTURES,
+  LAB_THREADS,
+  LAB_VARIABLES,
+  type Fixture,
+  type FixtureId,
+} from "./fixtures";
 
 const JSON_DEBOUNCE_MS = 250;
 
@@ -30,7 +44,10 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
   const [threads, setThreads] = useState<ThreadAnchor[]>(LAB_THREADS);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const editorRef = useRef<DocumentEditorHandle>(null);
-  const [json, setJson] = useState<LabState>({ doc: FIXTURES[0].content, variables: LAB_VARIABLES });
+  const [json, setJson] = useState<LabState>({
+    doc: FIXTURES[0].content,
+    variables: LAB_VARIABLES,
+  });
 
   const fixture = FIXTURES.find((f) => f.id === fixtureId) as Fixture;
   const forcedReadOnly = Boolean(fixture.readOnly);
@@ -38,14 +55,20 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
 
   // The latest state lives in a ref; the JSON panel catches up on a debounce, and only while
   // it's open, so the lab never adds work to a keystroke.
-  const latest = useRef<LabState>({ doc: fixture.content, variables: fixture.variables ?? LAB_VARIABLES });
+  const latest = useRef<LabState>({
+    doc: fixture.content,
+    variables: fixture.variables ?? LAB_VARIABLES,
+  });
   const jsonOpenRef = useRef(false);
   const timer = useRef<number | undefined>(undefined);
 
   const refreshJson = useCallback(() => {
     if (!jsonOpenRef.current) return;
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setJson({ ...latest.current }), JSON_DEBOUNCE_MS);
+    timer.current = window.setTimeout(
+      () => setJson({ ...latest.current }),
+      JSON_DEBOUNCE_MS,
+    );
   }, []);
 
   const onChange = useCallback(
@@ -68,14 +91,25 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
     const next = FIXTURES.find((f) => f.id === id);
     if (!next) return;
     window.clearTimeout(timer.current);
-    latest.current = { doc: next.content, variables: next.variables ?? LAB_VARIABLES };
+    latest.current = {
+      doc: next.content,
+      variables: next.variables ?? LAB_VARIABLES,
+    };
     setJson({ ...latest.current });
     setFixtureId(id);
   };
 
   const requestComment = useCallback((anchor: CommentRequest) => {
     const id = `lab-new-${Date.now().toString(36)}`;
-    setThreads((list) => [...list, { id, blockId: anchor.blockId, quote: anchor.quote ?? null, status: "open" }]);
+    setThreads((list) => [
+      ...list,
+      {
+        id,
+        blockId: anchor.blockId,
+        quote: anchor.quote ?? null,
+        status: "open",
+      },
+    ]);
     setActiveThreadId(id);
   }, []);
 
@@ -138,12 +172,22 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
           </label>
 
           <label className="flex items-center gap-2.5 text-sm text-text-muted">
-            <Switch checked={commentsOn} onCheckedChange={(checked) => setCommentsOn(checked)} aria-label="Comments" />
+            <Switch
+              checked={commentsOn}
+              onCheckedChange={(checked) => setCommentsOn(checked)}
+              aria-label="Comments"
+            />
             Comments
           </label>
 
           <CollapsibleTrigger
-            render={<Button variant="outline" size="sm" className="gap-1.5 bg-surface font-normal" />}
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 bg-surface font-normal"
+              />
+            }
           >
             <Braces className="size-4" strokeWidth={1.75} aria-hidden />
             JSON
@@ -169,7 +213,9 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
                   value={thread.id}
                   className="max-w-56 px-3 font-normal text-text-muted aria-pressed:bg-selected aria-pressed:text-text"
                 >
-                  <span className="truncate">{thread.quote ?? "Whole block"}</span>
+                  <span className="truncate">
+                    {thread.quote ?? "Whole block"}
+                  </span>
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
@@ -186,11 +232,17 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
         >
           <div className="flex min-h-0 flex-1">
             {/* Deep bottom room, like the workspace: menus near the end of the document open below. */}
-            <section aria-label="Document" className="min-w-0 flex-1 px-6 pt-8 pb-[max(3.5rem,40svh)]">
+            <section
+              aria-label="Document"
+              className="min-w-0 flex-1 px-6 pt-8 pb-[max(3.5rem,40svh)]"
+            >
               {fixture.subject !== undefined ? (
                 <div className="mx-auto mb-10 grid max-w-(--doc-width) gap-2">
                   <span className="caps-label">Email subject</span>
-                  <InlineVariableField label="Email subject" value={fixture.subject} />
+                  <InlineVariableField
+                    label="Email subject"
+                    value={fixture.subject}
+                  />
                 </div>
               ) : null}
               {fixtureId === "static" ? (
@@ -212,7 +264,10 @@ export function EditorLab({ serverPaint }: { serverPaint: ReactNode }) {
               )}
             </section>
 
-            <aside aria-label="Variables" className="w-[300px] shrink-0 border-l border-hairline px-3 pt-8 pb-16">
+            <aside
+              aria-label="Variables"
+              className="w-[300px] shrink-0 border-l border-hairline px-3 pt-8 pb-16"
+            >
               <VariablesPanel className="sticky top-6" />
             </aside>
 

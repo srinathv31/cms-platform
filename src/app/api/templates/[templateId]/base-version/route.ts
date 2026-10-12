@@ -8,8 +8,16 @@ import { getViewer } from "@/server/viewer";
 // (src/server/api/reads.ts). Only someone who may edit the team's drafts. Request-time only: it reads
 // the persona cookie first.
 
-export async function GET(request: NextRequest, ctx: RouteContext<"/api/templates/[templateId]/base-version">) {
+export async function GET(
+  request: NextRequest,
+  ctx: RouteContext<"/api/templates/[templateId]/base-version">,
+) {
   const viewer = await getViewer();
   const { templateId } = await ctx.params;
-  return readResponse(await getBaseVersion(viewer, { templateId, versionId: request.nextUrl.searchParams.get("draft") }));
+  return readResponse(
+    await getBaseVersion(viewer, {
+      templateId,
+      versionId: request.nextUrl.searchParams.get("draft"),
+    }),
+  );
 }

@@ -45,9 +45,24 @@ interface State {
   height: number | null;
 }
 
-export function BufferedFrame({ html, title, autoHeight = false, initialHeight = 320, className }: BufferedFrameProps) {
-  const [state, setState] = useState<State>({ docs: [html, null], front: 0, pending: null, latest: html, height: null });
-  const frames = [useRef<HTMLIFrameElement>(null), useRef<HTMLIFrameElement>(null)] as const;
+export function BufferedFrame({
+  html,
+  title,
+  autoHeight = false,
+  initialHeight = 320,
+  className,
+}: BufferedFrameProps) {
+  const [state, setState] = useState<State>({
+    docs: [html, null],
+    front: 0,
+    pending: null,
+    latest: html,
+    height: null,
+  });
+  const frames = [
+    useRef<HTMLIFrameElement>(null),
+    useRef<HTMLIFrameElement>(null),
+  ] as const;
 
   // A new document goes into the iframe that is not on screen (adjusting state during render).
   if (html !== state.latest) {
@@ -62,13 +77,17 @@ export function BufferedFrame({ html, title, autoHeight = false, initialHeight =
     if (doc) {
       // A click on a link must not navigate the preview.
       doc.addEventListener("click", (event) => {
-        if (event.target instanceof Element && event.target.closest("a")) event.preventDefault();
+        if (event.target instanceof Element && event.target.closest("a"))
+          event.preventDefault();
       });
       // The frame's width changed (the pane was resized): its content's height did too.
       if (autoHeight) {
         frame.contentWindow?.addEventListener("resize", () => {
           const height = contentHeight(frame);
-          if (height !== null) setState((s) => (s.front === slot && s.height !== height ? { ...s, height } : s));
+          if (height !== null)
+            setState((s) =>
+              s.front === slot && s.height !== height ? { ...s, height } : s,
+            );
         });
       }
     }
@@ -77,7 +96,8 @@ export function BufferedFrame({ html, title, autoHeight = false, initialHeight =
       // The first document, or a front one that reloaded: nothing to swap, just measure.
       if (autoHeight) {
         const height = contentHeight(frame);
-        if (height !== null) setState((s) => (s.height === height ? s : { ...s, height }));
+        if (height !== null)
+          setState((s) => (s.height === height ? s : { ...s, height }));
       }
       return;
     }
@@ -91,7 +111,13 @@ export function BufferedFrame({ html, title, autoHeight = false, initialHeight =
       if (s.pending !== slot) return s;
       const docs: State["docs"] = [s.docs[0], s.docs[1]];
       docs[s.front] = null; // the old front goes away
-      return { ...s, docs, front: slot, pending: null, height: height ?? s.height };
+      return {
+        ...s,
+        docs,
+        front: slot,
+        pending: null,
+        height: height ?? s.height,
+      };
     });
   }
 
@@ -116,7 +142,10 @@ export function BufferedFrame({ html, title, autoHeight = false, initialHeight =
             sandbox="allow-same-origin"
             referrerPolicy="no-referrer"
             onLoad={(event) => onLoad(slot, event.currentTarget)}
-            className={cn("absolute inset-0 block size-full border-0 bg-surface", !front && "invisible")}
+            className={cn(
+              "absolute inset-0 block size-full border-0 bg-surface",
+              !front && "invisible",
+            )}
           />
         );
       })}

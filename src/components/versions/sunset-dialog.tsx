@@ -65,7 +65,16 @@ export function SunsetDialog({
     () =>
       invalid
         ? []
-        : consequences({ kind: "sunset", number: versionNumber, sunsetAt: ymd, activeNumber }, usage, new Date(nowIso)),
+        : consequences(
+            {
+              kind: "sunset",
+              number: versionNumber,
+              sunsetAt: ymd,
+              activeNumber,
+            },
+            usage,
+            new Date(nowIso),
+          ),
     [invalid, ymd, versionNumber, activeNumber, usage, nowIso],
   );
 
@@ -90,22 +99,37 @@ export function SunsetDialog({
       primary={{
         label: verb,
         blocked: invalid !== null,
-        onClick: () => submit(invalid, () => setSunset({ templateId, versionNumber, sunsetAt: ymd })),
+        onClick: () =>
+          submit(invalid, () =>
+            setSunset({ templateId, versionNumber, sunsetAt: ymd }),
+          ),
       }}
     >
       <div className="flex flex-col gap-2">
         <Label id={labelId} className="caps-label">
           Sunset date
         </Label>
-        <Popover open={pickerOpen} onOpenChange={(next) => !pending && setPickerOpen(next)}>
+        <Popover
+          open={pickerOpen}
+          onOpenChange={(next) => !pending && setPickerOpen(next)}
+        >
           <PopoverTrigger
             ref={dateButton}
             id={buttonId}
             aria-labelledby={`${labelId} ${buttonId}`}
             aria-describedby={zoneId}
-            render={<Button variant="outline" className="h-8 w-56 justify-start gap-2 bg-surface px-2.5 font-normal text-text" />}
+            render={
+              <Button
+                variant="outline"
+                className="h-8 w-56 justify-start gap-2 bg-surface px-2.5 font-normal text-text"
+              />
+            }
           >
-            <CalendarDays aria-hidden strokeWidth={1.75} className="text-text-muted" />
+            <CalendarDays
+              aria-hidden
+              strokeWidth={1.75}
+              className="text-text-muted"
+            />
             {formatLong(ymd) || "Pick a date"}
           </PopoverTrigger>
           <SunsetCalendarContent

@@ -21,7 +21,13 @@ import type {
 } from "./access-types";
 import { INACTIVITY_FLAG_DAYS } from "./access-types";
 import { SYSTEM_ACTOR, describeActivity } from "./activity";
-import { addDays, formatRecordedDate, formatShortDate, isCalendarDay, utcDay } from "./dates";
+import {
+  addDays,
+  formatRecordedDate,
+  formatShortDate,
+  isCalendarDay,
+  utcDay,
+} from "./dates";
 import { plural } from "./plural";
 import type { Person } from "./review-types";
 import type { NumberedRound } from "./rounds";
@@ -29,7 +35,11 @@ import { TEAM_ROLES, type TeamRole } from "./types";
 
 // ── The action catalog ──────────────────────────────────────────────────────
 
-export const AUDIT_CATEGORIES = ["templates", "access", "platform"] as const satisfies readonly AuditCategory[];
+export const AUDIT_CATEGORIES = [
+  "templates",
+  "access",
+  "platform",
+] as const satisfies readonly AuditCategory[];
 
 export const CATEGORY_LABEL: Record<AuditCategory, string> = {
   templates: "Templates",
@@ -51,14 +61,20 @@ const ACTIONS = {
   "comment.added": { label: "Commented", category: "templates" },
   "thread.resolved": { label: "Comment resolved", category: "templates" },
   "thread.reopened": { label: "Comment reopened", category: "templates" },
-  "version.changes_requested": { label: "Changes requested", category: "templates" },
+  "version.changes_requested": {
+    label: "Changes requested",
+    category: "templates",
+  },
   "version.approved": { label: "Approved", category: "templates" },
   "version.activated": { label: "Became Active", category: "templates" },
   "version.superseded": { label: "Superseded", category: "templates" },
   "version.sunset_set": { label: "Sunset set", category: "templates" },
   "version.sunset_passed": { label: "Sunset passed", category: "templates" },
   "version.revoke_started": { label: "Revoke started", category: "templates" },
-  "version.revoke_cancelled": { label: "Revoke canceled", category: "templates" },
+  "version.revoke_cancelled": {
+    label: "Revoke canceled",
+    category: "templates",
+  },
   "version.revoked": { label: "Revoked", category: "templates" },
 
   "access.requested": { label: "Access requested", category: "access" },
@@ -71,13 +87,19 @@ const ACTIONS = {
   "access.suspended": { label: "Suspended", category: "access" },
   "access.lapsed": { label: "Access lapsed", category: "access" },
   "access.reinstated": { label: "Reinstated", category: "access" },
-  "access.kept_last_admin": { label: "Kept: last Team Admin", category: "access" },
+  "access.kept_last_admin": {
+    label: "Kept: last Team Admin",
+    category: "access",
+  },
   "recert.started": { label: "Review started", category: "access" },
   "recert.kept": { label: "Recertified", category: "access" },
   "recert.removed": { label: "Removed in review", category: "access" },
   "recert.closed": { label: "Review closed", category: "access" },
 
-  "platform.config_changed": { label: "Configuration changed", category: "platform" },
+  "platform.config_changed": {
+    label: "Configuration changed",
+    category: "platform",
+  },
 } as const satisfies Record<string, ActionInfo>;
 
 export type CanonicalAuditAction = keyof typeof ACTIONS;
@@ -104,7 +126,8 @@ export function canonicalAction(action: string, byPerson = false): string {
 export function categoryOf(action: string): AuditCategory {
   const known = ACTION_INFO[canonicalAction(action)];
   if (known) return known.category;
-  if (action.startsWith("access.") || action.startsWith("recert.")) return "access";
+  if (action.startsWith("access.") || action.startsWith("recert."))
+    return "access";
   if (action.startsWith("platform.")) return "platform";
   return "templates";
 }
@@ -118,12 +141,23 @@ export function actionLabel(action: string, byPerson = false): string {
   return words ? words[0]!.toUpperCase() + words.slice(1) : action;
 }
 
-export function actionOptions(): { value: string; label: string; category: AuditCategory }[] {
-  return Object.entries(ACTIONS).map(([value, info]) => ({ value, label: info.label, category: info.category }));
+export function actionOptions(): {
+  value: string;
+  label: string;
+  category: AuditCategory;
+}[] {
+  return Object.entries(ACTIONS).map(([value, info]) => ({
+    value,
+    label: info.label,
+    category: info.category,
+  }));
 }
 
 export function isAuditCategory(value: unknown): value is AuditCategory {
-  return typeof value === "string" && (AUDIT_CATEGORIES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (AUDIT_CATEGORIES as readonly string[]).includes(value)
+  );
 }
 
 // ── Sentences ───────────────────────────────────────────────────────────────
@@ -140,7 +174,10 @@ export interface AuditEventInput {
  * their details (userName, role/roles, from/to, reason, note, label, dueAt, area, summary).
  * Details never hold variable values, so nothing here can leak one.
  */
-export function describeAuditEvent(e: AuditEventInput, actor: Person | null): string {
+export function describeAuditEvent(
+  e: AuditEventInput,
+  actor: Person | null,
+): string {
   if (categoryOf(e.action) === "templates") return describeActivity(e, actor);
 
   const d = e.details ?? {};
@@ -154,33 +191,51 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
 
   switch (e.action) {
     case "access.requested":
-      return withText(`${who} asked for ${role || "access"}${role ? " access" : ""}`, d.reason);
+      return withText(
+        `${who} asked for ${role || "access"}${role ? " access" : ""}`,
+        d.reason,
+      );
 
     case "access.granted": {
       if (d.appointed === true) return `${who} made ${subject} the Team Admin.`;
       if (typeof d.requestId === "string") {
-        return withText(`${who} approved ${possessive(subject)} request for ${role || roles || "team"} access`, d.note);
+        return withText(
+          `${who} approved ${possessive(subject)} request for ${role || roles || "team"} access`,
+          d.note,
+        );
       }
-      return roles ? `${who} gave ${subject} ${roles} access.` : `${who} gave ${subject} access.`;
+      return roles
+        ? `${who} gave ${subject} ${roles} access.`
+        : `${who} gave ${subject} access.`;
     }
 
     case "access.denied":
-      return withText(`${who} declined ${possessive(subject)} request for ${role || "team"} access`, d.note);
+      return withText(
+        `${who} declined ${possessive(subject)} request for ${role || "team"} access`,
+        d.note,
+      );
 
     case "access.role_changed": {
       const from = rolesText(d.from);
       const to = rolesText(d.to);
-      if (from && to) return `${who} changed ${possessive(subject)} roles from ${from} to ${to}.`;
-      return to ? `${who} changed ${possessive(subject)} roles to ${to}.` : `${who} changed ${possessive(subject)} roles.`;
+      if (from && to)
+        return `${who} changed ${possessive(subject)} roles from ${from} to ${to}.`;
+      return to
+        ? `${who} changed ${possessive(subject)} roles to ${to}.`
+        : `${who} changed ${possessive(subject)} roles.`;
     }
 
     case "access.removed":
-      return roles ? `${who} removed ${possessive(subject)} ${roles} access.` : `${who} removed ${subject}.`;
+      return roles
+        ? `${who} removed ${possessive(subject)} ${roles} access.`
+        : `${who} removed ${subject}.`;
 
     case "access.flagged_inactive": {
       const until = formatRecordedDate(d.suspendsAt);
       const stem = `${subject} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days`;
-      return until ? `${stem}: suspends automatically on ${until}.` : `${stem}.`;
+      return until
+        ? `${stem}: suspends automatically on ${until}.`
+        : `${stem}.`;
     }
 
     case "access.kept": {
@@ -192,8 +247,12 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
 
     case "access.suspended": {
       const days = count(d.daysInactive);
-      const idle = days === null ? "for inactivity" : `after ${plural(days, "day")} without a sign-in`;
-      if (d.reason === "inactivity_auto" || !actor) return `${possessive(subject)} access was suspended automatically ${idle}.`;
+      const idle =
+        days === null
+          ? "for inactivity"
+          : `after ${plural(days, "day")} without a sign-in`;
+      if (d.reason === "inactivity_auto" || !actor)
+        return `${possessive(subject)} access was suspended automatically ${idle}.`;
       return `${who} suspended ${possessive(subject)} access ${idle}.`;
     }
 
@@ -206,7 +265,9 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
 
     case "access.kept_last_admin": {
       const team = text(d.teamName);
-      const as = team ? `the last Team Admin of ${team}` : "the last Team Admin";
+      const as = team
+        ? `the last Team Admin of ${team}`
+        : "the last Team Admin";
       if (d.reason === "recert_unconfirmed") {
         const by = formatRecordedDate(d.dueAt);
         return `${possessive(subject)} access didn't lapse${by ? ` on ${by}` : ""}: ${as}.`;
@@ -216,13 +277,20 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
     }
 
     case "access.reinstated":
-      return roles ? `${who} reinstated ${subject} as ${roles}.` : `${who} reinstated ${subject}.`;
+      return roles
+        ? `${who} reinstated ${subject} as ${roles}.`
+        : `${who} reinstated ${subject}.`;
 
     case "recert.started": {
       const members = count(d.members);
       const due = formatRecordedDate(d.dueAt);
-      const parts = [members === null ? "" : `${plural(members, "member")} to confirm`, due ? `due ${due}` : ""].filter(Boolean);
-      const stem = actor ? `${who} started ${review}` : `${capitalize(review)} started`;
+      const parts = [
+        members === null ? "" : `${plural(members, "member")} to confirm`,
+        due ? `due ${due}` : "",
+      ].filter(Boolean);
+      const stem = actor
+        ? `${who} started ${review}`
+        : `${capitalize(review)} started`;
       return parts.length ? `${stem}: ${parts.join(", ")}.` : `${stem}.`;
     }
 
@@ -241,7 +309,9 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
 
     case "platform.config_changed": {
       const summary = text(d.summary);
-      return summary ? continued(who, summary) : `${who} changed the ${areaText(d.area)}.`;
+      return summary
+        ? continued(who, summary)
+        : `${who} changed the ${areaText(d.area)}.`;
     }
 
     default: {
@@ -253,7 +323,10 @@ export function describeAuditEvent(e: AuditEventInput, actor: Person | null): st
 }
 
 /** The person an access event is about (details.userId), for the Person filter and the row. */
-export function subjectIdOf(action: string, details: Record<string, unknown> | null): string | null {
+export function subjectIdOf(
+  action: string,
+  details: Record<string, unknown> | null,
+): string | null {
   if (categoryOf(action) !== "access") return null;
   const id = details?.userId;
   return typeof id === "string" && id ? id : null;
@@ -265,7 +338,12 @@ export function subjectIdOf(action: string, details: Record<string, unknown> | n
 export const SYSTEM_PERSON = "system";
 
 export type AuditListKey = "team" | "person" | "action" | "template";
-export const AUDIT_LIST_KEYS = ["team", "person", "action", "template"] as const satisfies readonly AuditListKey[];
+export const AUDIT_LIST_KEYS = [
+  "team",
+  "person",
+  "action",
+  "template",
+] as const satisfies readonly AuditListKey[];
 /** A facet the menus count: one of the list filters. Dates aren't counted. */
 export type AuditFacet = AuditListKey;
 
@@ -279,13 +357,20 @@ export function isDay(value: unknown): value is string {
 }
 
 /** The values of one list filter (empty when unset). */
-export function filterValues(filters: AuditFilters, key: AuditListKey): string[] {
+export function filterValues(
+  filters: AuditFilters,
+  key: AuditListKey,
+): string[] {
   const raw = filters[key];
   return raw ? raw.split(",").filter(Boolean) : [];
 }
 
 /** The filters with one list replaced (an empty list removes the field). */
-export function withFilterValues(filters: AuditFilters, key: AuditListKey, values: readonly string[]): AuditFilters {
+export function withFilterValues(
+  filters: AuditFilters,
+  key: AuditListKey,
+  values: readonly string[],
+): AuditFilters {
   const next: AuditFilters = { ...filters };
   const unique = [...new Set(values.filter(Boolean))];
   if (unique.length) next[key] = unique.join(",");
@@ -294,17 +379,28 @@ export function withFilterValues(filters: AuditFilters, key: AuditListKey, value
 }
 
 /** Adds the value when it isn't picked, removes it when it is (a menu checkbox, a chip's ×). */
-export function toggleFilterValue(filters: AuditFilters, key: AuditListKey, value: string): AuditFilters {
+export function toggleFilterValue(
+  filters: AuditFilters,
+  key: AuditListKey,
+  value: string,
+): AuditFilters {
   const current = filterValues(filters, key);
   return withFilterValues(
     filters,
     key,
-    current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
+    current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value],
   );
 }
 
-function listParam(value: string | string[] | undefined, keep: (v: string) => string | null): string | undefined {
-  const parts = (Array.isArray(value) ? value : value === undefined ? [] : [value])
+function listParam(
+  value: string | string[] | undefined,
+  keep: (v: string) => string | null,
+): string | undefined {
+  const parts = (
+    Array.isArray(value) ? value : value === undefined ? [] : [value]
+  )
     .flatMap((v) => v.split(","))
     .map((v) => v.trim())
     .filter(Boolean)
@@ -322,16 +418,24 @@ function firstParam(value: string | string[] | undefined): string | undefined {
  * Reads `?team&person&action&template&from&to`. Drops what is malformed: bad slugs and ids, unknown
  * actions, impossible days. Action spellings fold to the canonical one; a reversed range is swapped.
  */
-export function parseAuditFilters(params: Record<string, string | string[] | undefined>): AuditFilters {
+export function parseAuditFilters(
+  params: Record<string, string | string[] | undefined>,
+): AuditFilters {
   const out: AuditFilters = {};
-  const team = listParam(params.team, (v) => (SLUG_RE.test(v) && v !== "all" ? v : null));
-  const person = listParam(params.person, (v) => (PERSON_RE.test(v) ? v : null));
+  const team = listParam(params.team, (v) =>
+    SLUG_RE.test(v) && v !== "all" ? v : null,
+  );
+  const person = listParam(params.person, (v) =>
+    PERSON_RE.test(v) ? v : null,
+  );
   const action = listParam(params.action, (v) => {
     if (isAuditCategory(v)) return v;
     const canonical = canonicalAction(v);
     return canonical in ACTIONS ? canonical : null;
   });
-  const template = listParam(params.template, (v) => (TEMPLATE_RE.test(v.toUpperCase()) ? v.toUpperCase() : null));
+  const template = listParam(params.template, (v) =>
+    TEMPLATE_RE.test(v.toUpperCase()) ? v.toUpperCase() : null,
+  );
   if (team) out.team = team;
   if (person) out.person = person;
   if (action) out.action = action;
@@ -352,34 +456,52 @@ export function auditQuery(filters: AuditFilters): string {
   const keys = ["team", "person", "action", "template", "from", "to"] as const;
   const parts = keys
     .filter((k) => filters[k])
-    .map((k) => `${k}=${encodeURIComponent(filters[k]!).replace(/%2C/gi, ",")}`);
+    .map(
+      (k) => `${k}=${encodeURIComponent(filters[k]!).replace(/%2C/gi, ",")}`,
+    );
   return parts.length ? `?${parts.join("&")}` : "";
 }
 
 /** How many chips the filters make (the date range is one). */
 export function activeFilterCount(filters: AuditFilters): number {
   return (
-    AUDIT_LIST_KEYS.reduce((n, k) => n + filterValues(filters, k).length, 0) + (filters.from || filters.to ? 1 : 0)
+    AUDIT_LIST_KEYS.reduce((n, k) => n + filterValues(filters, k).length, 0) +
+    (filters.from || filters.to ? 1 : 0)
   );
 }
 
 /** Does the row pass every filter (but `skip`, for that facet's own counts)? */
-export function matchesAuditFilters(row: AuditRow, filters: AuditFilters, skip?: AuditFacet): boolean {
+export function matchesAuditFilters(
+  row: AuditRow,
+  filters: AuditFilters,
+  skip?: AuditFacet,
+): boolean {
   if (skip !== "team") {
     const teams = filterValues(filters, "team");
-    if (teams.length && !(row.team && teams.includes(row.team.slug))) return false;
+    if (teams.length && !(row.team && teams.includes(row.team.slug)))
+      return false;
   }
   if (skip !== "person") {
     const people = filterValues(filters, "person");
-    if (people.length && !personKeysOf(row).some((p) => people.includes(p))) return false;
+    if (people.length && !personKeysOf(row).some((p) => people.includes(p)))
+      return false;
   }
   if (skip !== "action") {
     const actions = filterValues(filters, "action");
-    if (actions.length && !actions.includes(row.category) && !actions.includes(actionKeyOf(row))) return false;
+    if (
+      actions.length &&
+      !actions.includes(row.category) &&
+      !actions.includes(actionKeyOf(row))
+    )
+      return false;
   }
   if (skip !== "template") {
     const templates = filterValues(filters, "template");
-    if (templates.length && !(row.template && templates.includes(row.template.id))) return false;
+    if (
+      templates.length &&
+      !(row.template && templates.includes(row.template.id))
+    )
+      return false;
   }
   const day = utcDay(row.at);
   if (filters.from && day < filters.from) return false;
@@ -387,7 +509,10 @@ export function matchesAuditFilters(row: AuditRow, filters: AuditFilters, skip?:
   return true;
 }
 
-export function filterAuditRows(rows: readonly AuditRow[], filters: AuditFilters): AuditRow[] {
+export function filterAuditRows(
+  rows: readonly AuditRow[],
+  filters: AuditFilters,
+): AuditRow[] {
   return rows.filter((r) => matchesAuditFilters(r, filters));
 }
 
@@ -397,7 +522,9 @@ export function actionKeyOf(row: Pick<AuditRow, "action" | "actor">): string {
 }
 
 /** Who the Person filter matches on a row: who acted (or "system") and whom it's about. */
-export function personKeysOf(row: Pick<AuditRow, "actor" | "subject">): string[] {
+export function personKeysOf(
+  row: Pick<AuditRow, "actor" | "subject">,
+): string[] {
   const keys = [row.actor?.id ?? SYSTEM_PERSON];
   if (row.subject && row.subject.id !== keys[0]) keys.push(row.subject.id);
   return keys;
@@ -412,17 +539,29 @@ export interface AuditFacetCounts {
 }
 
 /** For each menu: how many rows each value would match with every OTHER filter applied. */
-export function auditFacetCounts(rows: readonly AuditRow[], filters: AuditFilters): AuditFacetCounts {
-  const counts: AuditFacetCounts = { team: {}, person: {}, action: {}, template: {} };
-  const bump = (bag: Record<string, number>, key: string) => (bag[key] = (bag[key] ?? 0) + 1);
+export function auditFacetCounts(
+  rows: readonly AuditRow[],
+  filters: AuditFilters,
+): AuditFacetCounts {
+  const counts: AuditFacetCounts = {
+    team: {},
+    person: {},
+    action: {},
+    template: {},
+  };
+  const bump = (bag: Record<string, number>, key: string) =>
+    (bag[key] = (bag[key] ?? 0) + 1);
   for (const row of rows) {
-    if (row.team && matchesAuditFilters(row, filters, "team")) bump(counts.team, row.team.slug);
-    if (matchesAuditFilters(row, filters, "person")) for (const p of personKeysOf(row)) bump(counts.person, p);
+    if (row.team && matchesAuditFilters(row, filters, "team"))
+      bump(counts.team, row.team.slug);
+    if (matchesAuditFilters(row, filters, "person"))
+      for (const p of personKeysOf(row)) bump(counts.person, p);
     if (matchesAuditFilters(row, filters, "action")) {
       bump(counts.action, actionKeyOf(row));
       bump(counts.action, row.category);
     }
-    if (row.template && matchesAuditFilters(row, filters, "template")) bump(counts.template, row.template.id);
+    if (row.template && matchesAuditFilters(row, filters, "template"))
+      bump(counts.template, row.template.id);
   }
   return counts;
 }
@@ -432,7 +571,9 @@ export function auditFacetCounts(rows: readonly AuditRow[], filters: AuditFilter
 export const AUDIT_DATE_PRESETS = [7, 30, 90] as const;
 
 /** "Last 7 days" etc., ending today (inclusive) on the demo clock. */
-export function datePresets(today: string): { days: number; label: string; from: string; to: string }[] {
+export function datePresets(
+  today: string,
+): { days: number; label: string; from: string; to: string }[] {
   return AUDIT_DATE_PRESETS.map((days) => ({
     days,
     label: `Last ${days} days`,
@@ -445,9 +586,17 @@ export function datePresets(today: string): { days: number; label: string; from:
  * The Date chip: "Sep 6, 2026 – Oct 5, 2026", "From Sep 6, 2026", "Until Oct 5, 2026". Given `today`
  * (YYYY-MM-DD, the demo clock's), a day in its year drops the year: "Sep 6 – Oct 5".
  */
-export function dateRangeLabel(from?: string | null, to?: string | null, today?: string): string {
+export function dateRangeLabel(
+  from?: string | null,
+  to?: string | null,
+  today?: string,
+): string {
   // With no `today`, every day says its year (`now` year 0 never matches).
-  const f = (s: string) => formatShortDate(`${s}T00:00:00.000Z`, today ? `${today}T00:00:00.000Z` : "0000-01-01T00:00:00.000Z");
+  const f = (s: string) =>
+    formatShortDate(
+      `${s}T00:00:00.000Z`,
+      today ? `${today}T00:00:00.000Z` : "0000-01-01T00:00:00.000Z",
+    );
   if (from && to) return from === to ? f(from) : `${f(from)} – ${f(to)}`;
   if (from) return `From ${f(from)}`;
   if (to) return `Until ${f(to)}`;
@@ -456,7 +605,15 @@ export function dateRangeLabel(from?: string | null, to?: string | null, today?:
 
 // ── CSV ─────────────────────────────────────────────────────────────────────
 
-export const AUDIT_CSV_HEADER = ["When", "Who", "Team", "Template", "Version", "Action", "Details"] as const;
+export const AUDIT_CSV_HEADER = [
+  "When",
+  "Who",
+  "Team",
+  "Template",
+  "Version",
+  "Action",
+  "Details",
+] as const;
 
 /**
  * One RFC 4180 field: quoted when it holds a comma, a quote, a line break or edge spaces, with
@@ -547,7 +704,10 @@ export const NOTIFICATION_KINDS = [
 ] as const satisfies readonly AnyNotificationKind[];
 
 // Fails to compile when a kind is added to AnyNotificationKind but not listed above.
-type MissingKind = Exclude<AnyNotificationKind, (typeof NOTIFICATION_KINDS)[number]>;
+type MissingKind = Exclude<
+  AnyNotificationKind,
+  (typeof NOTIFICATION_KINDS)[number]
+>;
 const allKindsListed: MissingKind extends never ? true : MissingKind = true;
 void allKindsListed;
 
@@ -557,28 +717,83 @@ export function isNotificationKind(kind: string): kind is AnyNotificationKind {
 
 type Where = { team: string | null; teamName: string | null };
 
-const NOTIFICATION_FALLBACKS: Record<AnyNotificationKind, { title: (t: string) => string; href: (w: Where) => string }> = {
-  review_requested: { title: () => "A version is waiting for your review.", href: (w) => teamPath(w, "review") },
-  changes_requested: { title: () => "Changes were requested on a version you submitted.", href: (w) => teamPath(w, "library") },
-  stage_approved: { title: () => "A version passed a review stage.", href: (w) => teamPath(w, "review") },
-  version_live: { title: () => "A version is now Active.", href: (w) => teamPath(w, "library") },
-  comment_added: { title: () => "There's a new comment on a version in review.", href: (w) => teamPath(w, "review") },
-  revoke_started: { title: () => "A revoke is waiting for a second approver.", href: (w) => teamPath(w, "review") },
-  version_revoked: { title: () => "A version was revoked.", href: (w) => teamPath(w, "library") },
-  sunset_scheduled: { title: () => "A sunset date was set.", href: (w) => teamPath(w, "library") },
-  access_requested: { title: (t) => `Someone asked for access to ${t}.`, href: (w) => teamPath(w, "settings/access-requests") },
-  access_granted: { title: (t) => `You now have access to ${t}.`, href: (w) => teamPath(w, "library") },
-  access_denied: { title: (t) => `Your request for access to ${t} was declined.`, href: () => "/request-access" },
-  roles_changed: { title: (t) => `Your roles in ${t} changed.`, href: (w) => teamPath(w, "library") },
-  access_removed: { title: (t) => `Your access to ${t} was removed.`, href: () => "/request-access" },
-  access_lapsed: { title: (t) => `Access to ${t} lapsed.`, href: () => "/request-access" },
-  access_suspended: { title: (t) => `Access to ${t} was suspended.`, href: () => "/request-access" },
+const NOTIFICATION_FALLBACKS: Record<
+  AnyNotificationKind,
+  { title: (t: string) => string; href: (w: Where) => string }
+> = {
+  review_requested: {
+    title: () => "A version is waiting for your review.",
+    href: (w) => teamPath(w, "review"),
+  },
+  changes_requested: {
+    title: () => "Changes were requested on a version you submitted.",
+    href: (w) => teamPath(w, "library"),
+  },
+  stage_approved: {
+    title: () => "A version passed a review stage.",
+    href: (w) => teamPath(w, "review"),
+  },
+  version_live: {
+    title: () => "A version is now Active.",
+    href: (w) => teamPath(w, "library"),
+  },
+  comment_added: {
+    title: () => "There's a new comment on a version in review.",
+    href: (w) => teamPath(w, "review"),
+  },
+  revoke_started: {
+    title: () => "A revoke is waiting for a second approver.",
+    href: (w) => teamPath(w, "review"),
+  },
+  version_revoked: {
+    title: () => "A version was revoked.",
+    href: (w) => teamPath(w, "library"),
+  },
+  sunset_scheduled: {
+    title: () => "A sunset date was set.",
+    href: (w) => teamPath(w, "library"),
+  },
+  access_requested: {
+    title: (t) => `Someone asked for access to ${t}.`,
+    href: (w) => teamPath(w, "settings/access-requests"),
+  },
+  access_granted: {
+    title: (t) => `You now have access to ${t}.`,
+    href: (w) => teamPath(w, "library"),
+  },
+  access_denied: {
+    title: (t) => `Your request for access to ${t} was declined.`,
+    href: () => "/request-access",
+  },
+  roles_changed: {
+    title: (t) => `Your roles in ${t} changed.`,
+    href: (w) => teamPath(w, "library"),
+  },
+  access_removed: {
+    title: (t) => `Your access to ${t} was removed.`,
+    href: () => "/request-access",
+  },
+  access_lapsed: {
+    title: (t) => `Access to ${t} lapsed.`,
+    href: () => "/request-access",
+  },
+  access_suspended: {
+    title: (t) => `Access to ${t} was suspended.`,
+    href: () => "/request-access",
+  },
   inactivity_flagged: {
-    title: (t) => `A member of ${t} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days.`,
+    title: (t) =>
+      `A member of ${t} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days.`,
     href: (w) => teamPath(w, "settings/inactivity"),
   },
-  recert_due: { title: (t) => `An access review for ${t} is due.`, href: (w) => teamPath(w, "settings/recertification") },
-  team_admin_appointed: { title: (t) => `You're the Team Admin of ${t}.`, href: (w) => teamPath(w, "settings/members") },
+  recert_due: {
+    title: (t) => `An access review for ${t} is due.`,
+    href: (w) => teamPath(w, "settings/recertification"),
+  },
+  team_admin_appointed: {
+    title: (t) => `You're the Team Admin of ${t}.`,
+    href: (w) => teamPath(w, "settings/members"),
+  },
 };
 
 /** Team ids are their slugs (seed contract). No team: the app's root, which lands in the viewer's space. */
@@ -599,7 +814,10 @@ export function notificationFallback(
     const f = NOTIFICATION_FALLBACKS[kind];
     return { title: f.title(teamName), href: f.href(where) };
   }
-  return { title: "Something changed in Stencil.", href: teamPath(where, "library") };
+  return {
+    title: "Something changed in Stencil.",
+    href: teamPath(where, "library"),
+  };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -613,7 +831,10 @@ function count(value: unknown): number | null {
 }
 
 function isRole(value: unknown): value is TeamRole {
-  return typeof value === "string" && (TEAM_ROLES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (TEAM_ROLES as readonly string[]).includes(value)
+  );
 }
 
 function roleText(value: unknown): string {

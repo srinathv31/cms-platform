@@ -20,7 +20,13 @@ const line = (w = "w-full"): Piece => ({ kind: "line", w });
 
 const PIECES: Record<StarterKey<"document">, Piece[]> = {
   // Only the three required headings, with room to write under each.
-  blank: [h("w-[34%]"), { kind: "space" }, h("w-[40%]"), { kind: "space" }, h("w-[30%]")],
+  blank: [
+    h("w-[34%]"),
+    { kind: "space" },
+    h("w-[40%]"),
+    { kind: "space" },
+    h("w-[30%]"),
+  ],
   card_offer_terms: [
     h("w-[36%]"),
     line(),
@@ -68,9 +74,22 @@ interface AlertPieces {
 
 const ALERT_PIECES: Record<StarterKey<"message">, AlertPieces> = {
   blank: { title: null, body: [], sms: [] },
-  payment_reminder: { title: "w-[58%]", body: ["chip", "w-[70%]"], sms: ["chip", "w-[64%]"] },
-  card_activity: { title: "w-[62%]", subtitle: "w-[44%]", body: ["chip", "w-[76%]"], sms: ["w-[92%]", "chip"] },
-  statement_ready: { title: "w-[54%]", body: ["w-[94%]", "chip"], sms: ["chip", "w-[52%]"] },
+  payment_reminder: {
+    title: "w-[58%]",
+    body: ["chip", "w-[70%]"],
+    sms: ["chip", "w-[64%]"],
+  },
+  card_activity: {
+    title: "w-[62%]",
+    subtitle: "w-[44%]",
+    body: ["chip", "w-[76%]"],
+    sms: ["w-[92%]", "chip"],
+  },
+  statement_ready: {
+    title: "w-[54%]",
+    body: ["w-[94%]", "chip"],
+    sms: ["chip", "w-[52%]"],
+  },
 };
 
 const LINE = "h-[3px] rounded-full bg-hairline-strong";
@@ -108,13 +127,34 @@ function Mini({ piece }: { piece: Piece }) {
           {Array.from({ length: piece.rows }, (_, row) => (
             <div
               key={row}
-              className={cn("grid grid-cols-[1.4fr_1fr] gap-px bg-hairline", row > 0 && "border-t border-hairline")}
+              className={cn(
+                "grid grid-cols-[1.4fr_1fr] gap-px bg-hairline",
+                row > 0 && "border-t border-hairline",
+              )}
             >
-              <div className={cn("flex h-[9px] items-center px-1", row === 0 ? "bg-surface-tinted" : "bg-surface")}>
-                <div className={cn(LINE, "w-[70%]", row === 0 && "bg-text-subtle")} />
+              <div
+                className={cn(
+                  "flex h-[9px] items-center px-1",
+                  row === 0 ? "bg-surface-tinted" : "bg-surface",
+                )}
+              >
+                <div
+                  className={cn(LINE, "w-[70%]", row === 0 && "bg-text-subtle")}
+                />
               </div>
-              <div className={cn("flex h-[9px] items-center px-1", row === 0 ? "bg-surface-tinted" : "bg-surface")}>
-                <div className={cn(LINE, row % 2 ? "w-[46%]" : "w-[62%]", row === 0 && "bg-text-subtle")} />
+              <div
+                className={cn(
+                  "flex h-[9px] items-center px-1",
+                  row === 0 ? "bg-surface-tinted" : "bg-surface",
+                )}
+              >
+                <div
+                  className={cn(
+                    LINE,
+                    row % 2 ? "w-[46%]" : "w-[62%]",
+                    row === 0 && "bg-text-subtle",
+                  )}
+                />
               </div>
             </div>
           ))}
@@ -151,8 +191,14 @@ function AlertMini({ pieces }: { pieces: AlertPieces }) {
       <div className="flex gap-1.5 rounded-lg border border-hairline bg-surface-tinted p-1.5">
         <div className="size-3.5 shrink-0 rounded-[4px] bg-text/70" />
         <div className="flex min-h-7 min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
-          {pieces.title ? <div className={cn("h-[4px] rounded-full bg-text/70", pieces.title)} /> : null}
-          {pieces.subtitle ? <div className={cn(LINE, "bg-text-subtle", pieces.subtitle)} /> : null}
+          {pieces.title ? (
+            <div
+              className={cn("h-[4px] rounded-full bg-text/70", pieces.title)}
+            />
+          ) : null}
+          {pieces.subtitle ? (
+            <div className={cn(LINE, "bg-text-subtle", pieces.subtitle)} />
+          ) : null}
           {pieces.body.map((words, i) => (
             <WordsLine key={i} words={words} />
           ))}
@@ -173,9 +219,21 @@ function AlertMini({ pieces }: { pieces: AlertPieces }) {
  * A small sheet of paper showing a document starter's shape, or the top of a phone showing an alert
  * starter's push and SMS. Fixed height; the bottom fades out.
  */
-export function StarterPreview({ starter, className }: { starter: StarterChoice; className?: string }) {
+export function StarterPreview({
+  starter,
+  className,
+}: {
+  starter: StarterChoice;
+  className?: string;
+}) {
   return (
-    <div aria-hidden className={cn("relative overflow-hidden rounded-xl bg-surface-tinted px-5 pt-4", className)}>
+    <div
+      aria-hidden
+      className={cn(
+        "relative overflow-hidden rounded-xl bg-surface-tinted px-5 pt-4",
+        className,
+      )}
+    >
       <div
         className={cn(
           "relative h-full overflow-hidden border border-b-0 border-hairline bg-surface px-3 pt-3",

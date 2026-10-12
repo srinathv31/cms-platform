@@ -51,13 +51,17 @@ const EMPTY_USAGE: FieldUsage = new Map();
 const summaries = new WeakMap<PMNode, BlockSummary>();
 
 /** Usage in a live document. Unchanged blocks come from the identity cache. */
-export function usageFromDoc(doc: PMNode, { sections }: UsageOptions): FieldUsage {
+export function usageFromDoc(
+  doc: PMNode,
+  { sections }: UsageOptions,
+): FieldUsage {
   const acc = new UsageAccumulator();
   let section: string | null = null;
   doc.forEach((block) => {
     const summary = summarizeBlock(block);
     if (sections && summary.section !== undefined) section = summary.section;
-    for (const [key, count] of summary.chips) acc.add(key, sections ? section : null, count);
+    for (const [key, count] of summary.chips)
+      acc.add(key, sections ? section : null, count);
   });
   return acc.result();
 }
@@ -78,7 +82,9 @@ function summarizeBlock(block: PMNode): BlockSummary {
     });
   }
   const summary: BlockSummary = {
-    section: isSectionHeading(block.type.name, block.attrs) ? textOf(block) : undefined,
+    section: isSectionHeading(block.type.name, block.attrs)
+      ? textOf(block)
+      : undefined,
     chips: [...counts],
   };
   summaries.set(block, summary);
@@ -94,15 +100,20 @@ function textOf(block: PMNode): string | null {
 }
 
 /** Usage in TipTap JSON (before the editor exists: server render, first paint). */
-export function usageFromJSON(doc: JSONContent | null | undefined, { sections }: UsageOptions): FieldUsage {
+export function usageFromJSON(
+  doc: JSONContent | null | undefined,
+  { sections }: UsageOptions,
+): FieldUsage {
   if (!doc?.content?.length) return EMPTY_USAGE;
   const acc = new UsageAccumulator();
   let section: string | null = null;
   for (const block of doc.content) {
-    if (sections && isSectionHeading(block.type, block.attrs)) section = jsonText(block);
+    if (sections && isSectionHeading(block.type, block.attrs))
+      section = jsonText(block);
     const counts = new Map<string, number>();
     walkJSON(block, counts);
-    for (const [key, count] of counts) acc.add(key, sections ? section : null, count);
+    for (const [key, count] of counts)
+      acc.add(key, sections ? section : null, count);
   }
   return acc.result();
 }
@@ -116,11 +127,16 @@ function walkJSON(node: JSONContent, counts: Map<string, number>) {
 }
 
 function jsonText(block: JSONContent): string | null {
-  const text = (block.content ?? []).map((child) => (child.type === "text" ? (child.text ?? "") : "")).join("");
+  const text = (block.content ?? [])
+    .map((child) => (child.type === "text" ? (child.text ?? "") : ""))
+    .join("");
   return text.trim() || null;
 }
 
-function isSectionHeading(type: string | undefined, attrs: Record<string, unknown> | undefined): boolean {
+function isSectionHeading(
+  type: string | undefined,
+  attrs: Record<string, unknown> | undefined,
+): boolean {
   return type === NODE.heading && Number(attrs?.level) === 2;
 }
 
@@ -157,7 +173,9 @@ export interface FieldUsageEntry {
 }
 
 /** Usage per key across every field of a root, fields in the order given. */
-export function mergeUsage(fields: readonly FieldUsageEntry[]): Map<string, VariableUsage> {
+export function mergeUsage(
+  fields: readonly FieldUsageEntry[],
+): Map<string, VariableUsage> {
   const merged = new Map<string, { count: number; places: VariablePlace[] }>();
   for (const field of fields) {
     for (const [key, sections] of field.usage) {
@@ -173,16 +191,25 @@ export function mergeUsage(fields: readonly FieldUsageEntry[]): Map<string, Vari
     }
   }
   const out = new Map<string, VariableUsage>();
-  for (const [key, { count, places }] of merged) out.set(key, { key, count, places });
+  for (const [key, { count, places }] of merged)
+    out.set(key, { key, count, places });
   return out;
 }
 
-export function sameUsage(a: VariableUsage | undefined, b: VariableUsage | undefined): boolean {
+export function sameUsage(
+  a: VariableUsage | undefined,
+  b: VariableUsage | undefined,
+): boolean {
   if (a === b) return true;
-  if (!a || !b || a.count !== b.count || a.places.length !== b.places.length) return false;
+  if (!a || !b || a.count !== b.count || a.places.length !== b.places.length)
+    return false;
   return a.places.every((place, i) => {
     const other = b.places[i];
-    return place.field === other.field && place.section === other.section && place.count === other.count;
+    return (
+      place.field === other.field &&
+      place.section === other.section &&
+      place.count === other.count
+    );
   });
 }
 

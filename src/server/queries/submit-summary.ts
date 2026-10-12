@@ -24,9 +24,13 @@ import type { SubmitSummary } from "@/domain/submit-types";
 
 const Input = z.object({ templateId: z.string().min(1).max(64) });
 
-export async function getSubmitSummary(viewer: Viewer, input: { templateId: string }): Promise<ReadResult<{ summary: SubmitSummary }>> {
+export async function getSubmitSummary(
+  viewer: Viewer,
+  input: { templateId: string },
+): Promise<ReadResult<{ summary: SubmitSummary }>> {
   const parsed = Input.safeParse(input);
-  if (!parsed.success) return refusal(400, REQUEST_REFUSALS.templateUnavailable);
+  if (!parsed.success)
+    return refusal(400, REQUEST_REFUSALS.templateUnavailable);
   const template = await db
     .select({ id: templates.id, teamId: templates.teamId })
     .from(templates)
@@ -55,7 +59,12 @@ export async function getSubmitSummary(viewer: Viewer, input: { templateId: stri
 
   const draft = list.find((v) => v.state === "draft");
   if (!draft) {
-    return refusal(409, list.some((v) => v.state === "in_review") ? REFUSALS.alreadyInReview : REQUEST_REFUSALS.noDraftToSubmit);
+    return refusal(
+      409,
+      list.some((v) => v.state === "in_review")
+        ? REFUSALS.alreadyInReview
+        : REQUEST_REFUSALS.noDraftToSubmit,
+    );
   }
   const at = await now();
   // What submit will compare with: the newest version that still renders (the Active one, if any).
@@ -72,11 +81,17 @@ export async function getSubmitSummary(viewer: Viewer, input: { templateId: stri
       round: next.round,
       name: draft.name,
       channels: CHANNELS.filter((channel) => draft.channels.includes(channel)),
-      sampleSetNames: listSets(draft.sampleSets, draft.variables, today).map((set) => set.name),
+      sampleSetNames: listSets(draft.sampleSets, draft.variables, today).map(
+        (set) => set.name,
+      ),
       variables: draft.variables,
       baseline:
         baseline && baseline.number !== null
-          ? { number: baseline.number, name: baseline.name, variables: baseline.variables }
+          ? {
+              number: baseline.number,
+              name: baseline.name,
+              variables: baseline.variables,
+            }
           : null,
     },
   };

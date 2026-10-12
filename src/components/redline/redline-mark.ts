@@ -24,6 +24,13 @@ export const RedlineMark = Mark.create({
 
   renderHTML({ mark }) {
     const deleted = mark.attrs.op === "delete";
-    return [deleted ? "del" : "ins", { class: deleted ? DELETE_CLASS : INSERT_CLASS, "data-redline-op": deleted ? "delete" : "insert" }, 0];
+    return [
+      deleted ? "del" : "ins",
+      {
+        class: deleted ? DELETE_CLASS : INSERT_CLASS,
+        "data-redline-op": deleted ? "delete" : "insert",
+      },
+      0,
+    ];
   },
 });

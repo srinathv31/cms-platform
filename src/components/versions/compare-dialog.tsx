@@ -5,7 +5,12 @@ import { GitCompareArrows, X } from "lucide-react";
 import { NAV_ICON_STROKE } from "@/components/app-shell/nav";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { CompareOption } from "@/server/queries/versions";
 
@@ -15,14 +20,24 @@ import type { CompareOption } from "@/server/queries/versions";
 
 const ComparePanel = lazy(() => import("./compare-panel"));
 
-export function CompareVersions({ templateId, options }: { templateId: string; options: CompareOption[] }) {
+export function CompareVersions({
+  templateId,
+  options,
+}: {
+  templateId: string;
+  options: CompareOption[];
+}) {
   const [open, setOpen] = useState(false);
   // Newest first. With fewer than two versions there is nothing to compare, so there is no button.
   if (options.length < 2) return null;
 
   return (
     <>
-      <Button variant="outline" className="gap-1.5 bg-surface" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        className="gap-1.5 bg-surface"
+        onClick={() => setOpen(true)}
+      >
         <GitCompareArrows aria-hidden strokeWidth={1.75} />
         Compare versions
       </Button>
@@ -44,7 +59,8 @@ export function CompareVersions({ templateId, options }: { templateId: string; o
             </DialogClose>
           </div>
           <DialogDescription className="sr-only">
-            The changes from the earlier version to the later one: additions underlined in green, removals struck through in red.
+            The changes from the earlier version to the later one: additions
+            underlined in green, removals struck through in red.
           </DialogDescription>
           <Suspense fallback={<CompareSkeleton />}>
             <ComparePanel templateId={templateId} options={options} />

@@ -23,7 +23,8 @@ function fromBytes(alphabet: string, length: number): string {
 
 function fromRng(alphabet: string, length: number, rng: Random01): string {
   let out = "";
-  for (let i = 0; i < length; i++) out += alphabet[Math.floor(rng() * alphabet.length)];
+  for (let i = 0; i < length; i++)
+    out += alphabet[Math.floor(rng() * alphabet.length)];
   return out;
 }
 

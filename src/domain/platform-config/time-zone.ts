@@ -20,10 +20,22 @@ export interface ZoneChange {
  * What picking `next` does, as the admin picks it (the settings screen calls this; `setBusinessZone`
  * refuses with the same `problem`).
  */
-export function describeZoneChange(input: { current: string; next: string }): ZoneChange {
-  const problem = isBusinessZone(input.next) ? null : PLATFORM_REFUSALS.pickZone;
+export function describeZoneChange(input: {
+  current: string;
+  next: string;
+}): ZoneChange {
+  const problem = isBusinessZone(input.next)
+    ? null
+    : PLATFORM_REFUSALS.pickZone;
   const changed = input.next !== input.current;
-  return { problem, changed, lines: changed && !problem ? [`New sunset dates end at 00:00 ${zoneLabel(input.next)}.`] : [] };
+  return {
+    problem,
+    changed,
+    lines:
+      changed && !problem
+        ? [`New sunset dates end at 00:00 ${zoneLabel(input.next)}.`]
+        : [],
+  };
 }
 
 /**
@@ -32,8 +44,14 @@ export function describeZoneChange(input: { current: string; next: string }): Zo
  * Nothing with none set. A sunset already set keeps its instant (decision 0017).
  */
 export function zoneChangeConsequences(pendingSunsets: number): string[] {
-  if (pendingSunsets === 1) return ["1 sunset already set doesn't move: its consumers have been told when it ends."];
-  if (pendingSunsets > 1) return [`${pendingSunsets} sunsets already set don't move: their consumers have been told when they end.`];
+  if (pendingSunsets === 1)
+    return [
+      "1 sunset already set doesn't move: its consumers have been told when it ends.",
+    ];
+  if (pendingSunsets > 1)
+    return [
+      `${pendingSunsets} sunsets already set don't move: their consumers have been told when they end.`,
+    ];
   return [];
 }
 
@@ -51,17 +69,23 @@ export function setBusinessZone(input: {
 }): Ok<{ zone: BusinessZone; effects: AccessEffect[] }> | Refused {
   const { current, next, pendingSunsets } = input;
   const change = describeZoneChange({ current, next });
-  if (change.problem || !isBusinessZone(next)) return refuse(change.problem ?? PLATFORM_REFUSALS.pickZone);
+  if (change.problem || !isBusinessZone(next))
+    return refuse(change.problem ?? PLATFORM_REFUSALS.pickZone);
   if (!change.changed) return { ok: true, zone: next, effects: [] };
   return {
     ok: true,
     zone: next,
     effects: [
-      configChanged("business_zone", null, `Set the business time zone to ${zoneLabel(next)}`, {
-        from: current,
-        to: next,
-        pendingSunsets,
-      }),
+      configChanged(
+        "business_zone",
+        null,
+        `Set the business time zone to ${zoneLabel(next)}`,
+        {
+          from: current,
+          to: next,
+          pendingSunsets,
+        },
+      ),
     ],
   };
 }

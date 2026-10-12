@@ -2,7 +2,10 @@
 
 import { Fragment, useId, useRef, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, Plus } from "lucide-react";
-import type { ApprovalChainView, ApprovalChainsSection } from "@/domain/access-types";
+import type {
+  ApprovalChainView,
+  ApprovalChainsSection,
+} from "@/domain/access-types";
 import { ROLE_LABEL } from "@/domain/access/roles";
 import { STAGE_NAME_MAX } from "@/domain/platform-config/limits";
 import {
@@ -44,26 +47,56 @@ interface DraftStage {
 }
 
 const APPROVER: ApproverRule = { kind: "team_role", role: "approver" };
-const ruleValue = (rule: ApproverRule) => (rule.kind === "user" ? `user:${rule.userId}` : `role:${rule.role}`);
+const ruleValue = (rule: ApproverRule) =>
+  rule.kind === "user" ? `user:${rule.userId}` : `role:${rule.role}`;
 const ruleFromValue = (value: string): ApproverRule =>
   value.startsWith("user:")
     ? { kind: "user", userId: value.slice(5) }
-    : { kind: "team_role", role: value.slice(5) as Extract<ApproverRule, { kind: "team_role" }>["role"] };
+    : {
+        kind: "team_role",
+        role: value.slice(5) as Extract<
+          ApproverRule,
+          { kind: "team_role" }
+        >["role"],
+      };
 
 const draftOf = (chain: ApprovalChainView): DraftStage[] =>
-  chain.stages.map((s) => ({ key: s.id, id: s.id, name: s.name, rule: s.rule }));
+  chain.stages.map((s) => ({
+    key: s.id,
+    id: s.id,
+    name: s.name,
+    rule: s.rule,
+  }));
 
-export function ApprovalChainsSectionView({ section }: { section: ApprovalChainsSection }) {
+export function ApprovalChainsSectionView({
+  section,
+}: {
+  section: ApprovalChainsSection;
+}) {
   return (
-    <div data-slot="platform-section" data-section="approval-chains" className="flex flex-col gap-10">
+    <div
+      data-slot="platform-section"
+      data-section="approval-chains"
+      className="flex flex-col gap-10"
+    >
       {section.chains.map((chain) => (
-        <ChainEditor key={chain.contentTypeId} chain={chain} section={section} />
+        <ChainEditor
+          key={chain.contentTypeId}
+          chain={chain}
+          section={section}
+        />
       ))}
     </div>
   );
 }
 
-function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: ApprovalChainsSection }) {
+function ChainEditor({
+  chain,
+  section,
+}: {
+  chain: ApprovalChainView;
+  section: ApprovalChainsSection;
+}) {
   const [rows, setRows] = useState<DraftStage[]>(() => draftOf(chain));
   const [editing, setEditing] = useState<string | null>(null);
   const nextNew = useRef(1);
@@ -73,7 +106,9 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
   const fieldId = useId();
 
   // The saved chain changed (a save landed, or someone else edited it): start the draft over.
-  const signature = JSON.stringify(chain.stages.map((s) => [s.id, s.name, s.rule]));
+  const signature = JSON.stringify(
+    chain.stages.map((s) => [s.id, s.name, s.rule]),
+  );
   const [seen, setSeen] = useState(signature);
   if (seen !== signature) {
     setSeen(signature);
@@ -84,19 +119,36 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
   // `people` are the choices; `approvers` also holds whoever a stage names now, so labels and checks cover both.
   const people = section.people;
   const approvers = section.approvers;
-  const waiting = Object.fromEntries(chain.stages.map((s) => [s.id, s.waiting]));
-  const next = rows.map((r) => ({ id: r.id, name: r.name.trim() || "New stage", rule: r.rule }));
+  const waiting = Object.fromEntries(
+    chain.stages.map((s) => [s.id, s.waiting]),
+  );
+  const next = rows.map((r) => ({
+    id: r.id,
+    name: r.name.trim() || "New stage",
+    rule: r.rule,
+  }));
   const change = describeChainChange({
     contentTypeName: chain.name,
-    current: chain.stages.map((s) => ({ id: s.id, position: s.position, name: s.name, rule: s.rule })),
+    current: chain.stages.map((s) => ({
+      id: s.id,
+      position: s.position,
+      name: s.name,
+      rule: s.rule,
+    })),
     next,
     people: approvers,
     waiting,
   });
 
-  const problems = validateChain({ stages: rows, current: chain.stages, actorId: section.viewerId, people: approvers });
+  const problems = validateChain({
+    stages: rows,
+    current: chain.stages,
+    actorId: section.viewerId,
+    people: approvers,
+  });
   const problemAt = (index: number, field: StageProblem["field"]) =>
-    problems.find((p) => p.stage === index && p.field === field)?.reason ?? null;
+    problems.find((p) => p.stage === index && p.field === field)?.reason ??
+    null;
   const blocked = problems.length > 0;
 
   const added = rows.filter((r) => !r.id);
@@ -105,13 +157,18 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
   const onlyRemove = removed.length === 1 && added.length === 0;
   // An unnamed new stage reads "Save chain" (blocked), never "Add stage" like the button that adds one.
   const confirmLabel =
-    onlyAdd && change.after.filter((a) => a.change !== null).length === 1 && added[0]!.name.trim()
+    onlyAdd &&
+    change.after.filter((a) => a.change !== null).length === 1 &&
+    added[0]!.name.trim()
       ? `Add ${added[0]!.name.trim()} stage`
-      : onlyRemove && change.now.filter((n) => n.change !== null).length === 1 && change.after.every((a) => a.change === null)
+      : onlyRemove &&
+          change.now.filter((n) => n.change !== null).length === 1 &&
+          change.after.every((a) => a.change === null)
         ? `Remove ${removed[0]!.name} stage`
         : "Save chain";
 
-  const patch = (key: string, p: Partial<DraftStage>) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...p } : r)));
+  const patch = (key: string, p: Partial<DraftStage>) =>
+    setRows((list) => list.map((r) => (r.key === key ? { ...r, ...p } : r)));
   const move = (index: number, by: -1 | 1) =>
     setRows((list) => {
       const to = index + by;
@@ -138,10 +195,20 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
   };
 
   return (
-    <section aria-label={`${chain.name} approval chain`} data-content-type={chain.contentTypeId}>
+    <section
+      aria-label={`${chain.name} approval chain`}
+      data-content-type={chain.contentTypeId}
+    >
       <div className="flex items-center justify-between gap-4 border-b border-hairline pb-2">
         <h3 className="caps-label">{chain.name}</h3>
-        <Flow stages={chain.stages.map((s) => ({ id: s.id, name: s.name, ruleLabel: s.ruleLabel, change: null }))} />
+        <Flow
+          stages={chain.stages.map((s) => ({
+            id: s.id,
+            name: s.name,
+            ruleLabel: s.ruleLabel,
+            change: null,
+          }))}
+        />
       </div>
       <ol aria-label={`${chain.name} stages`}>
         {rows.map((row, index) => {
@@ -149,19 +216,28 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
           const isEditing = editing === row.key;
           // The server's own rule: a stage being added has nobody waiting on it.
           const removeReason =
-            removeStageRefusal({ name: saved?.name ?? row.name, waiting: saved?.waiting ?? 0 }, rows.length - 1)?.reason ?? null;
+            removeStageRefusal(
+              { name: saved?.name ?? row.name, waiting: saved?.waiting ?? 0 },
+              rows.length - 1,
+            )?.reason ?? null;
           // A name still being typed isn't flagged while it's empty; the strip still says why Save waits.
-          const nameProblem = isEditing && !row.name.trim() ? null : problemAt(index, "name");
+          const nameProblem =
+            isEditing && !row.name.trim() ? null : problemAt(index, "name");
           const reviewerProblem = problemAt(index, "reviewer");
           const nameProblemId = `${fieldId}-${row.key}-name-problem`;
           const reviewerProblemId = `${fieldId}-${row.key}-reviewer-problem`;
           // A person the choices leave out (they lost access since): still listed, so the select shows them.
           const namedId = row.rule.kind === "user" ? row.rule.userId : null;
-          const unlisted = namedId !== null && !people.some((p) => p.id === namedId);
+          const unlisted =
+            namedId !== null && !people.some((p) => p.id === namedId);
           return (
             <li
               key={row.key}
-              className={cn("grid min-h-16 gap-x-4 border-b border-hairline py-2.5", COLS, isEditing ? "items-end" : "items-center")}
+              className={cn(
+                "grid min-h-16 gap-x-4 border-b border-hairline py-2.5",
+                COLS,
+                isEditing ? "items-end" : "items-center",
+              )}
               onKeyDown={
                 isEditing
                   ? (e) => {
@@ -173,11 +249,21 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                   : undefined
               }
             >
-              <span className={cn("text-[14px] text-text-muted tabular-nums", isEditing && "pb-1.5")}>{index + 1}</span>
+              <span
+                className={cn(
+                  "text-[14px] text-text-muted tabular-nums",
+                  isEditing && "pb-1.5",
+                )}
+              >
+                {index + 1}
+              </span>
               <div className="min-w-0">
                 {isEditing ? (
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor={`${fieldId}-${row.key}-name`} className="text-[13px] text-text-muted">
+                    <label
+                      htmlFor={`${fieldId}-${row.key}-name`}
+                      className="text-[13px] text-text-muted"
+                    >
                       Stage name
                     </label>
                     <Input
@@ -192,7 +278,9 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                     />
                   </div>
                 ) : (
-                  <div className="truncate text-[15px] font-medium text-text">{row.name || "New stage"}</div>
+                  <div className="truncate text-[15px] font-medium text-text">
+                    {row.name || "New stage"}
+                  </div>
                 )}
               </div>
               <div className="min-w-0 text-[14px] text-text max-[40rem]:col-start-2">
@@ -204,16 +292,29 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                     <Pick
                       label="Reviewer"
                       value={ruleValue(row.rule)}
-                      onChange={(v) => patch(row.key, { rule: ruleFromValue(v) })}
+                      onChange={(v) =>
+                        patch(row.key, { rule: ruleFromValue(v) })
+                      }
                       invalid={!!reviewerProblem}
-                      describedBy={reviewerProblem ? reviewerProblemId : undefined}
+                      describedBy={
+                        reviewerProblem ? reviewerProblemId : undefined
+                      }
                       className="w-full"
                     >
-                      <option value={ruleValue(APPROVER)}>{ruleLabel(APPROVER, people)}</option>
-                      {row.rule.kind === "team_role" && row.rule.role !== "approver" ? (
-                        <option value={ruleValue(row.rule)}>{`${ROLE_LABEL[row.rule.role]} role`}</option>
+                      <option value={ruleValue(APPROVER)}>
+                        {ruleLabel(APPROVER, people)}
+                      </option>
+                      {row.rule.kind === "team_role" &&
+                      row.rule.role !== "approver" ? (
+                        <option
+                          value={ruleValue(row.rule)}
+                        >{`${ROLE_LABEL[row.rule.role]} role`}</option>
                       ) : null}
-                      {unlisted ? <option value={ruleValue(row.rule)}>{ruleLabel(row.rule, approvers)}</option> : null}
+                      {unlisted ? (
+                        <option value={ruleValue(row.rule)}>
+                          {ruleLabel(row.rule, approvers)}
+                        </option>
+                      ) : null}
                       <optgroup label="People">
                         {people.map((p) => (
                           <option key={p.id} value={`user:${p.id}`}>
@@ -224,18 +325,37 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                     </Pick>
                   </div>
                 ) : (
-                  <span className="block truncate">{ruleLabel(row.rule, approvers)}</span>
+                  <span className="block truncate">
+                    {ruleLabel(row.rule, approvers)}
+                  </span>
                 )}
               </div>
               <div className="flex items-center justify-end gap-1.5 max-[40rem]:col-start-2 max-[40rem]:justify-start">
-                <Button variant="ghost" size="icon" aria-label={`Move ${row.name || "stage"} up`} aria-disabled={index === 0} className="aria-disabled:opacity-40" onClick={() => index > 0 && move(index, -1)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Move ${row.name || "stage"} up`}
+                  aria-disabled={index === 0}
+                  className="aria-disabled:opacity-40"
+                  onClick={() => index > 0 && move(index, -1)}
+                >
                   <ArrowUp aria-hidden strokeWidth={1.75} />
                 </Button>
-                <Button variant="ghost" size="icon" aria-label={`Move ${row.name || "stage"} down`} aria-disabled={index === rows.length - 1} className="aria-disabled:opacity-40" onClick={() => index < rows.length - 1 && move(index, 1)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Move ${row.name || "stage"} down`}
+                  aria-disabled={index === rows.length - 1}
+                  className="aria-disabled:opacity-40"
+                  onClick={() => index < rows.length - 1 && move(index, 1)}
+                >
                   <ArrowDown aria-hidden strokeWidth={1.75} />
                 </Button>
                 {isEditing ? (
-                  <Button variant="outline" onClick={() => closeEditor(row, false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => closeEditor(row, false)}
+                  >
                     Done
                   </Button>
                 ) : (
@@ -268,12 +388,20 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
                 </Blocked>
               </div>
               {nameProblem ? (
-                <p id={nameProblemId} data-problem="name" className="col-start-2 pt-1 text-[13px] text-danger-text">
+                <p
+                  id={nameProblemId}
+                  data-problem="name"
+                  className="col-start-2 pt-1 text-[13px] text-danger-text"
+                >
                   {nameProblem}
                 </p>
               ) : null}
               {reviewerProblem ? (
-                <p id={reviewerProblemId} data-problem="reviewer" className="col-start-3 col-end-5 pt-1 text-[13px] text-danger-text max-[40rem]:col-start-2 max-[40rem]:col-end-3">
+                <p
+                  id={reviewerProblemId}
+                  data-problem="reviewer"
+                  className="col-start-3 col-end-5 pt-1 text-[13px] text-danger-text max-[40rem]:col-start-2 max-[40rem]:col-end-3"
+                >
                   {reviewerProblem}
                 </p>
               ) : null}
@@ -310,7 +438,11 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
           onConfirm={() =>
             saveApprovalChain({
               contentTypeId: chain.contentTypeId,
-              stages: rows.map((r) => ({ id: r.id, name: r.name.trim(), rule: r.rule })),
+              stages: rows.map((r) => ({
+                id: r.id,
+                name: r.name.trim(),
+                rule: r.rule,
+              })),
             })
           }
           className="mt-4"
@@ -328,11 +460,24 @@ function ChainEditor({ chain, section }: { chain: ApprovalChainView; section: Ap
 // ── The chain, drawn ─────────────────────────────────────────
 
 /** One side of the Now / After pair: the stages in order, who reviews each. Added is dashed, removed struck. */
-function Card({ label, stages, highlighted }: { label: string; stages: ChainCardStage[]; highlighted?: boolean }) {
+function Card({
+  label,
+  stages,
+  highlighted,
+}: {
+  label: string;
+  stages: ChainCardStage[];
+  highlighted?: boolean;
+}) {
   return (
     <section
       aria-label={label}
-      className={cn("min-w-0 rounded-xl border p-4", highlighted ? "border-brand bg-brand-soft" : "border-hairline bg-surface")}
+      className={cn(
+        "min-w-0 rounded-xl border p-4",
+        highlighted
+          ? "border-brand bg-brand-soft"
+          : "border-hairline bg-surface",
+      )}
     >
       <div className="caps-label mb-3">{label}</div>
       <ol className="flex flex-col gap-1.5">
@@ -341,17 +486,28 @@ function Card({ label, stages, highlighted }: { label: string; stages: ChainCard
             key={s.id ?? `new-${i}`}
             className={cn(
               "flex min-w-0 items-baseline gap-2 rounded-md border px-2.5 py-1.5 text-[13px] leading-tight",
-              s.change === "added" ? "border-dashed border-brand bg-surface text-text" : "border-chip-border bg-chip text-chip-text",
+              s.change === "added"
+                ? "border-dashed border-brand bg-surface text-text"
+                : "border-chip-border bg-chip text-chip-text",
               s.change === "removed" && "text-text-muted line-through",
             )}
           >
-            <span aria-hidden className="w-3 shrink-0 text-text-muted tabular-nums no-underline">
+            <span
+              aria-hidden
+              className="w-3 shrink-0 text-text-muted tabular-nums no-underline"
+            >
               {i + 1}
             </span>
-            {s.change === "added" ? <span className="sr-only">Added: </span> : null}
-            {s.change === "removed" ? <span className="sr-only">Removed: </span> : null}
+            {s.change === "added" ? (
+              <span className="sr-only">Added: </span>
+            ) : null}
+            {s.change === "removed" ? (
+              <span className="sr-only">Removed: </span>
+            ) : null}
             <span className="min-w-0 truncate font-medium">{s.name}</span>
-            <span className="ml-auto shrink-0 pl-2 text-[12px] text-text-muted">{s.ruleLabel}</span>
+            <span className="ml-auto shrink-0 pl-2 text-[12px] text-text-muted">
+              {s.ruleLabel}
+            </span>
           </li>
         ))}
       </ol>
@@ -369,7 +525,9 @@ function Flow({ stages }: { stages: ChainCardStage[] }) {
           <li aria-hidden className="text-text-muted">
             <ArrowRight strokeWidth={1.75} className="size-3.5" />
           </li>
-          <li className="rounded-md border border-chip-border bg-chip px-2 py-1 leading-tight text-chip-text">{s.name}</li>
+          <li className="rounded-md border border-chip-border bg-chip px-2 py-1 leading-tight text-chip-text">
+            {s.name}
+          </li>
         </Fragment>
       ))}
       <li aria-hidden className="text-text-muted">

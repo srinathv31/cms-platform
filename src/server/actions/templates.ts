@@ -43,14 +43,20 @@ const StartDraftInput = z.object({ templateId: z.string().min(1).max(32) });
  * redirects to the workspace. A refusal (a newer version in review, a viewer who can't edit) is the
  * answer instead, and nothing is written.
  */
-export async function startDraft(input: { templateId: string }): Promise<ActionResult> {
+export async function startDraft(input: {
+  templateId: string;
+}): Promise<ActionResult> {
   return serverAction(input, {
     input: StartDraftInput,
     // As in createTemplate (create-template.ts), the template is read only to learn its team for the
     // permission check.
     authorize: async ({ viewer, input }) => {
       const found = await db
-        .select({ id: templates.id, teamId: templates.teamId, teamSlug: teams.slug })
+        .select({
+          id: templates.id,
+          teamId: templates.teamId,
+          teamSlug: teams.slug,
+        })
         .from(templates)
         .innerJoin(teams, eq(teams.id, templates.teamId))
         .where(eq(templates.id, input.templateId))
@@ -65,7 +71,12 @@ export async function startDraft(input: { templateId: string }): Promise<ActionR
     // draft another press made meanwhile.
     transaction: async (tx, { viewer, found, now: at }) => {
       const list = await tx
-        .select({ id: versions.id, state: versions.state, number: versions.number, round: versions.round })
+        .select({
+          id: versions.id,
+          state: versions.state,
+          number: versions.number,
+          round: versions.round,
+        })
         .from(versions)
         .where(eq(versions.templateId, found.id));
       const plan = planDraftStart(list);
@@ -73,7 +84,10 @@ export async function startDraft(input: { templateId: string }): Promise<ActionR
       if (plan.kind === "blocked") refuse(plan);
 
       const latest = await tx.query.versions.findFirst({
-        where: and(eq(versions.id, plan.from), inArray(versions.state, ["active", "revoked"])),
+        where: and(
+          eq(versions.id, plan.from),
+          inArray(versions.state, ["active", "revoked"]),
+        ),
       });
       if (!latest) refuse(REQUEST_REFUSALS.latestChanged);
 
@@ -89,7 +103,11 @@ export async function startDraft(input: { templateId: string }): Promise<ActionR
         variables: latest.variables,
         sampleSets: latest.sampleSets,
       };
-      const { changes, effects } = editLatest({ from: snapshot, createdBy: viewer.userId, now: at });
+      const { changes, effects } = editLatest({
+        from: snapshot,
+        createdBy: viewer.userId,
+        now: at,
+      });
       const draftId = newId("v");
 
       // Two people pressing Edit at once: the partial unique index (one open draft per template) lets
@@ -112,7 +130,10 @@ export async function startDraft(input: { templateId: string }): Promise<ActionR
     after: ({ opened }, { found }) => {
       if (!opened) refreshLists(found.id);
       // Usually called from the workspace itself: replace, so Back doesn't land on the same page twice.
-      redirect(`/${found.teamSlug}/templates/${found.id}` as Route, RedirectType.replace);
+      redirect(
+        `/${found.teamSlug}/templates/${found.id}` as Route,
+        RedirectType.replace,
+      );
     },
   });
 }
@@ -126,6 +147,10 @@ export type SubmitDraftResult = ActionResult<{ number: number; round: number }>;
  * "Submit for review" from Phase 3. The submit now lives with the review actions (`submitVersion`,
  * which adds the note to reviewers and the notifications); this name stays for existing callers.
  */
-export async function submitDraft(input: { templateId: string; note?: string | null; rev: number }): Promise<SubmitDraftResult> {
+export async function submitDraft(input: {
+  templateId: string;
+  note?: string | null;
+  rev: number;
+}): Promise<SubmitDraftResult> {
   return submitVersion(input);
 }

@@ -67,27 +67,31 @@
   --viz-blue: #2084d4;
 
   /* ── 2. Semantic ───────────────────────────────────────────── */
-  --app-bg: var(--stone-100);          /* window + sidebar */
-  --canvas: var(--stone-25);           /* the big rounded content panel */
-  --surface: var(--stone-0);           /* cards, popovers, inputs */
-  --surface-tinted: var(--stone-100);  /* tinted cards on the canvas (stat cards, row cards) */
-  --surface-sunken: var(--stone-50);   /* wells, the SHARE disc, keycaps */
+  --app-bg: var(--stone-100); /* window + sidebar */
+  --canvas: var(--stone-25); /* the big rounded content panel */
+  --surface: var(--stone-0); /* cards, popovers, inputs */
+  --surface-tinted: var(
+    --stone-100
+  ); /* tinted cards on the canvas (stat cards, row cards) */
+  --surface-sunken: var(--stone-50); /* wells, the SHARE disc, keycaps */
   --hairline: var(--stone-250);
   --hairline-strong: var(--stone-300);
-  --selected: var(--stone-200);        /* active nav pill */
+  --selected: var(--stone-200); /* active nav pill */
   --hover: var(--stone-150);
-  --tan: var(--stone-150);             /* tertiary filled button */
+  --tan: var(--stone-150); /* tertiary filled button */
 
   --text: var(--stone-900);
   --text-muted: var(--stone-600);
   --text-subtle: var(--stone-550);
-  --text-label: var(--stone-700);      /* tracked caps labels */
+  --text-label: var(--stone-700); /* tracked caps labels */
   --text-inverse: var(--stone-0);
 
-  --primary-fill: var(--ink);          /* the black pill: one primary action per screen */
+  --primary-fill: var(
+    --ink
+  ); /* the black pill: one primary action per screen */
   --primary-text: var(--stone-0);
 
-  --brand: var(--teal-700);            /* data + active states */
+  --brand: var(--teal-700); /* data + active states */
   --brand-text: var(--stone-0);
   --brand-1: var(--teal-100);
   --brand-2: var(--teal-300);
@@ -152,8 +156,10 @@
   --radius-modal: 22px;
 
   /* Elevation — borders, not shadows. Only modals get a real shadow. */
-  --shadow-pop: 0 10px 28px -10px rgb(27 27 27 / 0.14), 0 1px 2px rgb(27 27 27 / 0.05);
-  --shadow-modal: 0 28px 72px -16px rgb(27 27 27 / 0.22), 0 2px 8px rgb(27 27 27 / 0.06);
+  --shadow-pop:
+    0 10px 28px -10px rgb(27 27 27 / 0.14), 0 1px 2px rgb(27 27 27 / 0.05);
+  --shadow-modal:
+    0 28px 72px -16px rgb(27 27 27 / 0.22), 0 2px 8px rgb(27 27 27 / 0.06);
 
   /* Layout */
   --sidebar-w: 16.5rem;
@@ -375,7 +381,14 @@
    Apple devices, Inter (OFL) elsewhere; no SF font files ship, as Apple's licence forbids embedding them.
    Android: Google Sans Flex (OFL), then the platform's Roboto. */
 [data-device] {
-  --font-device-ios: -apple-system, BlinkMacSystemFont, var(--ff-device-inter, "Inter"), system-ui, sans-serif;
-  --font-device-android: var(--ff-device-google-sans, "Google Sans Flex", Roboto, system-ui, sans-serif);
+  --font-device-ios:
+    -apple-system, BlinkMacSystemFont, var(--ff-device-inter, "Inter"),
+    system-ui, sans-serif;
+  --font-device-android: var(
+    --ff-device-google-sans,
+    "Google Sans Flex",
+    Roboto,
+    system-ui,
+    sans-serif
+  );
 }
-

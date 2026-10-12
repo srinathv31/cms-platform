@@ -9,12 +9,32 @@ import type { SampleSet, Variable } from "@/editor/model/types";
 import { MAX_VALUE_LENGTH } from "@/editor/model/variables";
 import { ValuesEditor } from "./values-editor";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const VARIABLES: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "annual_fee", label: "Annual fee", type: "currency", required: true, sample: "95" },
-  { key: "home_state", label: "Home state", type: "us_state", required: true, sample: "NJ" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "annual_fee",
+    label: "Annual fee",
+    type: "currency",
+    required: true,
+    sample: "95",
+  },
+  {
+    key: "home_state",
+    label: "Home state",
+    type: "us_state",
+    required: true,
+    sample: "NJ",
+  },
 ];
 const SET: SampleSet = { id: "holiday", name: "Holiday promo", values: {} };
 
@@ -48,7 +68,9 @@ describe("ValuesEditor", () => {
         />,
       ),
     );
-    const inputs = [...container.querySelectorAll<HTMLInputElement>("[role='group'] input")];
+    const inputs = [
+      ...container.querySelectorAll<HTMLInputElement>("[role='group'] input"),
+    ];
     expect(inputs).toHaveLength(VARIABLES.length);
     for (const input of inputs) expect(input.maxLength).toBe(MAX_VALUE_LENGTH);
     expect(MAX_VALUE_LENGTH).toBe(1000);

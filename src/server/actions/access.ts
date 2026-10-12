@@ -15,7 +15,10 @@ import {
   decideAccessRequest as decideRequestTransition,
   requestAccess as requestTransition,
 } from "@/domain/access/requests";
-import { decideRecertItem as decideRecertTransition, startRecert } from "@/domain/access/recertification";
+import {
+  decideRecertItem as decideRecertTransition,
+  startRecert,
+} from "@/domain/access/recertification";
 import {
   ACCESS_REASON_MAX,
   DECISION_NOTE_MAX,
@@ -29,10 +32,25 @@ import {
 import { REASONS } from "@/domain/permissions";
 import { REQUEST_REFUSALS, type Refused } from "@/domain/refusals";
 import { TEAM_ROLES, type TeamRole, type Viewer } from "@/domain/types";
-import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
-import { loadMembershipFacts, loadRecertFacts, loadRequestFacts, runAccessSweep } from "@/server/access-sweep";
+import {
+  applyMembershipChange,
+  writeAccessEffects,
+} from "@/server/access-effects";
+import {
+  loadMembershipFacts,
+  loadRecertFacts,
+  loadRequestFacts,
+  runAccessSweep,
+} from "@/server/access-sweep";
 import { db } from "@/server/db/client";
-import { accessRequests, memberships, recertifications, recertItems, teams, users } from "@/server/db/schema/ucomp";
+import {
+  accessRequests,
+  memberships,
+  recertifications,
+  recertItems,
+  teams,
+  users,
+} from "@/server/db/schema/ucomp";
 import type { Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { runSunsetSweep } from "@/server/sunset-sweep";
@@ -69,7 +87,10 @@ function refreshAfter() {
 async function sweep(): Promise<boolean> {
   const swept = await runAccessSweep();
   const sunsets = await runSunsetSweep();
-  const changed = swept.membershipChanges.length > 0 || swept.recertsClosed.length > 0 || sunsets.length > 0;
+  const changed =
+    swept.membershipChanges.length > 0 ||
+    swept.recertsClosed.length > 0 ||
+    sunsets.length > 0;
   if (changed) refreshAfter();
   return changed;
 }
@@ -80,7 +101,10 @@ async function sweep(): Promise<boolean> {
  */
 function accessAction<I, F, T extends object = Record<never, never>>(
   raw: unknown,
-  steps: Pick<ActionSteps<I, F, T>, "input" | "invalid" | "authorize" | "transaction">,
+  steps: Pick<
+    ActionSteps<I, F, T>,
+    "input" | "invalid" | "authorize" | "transaction"
+  >,
 ): Promise<ActionResult<T>> {
   let swept = false;
   return serverAction(raw, {
@@ -98,25 +122,46 @@ function accessAction<I, F, T extends object = Record<never, never>>(
 }
 
 async function teamNamed(tx: Tx, id: string): Promise<Named | null> {
-  const rows = await tx.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.id, id)).limit(1);
+  const rows = await tx
+    .select({ id: teams.id, name: teams.name })
+    .from(teams)
+    .where(eq(teams.id, id))
+    .limit(1);
   return rows[0] ?? null;
 }
 
 /** The person by id; a stand-in built from the id when the user row is gone. */
 async function personNamed(tx: Tx, id: string): Promise<Named> {
-  const rows = await tx.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, id)).limit(1);
+  const rows = await tx
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
   return rows[0] ?? { id, name: id };
 }
 
-const actorOf = (viewer: Viewer): Named => ({ id: viewer.userId, name: viewer.name });
+const actorOf = (viewer: Viewer): Named => ({
+  id: viewer.userId,
+  name: viewer.name,
+});
 
 async function isAuditor(tx: Tx, userId: string): Promise<boolean> {
-  const rows = await tx.select({ platformRole: users.platformRole }).from(users).where(eq(users.id, userId)).limit(1);
+  const rows = await tx
+    .select({ platformRole: users.platformRole })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   return rows[0]?.platformRole === "auditor";
 }
 
 /** Writes a domain result: the membership change, then the audit rows and notifications. */
-async function commit(tx: Tx, change: MembershipChange | null, effects: readonly AccessEffect[], at: Date, viewer: Viewer) {
+async function commit(
+  tx: Tx,
+  change: MembershipChange | null,
+  effects: readonly AccessEffect[],
+  at: Date,
+  viewer: Viewer,
+) {
   if (change) await applyMembershipChange(tx, change);
   await writeAccessEffects(tx, effects, { now: at, actorId: viewer.userId });
 }
@@ -126,7 +171,11 @@ const Id = z.string().min(1).max(64);
 /** The membership, read only to learn its team and person for the permission check. */
 async function findMembership(membershipId: string) {
   return db
-    .select({ id: memberships.id, teamId: memberships.teamId, userId: memberships.userId })
+    .select({
+      id: memberships.id,
+      teamId: memberships.teamId,
+      userId: memberships.userId,
+    })
     .from(memberships)
     .where(eq(memberships.id, membershipId))
     .limit(1)
@@ -142,15 +191,25 @@ async function memberContext(tx: Tx, membershipId: string) {
     .limit(1)
     .then((rows) => rows[0]);
   if (!ref) refuse(ACCESS_REFUSALS.noLongerMember);
-  const teamMemberships = await loadMembershipFacts(tx, eq(memberships.teamId, ref.teamId));
+  const teamMemberships = await loadMembershipFacts(
+    tx,
+    eq(memberships.teamId, ref.teamId),
+  );
   const membership = teamMemberships.find((m) => m.id === membershipId)!;
   const member = await personNamed(tx, membership.userId);
-  const team = (await teamNamed(tx, membership.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+  const team =
+    (await teamNamed(tx, membership.teamId)) ??
+    refuse(REQUEST_REFUSALS.teamGone);
   return { membership, teamMemberships, member, team };
 }
 
-type MemberContext = Awaited<ReturnType<typeof memberContext>> & { actor: Named; now: Date };
-type MemberOutcome = { ok: true; membership: MembershipChange | null; effects: AccessEffect[] } | Refused;
+type MemberContext = Awaited<ReturnType<typeof memberContext>> & {
+  actor: Named;
+  now: Date;
+};
+type MemberOutcome =
+  | { ok: true; membership: MembershipChange | null; effects: AccessEffect[] }
+  | Refused;
 
 const MemberInput = z.object({ membershipId: Id });
 
@@ -160,7 +219,10 @@ const MemberInput = z.object({ membershipId: Id });
  */
 async function memberAction<I extends { membershipId: string }>(
   raw: unknown,
-  steps: Pick<ActionSteps<I, void, Record<never, never>>, "input" | "invalid"> & {
+  steps: Pick<
+    ActionSteps<I, void, Record<never, never>>,
+    "input" | "invalid"
+  > & {
     transition: (ctx: MemberContext, input: I) => MemberOutcome;
   },
 ): Promise<ActionResult> {
@@ -170,11 +232,17 @@ async function memberAction<I extends { membershipId: string }>(
     authorize: async ({ viewer, input }) => {
       const ref = await findMembership(input.membershipId);
       if (!ref) refuse(ACCESS_REFUSALS.noLongerMember);
-      check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: ref.userId });
+      check(viewer, "team.manageMembers", {
+        teamId: ref.teamId,
+        subjectUserId: ref.userId,
+      });
     },
     transaction: async (tx, { viewer, input, now: at }) => {
       const ctx = await memberContext(tx, input.membershipId);
-      const outcome = steps.transition({ ...ctx, actor: actorOf(viewer), now: at }, input);
+      const outcome = steps.transition(
+        { ...ctx, actor: actorOf(viewer), now: at },
+        input,
+      );
       if (!outcome.ok) refuse(outcome);
       await commit(tx, outcome.membership, outcome.effects, at, viewer);
       return { ok: true };
@@ -205,15 +273,23 @@ export async function requestAccess(input: {
       check(viewer, "access.request", { teamId: input.teamId });
     },
     transaction: async (tx, { viewer, input, now: at }) => {
-      const team = (await teamNamed(tx, input.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const team =
+        (await teamNamed(tx, input.teamId)) ??
+        refuse(REQUEST_REFUSALS.teamGone);
       const outcome = requestTransition({
         requester: actorOf(viewer),
         team,
         role: input.role,
         reason: input.reason,
         now: at,
-        memberships: await loadMembershipFacts(tx, eq(memberships.userId, viewer.userId)),
-        requests: await loadRequestFacts(tx, eq(accessRequests.userId, viewer.userId)),
+        memberships: await loadMembershipFacts(
+          tx,
+          eq(memberships.userId, viewer.userId),
+        ),
+        requests: await loadRequestFacts(
+          tx,
+          eq(accessRequests.userId, viewer.userId),
+        ),
       });
       if (!outcome.ok) refuse(outcome);
       const requestId = newId("ar");
@@ -234,7 +310,10 @@ export async function requestAccess(input: {
 const DecideInput = z.object({
   requestId: Id,
   decision: z.enum(["approve", "deny"]),
-  note: z.string().max(DECISION_NOTE_MAX * 2).optional(),
+  note: z
+    .string()
+    .max(DECISION_NOTE_MAX * 2)
+    .optional(),
 });
 
 /** A Team Admin approves (membership created, extended or reinstated) or denies (with a note) a request. */
@@ -247,27 +326,44 @@ export async function decideAccessRequest(input: {
     input: DecideInput,
     authorize: async ({ viewer, input }) => {
       const ref = await db
-        .select({ teamId: accessRequests.teamId, userId: accessRequests.userId })
+        .select({
+          teamId: accessRequests.teamId,
+          userId: accessRequests.userId,
+        })
         .from(accessRequests)
         .where(eq(accessRequests.id, input.requestId))
         .limit(1)
         .then((rows) => rows[0]);
       if (!ref) refuse(REQUEST_REFUSALS.requestGone);
-      check(viewer, "team.decideAccessRequest", { teamId: ref.teamId, requesterId: ref.userId });
+      check(viewer, "team.decideAccessRequest", {
+        teamId: ref.teamId,
+        requesterId: ref.userId,
+      });
     },
     transaction: async (tx, { viewer, input, now: at }) => {
-      const [request] = await loadRequestFacts(tx, eq(accessRequests.id, input.requestId));
+      const [request] = await loadRequestFacts(
+        tx,
+        eq(accessRequests.id, input.requestId),
+      );
       if (!request) refuse(REQUEST_REFUSALS.requestGone);
-      const team = (await teamNamed(tx, request.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const team =
+        (await teamNamed(tx, request.teamId)) ??
+        refuse(REQUEST_REFUSALS.teamGone);
       const requester = await personNamed(tx, request.userId);
       // A request made before the requester became an Auditor (or written around the request check)
       // can't be approved: an Auditor holds no team role. Denying it still works.
-      if (input.decision === "approve" && (await isAuditor(tx, request.userId))) {
+      if (
+        input.decision === "approve" &&
+        (await isAuditor(tx, request.userId))
+      ) {
         refuse(ACCESS_REFUSALS.auditorRequester(requester.name));
       }
       const [membership] = await loadMembershipFacts(
         tx,
-        and(eq(memberships.userId, request.userId), eq(memberships.teamId, request.teamId)),
+        and(
+          eq(memberships.userId, request.userId),
+          eq(memberships.teamId, request.teamId),
+        ),
       );
       const outcome = decideRequestTransition({
         request,
@@ -284,7 +380,12 @@ export async function decideAccessRequest(input: {
       const updated = await tx
         .update(accessRequests)
         .set(outcome.request)
-        .where(and(eq(accessRequests.id, request.id), eq(accessRequests.status, "pending")))
+        .where(
+          and(
+            eq(accessRequests.id, request.id),
+            eq(accessRequests.status, "pending"),
+          ),
+        )
         .returning({ id: accessRequests.id });
       if (updated.length === 0) refuse(ACCESS_REFUSALS.decided);
       await commit(tx, outcome.membership, outcome.effects, at, viewer);
@@ -295,10 +396,15 @@ export async function decideAccessRequest(input: {
 
 // ── Members and inactivity ───────────────────────────────────
 
-const RolesInput = MemberInput.extend({ roles: z.array(z.enum(TEAM_ROLES)).max(TEAM_ROLES.length) });
+const RolesInput = MemberInput.extend({
+  roles: z.array(z.enum(TEAM_ROLES)).max(TEAM_ROLES.length),
+});
 
 /** Replace a member's roles. A team keeps at least one active Team Admin. */
-export async function changeMemberRoles(input: { membershipId: string; roles: TeamRole[] }): Promise<ActionResult> {
+export async function changeMemberRoles(input: {
+  membershipId: string;
+  roles: TeamRole[];
+}): Promise<ActionResult> {
   return memberAction(input, {
     input: RolesInput,
     // Roles that don't parse are asked for again, whatever else is wrong.
@@ -311,28 +417,52 @@ export async function changeMemberRoles(input: { membershipId: string; roles: Te
 }
 
 /** Remove a member: the membership is deleted. */
-export async function removeMember(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, { input: MemberInput, transition: (ctx) => removeTransition(ctx) });
+export async function removeMember(input: {
+  membershipId: string;
+}): Promise<ActionResult> {
+  return memberAction(input, {
+    input: MemberInput,
+    transition: (ctx) => removeTransition(ctx),
+  });
 }
 
 /** Restore a suspended or lapsed member with their previous roles (their inactivity clock restarts). */
-export async function reinstateMember(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, { input: MemberInput, transition: (ctx) => reinstateTransition(ctx) });
+export async function reinstateMember(input: {
+  membershipId: string;
+}): Promise<ActionResult> {
+  return memberAction(input, {
+    input: MemberInput,
+    transition: (ctx) => reinstateTransition(ctx),
+  });
 }
 
 /** Suspend a member flagged for inactivity (90 days or more without a sign-in). */
-export async function suspendInactive(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, { input: MemberInput, transition: (ctx) => suspendTransition(ctx) });
+export async function suspendInactive(input: {
+  membershipId: string;
+}): Promise<ActionResult> {
+  return memberAction(input, {
+    input: MemberInput,
+    transition: (ctx) => suspendTransition(ctx),
+  });
 }
 
 /** Keep a flagged member: their inactivity clock restarts now. */
-export async function keepInactive(input: { membershipId: string }): Promise<ActionResult> {
-  return memberAction(input, { input: MemberInput, transition: (ctx) => keepTransition(ctx) });
+export async function keepInactive(input: {
+  membershipId: string;
+}): Promise<ActionResult> {
+  return memberAction(input, {
+    input: MemberInput,
+    transition: (ctx) => keepTransition(ctx),
+  });
 }
 
 // ── Recertification ──────────────────────────────────────────
 
-const RecertItemInput = z.object({ recertId: Id, userId: Id, decision: z.enum(["keep", "remove"]) });
+const RecertItemInput = z.object({
+  recertId: Id,
+  userId: Id,
+  decision: z.enum(["keep", "remove"]),
+});
 
 /** Keep or Remove one member in an open review. Remove ends access at once; the last decision closes it. */
 export async function decideRecertItem(input: {
@@ -350,14 +480,28 @@ export async function decideRecertItem(input: {
         .limit(1)
         .then((rows) => rows[0]);
       if (!ref) refuse(REQUEST_REFUSALS.reviewGone);
-      check(viewer, "team.manageMembers", { teamId: ref.teamId, subjectUserId: input.userId });
+      check(viewer, "team.manageMembers", {
+        teamId: ref.teamId,
+        subjectUserId: input.userId,
+      });
     },
-    transaction: async (tx, { viewer, input: { recertId, userId, decision }, now: at }) => {
-      const [recert] = await loadRecertFacts(tx, eq(recertifications.id, recertId));
+    transaction: async (
+      tx,
+      { viewer, input: { recertId, userId, decision }, now: at },
+    ) => {
+      const [recert] = await loadRecertFacts(
+        tx,
+        eq(recertifications.id, recertId),
+      );
       if (!recert) refuse(REQUEST_REFUSALS.reviewGone);
-      const team = (await teamNamed(tx, recert.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const team =
+        (await teamNamed(tx, recert.teamId)) ??
+        refuse(REQUEST_REFUSALS.teamGone);
       const member = await personNamed(tx, userId);
-      const teamMemberships = await loadMembershipFacts(tx, eq(memberships.teamId, recert.teamId));
+      const teamMemberships = await loadMembershipFacts(
+        tx,
+        eq(memberships.teamId, recert.teamId),
+      );
       const outcome = decideRecertTransition({
         recert,
         userId,
@@ -372,14 +516,25 @@ export async function decideRecertItem(input: {
       const updated = await tx
         .update(recertItems)
         .set(outcome.item)
-        .where(and(eq(recertItems.recertId, recertId), eq(recertItems.userId, userId), isNull(recertItems.decision)))
+        .where(
+          and(
+            eq(recertItems.recertId, recertId),
+            eq(recertItems.userId, userId),
+            isNull(recertItems.decision),
+          ),
+        )
         .returning({ userId: recertItems.userId });
       if (updated.length === 0) refuse(ACCESS_REFUSALS.alreadyReviewed);
       if (outcome.completedAt) {
         await tx
           .update(recertifications)
           .set({ completedAt: outcome.completedAt })
-          .where(and(eq(recertifications.id, recertId), isNull(recertifications.completedAt)));
+          .where(
+            and(
+              eq(recertifications.id, recertId),
+              isNull(recertifications.completedAt),
+            ),
+          );
       }
       await commit(tx, outcome.membership, outcome.effects, at, viewer);
       return { ok: true };
@@ -388,27 +543,42 @@ export async function decideRecertItem(input: {
 }
 
 /** Start a review now, due in 30 days, covering the team's members (Team Admins aside). */
-export async function startRecertification(input: { teamId: string }): Promise<ActionResult<{ recertId: string }>> {
+export async function startRecertification(input: {
+  teamId: string;
+}): Promise<ActionResult<{ recertId: string }>> {
   return accessAction(input, {
     input: z.object({ teamId: Id }),
-    authorize: ({ viewer, input }) => check(viewer, "team.manageMembers", { teamId: input.teamId }),
+    authorize: ({ viewer, input }) =>
+      check(viewer, "team.manageMembers", { teamId: input.teamId }),
     transaction: async (tx, { viewer, input, now: at }) => {
-      const team = (await teamNamed(tx, input.teamId)) ?? refuse(REQUEST_REFUSALS.teamGone);
+      const team =
+        (await teamNamed(tx, input.teamId)) ??
+        refuse(REQUEST_REFUSALS.teamGone);
       const outcome = startRecert({
         team,
         actor: actorOf(viewer),
         now: at,
-        memberships: await loadMembershipFacts(tx, eq(memberships.teamId, team.id)),
+        memberships: await loadMembershipFacts(
+          tx,
+          eq(memberships.teamId, team.id),
+        ),
         unfinished: await loadRecertFacts(
           tx,
-          and(eq(recertifications.teamId, team.id), isNull(recertifications.completedAt)),
+          and(
+            eq(recertifications.teamId, team.id),
+            isNull(recertifications.completedAt),
+          ),
         ),
       });
       if (!outcome.ok) refuse(outcome);
       const recertId = newId("rc");
       const { items, ...recert } = outcome.recert;
-      await tx.insert(recertifications).values({ id: recertId, ...recert, completedAt: null });
-      await tx.insert(recertItems).values(items.map((item) => ({ recertId, ...item })));
+      await tx
+        .insert(recertifications)
+        .values({ id: recertId, ...recert, completedAt: null });
+      await tx
+        .insert(recertItems)
+        .values(items.map((item) => ({ recertId, ...item })));
       await commit(tx, null, outcome.effects, at, viewer);
       return { ok: true, recertId };
     },

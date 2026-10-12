@@ -7,7 +7,11 @@ async function TeamGuard({ params }: { params: Promise<{ team: string }> }) {
   return null;
 }
 
-export default function TeamLayout({ children, modal, params }: LayoutProps<"/[team]">) {
+export default function TeamLayout({
+  children,
+  modal,
+  params,
+}: LayoutProps<"/[team]">) {
   return (
     <>
       <Suspense fallback={null}>

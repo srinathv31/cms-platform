@@ -13,7 +13,15 @@
 // only when its own numbers change.
 
 import { PencilLine, Plus, TriangleAlert } from "lucide-react";
-import { memo, useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import {
+  memo,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import { useStore } from "zustand";
 import {
   AlertDialog,
@@ -53,7 +61,13 @@ interface RowFlag {
   detail?: string;
 }
 
-const FLAG_ORDER: ContractChange["kind"][] = ["key_renamed", "type_changed", "made_required", "added", "made_optional"];
+const FLAG_ORDER: ContractChange["kind"][] = [
+  "key_renamed",
+  "type_changed",
+  "made_required",
+  "added",
+  "made_optional",
+];
 
 /** Per-key flags for the rows, from the contract diff (labels are display-only, never flagged). */
 function rowFlags(changes: readonly ContractChange[]): Map<string, RowFlag[]> {
@@ -71,9 +85,17 @@ function rowFlags(changes: readonly ContractChange[]): Map<string, RowFlag[]> {
 function flagFor(change: ContractChange): RowFlag {
   switch (change.kind) {
     case "key_renamed":
-      return { text: "Key changed", breaking: true, detail: `Was ${change.from}` };
+      return {
+        text: "Key changed",
+        breaking: true,
+        detail: `Was ${change.from}`,
+      };
     case "type_changed":
-      return { text: "Type changed", breaking: true, detail: `Was ${TYPE_META[change.from]?.label ?? change.from}` };
+      return {
+        text: "Type changed",
+        breaking: true,
+        detail: `Was ${TYPE_META[change.from]?.label ?? change.from}`,
+      };
     case "made_required":
       return { text: "Now required", breaking: true };
     case "made_optional":
@@ -98,13 +120,22 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
   const baseline = useStore(root.config, (s) => s.baseline);
   const headingId = useId();
 
-  const changes = useMemo(() => (baseline ? diffVariables(baseline, variables) : []), [baseline, variables]);
+  const changes = useMemo(
+    () => (baseline ? diffVariables(baseline, variables) : []),
+    [baseline, variables],
+  );
   const flags = useMemo(() => rowFlags(changes), [changes]);
-  const removed = useMemo(() => changes.filter((c) => c.kind === "removed"), [changes]);
+  const removed = useMemo(
+    () => changes.filter((c) => c.kind === "removed"),
+    [changes],
+  );
 
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [creatingOpen, setCreatingOpen] = useState(false);
-  const [confirm, setConfirm] = useState<{ variable: Variable; count: number } | null>(null);
+  const [confirm, setConfirm] = useState<{
+    variable: Variable;
+    count: number;
+  } | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const newButtonRef = useRef<HTMLButtonElement>(null);
   const deletedRef = useRef(false);
@@ -116,9 +147,14 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
 
   const focusRow = (key: string) =>
     requestAnimationFrame(() =>
-      listRef.current?.querySelector<HTMLElement>(`[data-variable-row="${CSS.escape(key)}"] [data-row-insert]`)?.focus(),
+      listRef.current
+        ?.querySelector<HTMLElement>(
+          `[data-variable-row="${CSS.escape(key)}"] [data-row-insert]`,
+        )
+        ?.focus(),
     );
-  const focusNew = () => requestAnimationFrame(() => newButtonRef.current?.focus());
+  const focusNew = () =>
+    requestAnimationFrame(() => newButtonRef.current?.focus());
 
   const requestDelete = (variable: Variable) => {
     root.flushUsage();
@@ -146,15 +182,22 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     const target = event.target as HTMLElement;
     if (!target.matches("[data-row-insert]")) return;
-    const rows = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-row-insert]") ?? [])];
-    const next = rows[rows.indexOf(target) + (event.key === "ArrowDown" ? 1 : -1)];
+    const rows = [
+      ...(listRef.current?.querySelectorAll<HTMLElement>("[data-row-insert]") ??
+        []),
+    ];
+    const next =
+      rows[rows.indexOf(target) + (event.key === "ArrowDown" ? 1 : -1)];
     if (!next) return;
     event.preventDefault();
     next.focus();
   };
 
   return (
-    <section aria-labelledby={headingId} className={cx("flex min-w-0 flex-col", className)}>
+    <section
+      aria-labelledby={headingId}
+      className={cx("flex min-w-0 flex-col", className)}
+    >
       <div className="flex items-baseline justify-between px-2 pb-2">
         <h2 id={headingId} className="caps-label">
           Variables
@@ -169,7 +212,10 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
       <ul ref={listRef} className="grid gap-0.5" onKeyDown={onListKeyDown}>
         {variables.map((variable) =>
           editing === variable.key ? (
-            <li key={variable.key} className="my-1 rounded-xl border border-hairline bg-surface p-3">
+            <li
+              key={variable.key}
+              className="my-1 rounded-xl border border-hairline bg-surface p-3"
+            >
               <VariableForm
                 mode="edit"
                 initial={draftFromVariable(variable)}
@@ -238,7 +284,10 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
             setEditingKey(null);
             setCreatingOpen(true);
           }}
-          className={cx("mt-1 h-9 justify-start gap-2.5 rounded-lg px-2 font-normal text-text-muted hover:bg-hover hover:text-text", FOCUS_RING)}
+          className={cx(
+            "mt-1 h-9 justify-start gap-2.5 rounded-lg px-2 font-normal text-text-muted hover:bg-hover hover:text-text",
+            FOCUS_RING,
+          )}
         >
           <span className="flex size-7 items-center justify-center">
             <Plus className="size-4" {...ICON} />
@@ -253,11 +302,17 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
           if (!open) setConfirm(null);
         }}
       >
-        <AlertDialogContent finalFocus={() => (deletedRef.current ? newButtonRef.current : true)}>
+        <AlertDialogContent
+          finalFocus={() => (deletedRef.current ? newButtonRef.current : true)}
+        >
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {confirm?.variable.label}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete {confirm?.variable.label}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm ? `It’s used ${confirm.count === 1 ? "once" : `${confirm.count} times`} in this template. ` : ""}
+              {confirm
+                ? `It’s used ${confirm.count === 1 ? "once" : `${confirm.count} times`} in this template. `
+                : ""}
               Chips you keep show its key and are marked as missing.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -265,7 +320,11 @@ export function VariablesPanel({ className }: VariablesPanelProps) {
             <AlertDialogCancel variant="ghost" className={FOCUS_RING}>
               Cancel
             </AlertDialogCancel>
-            <Button variant="outline" onClick={() => finishDelete(false)} className={FOCUS_RING}>
+            <Button
+              variant="outline"
+              onClick={() => finishDelete(false)}
+              className={FOCUS_RING}
+            >
               Keep chips
             </Button>
             <Button onClick={() => finishDelete(true)} className={FOCUS_RING}>
@@ -295,8 +354,18 @@ interface VariableRowProps {
   onEdit: (key: string) => void;
 }
 
-const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly, held, onEdit }: VariableRowProps) {
-  const count = useLiveStore(root.usage, (s) => s.byKey.get(variable.key)?.count ?? 0);
+const VariableRow = memo(function VariableRow({
+  root,
+  variable,
+  flags,
+  readOnly,
+  held,
+  onEdit,
+}: VariableRowProps) {
+  const count = useLiveStore(
+    root.usage,
+    (s) => s.byKey.get(variable.key)?.count ?? 0,
+  );
   // Before any field registered (the panel rendered ahead of the document), counts are unknown:
   // leave them out rather than mute every row. They fill in on the same line, so nothing shifts.
   const ready = useLiveStore(root.usage, (s) => s.ready);
@@ -316,16 +385,27 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
       <span
         className={cx(
           "flex size-7 shrink-0 items-center justify-center rounded-md border",
-          unused ? "border-hairline bg-surface text-text-subtle" : "border-chip-border bg-chip text-chip-icon",
+          unused
+            ? "border-hairline bg-surface text-text-subtle"
+            : "border-chip-border bg-chip text-chip-icon",
         )}
       >
         <Icon className="size-4" {...ICON} />
       </span>
       <span className="min-w-0 flex-1 text-left">
-        <span className={cx("block truncate text-sm leading-5", unused ? "text-text-muted" : "text-text")}>{variable.label}</span>
+        <span
+          className={cx(
+            "block truncate text-sm leading-5",
+            unused ? "text-text-muted" : "text-text",
+          )}
+        >
+          {variable.label}
+        </span>
         <span id={metaId} className="block text-xs leading-4 text-text-muted">
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="min-w-0 truncate font-mono text-[11.5px]">{variable.key}</span>
+            <span className="min-w-0 truncate font-mono text-[11.5px]">
+              {variable.key}
+            </span>
             {ready ? (
               <>
                 <span aria-hidden>·</span>
@@ -351,10 +431,15 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
       data-unused={unused ? "" : undefined}
       draggable={!readOnly && !held}
       onDragStart={readOnly || held ? undefined : onDragStart}
-      className={cx("group/row relative flex items-center gap-1 rounded-lg pr-2", !readOnly && !held && "hover:bg-hover")}
+      className={cx(
+        "group/row relative flex items-center gap-1 rounded-lg pr-2",
+        !readOnly && !held && "hover:bg-hover",
+      )}
     >
       {readOnly ? (
-        <div className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5">{content}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5">
+          {content}
+        </div>
       ) : (
         <button
           type="button"
@@ -363,7 +448,10 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
           aria-label={`Insert ${variable.label}`}
           aria-describedby={metaId}
           onClick={() => root.insertVariable(variable.key)}
-          className={cx("flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5", FOCUS_RING)}
+          className={cx(
+            "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5",
+            FOCUS_RING,
+          )}
         >
           {content}
         </button>
@@ -386,20 +474,28 @@ const VariableRow = memo(function VariableRow({ root, variable, flags, readOnly,
       )}
       {readOnly ? (
         // Display only: a quiet word where the switch sits (nothing for optional), same row height.
-        <span className="ml-1 w-14 shrink-0 text-right text-xs leading-4 text-text-muted">{variable.required ? "Required" : ""}</span>
+        <span className="ml-1 w-14 shrink-0 text-right text-xs leading-4 text-text-muted">
+          {variable.required ? "Required" : ""}
+        </span>
       ) : (
         <Switch
           size="sm"
           checked={variable.required}
           aria-label={`${variable.label} required`}
           disabled={held}
-          onCheckedChange={(required) => root.updateVariable(variable.key, { required })}
+          onCheckedChange={(required) =>
+            root.updateVariable(variable.key, { required })
+          }
           className={cx("ml-1", SWITCH_TRACK, FOCUS_RING)}
         />
       )}
       {readOnly ? null : (
         // The drag image: the chip this row becomes.
-        <span ref={ghost} aria-hidden className="pointer-events-none fixed top-0 -left-[9999px] text-base">
+        <span
+          ref={ghost}
+          aria-hidden
+          className="pointer-events-none fixed top-0 -left-[9999px] text-base"
+        >
           <VariableChipView variableKey={variable.key} variable={variable} />
         </span>
       )}
@@ -413,7 +509,9 @@ function ContractFlag({ flag }: { flag: RowFlag }) {
       title={flag.detail}
       className={cx(
         "inline-flex items-center gap-1 rounded-md border px-1.5 text-[11px] leading-[18px]",
-        flag.breaking ? "border-warning-border bg-warning-soft text-warning-text" : "border-hairline bg-surface-tinted text-text-muted",
+        flag.breaking
+          ? "border-warning-border bg-warning-soft text-warning-text"
+          : "border-hairline bg-surface-tinted text-text-muted",
       )}
     >
       {flag.breaking ? <TriangleAlert className="size-3" {...ICON} /> : null}
@@ -432,7 +530,9 @@ function RemovedLine({ changes }: { changes: readonly ContractChange[] }) {
         {changes.map((change, i) => (
           <span key={change.key}>
             {i ? ", " : ""}
-            <span className="font-mono text-[11.5px] break-all">{change.key}</span>
+            <span className="font-mono text-[11.5px] break-all">
+              {change.key}
+            </span>
           </span>
         ))}
       </span>

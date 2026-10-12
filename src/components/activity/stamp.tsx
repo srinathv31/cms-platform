@@ -1,6 +1,10 @@
 "use client";
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * A time as its relative words ("3 days ago", the demo clock's), with the absolute time (UTC) in a
@@ -8,7 +12,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
  * absolute time is also in the text for assistive technology. Both strings are made on the server, so
  * they never differ between server and browser.
  */
-export function Stamp({ iso, relative, absolute }: { iso: string; relative: string; absolute: string }) {
+export function Stamp({
+  iso,
+  relative,
+  absolute,
+}: {
+  iso: string;
+  relative: string;
+  absolute: string;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger

@@ -4,7 +4,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScaledBox, ScaledViewport, containScale } from "./scaled-viewport";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
@@ -24,8 +26,12 @@ beforeEach(() => {
   observed = null;
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   // happy-dom lays nothing out: give every element the box's size.
-  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => box.width);
-  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(() => box.height);
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
+    () => box.width,
+  );
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(
+    () => box.height,
+  );
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -39,7 +45,8 @@ afterEach(() => {
 });
 
 describe("ScaledViewport", () => {
-  const inner = () => container.querySelector<HTMLElement>('[data-slot="scaled-viewport"] > div');
+  const inner = () =>
+    container.querySelector<HTMLElement>('[data-slot="scaled-viewport"] > div');
 
   it("lays its content out at the design width and scales it down to the box's width", () => {
     act(() => root.render(<ScaledViewport width={1200}>x</ScaledViewport>));
@@ -48,7 +55,9 @@ describe("ScaledViewport", () => {
     expect(el.style.transform).toBe("scale(0.5)");
     // Once scaled, the content is exactly as tall as the box.
     expect(el.style.height).toBe("800px");
-    expect(container.querySelector("[data-scale]")?.getAttribute("data-scale")).toBe("0.500");
+    expect(
+      container.querySelector("[data-scale]")?.getAttribute("data-scale"),
+    ).toBe("0.500");
   });
 
   it("never scales up", () => {
@@ -83,7 +92,8 @@ describe("containScale", () => {
 });
 
 describe("ScaledBox", () => {
-  const reserve = () => container.querySelector<HTMLElement>('[data-slot="scaled-reserve"]')!;
+  const reserve = () =>
+    container.querySelector<HTMLElement>('[data-slot="scaled-reserve"]')!;
   const content = () => reserve().firstElementChild as HTMLElement;
 
   it("lays its content out at its own size and reserves the scaled size", () => {
@@ -106,7 +116,12 @@ describe("ScaledBox", () => {
   it("takes its scale from the caller, follows the box, and keeps the room under content that runs past it", () => {
     act(() =>
       root.render(
-        <ScaledBox width={400} height={800} room={40} scale={(b) => containScale(b, { width: 400, height: 1000 }, 0.3)}>
+        <ScaledBox
+          width={400}
+          height={800}
+          room={40}
+          scale={(b) => containScale(b, { width: 400, height: 1000 }, 0.3)}
+        >
           x
         </ScaledBox>,
       ),

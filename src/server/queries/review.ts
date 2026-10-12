@@ -1,25 +1,52 @@
 import "server-only";
 import { cache } from "react";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
-import { approvedThisRound, currentStageOf, ownStages, stepperState } from "@/domain/approval-chain";
+import {
+  approvedThisRound,
+  currentStageOf,
+  ownStages,
+  stepperState,
+} from "@/domain/approval-chain";
 import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { canComment } from "@/domain/comments";
 import { describeChanges, diffVariables } from "@/domain/contract";
 import { DAY_MS, utcDay } from "@/domain/dates";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
-import { contractBaseline, renameBaseline, reviewBaseline } from "@/domain/lifecycle/baselines";
+import {
+  contractBaseline,
+  renameBaseline,
+  reviewBaseline,
+} from "@/domain/lifecycle/baselines";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { canSeeSpace } from "@/domain/permissions";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
+import type {
+  MessageTypeRules,
+  TeamSenders,
+} from "@/domain/platform-config/limits";
 import { refuse } from "@/domain/refusals";
 import type { ApprovalStage, VersionStage } from "@/domain/review-types";
 import { asNumbered, replacedBy, versionLabel } from "@/domain/rounds";
-import type { ChannelFamily, ContractChange, PermissionResult, Variable, VersionState } from "@/domain/types";
+import type {
+  ChannelFamily,
+  ContractChange,
+  PermissionResult,
+  Variable,
+  VersionState,
+} from "@/domain/types";
 import { getBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
-import { approvals, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  approvals,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
-import type { ReviewQueue, ReviewQueueRow, ReviewScreenData } from "./review-models";
+import type {
+  ReviewQueue,
+  ReviewQueueRow,
+  ReviewScreenData,
+} from "./review-models";
 import {
   anchorIdsOf,
   chainFor,
@@ -93,7 +120,9 @@ interface QueueVersion {
 
 /** One team's space reads that team; "All teams" reads every team (requireSpace already let the viewer in). */
 function inScope(space: SpaceContext) {
-  return space.isAll || !space.teamId ? undefined : eq(templates.teamId, space.teamId);
+  return space.isAll || !space.teamId
+    ? undefined
+    : eq(templates.teamId, space.teamId);
 }
 
 function queueRow(
@@ -118,13 +147,18 @@ function queueRow(
 }
 
 /** The queue's "Stage 2 of 3": a position in the version's own stages, with the name it recorded. */
-function queueStage(v: { stages: VersionStage[] | null }, chain: readonly ApprovalStage[], position: number) {
+function queueStage(
+  v: { stages: VersionStage[] | null },
+  chain: readonly ApprovalStage[],
+  position: number,
+) {
   const own = ownStages(v.stages, chain);
   return { position, name: own[position]?.name ?? "", count: own.length };
 }
 
 const newestSubmitted = (a: ReviewQueueRow, b: ReviewQueueRow) =>
-  b.submittedAt.localeCompare(a.submittedAt) || a.templateName.localeCompare(b.templateName);
+  b.submittedAt.localeCompare(a.submittedAt) ||
+  a.templateName.localeCompare(b.templateName);
 
 /**
  * In-review versions in the space, and the ones the viewer may decide now. Cached: the badge and the
@@ -147,9 +181,14 @@ const loadInReview = cache(async (spaceSlug: string) => {
   const inSpace = (v: QueueVersion) => space.isAll || v.teamId === space.teamId;
   const namedElsewhere = (v: QueueVersion) =>
     !canSeeSpace(viewer, v.teamSlug) &&
-    stageApproverIds(currentStageOf(v, chainFor(chains, v.contentTypeId))).includes(viewer.userId);
+    stageApproverIds(
+      currentStageOf(v, chainFor(chains, v.contentTypeId)),
+    ).includes(viewer.userId);
   const rows = all.filter((v) => inSpace(v) || namedElsewhere(v));
-  const decisions = await loadDecisions(db, rows.map((v) => v.versionId));
+  const decisions = await loadDecisions(
+    db,
+    rows.map((v) => v.versionId),
+  );
 
   const waiting: ReviewQueueRow[] = [];
   const submitted: ReviewQueueRow[] = [];
@@ -169,7 +208,11 @@ const loadInReview = cache(async (spaceSlug: string) => {
     });
     if (check.ok) waiting.push(row);
   }
-  return { space, waiting: waiting.sort(newestSubmitted), submitted: submitted.sort(newestSubmitted) };
+  return {
+    space,
+    waiting: waiting.sort(newestSubmitted),
+    submitted: submitted.sort(newestSubmitted),
+  };
 });
 
 /**
@@ -180,55 +223,73 @@ const loadInReview = cache(async (spaceSlug: string) => {
  * - decided: the latest decision on each round decided in the last 30 days, newest first.
  * "All teams" spans every team (it's open only to cross-team viewers).
  */
-export const getReviewQueue = cache(async (spaceSlug: string): Promise<ReviewQueue> => {
-  const { space, waiting, submitted } = await loadInReview(spaceSlug);
-  const nowDate = await demoNow();
-  const since = new Date(nowDate.getTime() - DECIDED_WINDOW_DAYS * DAY_MS);
+export const getReviewQueue = cache(
+  async (spaceSlug: string): Promise<ReviewQueue> => {
+    const { space, waiting, submitted } = await loadInReview(spaceSlug);
+    const nowDate = await demoNow();
+    const since = new Date(nowDate.getTime() - DECIDED_WINDOW_DAYS * DAY_MS);
 
-  const [rows, chains, people] = await Promise.all([
-    db
-      .select({
-        ...queueColumns,
-        stagePosition: approvals.stagePosition,
-        stageName: approvals.stageName,
-        decision: approvals.decision,
-        decidedBy: approvals.actorId,
-        decidedAt: approvals.decidedAt,
-      })
-      .from(approvals)
-      .innerJoin(versions, eq(versions.id, approvals.versionId))
-      .innerJoin(templates, eq(templates.id, versions.templateId))
-      .innerJoin(teams, eq(teams.id, templates.teamId))
-      .where(and(gte(approvals.decidedAt, since), inScope(space)))
-      .orderBy(desc(approvals.decidedAt), desc(approvals.id)),
-    getChains(),
-    getPeople(),
-  ]);
+    const [rows, chains, people] = await Promise.all([
+      db
+        .select({
+          ...queueColumns,
+          stagePosition: approvals.stagePosition,
+          stageName: approvals.stageName,
+          decision: approvals.decision,
+          decidedBy: approvals.actorId,
+          decidedAt: approvals.decidedAt,
+        })
+        .from(approvals)
+        .innerJoin(versions, eq(versions.id, approvals.versionId))
+        .innerJoin(templates, eq(templates.id, versions.templateId))
+        .innerJoin(teams, eq(teams.id, templates.teamId))
+        .where(and(gte(approvals.decidedAt, since), inScope(space)))
+        .orderBy(desc(approvals.decidedAt), desc(approvals.id)),
+      getChains(),
+      getPeople(),
+    ]);
 
-  const decided: ReviewQueueRow[] = [];
-  const seen = new Set<string>();
-  for (const r of rows) {
-    if (seen.has(r.versionId)) continue; // newest first: the first row is the version's latest decision
-    seen.add(r.versionId);
-    const count = ownStages(r.stages, chainFor(chains, r.contentTypeId)).length;
-    decided.push({
-      ...queueRow(r, people, { position: r.stagePosition, name: r.stageName, count }),
-      decision: { kind: r.decision, by: personOf(people, r.decidedBy), at: iso(r.decidedAt) },
-    });
-  }
+    const decided: ReviewQueueRow[] = [];
+    const seen = new Set<string>();
+    for (const r of rows) {
+      if (seen.has(r.versionId)) continue; // newest first: the first row is the version's latest decision
+      seen.add(r.versionId);
+      const count = ownStages(
+        r.stages,
+        chainFor(chains, r.contentTypeId),
+      ).length;
+      decided.push({
+        ...queueRow(r, people, {
+          position: r.stagePosition,
+          name: r.stageName,
+          count,
+        }),
+        decision: {
+          kind: r.decision,
+          by: personOf(people, r.decidedBy),
+          at: iso(r.decidedAt),
+        },
+      });
+    }
 
-  return { waiting, submitted, decided };
-});
+    return { waiting, submitted, decided };
+  },
+);
 
 /** The sidebar badge: how many versions wait on this viewer in the space. */
-export const getReviewBadgeCount = cache(async (spaceSlug: string): Promise<number> => {
-  return (await loadInReview(spaceSlug)).waiting.length;
-});
+export const getReviewBadgeCount = cache(
+  async (spaceSlug: string): Promise<number> => {
+    return (await loadInReview(spaceSlug)).waiting.length;
+  },
+);
 
 // ── Review screen ─────────────────────────────────────────────
 
 /** Approve and Request changes share one answer: the decide check, then the version's state. */
-function decideOnScreen(check: PermissionResult, state: string): PermissionResult {
+function decideOnScreen(
+  check: PermissionResult,
+  state: string,
+): PermissionResult {
   if (!check.ok) return check;
   return state === "in_review" ? check : refuse(REFUSALS.notInReview);
 }
@@ -239,15 +300,26 @@ async function loadBaseline(
 ): Promise<ReviewScreenData["baseline"]> {
   if (!base || base.number === null) return null;
   const row = await db.query.versions.findFirst({
-    columns: { body: true, variables: true, channels: true, channelFields: true, smsFooter: true },
+    columns: {
+      body: true,
+      variables: true,
+      channels: true,
+      channelFields: true,
+      smsFooter: true,
+    },
     where: eq(versions.id, base.id),
   });
-  return row ? { id: base.id, number: base.number, state: base.state, ...row } : null;
+  return row
+    ? { id: base.id, number: base.number, state: base.state, ...row }
+    : null;
 }
 
 /** The variable list of one stored version: what a version's contract changes are worked out against. */
 async function loadVariables(versionId: string): Promise<Variable[]> {
-  const row = await db.query.versions.findFirst({ columns: { variables: true }, where: eq(versions.id, versionId) });
+  const row = await db.query.versions.findFirst({
+    columns: { variables: true },
+    where: eq(versions.id, versionId),
+  });
   return row?.variables ?? [];
 }
 
@@ -257,15 +329,33 @@ async function loadVariables(versionId: string): Promise<Variable[]> {
  * visible.
  */
 export const getReviewScreen = cache(
-  async (spaceSlug: string, templateId: string, versionNumber: number, round: number | null): Promise<ReviewScreenData> => {
-    const access = await requireReviewVersion(spaceSlug, templateId, versionNumber, round);
+  async (
+    spaceSlug: string,
+    templateId: string,
+    versionNumber: number,
+    round: number | null,
+  ): Promise<ReviewScreenData> => {
+    const access = await requireReviewVersion(
+      spaceSlug,
+      templateId,
+      versionNumber,
+      round,
+    );
     const { space, template, version } = access;
     const shown = asNumbered(version);
     const { number } = shown;
 
     const nowDate = await demoNow();
     const zone = await getBusinessZone();
-    const [others, chain, people, decisionRows, threads, consumerUsage, messages] = await Promise.all([
+    const [
+      others,
+      chain,
+      people,
+      decisionRows,
+      threads,
+      consumerUsage,
+      messages,
+    ] = await Promise.all([
       db
         .select({
           id: versions.id,
@@ -295,12 +385,23 @@ export const getReviewScreen = cache(
     // The version's own stages (recorded at submit), each stage's rule read from the chain now.
     const own = ownStages(version.stages, chain);
     const stage = currentStageOf(version, chain);
-    const decideInput = { teamId: template.teamId, submittedBy: version.submittedBy, writers: version.writers, stage };
-    const decide = decideOnScreen(decideCheck(space.viewer, decideInput), version.state);
+    const decideInput = {
+      teamId: template.teamId,
+      submittedBy: version.submittedBy,
+      writers: version.writers,
+      stage,
+    };
+    const decide = decideOnScreen(
+      decideCheck(space.viewer, decideInput),
+      version.state,
+    );
     const inReview = version.state === "in_review";
     // Two stages need two people: someone who approved a stage of this version can't approve another.
     const approvedBy = inReview ? approvedThisRound(decisionRows) : [];
-    const approve = decideOnScreen(decideCheck(space.viewer, { ...decideInput, approvedBy }), version.state);
+    const approve = decideOnScreen(
+      decideCheck(space.viewer, { ...decideInput, approvedBy }),
+      version.state,
+    );
     const contractChanges = version.contractChanges ?? [];
     // What a rename is shown against: the name customers get today, the Active version's or, with none
     // Active, the newest that still renders (as submit's contract changes compare). Not this version's own:
@@ -309,7 +410,9 @@ export const getReviewScreen = cache(
     // What the redline compares with: the Active version or, after a revoke, the revoked text the draft
     // corrects (decision 0031); never a round's own number. The Approve dialog's previous version stays
     // the Active one, unless that is this version's own release.
-    const baseline = await loadBaseline(reviewBaseline(others, version.id, nowDate));
+    const baseline = await loadBaseline(
+      reviewBaseline(others, version.id, nowDate),
+    );
     const active = others.find((v) => v.state === "active");
     // With nothing Active (after a revoke), the version consumers move from is the newest that still
     // renders: the Approve dialog names its consumers and what they have to map (N3). The contract changes
@@ -317,12 +420,18 @@ export const getReviewScreen = cache(
     // (submitted while v2 was Active, v2 revoked during review), so they are worked out again here against
     // the version that renders now, with the diff submit uses.
     const renders = active ? null : contractBaseline(others, nowDate);
-    const rendersNow = renders && renders.number !== null && renders.number !== number ? { ...renders, number: renders.number } : null;
-    const mapFrom = rendersNow ? diffVariables(await loadVariables(rendersNow.id), version.variables) : [];
+    const rendersNow =
+      renders && renders.number !== null && renders.number !== number
+        ? { ...renders, number: renders.number }
+        : null;
+    const mapFrom = rendersNow
+      ? diffVariables(await loadVariables(rendersNow.id), version.variables)
+      : [];
     // A sent-back round that was resubmitted is a record: where its work went is the number's head, linked
     // when the viewer may open it (a stage reviewer from another team may not).
     const head = replacedBy(others, shown);
-    const next = head && (await opensRound(access, head.id)) ? asNumbered(head) : null;
+    const next =
+      head && (await opensRound(access, head.id)) ? asNumbered(head) : null;
 
     return {
       template: {
@@ -355,9 +464,17 @@ export const getReviewScreen = cache(
       baseline,
       previousNumber: active && active.number !== number ? active.number : null,
       stillRenders: rendersNow
-        ? { number: rendersNow.number, sunsetDay: rendersNow.sunsetAt ? sunsetDay(rendersNow.sunsetAt, zone) : null, contractChanges: mapFrom }
+        ? {
+            number: rendersNow.number,
+            sunsetDay: rendersNow.sunsetAt
+              ? sunsetDay(rendersNow.sunsetAt, zone)
+              : null,
+            contractChanges: mapFrom,
+          }
         : null,
-      replacedBy: next ? { ...next, label: versionLabel(next, { style: "sentence" }) } : null,
+      replacedBy: next
+        ? { ...next, label: versionLabel(next, { style: "sentence" }) }
+        : null,
       liveName: renamedFrom?.name ?? null,
       steps: stepperState(
         own,
@@ -376,7 +493,10 @@ export const getReviewScreen = cache(
         // Authors and approvers on the team, and whoever the waiting stage names (any team), while it is in review.
         comment: canComment(space.viewer, {
           teamId: template.teamId,
-          version: { state: version.state, stageApproverIds: stageApproverIds(stage) },
+          version: {
+            state: version.state,
+            stageApproverIds: stageApproverIds(stage),
+          },
         }),
       },
       consumerUsage,
@@ -394,7 +514,10 @@ export const getReviewScreen = cache(
  * its content type's SMS footer and part budget, and who the team's messages come from (the push's app,
  * the SMS's short code).
  */
-async function loadMessageSetup(template: { teamId: string; contentTypeId: string }): Promise<{
+async function loadMessageSetup(template: {
+  teamId: string;
+  contentTypeId: string;
+}): Promise<{
   family: ChannelFamily;
   rules: MessageTypeRules;
   senders: TeamSenders;
@@ -402,7 +525,17 @@ async function loadMessageSetup(template: { teamId: string; contentTypeId: strin
   const [family, rules, team] = await Promise.all([
     loadFamily(db, template.contentTypeId),
     loadMessageRules(db, template.contentTypeId),
-    db.query.teams.findFirst({ where: eq(teams.id, template.teamId), columns: { appName: true, smsSender: true } }),
+    db.query.teams.findFirst({
+      where: eq(teams.id, template.teamId),
+      columns: { appName: true, smsSender: true },
+    }),
   ]);
-  return { family, rules, senders: { appName: team?.appName ?? null, smsSender: team?.smsSender ?? null } };
+  return {
+    family,
+    rules,
+    senders: {
+      appName: team?.appName ?? null,
+      smsSender: team?.smsSender ?? null,
+    },
+  };
 }

@@ -17,7 +17,9 @@ describe("sectionTitleKey", () => {
 
 describe("matchesSectionTitle", () => {
   it("matches the same title written differently", () => {
-    expect(matchesSectionTitle("1. Offer Details:", "Offer details")).toBe(true);
+    expect(matchesSectionTitle("1. Offer Details:", "Offer details")).toBe(
+      true,
+    );
     expect(matchesSectionTitle("Offer", "Offer details")).toBe(false);
     expect(matchesSectionTitle("   ", "")).toBe(false);
   });

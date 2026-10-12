@@ -4,7 +4,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { versions } from "@/server/db/schema/ucomp";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { GET as baseVersion } from "./base-version/route";
 import { GET as compare } from "./compare/route";
@@ -29,7 +32,9 @@ vi.mock("@/server/db/client", async () => {
 });
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
-vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Headers({ host: "localhost:3000" })) }));
+vi.mock("next/headers", () => ({
+  headers: vi.fn(async () => new Headers({ host: "localhost:3000" })),
+}));
 
 let db: Db;
 const people: Record<string, Viewer> = {};
@@ -38,7 +43,8 @@ const ids = seededDatabasePerTest({ base: env.now });
 
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
-  for (const id of ["maya", "sam", "eli", "morgan", "taylor"]) people[id] = await loadPersona(db, id);
+  for (const id of ["maya", "sam", "eli", "morgan", "taylor"])
+    people[id] = await loadPersona(db, id);
 });
 
 beforeEach(() => as("maya"));
@@ -47,12 +53,17 @@ function as(userId: string) {
   vi.mocked(getViewer).mockResolvedValue(people[userId]!);
 }
 
-type Handler = (request: NextRequest, ctx: { params: Promise<{ templateId: string }> }) => Promise<Response>;
+type Handler = (
+  request: NextRequest,
+  ctx: { params: Promise<{ templateId: string }> },
+) => Promise<Response>;
 
 /** GET /api/templates/{templateId}/{read}{query} through the route's handler. */
 function get(handler: Handler, read: string, templateId: string, query = "") {
   const url = `http://localhost/api/templates/${encodeURIComponent(templateId)}/${read}${query}`;
-  return handler(new NextRequest(url), { params: Promise.resolve({ templateId }) });
+  return handler(new NextRequest(url), {
+    params: Promise.resolve({ templateId }),
+  });
 }
 
 /** The status and body, checking the headers every answer has. */
@@ -60,15 +71,23 @@ async function answer(response: Promise<Response>) {
   const res = await response;
   expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
   expect(res.headers.get("Cache-Control")).toBe("private, no-store");
-  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  return {
+    status: res.status,
+    body: (await res.json()) as Record<string, unknown>,
+  };
 }
 
-const versionOf = (templateId: string, where: { number?: number; state?: "draft" }) =>
+const versionOf = (
+  templateId: string,
+  where: { number?: number; state?: "draft" },
+) =>
   db.query.versions
     .findFirst({
       where: and(
         eq(versions.templateId, templateId),
-        where.number !== undefined ? eq(versions.number, where.number) : undefined,
+        where.number !== undefined
+          ? eq(versions.number, where.number)
+          : undefined,
         where.state ? eq(versions.state, where.state) : undefined,
       ),
     })
@@ -77,10 +96,15 @@ const versionOf = (templateId: string, where: { number?: number; state?: "draft"
 describe("GET /api/templates/[templateId]/compare", () => {
   it("200 with the two versions, older first, for anyone who can see the template", async () => {
     const cashBack = ids["cash-back"]!;
-    const [v1, v2] = [await versionOf(cashBack, { number: 1 }), await versionOf(cashBack, { number: 2 })];
+    const [v1, v2] = [
+      await versionOf(cashBack, { number: 1 }),
+      await versionOf(cashBack, { number: 2 }),
+    ];
     for (const persona of ["maya", "sam"]) {
       as(persona);
-      const { status, body } = await answer(get(compare, "compare", cashBack, `?from=${v1.id}&to=${v2.id}`));
+      const { status, body } = await answer(
+        get(compare, "compare", cashBack, `?from=${v1.id}&to=${v2.id}`),
+      );
       expect(status).toBe(200);
       const side = (v: typeof v1, number: number, state: string) => ({
         id: v.id,
@@ -94,7 +118,12 @@ describe("GET /api/templates/[templateId]/compare", () => {
         smsFooter: null,
         variables: v.variables,
       });
-      expect(body).toEqual({ ok: true, family: "document", from: side(v1, 1, "superseded"), to: side(v2, 2, "active") });
+      expect(body).toEqual({
+        ok: true,
+        family: "document",
+        from: side(v1, 1, "superseded"),
+        to: side(v2, 2, "active"),
+      });
     }
   });
 
@@ -102,13 +131,25 @@ describe("GET /api/templates/[templateId]/compare", () => {
     const alert = ids["payment-due-reminder"]!;
     const v1 = await versionOf(alert, { number: 1 });
     // A draft after it, and a new footer on the Alert content type since v1 was submitted.
-    await db.insert(versions).values({ ...v1, id: "v_payment_draft", number: null, round: null, state: "draft", smsFooter: null });
+    await db.insert(versions).values({
+      ...v1,
+      id: "v_payment_draft",
+      number: null,
+      round: null,
+      state: "draft",
+      smsFooter: null,
+    });
     const { contentTypes } = await import("@/server/db/schema/ucomp");
     const NOW = "Coral: Reply STOP to end.";
-    await db.update(contentTypes).set({ smsFooter: NOW }).where(eq(contentTypes.id, "ct_alert"));
+    await db
+      .update(contentTypes)
+      .set({ smsFooter: NOW })
+      .where(eq(contentTypes.id, "ct_alert"));
     try {
       as("maya");
-      const { body } = await answer(get(compare, "compare", alert, `?from=${v1.id}&to=v_payment_draft`));
+      const { body } = await answer(
+        get(compare, "compare", alert, `?from=${v1.id}&to=v_payment_draft`),
+      );
       expect(body).toMatchObject({
         ok: true,
         family: "message",
@@ -117,24 +158,44 @@ describe("GET /api/templates/[templateId]/compare", () => {
       });
     } finally {
       await db.delete(versions).where(eq(versions.id, "v_payment_draft"));
-      await db.update(contentTypes).set({ smsFooter: "Coral: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
+      await db
+        .update(contentTypes)
+        .set({ smsFooter: "Coral: Reply STOP to opt out, HELP for help." })
+        .where(eq(contentTypes.id, "ct_alert"));
     }
   });
 
   it("the open draft has no number", async () => {
     const fee = ids["annual-fee-waiver"]!;
-    const [v1, draft] = [await versionOf(fee, { number: 1 }), await versionOf(fee, { state: "draft" })];
-    const { body } = await answer(get(compare, "compare", fee, `?from=${v1.id}&to=${draft.id}`));
-    expect(body).toMatchObject({ ok: true, to: { id: draft.id, number: null, round: null, state: "draft" } });
+    const [v1, draft] = [
+      await versionOf(fee, { number: 1 }),
+      await versionOf(fee, { state: "draft" }),
+    ];
+    const { body } = await answer(
+      get(compare, "compare", fee, `?from=${v1.id}&to=${draft.id}`),
+    );
+    expect(body).toMatchObject({
+      ok: true,
+      to: { id: draft.id, number: null, round: null, state: "draft" },
+    });
   });
 
   it("400 when a version is missing or malformed", async () => {
     const cashBack = ids["cash-back"]!;
     const v1 = await versionOf(cashBack, { number: 1 });
-    for (const query of ["", `?from=${v1.id}`, `?from=${v1.id}&to=`, `?from=${v1.id}&to=${"v".repeat(65)}`]) {
+    for (const query of [
+      "",
+      `?from=${v1.id}`,
+      `?from=${v1.id}&to=`,
+      `?from=${v1.id}&to=${"v".repeat(65)}`,
+    ]) {
       expect(await answer(get(compare, "compare", cashBack, query))).toEqual({
         status: 400,
-        body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
+        body: {
+          ok: false,
+          code: "template_unavailable",
+          reason: "This template isn't available.",
+        },
       });
     }
   });
@@ -142,20 +203,50 @@ describe("GET /api/templates/[templateId]/compare", () => {
   it("403 for someone who can't see the template's team", async () => {
     as("morgan");
     const cashBack = ids["cash-back"]!;
-    const [v1, v2] = [await versionOf(cashBack, { number: 1 }), await versionOf(cashBack, { number: 2 })];
-    expect(await answer(get(compare, "compare", cashBack, `?from=${v1.id}&to=${v2.id}`))).toEqual({
+    const [v1, v2] = [
+      await versionOf(cashBack, { number: 1 }),
+      await versionOf(cashBack, { number: 2 }),
+    ];
+    expect(
+      await answer(
+        get(compare, "compare", cashBack, `?from=${v1.id}&to=${v2.id}`),
+      ),
+    ).toEqual({
       status: 403,
-      body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
+      body: {
+        ok: false,
+        code: "template_unavailable",
+        reason: "This template isn't available.",
+      },
     });
   });
 
   it("404 for an unknown template, or a version of another template", async () => {
     const v1 = await versionOf(ids["cash-back"]!, { number: 1 });
     const other = await versionOf(ids["balance-transfer"]!, { number: 2 });
-    expect((await answer(get(compare, "compare", "UC-ZZZZZZ", `?from=${v1.id}&to=${other.id}`))).status).toBe(404);
-    expect(await answer(get(compare, "compare", ids["cash-back"]!, `?from=${v1.id}&to=${other.id}`))).toEqual({
+    expect(
+      (
+        await answer(
+          get(compare, "compare", "UC-ZZZZZZ", `?from=${v1.id}&to=${other.id}`),
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      await answer(
+        get(
+          compare,
+          "compare",
+          ids["cash-back"]!,
+          `?from=${v1.id}&to=${other.id}`,
+        ),
+      ),
+    ).toEqual({
       status: 404,
-      body: { ok: false, code: "version_unavailable", reason: "This version isn't available." },
+      body: {
+        ok: false,
+        code: "version_unavailable",
+        reason: "This version isn't available.",
+      },
     });
   });
 });
@@ -163,17 +254,38 @@ describe("GET /api/templates/[templateId]/compare", () => {
 describe("GET /api/templates/[templateId]/base-version", () => {
   it("200 with the content of the version the draft was started from", async () => {
     const fee = ids["annual-fee-waiver"]!;
-    const [v1, draft] = [await versionOf(fee, { number: 1 }), await versionOf(fee, { state: "draft" })];
-    const { status, body } = await answer(get(baseVersion, "base-version", fee, `?draft=${draft.id}`));
+    const [v1, draft] = [
+      await versionOf(fee, { number: 1 }),
+      await versionOf(fee, { state: "draft" }),
+    ];
+    const { status, body } = await answer(
+      get(baseVersion, "base-version", fee, `?draft=${draft.id}`),
+    );
     expect(status).toBe(200);
-    expect(body).toMatchObject({ ok: true, base: { number: 1, name: v1.name, body: v1.body, variables: v1.variables } });
+    expect(body).toMatchObject({
+      ok: true,
+      base: {
+        number: 1,
+        name: v1.name,
+        body: v1.body,
+        variables: v1.variables,
+      },
+    });
   });
 
   it("400 without the draft's id", async () => {
     for (const query of ["", "?draft=", `?draft=${"v".repeat(65)}`]) {
-      expect(await answer(get(baseVersion, "base-version", ids["annual-fee-waiver"]!, query))).toEqual({
+      expect(
+        await answer(
+          get(baseVersion, "base-version", ids["annual-fee-waiver"]!, query),
+        ),
+      ).toEqual({
         status: 400,
-        body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
+        body: {
+          ok: false,
+          code: "template_unavailable",
+          reason: "This template isn't available.",
+        },
       });
     }
   });
@@ -183,19 +295,37 @@ describe("GET /api/templates/[templateId]/base-version", () => {
     const draft = await versionOf(fee, { state: "draft" });
     for (const persona of ["sam", "eli", "morgan"]) {
       as(persona);
-      const { status, body } = await answer(get(baseVersion, "base-version", fee, `?draft=${draft.id}`));
+      const { status, body } = await answer(
+        get(baseVersion, "base-version", fee, `?draft=${draft.id}`),
+      );
       expect(status, persona).toBe(403);
-      expect(body).toEqual({ ok: false, code: expect.any(String), reason: expect.stringMatching(/\S/) });
+      expect(body).toEqual({
+        ok: false,
+        code: expect.any(String),
+        reason: expect.stringMatching(/\S/),
+      });
     }
   });
 
   it("404 for an unknown template; 409 when the version named isn't an open draft", async () => {
     const fee = ids["annual-fee-waiver"]!;
     const v1 = await versionOf(fee, { number: 1 });
-    expect((await answer(get(baseVersion, "base-version", "UC-ZZZZZZ", `?draft=${v1.id}`))).status).toBe(404);
-    expect(await answer(get(baseVersion, "base-version", fee, `?draft=${v1.id}`))).toEqual({
+    expect(
+      (
+        await answer(
+          get(baseVersion, "base-version", "UC-ZZZZZZ", `?draft=${v1.id}`),
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      await answer(get(baseVersion, "base-version", fee, `?draft=${v1.id}`)),
+    ).toEqual({
       status: 409,
-      body: { ok: false, code: "no_draft_to_revert", reason: "There is no draft to revert." },
+      body: {
+        ok: false,
+        code: "no_draft_to_revert",
+        reason: "There is no draft to revert.",
+      },
     });
   });
 });
@@ -204,49 +334,105 @@ describe("GET /api/templates/[templateId]/submit-summary", () => {
   it("200 with what submit will freeze: the draft's rev and name among it", async () => {
     const fee = ids["annual-fee-waiver"]!;
     const draft = await versionOf(fee, { state: "draft" });
-    const { status, body } = await answer(get(submitSummary, "submit-summary", fee));
+    const { status, body } = await answer(
+      get(submitSummary, "submit-summary", fee),
+    );
     expect(status).toBe(200);
     // v1 was sent back: its draft resubmits as v1, round 2.
-    expect(body).toMatchObject({ ok: true, summary: { templateId: fee, rev: draft.rev, name: draft.name, number: 1, round: 2 } });
+    expect(body).toMatchObject({
+      ok: true,
+      summary: {
+        templateId: fee,
+        rev: draft.rev,
+        name: draft.name,
+        number: 1,
+        round: 2,
+      },
+    });
   });
 
   it("400 for a malformed template id", async () => {
-    expect(await answer(get(submitSummary, "submit-summary", "U".repeat(65)))).toEqual({
+    expect(
+      await answer(get(submitSummary, "submit-summary", "U".repeat(65))),
+    ).toEqual({
       status: 400,
-      body: { ok: false, code: "template_unavailable", reason: "This template isn't available." },
+      body: {
+        ok: false,
+        code: "template_unavailable",
+        reason: "This template isn't available.",
+      },
     });
   });
 
   it("403 for someone who may not submit on the team", async () => {
     as("sam");
-    expect((await answer(get(submitSummary, "submit-summary", ids["annual-fee-waiver"]!))).status).toBe(403);
+    expect(
+      (
+        await answer(
+          get(submitSummary, "submit-summary", ids["annual-fee-waiver"]!),
+        )
+      ).status,
+    ).toBe(403);
   });
 
   it("404 for an unknown template; 409 when the template has no draft", async () => {
-    expect((await answer(get(submitSummary, "submit-summary", "UC-ZZZZZZ"))).status).toBe(404);
-    expect(await answer(get(submitSummary, "submit-summary", ids["cash-back"]!))).toEqual({
+    expect(
+      (await answer(get(submitSummary, "submit-summary", "UC-ZZZZZZ"))).status,
+    ).toBe(404);
+    expect(
+      await answer(get(submitSummary, "submit-summary", ids["cash-back"]!)),
+    ).toEqual({
       status: 409,
-      body: { ok: false, code: "already_in_review", reason: "This version is already in review." },
+      body: {
+        ok: false,
+        code: "already_in_review",
+        reason: "This version is already in review.",
+      },
     });
   });
 });
 
 describe("GET /api/templates/[templateId]/copilot-prompt", () => {
   it("200 with the prompt built from the saved draft", async () => {
-    const { status, body } = await answer(get(copilotPrompt, "copilot-prompt", ids["annual-fee-waiver"]!));
+    const { status, body } = await answer(
+      get(copilotPrompt, "copilot-prompt", ids["annual-fee-waiver"]!),
+    );
     expect(status).toBe(200);
-    expect(body).toMatchObject({ ok: true, prompt: { includesDraft: true, text: expect.stringContaining("Coral Offers") } });
+    expect(body).toMatchObject({
+      ok: true,
+      prompt: {
+        includesDraft: true,
+        text: expect.stringContaining("Coral Offers"),
+      },
+    });
   });
 
   it("400, 403, 404 and 409", async () => {
-    expect((await answer(get(copilotPrompt, "copilot-prompt", "U".repeat(65)))).status).toBe(400);
-    expect((await answer(get(copilotPrompt, "copilot-prompt", "UC-ZZZZZZ"))).status).toBe(404);
-    expect(await answer(get(copilotPrompt, "copilot-prompt", ids["cash-back"]!))).toEqual({
+    expect(
+      (await answer(get(copilotPrompt, "copilot-prompt", "U".repeat(65))))
+        .status,
+    ).toBe(400);
+    expect(
+      (await answer(get(copilotPrompt, "copilot-prompt", "UC-ZZZZZZ"))).status,
+    ).toBe(404);
+    expect(
+      await answer(get(copilotPrompt, "copilot-prompt", ids["cash-back"]!)),
+    ).toEqual({
       status: 409,
-      body: { ok: false, code: "no_draft_to_write", reason: "There is no draft to write." },
+      body: {
+        ok: false,
+        code: "no_draft_to_write",
+        reason: "There is no draft to write.",
+      },
     });
     as("taylor");
-    expect((await answer(get(copilotPrompt, "copilot-prompt", ids["annual-fee-waiver"]!))).status).toBe(403);
+    expect(
+      (
+        await answer(
+          get(copilotPrompt, "copilot-prompt", ids["annual-fee-waiver"]!),
+        )
+      ).status,
+    ).toBe(403);
   });
 });
 
@@ -254,30 +440,59 @@ describe("GET /api/templates/[templateId]/integration", () => {
   it("200 with the Active version's panel, for anyone who can see the template", async () => {
     const transfer = ids["balance-transfer"]!;
     as("sam");
-    const { status, body } = await answer(get(integration, "integration", transfer));
+    const { status, body } = await answer(
+      get(integration, "integration", transfer),
+    );
     expect(status).toBe(200);
     expect(body).toMatchObject({
       ok: true,
-      panel: { active: { number: 2 }, endpoint: { url: `http://localhost:3000/api/v1/templates/${transfer}/render` } },
+      panel: {
+        active: { number: 2 },
+        endpoint: {
+          url: `http://localhost:3000/api/v1/templates/${transfer}/render`,
+        },
+      },
     });
   });
 
   it("400, 403, 404 and 409", async () => {
-    expect((await answer(get(integration, "integration", "U".repeat(65)))).status).toBe(400);
-    expect((await answer(get(integration, "integration", "UC-ZZZZZZ"))).status).toBe(404);
-    expect(await answer(get(integration, "integration", ids["annual-fee-waiver"]!))).toEqual({
+    expect(
+      (await answer(get(integration, "integration", "U".repeat(65)))).status,
+    ).toBe(400);
+    expect(
+      (await answer(get(integration, "integration", "UC-ZZZZZZ"))).status,
+    ).toBe(404);
+    expect(
+      await answer(get(integration, "integration", ids["annual-fee-waiver"]!)),
+    ).toEqual({
       status: 409,
-      body: { ok: false, code: "no_active_version", reason: "This template has no Active version yet." },
+      body: {
+        ok: false,
+        code: "no_active_version",
+        reason: "This template has no Active version yet.",
+      },
     });
     as("morgan");
-    expect((await answer(get(integration, "integration", ids["balance-transfer"]!))).status).toBe(403);
+    expect(
+      (await answer(get(integration, "integration", ids["balance-transfer"]!)))
+        .status,
+    ).toBe(403);
   });
 });
 
 describe("every read", () => {
   it("is a GET handler and nothing else", async () => {
-    for (const route of ["base-version", "compare", "copilot-prompt", "integration", "submit-summary"]) {
-      const exported = (await import(`./${route}/route.ts`)) as Record<string, unknown>;
+    for (const route of [
+      "base-version",
+      "compare",
+      "copilot-prompt",
+      "integration",
+      "submit-summary",
+    ]) {
+      const exported = (await import(`./${route}/route.ts`)) as Record<
+        string,
+        unknown
+      >;
       expect(Object.keys(exported), route).toEqual(["GET"]);
     }
   });

@@ -1,6 +1,12 @@
 import type { Page, Response } from "@playwright/test";
 import { profileButton, switchPersona } from "./helpers/access";
-import { asPersona, expect, hydrated, PERSONA_COOKIE, test } from "./helpers/scenario";
+import {
+  asPersona,
+  expect,
+  hydrated,
+  PERSONA_COOKIE,
+  test,
+} from "./helpers/scenario";
 
 // The ⌘K palette searches on the server, and keeps nothing of one viewer's for the next (handoff review
 // I12, docs/decisions/0024-the-palette-searches-on-the-server.md):
@@ -22,17 +28,30 @@ const CORAL = [
   "Rate Change Heads-up",
   "Rate Change Notice",
 ];
-const DEPOSITS = ["Everyday Checking — Fee Schedule", "High-Yield Savings — Rate Disclosure", "Overdraft Protection — Terms"];
+const DEPOSITS = [
+  "Everyday Checking — Fee Schedule",
+  "High-Yield Savings — Rate Disclosure",
+  "Overdraft Protection — Terms",
+];
 
 const palette = (page: Page) => page.getByRole("dialog", { name: "Search" });
-const option = (page: Page, name: string) => palette(page).getByRole("option", { name: new RegExp(`^${name}`) });
-const group = (page: Page, heading: string) => palette(page).getByRole("group", { name: heading });
+const option = (page: Page, name: string) =>
+  palette(page).getByRole("option", { name: new RegExp(`^${name}`) });
+const group = (page: Page, heading: string) =>
+  palette(page).getByRole("group", { name: heading });
 
 /** The palette route's answer for this space (and search), as the page receives it. */
-function answerFor(page: Page, space: string, query?: string): Promise<Response> {
+function answerFor(
+  page: Page,
+  space: string,
+  query?: string,
+): Promise<Response> {
   return page.waitForResponse((res) => {
     const url = new URL(res.url());
-    return url.pathname === `/api/palette/${space}` && (url.searchParams.get("q") ?? "") === (query ?? "");
+    return (
+      url.pathname === `/api/palette/${space}` &&
+      (url.searchParams.get("q") ?? "") === (query ?? "")
+    );
   });
 }
 
@@ -43,7 +62,11 @@ async function openPalette(page: Page, space: string) {
   const response = await answered;
   expect(response.status()).toBe(200);
   await expect(palette(page).locator("input")).toBeFocused();
-  return (await response.json()) as { viewerId: string; templates: { name: string }[]; recent: { name: string }[] };
+  return (await response.json()) as {
+    viewerId: string;
+    templates: { name: string }[];
+    recent: { name: string }[];
+  };
 }
 
 async function closePalette(page: Page) {
@@ -51,30 +74,46 @@ async function closePalette(page: Page) {
   await expect(palette(page)).toBeHidden();
 }
 
-test("no page carries the catalog, and nothing is asked until the palette opens", async ({ page, request }) => {
+test("no page carries the catalog, and nothing is asked until the palette opens", async ({
+  page,
+  request,
+}) => {
   // Riley sees every team. Card Statements' Library lists that team's templates and no others; before,
   // the top bar's streamed props carried every template Riley can see, on every page.
-  const html = await (await request.get("/card-statements/library", { headers: { Cookie: `${PERSONA_COOKIE}=riley` } })).text();
+  const html = await (
+    await request.get("/card-statements/library", {
+      headers: { Cookie: `${PERSONA_COOKIE}=riley` },
+    })
+  ).text();
   expect(html).toContain("Statement Insert — Paperless Enrollment");
-  for (const name of [...CORAL, ...DEPOSITS]) expect(html, `${name} is not on this page`).not.toContain(name);
+  for (const name of [...CORAL, ...DEPOSITS])
+    expect(html, `${name} is not on this page`).not.toContain(name);
 
   const asked: string[] = [];
   page.on("request", (req) => {
-    if (new URL(req.url()).pathname.startsWith("/api/palette/")) asked.push(req.url());
+    if (new URL(req.url()).pathname.startsWith("/api/palette/"))
+      asked.push(req.url());
   });
   await asPersona(page, "riley");
   await page.goto("/card-statements/library");
   await hydrated(page);
-  await page.getByRole("navigation", { name: "Sidebar" }).getByRole("link", { name: /^Review/ }).click();
+  await page
+    .getByRole("navigation", { name: "Sidebar" })
+    .getByRole("link", { name: /^Review/ })
+    .click();
   await expect(page).toHaveURL(/\/card-statements\/review$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Review" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Review" }),
+  ).toBeVisible();
   expect(asked).toEqual([]);
 
   await openPalette(page, "card-statements");
   expect(asked).toHaveLength(1);
 });
 
-test("typing searches on the server, past the resting first page", async ({ page }) => {
+test("typing searches on the server, past the resting first page", async ({
+  page,
+}) => {
   await asPersona(page, "riley");
   await page.goto("/all/library");
   await hydrated(page);
@@ -86,18 +125,29 @@ test("typing searches on the server, past the resting first page", async ({ page
   const found = answerFor(page, "all", "paperless");
   await page.keyboard.type("paperless");
   const response = await found;
-  expect(((await response.json()) as { templates: { name: string }[] }).templates.map((t) => t.name)).toEqual([
-    "Statement Insert — Paperless Enrollment",
-  ]);
+  expect(
+    (
+      (await response.json()) as { templates: { name: string }[] }
+    ).templates.map((t) => t.name),
+  ).toEqual(["Statement Insert — Paperless Enrollment"]);
   await expect(palette(page).getByRole("option")).toHaveCount(1);
-  await expect(option(page, "Statement Insert — Paperless Enrollment")).toBeVisible();
+  await expect(
+    option(page, "Statement Insert — Paperless Enrollment"),
+  ).toBeVisible();
 
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/all\/templates\/UC-/);
-  await expect(page.getByRole("heading", { level: 1, name: "Statement Insert — Paperless Enrollment" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "Statement Insert — Paperless Enrollment",
+    }),
+  ).toBeVisible();
 });
 
-test("after a persona switch the palette lists the new viewer's templates, none of the last one's", async ({ page }) => {
+test("after a persona switch the palette lists the new viewer's templates, none of the last one's", async ({
+  page,
+}) => {
   // Priya works in Coral Offers and reads Deposits.
   await asPersona(page, "priya");
   await page.goto("/deposits/library");

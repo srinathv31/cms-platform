@@ -25,13 +25,19 @@ async function dropAllTables() {
   const references = new Map<string, Set<string>>();
   for (const name of names) {
     const fks = await libsql.execute(`PRAGMA foreign_key_list("${name}")`);
-    references.set(name, new Set(fks.rows.map((r) => String(r.table)).filter((t) => t !== name)));
+    references.set(
+      name,
+      new Set(fks.rows.map((r) => String(r.table)).filter((t) => t !== name)),
+    );
   }
 
   const remaining = new Set(names);
   while (remaining.size > 0) {
     const free = [...remaining].filter(
-      (name) => ![...remaining].some((other) => other !== name && references.get(other)?.has(name)),
+      (name) =>
+        ![...remaining].some(
+          (other) => other !== name && references.get(other)?.has(name),
+        ),
     );
     // A cycle would leave nothing free; drop whatever is left rather than loop forever.
     for (const name of free.length > 0 ? free : [...remaining]) {

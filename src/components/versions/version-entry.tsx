@@ -13,17 +13,34 @@ import {
 } from "lucide-react";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { StatusBadge } from "@/components/primitives/status-badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { VersionState } from "@/domain/types";
 import { formatShortDate } from "@/domain/dates";
 import { plural } from "@/domain/plural";
-import { reviewHistoryLabel, reviewHistoryName, reviewPath, roundLabel, versionLabel } from "@/domain/rounds";
+import {
+  reviewHistoryLabel,
+  reviewHistoryName,
+  reviewPath,
+  roundLabel,
+  versionLabel,
+} from "@/domain/rounds";
 import { formatLastRender } from "@/components/usage/format";
-import type { RoundHistoryItem, VersionTimelineItem } from "@/server/queries/versions";
+import type {
+  RoundHistoryItem,
+  VersionTimelineItem,
+} from "@/server/queries/versions";
 import { entryHeadingId } from "./entry-ids";
 import { codeSegments } from "./format";
-import { EntryActions, RevokeBlockActions, type VersionContext } from "./version-actions";
+import {
+  EntryActions,
+  RevokeBlockActions,
+  type VersionContext,
+} from "./version-actions";
 
 // One version on the timeline (a server component): the dates and sentences are made here, every
 // absolute date in UTC (`@/domain/dates`), and the only client parts are the action islands and the
@@ -64,7 +81,10 @@ function Line({ text }: { text: string }) {
     <>
       {codeSegments(text).map((part, i) =>
         part.code ? (
-          <code key={i} className="rounded-md bg-surface-tinted px-1.5 py-px font-mono text-[12.5px] text-text">
+          <code
+            key={i}
+            className="rounded-md bg-surface-tinted px-1.5 py-px font-mono text-[12.5px] text-text"
+          >
             {part.text}
           </code>
         ) : (
@@ -76,22 +96,41 @@ function Line({ text }: { text: string }) {
 }
 
 /** A row of the entry's facts. A breaking change carries the warning tokens, as it does in the submit dialog. */
-function Fact({ icon: Icon, tone, children }: { icon: LucideIcon; tone?: "positive" | "warning"; children: React.ReactNode }) {
+function Fact({
+  icon: Icon,
+  tone,
+  children,
+}: {
+  icon: LucideIcon;
+  tone?: "positive" | "warning";
+  children: React.ReactNode;
+}) {
   return (
     <li
       className={cn(
         "flex gap-2.5 text-[14px] leading-6",
         // The tint reaches left past the icon by the padding; the icon and the text keep their column.
-        tone === "warning" ? "-ml-2 rounded-md bg-warning-soft px-2 text-warning-text" : "text-text",
+        tone === "warning"
+          ? "-ml-2 rounded-md bg-warning-soft px-2 text-warning-text"
+          : "text-text",
       )}
     >
       <Icon
         aria-hidden
         strokeWidth={tone === "warning" ? 2 : 1.75}
-        className={cn("mt-1 size-4 shrink-0", tone === "positive" ? "text-positive" : tone === "warning" ? "text-warning-text" : "text-text-subtle")}
+        className={cn(
+          "mt-1 size-4 shrink-0",
+          tone === "positive"
+            ? "text-positive"
+            : tone === "warning"
+              ? "text-warning-text"
+              : "text-text-subtle",
+        )}
       />
       <span className="min-w-0 break-words">
-        {tone === "warning" ? <span className="sr-only">Breaking: </span> : null}
+        {tone === "warning" ? (
+          <span className="sr-only">Breaking: </span>
+        ) : null}
         {children}
       </span>
     </li>
@@ -103,7 +142,9 @@ function Quoted({ children }: { children: string }) {
   return <span className="whitespace-pre-line">&ldquo;{children}&rdquo;</span>;
 }
 
-const name = (who: string) => <span className="font-medium text-text">{who}</span>;
+const name = (who: string) => (
+  <span className="font-medium text-text">{who}</span>
+);
 
 /** What closed a round, or that it is still in review: one line, the reason quoted. */
 function RoundDecision({ round, now }: { round: RoundHistoryItem; now: Date }) {
@@ -111,7 +152,8 @@ function RoundDecision({ round, now }: { round: RoundHistoryItem; now: Date }) {
   if (!d) {
     return round.submittedAt ? (
       <>
-        Submitted by {name(round.submittedBy.name)} on {formatShortDate(round.submittedAt, now)}
+        Submitted by {name(round.submittedBy.name)} on{" "}
+        {formatShortDate(round.submittedAt, now)}
       </>
     ) : null;
   }
@@ -184,7 +226,10 @@ function ReviewHistory({
                 <Link
                   href={reviewPath(space, templateId, shown) as Route}
                   // "Round 3" on screen; "v2, round 3" for a screen reader, which lists links out of their rows.
-                  aria-label={versionLabel(shown, { style: "sentence", history: true })}
+                  aria-label={versionLabel(shown, {
+                    style: "sentence",
+                    history: true,
+                  })}
                   className="w-fit rounded-sm font-medium whitespace-nowrap text-text underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {roundLabel(round.round)}
@@ -207,12 +252,18 @@ function ReviewHistory({
 /** The key dates of the version, in the order they happened. */
 function keyDates(item: VersionTimelineItem, now: Date): string[] {
   const dates: string[] = [];
-  if (item.state === "draft") return [`Started ${formatShortDate(item.createdAt, now)}`];
-  if (item.submittedAt) dates.push(`Submitted ${formatShortDate(item.submittedAt, now)}`);
-  if (item.activatedAt) dates.push(`Activated ${formatShortDate(item.activatedAt, now)}`);
-  if (item.supersededAt) dates.push(`Superseded ${formatShortDate(item.supersededAt, now)}`);
-  if (item.sunsetDay && item.sunsetPassed) dates.push(`Sunset passed ${formatShortDate(item.sunsetDay, now)}`);
-  if (item.revoke?.confirmedAt) dates.push(`Revoked ${formatShortDate(item.revoke.confirmedAt, now)}`);
+  if (item.state === "draft")
+    return [`Started ${formatShortDate(item.createdAt, now)}`];
+  if (item.submittedAt)
+    dates.push(`Submitted ${formatShortDate(item.submittedAt, now)}`);
+  if (item.activatedAt)
+    dates.push(`Activated ${formatShortDate(item.activatedAt, now)}`);
+  if (item.supersededAt)
+    dates.push(`Superseded ${formatShortDate(item.supersededAt, now)}`);
+  if (item.sunsetDay && item.sunsetPassed)
+    dates.push(`Sunset passed ${formatShortDate(item.sunsetDay, now)}`);
+  if (item.revoke?.confirmedAt)
+    dates.push(`Revoked ${formatShortDate(item.revoke.confirmedAt, now)}`);
   return dates;
 }
 
@@ -232,12 +283,25 @@ export function VersionEntry({
 }) {
   const headingId = entryHeadingId(item.id);
   const dates = keyDates(item, now);
-  const rendersForConsumers = item.state === "active" || item.state === "superseded" || item.state === "revoked";
+  const rendersForConsumers =
+    item.state === "active" ||
+    item.state === "superseded" ||
+    item.state === "revoked";
   const revoke = item.revoke;
   const revokePending = !!revoke && !revoke.confirmedAt;
-  const status = <StatusBadge state={item.state} sunsetDay={item.sunsetDay} sunsetPassed={item.sunsetPassed} now={now} />;
+  const status = (
+    <StatusBadge
+      state={item.state}
+      sunsetDay={item.sunsetDay}
+      sunsetPassed={item.sunsetPassed}
+      now={now}
+    />
+  );
   // Breaking changes first, then the rest, each group in the diff's order (as in the submit dialog).
-  const contract = [...item.contractItems.filter((c) => c.breaking), ...item.contractItems.filter((c) => !c.breaking)];
+  const contract = [
+    ...item.contractItems.filter((c) => c.breaking),
+    ...item.contractItems.filter((c) => !c.breaking),
+  ];
 
   return (
     <li
@@ -253,7 +317,11 @@ export function VersionEntry({
       <div className={ENTRY_GEOMETRY.head}>
         {item.number === null ? (
           // The open draft has no number to call it by: its badge is its name, so it isn't said twice.
-          <h2 id={headingId} tabIndex={-1} className={cn(ENTRY_GEOMETRY.heading, "flex h-7 items-center")}>
+          <h2
+            id={headingId}
+            tabIndex={-1}
+            className={cn(ENTRY_GEOMETRY.heading, "flex h-7 items-center")}
+          >
             {status}
           </h2>
         ) : (
@@ -263,7 +331,10 @@ export function VersionEntry({
             </h2>
             {status}
             {item.approvedOnRound ? (
-              <span data-slot="approved-on-round" className="text-[13px] leading-5 text-text-muted">
+              <span
+                data-slot="approved-on-round"
+                className="text-[13px] leading-5 text-text-muted"
+              >
                 {item.approvedOnRound}
               </span>
             ) : null}
@@ -276,10 +347,15 @@ export function VersionEntry({
           inside a clip: an item that starts a line has its separator clipped, so no line begins with "·". */}
       <div className="mt-0.5 overflow-hidden">
         <p className="-ml-4 flex flex-wrap text-[13px] leading-5 text-text-muted">
-          <span className="pl-4 font-medium whitespace-nowrap text-text">{item.author.name}</span>
+          <span className="pl-4 font-medium whitespace-nowrap text-text">
+            {item.author.name}
+          </span>
           {dates.map((date) => (
             <span key={date} className="relative pl-4 whitespace-nowrap">
-              <span aria-hidden className="absolute left-[6px] text-text-subtle">
+              <span
+                aria-hidden
+                className="absolute left-[6px] text-text-subtle"
+              >
                 ·
               </span>
               {date}
@@ -288,7 +364,10 @@ export function VersionEntry({
         </p>
       </div>
 
-      {item.submitNote || contract.length > 0 || item.decisions.length > 0 || rendersForConsumers ? (
+      {item.submitNote ||
+      contract.length > 0 ||
+      item.decisions.length > 0 ||
+      rendersForConsumers ? (
         <ul className="mt-3 flex flex-col gap-1.5">
           {item.submitNote ? (
             <Fact icon={MessageSquareText}>
@@ -303,7 +382,10 @@ export function VersionEntry({
                   <BreakingBadge />
                 </li>
               ) : null}
-              <Fact icon={line.breaking ? TriangleAlert : Braces} tone={line.breaking ? "warning" : undefined}>
+              <Fact
+                icon={line.breaking ? TriangleAlert : Braces}
+                tone={line.breaking ? "warning" : undefined}
+              >
                 <Line text={line.text} />
               </Fact>
             </Fragment>
@@ -315,7 +397,8 @@ export function VersionEntry({
               </Fact>
             ) : (
               <Fact key={`${d.at}-${d.by.id}`} icon={CornerUpLeft}>
-                {name(d.by.name)} requested changes on {formatShortDate(d.at, now)}
+                {name(d.by.name)} requested changes on{" "}
+                {formatShortDate(d.at, now)}
                 {d.reason ? (
                   <>
                     : <Quoted>{d.reason}</Quoted>
@@ -330,7 +413,9 @@ export function VersionEntry({
             <Fact icon={Activity}>
               {item.lastRenderAt
                 ? `Last render ${formatLastRender(item.lastRenderAt, now)}. ${
-                    item.renders30d > 0 ? `${plural(item.renders30d, "render")} in the last 30 days.` : "No renders in the last 30 days."
+                    item.renders30d > 0
+                      ? `${plural(item.renders30d, "render")} in the last 30 days.`
+                      : "No renders in the last 30 days."
                   }`
                 : "No renders yet."}
             </Fact>
@@ -347,18 +432,27 @@ export function VersionEntry({
           {revokePending ? (
             <>
               <p>
-                Revoke started by <span className="font-medium">{revoke.startedBy.name}</span>: <Quoted>{revoke.reason}</Quoted>
+                Revoke started by{" "}
+                <span className="font-medium">{revoke.startedBy.name}</span>:{" "}
+                <Quoted>{revoke.reason}</Quoted>
               </p>
               <RevokeBlockActions ctx={ctx} item={item} />
             </>
           ) : (
             <>
               <p>
-                Revoked {revoke.confirmedAt ? formatShortDate(revoke.confirmedAt, now) : ""}: <Quoted>{revoke.reason}</Quoted>
+                Revoked{" "}
+                {revoke.confirmedAt
+                  ? formatShortDate(revoke.confirmedAt, now)
+                  : ""}
+                : <Quoted>{revoke.reason}</Quoted>
               </p>
               <p className="mt-0.5 text-[13px] leading-5 opacity-80">
                 Started by {revoke.startedBy.name}
-                {revoke.confirmedBy ? `, confirmed by ${revoke.confirmedBy.name}` : ""}.
+                {revoke.confirmedBy
+                  ? `, confirmed by ${revoke.confirmedBy.name}`
+                  : ""}
+                .
               </p>
             </>
           )}
@@ -366,7 +460,13 @@ export function VersionEntry({
       ) : null}
 
       {item.rounds && item.number !== null ? (
-        <ReviewHistory number={item.number} rounds={item.rounds} space={space} templateId={ctx.templateId} now={now} />
+        <ReviewHistory
+          number={item.number}
+          rounds={item.rounds}
+          space={space}
+          templateId={ctx.templateId}
+          now={now}
+        />
       ) : null}
     </li>
   );

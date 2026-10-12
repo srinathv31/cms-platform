@@ -16,7 +16,10 @@ export function viewDom(editor: Editor): HTMLElement | null {
  * Calls `attach(dom)` whenever the editor's view is mounted (now, or when it mounts later), and the
  * cleanup it returns when the view goes away (unmount, destroy) or the component unmounts.
  */
-export function useViewDom(editor: Editor, attach: (dom: HTMLElement) => void | (() => void)) {
+export function useViewDom(
+  editor: Editor,
+  attach: (dom: HTMLElement) => void | (() => void),
+) {
   const attachRef = useRef(attach);
   useLayoutEffect(() => {
     attachRef.current = attach;

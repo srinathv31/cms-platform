@@ -1,5 +1,9 @@
 import "server-only";
-import { renderMessage, type MessageInput, type MessageResult } from "@/domain/render/message";
+import {
+  renderMessage,
+  type MessageInput,
+  type MessageResult,
+} from "@/domain/render/message";
 import type { SmsRender } from "@/domain/render/types";
 
 // The SMS channel's adapter: the domain's `renderMessage`, the same function the composer's preview

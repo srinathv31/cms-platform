@@ -9,5 +9,7 @@ import { simReadResponse } from "@/simulator/read-response";
 
 export async function GET(request: Request) {
   await connection();
-  return simReadResponse(await searchSimTemplates(new URL(request.url).searchParams.get("q")));
+  return simReadResponse(
+    await searchSimTemplates(new URL(request.url).searchParams.get("q")),
+  );
 }

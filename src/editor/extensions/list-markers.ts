@@ -33,10 +33,16 @@ import {
 export const LIST_MARKER_ATTR = "data-list-marker";
 
 /** An ordered list's style as stored: null where the attribute is absent, null or not a known value. */
-export function storedNumbering(list: PMNode): { format: NumberingStyle["format"] | null; delimiter: NumberingStyle["delimiter"] | null } {
+export function storedNumbering(list: PMNode): {
+  format: NumberingStyle["format"] | null;
+  delimiter: NumberingStyle["delimiter"] | null;
+} {
   const format = list.attrs[ORDERED_LIST_ATTRS.format] as unknown;
   const delimiter = list.attrs[ORDERED_LIST_ATTRS.delimiter] as unknown;
-  return { format: isMarkerFormat(format) ? format : null, delimiter: isMarkerDelimiter(delimiter) ? delimiter : null };
+  return {
+    format: isMarkerFormat(format) ? format : null,
+    delimiter: isMarkerDelimiter(delimiter) ? delimiter : null,
+  };
 }
 
 /**
@@ -46,14 +52,20 @@ export function storedNumbering(list: PMNode): { format: NumberingStyle["format"
  */
 export function listStart(list: PMNode): number {
   const start = list.attrs.start as unknown;
-  return typeof start === "number" && Number.isSafeInteger(start) && start >= 0 && start <= 2 ** 52 ? start : 1;
+  return typeof start === "number" &&
+    Number.isSafeInteger(start) &&
+    start >= 0 &&
+    start <= 2 ** 52
+    ? start
+    : 1;
 }
 
 /** Number of orderedList nodes among the ancestors of the node at `pos` (its ordered depth). */
 export function orderedDepthAt(doc: PMNode, pos: number): number {
   const $pos = doc.resolve(pos);
   let depth = 0;
-  for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type.name === "orderedList") depth++;
+  for (let d = $pos.depth; d > 0; d--)
+    if ($pos.node(d).type.name === "orderedList") depth++;
   return depth;
 }
 
@@ -76,10 +88,18 @@ export interface ListItemMarker {
  * `status` (the redline), new-version numbers skip removed items, and a removed item gets the number
  * it had (counting the items that weren't added).
  */
-export function listItemMarkers(doc: PMNode, status?: (item: PMNode) => ListItemStatus): ListItemMarker[] {
+export function listItemMarkers(
+  doc: PMNode,
+  status?: (item: PMNode) => ListItemStatus,
+): ListItemMarker[] {
   const out: ListItemMarker[] = [];
 
-  const visit = (parent: PMNode, contentStart: number, ordered: number, bullet: number) => {
+  const visit = (
+    parent: PMNode,
+    contentStart: number,
+    ordered: number,
+    bullet: number,
+  ) => {
     parent.forEach((child, offset) => {
       const pos = contentStart + offset;
       const name = child.type.name;
@@ -92,7 +112,13 @@ export function listItemMarkers(doc: PMNode, status?: (item: PMNode) => ListItem
     });
   };
 
-  const list = (node: PMNode, pos: number, isOrdered: boolean, ordered: number, bullet: number) => {
+  const list = (
+    node: PMNode,
+    pos: number,
+    isOrdered: boolean,
+    ordered: number,
+    bullet: number,
+  ) => {
     let style: NumberingStyle | null = null;
     let start = 1;
     if (isOrdered) {
@@ -114,7 +140,12 @@ export function listItemMarkers(doc: PMNode, status?: (item: PMNode) => ListItem
         marker = formatMarker(start + index, style.format, style.delimiter);
       }
       out.push({ pos: itemPos, node: item, marker });
-      visit(item, itemPos + 1, isOrdered ? ordered + 1 : ordered, isOrdered ? bullet : bullet + 1);
+      visit(
+        item,
+        itemPos + 1,
+        isOrdered ? ordered + 1 : ordered,
+        isOrdered ? bullet : bullet + 1,
+      );
     });
   };
 
@@ -131,7 +162,9 @@ function markerDecorations(doc: PMNode): DecorationSet {
   if (found.length === 0) return DecorationSet.empty;
   return DecorationSet.create(
     doc,
-    found.map(({ pos, node, marker }) => Decoration.node(pos, pos + node.nodeSize, { [LIST_MARKER_ATTR]: marker })),
+    found.map(({ pos, node, marker }) =>
+      Decoration.node(pos, pos + node.nodeSize, { [LIST_MARKER_ATTR]: marker }),
+    ),
   );
 }
 
@@ -141,7 +174,8 @@ function inlineOnly(tr: Transaction): boolean {
     if (!(step instanceof ReplaceStep)) return false;
     const doc = tr.docs[i]!;
     const $from = doc.resolve(step.from);
-    if (!$from.parent.isTextblock || !$from.sameParent(doc.resolve(step.to))) return false;
+    if (!$from.parent.isTextblock || !$from.sameParent(doc.resolve(step.to)))
+      return false;
     let blocks = false;
     step.slice.content.forEach((node) => {
       if (!node.isInline) blocks = true;
@@ -162,7 +196,9 @@ export const ListMarkers = Extension.create({
           init: (_config, state) => markerDecorations(state.doc),
           apply: (tr, previous, _oldState, state) => {
             if (!tr.docChanged) return previous;
-            return inlineOnly(tr) ? previous.map(tr.mapping, tr.doc) : markerDecorations(state.doc);
+            return inlineOnly(tr)
+              ? previous.map(tr.mapping, tr.doc)
+              : markerDecorations(state.doc);
           },
         },
         props: {
@@ -208,10 +244,14 @@ export function listMarkerAttrs(): Extension {
  * The document with every list item's marker set, for the static renderer. `doc`'s schema must
  * include `listMarkerAttrs()`. `status` is the redline's (see listItemMarkers).
  */
-export function withListMarkers(doc: PMNode, status?: (item: PMNode) => ListItemStatus): PMNode {
+export function withListMarkers(
+  doc: PMNode,
+  status?: (item: PMNode) => ListItemStatus,
+): PMNode {
   const found = listItemMarkers(doc, status);
   if (found.length === 0) return doc;
   const tr = new Transform(doc);
-  for (const { pos, marker } of found) tr.setNodeAttribute(pos, STATIC_ATTR, marker);
+  for (const { pos, marker } of found)
+    tr.setNodeAttribute(pos, STATIC_ATTR, marker);
   return tr.doc;
 }

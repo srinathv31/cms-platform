@@ -3,7 +3,11 @@
 
 import type { JSONContent } from "@/editor/model/types";
 import { plural } from "@/domain/plural";
-import type { RedlineBlock, RedlineDoc, RedlineStatus } from "@/domain/review-types";
+import type {
+  RedlineBlock,
+  RedlineDoc,
+  RedlineStatus,
+} from "@/domain/review-types";
 
 /**
  * What the document paints, in reading order:
@@ -20,7 +24,10 @@ export type RedlineItem =
   | { type: "gap"; count: number; hidden: string[] };
 
 /** The words of a node, for a heading's caption. A chip reads as its label. */
-export function plainText(node: JSONContent, labels?: ReadonlyMap<string, string>): string {
+export function plainText(
+  node: JSONContent,
+  labels?: ReadonlyMap<string, string>,
+): string {
   if (node.type === "text") return node.text ?? "";
   if (node.type === "variable") {
     const key = String(node.attrs?.key ?? "");
@@ -50,7 +57,8 @@ export function groupBlocks(
   labels?: ReadonlyMap<string, string>,
   reveal: string | null = null,
 ): RedlineItem[] {
-  if (!changesOnly) return doc.blocks.map((block) => ({ type: "block", block }));
+  if (!changesOnly)
+    return doc.blocks.map((block) => ({ type: "block", block }));
 
   const items: RedlineItem[] = [];
   let run: string[] = [];
@@ -104,7 +112,8 @@ export function groupBlocks(
   drop();
   // Headings after the last thing painted ride on it.
   const last = items[items.length - 1];
-  if (dropped.length > 0 && last) last.hidden = [...(last.hidden ?? []), ...dropped];
+  if (dropped.length > 0 && last)
+    last.hidden = [...(last.hidden ?? []), ...dropped];
   return items;
 }
 
@@ -124,7 +133,9 @@ export function isCollapsedKey(key: string): boolean {
 }
 
 /** Every hidden block, to the key of the item it is collapsed into (Changes only). */
-export function collapsedHosts(items: readonly RedlineItem[]): Map<string, string> {
+export function collapsedHosts(
+  items: readonly RedlineItem[],
+): Map<string, string> {
   const hosts = new Map<string, string>();
   for (const item of items) {
     const key = hostKey(item);
@@ -139,7 +150,10 @@ export function gapLabel(count: number): string {
 }
 
 /** What assistive technology hears for a block that isn't unchanged. */
-export const BLOCK_LABEL: Record<Exclude<RedlineStatus, "unchanged">, string> = {
+export const BLOCK_LABEL: Record<
+  Exclude<RedlineStatus, "unchanged">,
+  string
+> = {
   added: "Added block",
   removed: "Removed block",
   changed: "Changed block",
@@ -147,7 +161,9 @@ export const BLOCK_LABEL: Record<Exclude<RedlineStatus, "unchanged">, string> = 
 };
 
 /** The block's layout kind: the editor's block rhythm depends on headings and dividers (see redline.css). */
-export function blockKind(node: JSONContent): "h1" | "h2" | "h3" | "hr" | "block" {
+export function blockKind(
+  node: JSONContent,
+): "h1" | "h2" | "h3" | "hr" | "block" {
   if (node.type === "heading") {
     const level = Number(node.attrs?.level);
     return level === 1 ? "h1" : level === 3 ? "h3" : "h2";
@@ -186,7 +202,11 @@ const DELETE_MARK = { type: "redline", attrs: { op: "delete" } } as const;
 export function markAllDeleted(node: JSONContent): JSONContent {
   if (node.type === "text" || node.type === "variable") {
     const marks = node.marks ?? [];
-    return marks.some((m) => m.type === "redline") ? node : { ...node, marks: [...marks, DELETE_MARK] };
+    return marks.some((m) => m.type === "redline")
+      ? node
+      : { ...node, marks: [...marks, DELETE_MARK] };
   }
-  return node.content ? { ...node, content: node.content.map(markAllDeleted) } : node;
+  return node.content
+    ? { ...node, content: node.content.map(markAllDeleted) }
+    : node;
 }

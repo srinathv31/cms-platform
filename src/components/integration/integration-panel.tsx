@@ -3,7 +3,11 @@
 import { ChevronRight } from "lucide-react";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { TemplateId } from "@/components/primitives/template-id";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IntegrationPanelData } from "@/domain/golive-types";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
@@ -64,7 +68,15 @@ export function IntegrationIdentity({
   );
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+function Section({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
       <div className="flex min-h-8 items-center">
@@ -109,10 +121,19 @@ export function IntegrationBody({ panel }: { panel: IntegrationPanelData }) {
       </Section>
 
       <Section id="integration-responses" title="Responses">
-        <Responses responses={panel.responses} errors={panel.errors} channels={panel.active.channels} />
+        <Responses
+          responses={panel.responses}
+          errors={panel.errors}
+          channels={panel.active.channels}
+        />
       </Section>
 
-      {panel.since.length > 0 ? <ContractChanges since={panel.since} activeNumber={panel.active.number} /> : null}
+      {panel.since.length > 0 ? (
+        <ContractChanges
+          since={panel.since}
+          activeNumber={panel.active.number}
+        />
+      ) : null}
     </>
   );
 }

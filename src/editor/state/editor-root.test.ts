@@ -8,27 +8,62 @@ import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import type { SuggestionProps } from "@tiptap/suggestion";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { VARIABLE_DRAG_TYPE } from "../extensions/field-binding";
-import type { PickerItem, VariablePickerRender } from "../extensions/variable-picker";
+import type {
+  PickerItem,
+  VariablePickerRender,
+} from "../extensions/variable-picker";
 import type { Variable } from "../model/types";
 import { editorExtensions, inlineFieldExtensions } from "../schema";
 import { createChipPopoverStore } from "./chip-popover";
 import { createEditorRootRuntime, type EditorRootRuntime } from "./editor-root";
 
 const VARIABLES: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "purchase_apr",
+    label: "Purchase APR",
+    type: "percent",
+    required: true,
+    sample: "21.99",
+  },
 ];
 
 const text = (value: string): JSONContent => ({ type: "text", text: value });
-const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
+const chip = (key: string): JSONContent => ({
+  type: "variable",
+  attrs: { key },
+});
 
 const DOC: JSONContent = {
   type: "doc",
   content: [
     { type: "paragraph", content: [text("Intro")] },
-    { type: "heading", attrs: { level: 2, requiredKey: "offer_details" }, content: [text("Offer details")] },
-    { type: "paragraph", content: [text("Hi "), chip("first_name"), text(", your APR is "), chip("purchase_apr"), text(".")] },
-    { type: "heading", attrs: { level: 2, requiredKey: "legal_notices" }, content: [text("Legal notices")] },
+    {
+      type: "heading",
+      attrs: { level: 2, requiredKey: "offer_details" },
+      content: [text("Offer details")],
+    },
+    {
+      type: "paragraph",
+      content: [
+        text("Hi "),
+        chip("first_name"),
+        text(", your APR is "),
+        chip("purchase_apr"),
+        text("."),
+      ],
+    },
+    {
+      type: "heading",
+      attrs: { level: 2, requiredKey: "legal_notices" },
+      content: [text("Legal notices")],
+    },
     { type: "paragraph", content: [text("Thanks "), chip("first_name")] },
   ],
 };
@@ -58,7 +93,12 @@ function setup(content: JSONContent = DOC, variables = VARIABLES): Setup {
     extensions: editorExtensions({
       store: root.variables,
       pickerRender,
-      binding: { fieldId: "body", kind: "body", root, chip: createChipPopoverStore() },
+      binding: {
+        fieldId: "body",
+        kind: "body",
+        root,
+        chip: createChipPopoverStore(),
+      },
     }),
     content,
   });
@@ -89,7 +129,8 @@ function after(editor: Editor, index: number, needle: string): number {
   for (let i = 0; i < index; i++) start += editor.state.doc.child(i).nodeSize;
   let found = -1;
   editor.state.doc.child(index).forEach((node, offset) => {
-    if (found < 0 && node.isText && node.text!.includes(needle)) found = start + offset + node.text!.indexOf(needle) + needle.length;
+    if (found < 0 && node.isText && node.text!.includes(needle))
+      found = start + offset + node.text!.indexOf(needle) + needle.length;
   });
   if (found < 0) throw new Error(`"${needle}" not found`);
   return found;
@@ -109,10 +150,17 @@ describe("usage through the root", () => {
       ],
     });
     const apr = root.usage.getState().byKey.get("purchase_apr");
-    editor.commands.insertContentAt(after(editor, 0, "Intro"), [text(" "), chip("first_name")]);
+    editor.commands.insertContentAt(after(editor, 0, "Intro"), [
+      text(" "),
+      chip("first_name"),
+    ]);
     root.flushUsage();
     expect(root.usage.getState().byKey.get("first_name")?.count).toBe(3);
-    expect(root.usage.getState().byKey.get("first_name")?.places[0]).toEqual({ field: "Document", section: null, count: 1 });
+    expect(root.usage.getState().byKey.get("first_name")?.places[0]).toEqual({
+      field: "Document",
+      section: null,
+      count: 1,
+    });
     // A row whose numbers didn't change keeps its object (its subscribers don't re-render).
     expect(root.usage.getState().byKey.get("purchase_apr")).toBe(apr);
   });
@@ -122,19 +170,33 @@ describe("chip insertion", () => {
   it("click-to-insert goes to the first required section before any field had focus", () => {
     const { root, editor } = setup();
     expect(root.insertVariable("purchase_apr")).toBe(true);
-    expect(line(editor, 2)).toBe("{{purchase_apr}} Hi {{first_name}}, your APR is {{purchase_apr}}.");
+    expect(line(editor, 2)).toBe(
+      "{{purchase_apr}} Hi {{first_name}}, your APR is {{purchase_apr}}.",
+    );
     editor.commands.undo();
-    expect(line(editor, 2)).toBe("Hi {{first_name}}, your APR is {{purchase_apr}}.");
+    expect(line(editor, 2)).toBe(
+      "Hi {{first_name}}, your APR is {{purchase_apr}}.",
+    );
     editor.commands.redo();
-    expect(line(editor, 2)).toBe("{{purchase_apr}} Hi {{first_name}}, your APR is {{purchase_apr}}.");
+    expect(line(editor, 2)).toBe(
+      "{{purchase_apr}} Hi {{first_name}}, your APR is {{purchase_apr}}.",
+    );
   });
 
   it("adds a body line under a required heading that has none, in the same undo step", () => {
     const blank: JSONContent = {
       type: "doc",
       content: [
-        { type: "heading", attrs: { level: 2, requiredKey: "offer_details" }, content: [text("Offer details")] },
-        { type: "heading", attrs: { level: 2, requiredKey: "legal_notices" }, content: [text("Legal notices")] },
+        {
+          type: "heading",
+          attrs: { level: 2, requiredKey: "offer_details" },
+          content: [text("Offer details")],
+        },
+        {
+          type: "heading",
+          attrs: { level: 2, requiredKey: "legal_notices" },
+          content: [text("Legal notices")],
+        },
       ],
     };
     const { root, editor } = setup(blank);
@@ -188,7 +250,12 @@ describe("chip insertion", () => {
     insertAt(1 + "Hi, Ma".length); // inside a word
     expect(line(editor, 0)).toBe("Hi, Ma {{first_name}} ya.");
     // The caret sits right after the chip, before its trailing space.
-    expect(editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.from + 3)).toBe(" ya");
+    expect(
+      editor.state.doc.textBetween(
+        editor.state.selection.from,
+        editor.state.selection.from + 3,
+      ),
+    ).toBe(" ya");
     editor.commands.undo();
     insertAt(1 + "Hi, Maya.".length); // line end
     expect(line(editor, 0)).toBe("Hi, Maya.{{first_name}}");
@@ -198,24 +265,48 @@ describe("chip insertion", () => {
     const { root, editor } = setup();
     root.noteFocus("body");
     const pos = after(editor, 2, "Hi ");
-    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)),
+    );
     root.insertVariable("purchase_apr");
-    expect(line(editor, 2)).toBe("Hi {{first_name}} {{purchase_apr}}, your APR is {{purchase_apr}}.");
+    expect(line(editor, 2)).toBe(
+      "Hi {{first_name}} {{purchase_apr}}, your APR is {{purchase_apr}}.",
+    );
   });
 
   /** A drop on the document, as the browser sends it, carrying `data` and landing at `pos`. */
-  function drop(editor: Editor, data: Record<string, string>, pos: number | null): DragEvent {
+  function drop(
+    editor: Editor,
+    data: Record<string, string>,
+    pos: number | null,
+  ): DragEvent {
     editor.view.posAtCoords = () => (pos === null ? null : { pos, inside: -1 });
-    const event = new Event("drop", { bubbles: true, cancelable: true }) as DragEvent;
-    const dataTransfer = { getData: (type: string) => data[type] ?? "", types: Object.keys(data), effectAllowed: "copy", files: [] };
-    Object.defineProperties(event, { dataTransfer: { value: dataTransfer }, clientX: { value: 0 }, clientY: { value: 0 } });
+    const event = new Event("drop", {
+      bubbles: true,
+      cancelable: true,
+    }) as DragEvent;
+    const dataTransfer = {
+      getData: (type: string) => data[type] ?? "",
+      types: Object.keys(data),
+      effectAllowed: "copy",
+      files: [],
+    };
+    Object.defineProperties(event, {
+      dataTransfer: { value: dataTransfer },
+      clientX: { value: 0 },
+      clientY: { value: 0 },
+    });
     editor.view.dom.dispatchEvent(event);
     return event;
   }
 
   it("drop: a panel row's key lands where it's dropped, as one undo step", () => {
     const { editor } = setup();
-    const event = drop(editor, { [VARIABLE_DRAG_TYPE]: "purchase_apr" }, after(editor, 0, "Intro"));
+    const event = drop(
+      editor,
+      { [VARIABLE_DRAG_TYPE]: "purchase_apr" },
+      after(editor, 0, "Intro"),
+    );
     expect(event.defaultPrevented).toBe(true);
     expect(line(editor, 0)).toBe("Intro {{purchase_apr}}");
     editor.commands.undo();
@@ -240,7 +331,11 @@ describe("chip insertion", () => {
     await flush();
     expect(picker.props?.query).toBe("pur");
     const items = picker.props!.items;
-    expect(items.map((i) => (i.kind === "variable" ? i.variable.key : `create:${i.label}`))).toEqual(["purchase_apr", "create:pur"]);
+    expect(
+      items.map((i) =>
+        i.kind === "variable" ? i.variable.key : `create:${i.label}`,
+      ),
+    ).toEqual(["purchase_apr", "create:pur"]);
     picker.props!.command(items[0]);
     expect(line(editor, 0)).toBe("Intro {{purchase_apr}}");
     await flush();
@@ -276,13 +371,24 @@ describe("chip insertion", () => {
     editor.commands.insertContent(" {{Offer end date");
     await flush();
     expect(picker.props?.query).toBe("Offer end date");
-    expect(picker.props?.items).toEqual([{ kind: "create", label: "Offer end date" }]);
+    expect(picker.props?.items).toEqual([
+      { kind: "create", label: "Offer end date" },
+    ]);
 
-    const variable: Variable = { key: "offer_end_date", label: "Offer end date", type: "date", required: true, sample: "" };
+    const variable: Variable = {
+      key: "offer_end_date",
+      label: "Offer end date",
+      type: "date",
+      required: true,
+      sample: "",
+    };
     expect(root.createVariable(variable)).toEqual({ ok: true });
     picker.props!.command({ kind: "variable", variable });
     expect(line(editor, 0)).toBe("Intro {{offer_end_date}}");
-    expect(root.variables.getState().byKey.get("offer_end_date")).toEqual({ ...variable, id: expect.any(String) });
+    expect(root.variables.getState().byKey.get("offer_end_date")).toEqual({
+      ...variable,
+      id: expect.any(String),
+    });
   });
 
   it("typing {{key}} in full makes a chip for a known key only", () => {
@@ -291,7 +397,15 @@ describe("chip insertion", () => {
     editor.commands.setTextSelection(at);
     // Input rules run on text input; simulate the last keystroke.
     editor.commands.insertContent(" {{first_name}");
-    editor.view.someProp("handleTextInput", (f) => f(editor.view, editor.state.selection.from, editor.state.selection.from, "}", () => editor.state.tr.insertText("}")));
+    editor.view.someProp("handleTextInput", (f) =>
+      f(
+        editor.view,
+        editor.state.selection.from,
+        editor.state.selection.from,
+        "}",
+        () => editor.state.tr.insertText("}"),
+      ),
+    );
     expect(line(editor, 0)).toBe("Intro {{first_name}}");
     expect(chipKeys(editor).filter((k) => k === "first_name")).toHaveLength(3);
   });
@@ -305,7 +419,9 @@ describe("chips stay whole", () => {
     editor.commands.keyboardShortcut("Backspace");
     expect(line(editor, 2)).toBe("Hi , your APR is {{purchase_apr}}.");
     editor.commands.undo();
-    expect(line(editor, 2)).toBe("Hi {{first_name}}, your APR is {{purchase_apr}}.");
+    expect(line(editor, 2)).toBe(
+      "Hi {{first_name}}, your APR is {{purchase_apr}}.",
+    );
   });
 
   it("Delete right before a chip removes the whole chip", () => {
@@ -317,7 +433,11 @@ describe("chips stay whole", () => {
 
   it("a selected chip goes with Backspace", () => {
     const { editor } = setup();
-    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, after(editor, 2, "Hi "))));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(
+        NodeSelection.create(editor.state.doc, after(editor, 2, "Hi ")),
+      ),
+    );
     editor.commands.keyboardShortcut("Backspace");
     expect(line(editor, 2)).toBe("Hi , your APR is {{purchase_apr}}.");
   });
@@ -326,10 +446,20 @@ describe("chips stay whole", () => {
 describe("list changes reach the chips", () => {
   it("a key change re-points every chip, outside undo history", () => {
     const { root, editor } = setup();
-    expect(root.updateVariable("first_name", { key: "given_name" })).toEqual({ ok: true });
-    expect(chipKeys(editor)).toEqual(["given_name", "purchase_apr", "given_name"]);
+    expect(root.updateVariable("first_name", { key: "given_name" })).toEqual({
+      ok: true,
+    });
+    expect(chipKeys(editor)).toEqual([
+      "given_name",
+      "purchase_apr",
+      "given_name",
+    ]);
     editor.commands.undo();
-    expect(chipKeys(editor)).toEqual(["given_name", "purchase_apr", "given_name"]);
+    expect(chipKeys(editor)).toEqual([
+      "given_name",
+      "purchase_apr",
+      "given_name",
+    ]);
   });
 
   it("a chip that comes back with an old key lands on the renamed variable", () => {
@@ -339,7 +469,11 @@ describe("list changes reach the chips", () => {
     editor.commands.keyboardShortcut("Backspace");
     root.updateVariable("first_name", { key: "given_name" });
     editor.commands.undo();
-    expect(chipKeys(editor)).toEqual(["given_name", "purchase_apr", "given_name"]);
+    expect(chipKeys(editor)).toEqual([
+      "given_name",
+      "purchase_apr",
+      "given_name",
+    ]);
   });
 
   it("deleting with 'remove chips' is one undo step that also brings the variable back", async () => {
@@ -353,16 +487,27 @@ describe("list changes reach the chips", () => {
     expect(changes).toHaveBeenLastCalledWith([VARIABLES[1]]);
 
     editor.commands.undo();
-    expect(chipKeys(editor)).toEqual(["first_name", "purchase_apr", "first_name"]);
+    expect(chipKeys(editor)).toEqual([
+      "first_name",
+      "purchase_apr",
+      "first_name",
+    ]);
     await flush();
-    expect(root.variables.getState().variables.map((v) => v.key)).toEqual(["first_name", "purchase_apr"]);
+    expect(root.variables.getState().variables.map((v) => v.key)).toEqual([
+      "first_name",
+      "purchase_apr",
+    ]);
     expect(changes).toHaveBeenLastCalledWith(VARIABLES);
   });
 
   it("deleting with 'keep chips' leaves them as unknown chips", () => {
     const { root, editor } = setup();
     root.deleteVariable("first_name");
-    expect(chipKeys(editor)).toEqual(["first_name", "purchase_apr", "first_name"]);
+    expect(chipKeys(editor)).toEqual([
+      "first_name",
+      "purchase_apr",
+      "first_name",
+    ]);
     expect(root.variables.getState().byKey.has("first_name")).toBe(false);
   });
 
@@ -386,7 +531,11 @@ describe("read-only and selection details", () => {
     const { root, editor } = setup();
     root.noteFocus("body");
     const end = after(editor, 0, "Intro");
-    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, end - 5, end)));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, end - 5, end),
+      ),
+    );
     root.insertVariable("first_name");
     expect(line(editor, 0)).toBe("{{first_name}}");
   });
@@ -399,12 +548,27 @@ describe("undo and redo for a host's buttons", () => {
     editor.view.dispatch(closeHistory(editor.state.tr.insertText(value, end)));
   }
 
-  function inlineField(root: EditorRootRuntime, id: string, value: string): Editor {
-    const content: JSONContent = { type: "doc", content: [{ type: "paragraph", content: [text(value)] }] };
+  function inlineField(
+    root: EditorRootRuntime,
+    id: string,
+    value: string,
+  ): Editor {
+    const content: JSONContent = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [text(value)] }],
+    };
     root.registerField({ id, label: "Email subject", kind: "inline" }, content);
     const editor = new Editor({
       element: document.createElement("div"),
-      extensions: inlineFieldExtensions({ store: root.variables, binding: { fieldId: id, kind: "inline", root, chip: createChipPopoverStore() } }),
+      extensions: inlineFieldExtensions({
+        store: root.variables,
+        binding: {
+          fieldId: id,
+          kind: "inline",
+          root,
+          chip: createChipPopoverStore(),
+        },
+      }),
       content,
     });
     editors.push(editor);
@@ -459,14 +623,30 @@ describe("undo and redo for a host's buttons", () => {
 });
 
 describe("a field the host hides (the email subject while Email is off)", () => {
-  const SUBJECT: JSONContent = { type: "doc", content: [{ type: "paragraph", content: [text("Hi "), chip("first_name")] }] };
+  const SUBJECT: JSONContent = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [text("Hi "), chip("first_name")] },
+    ],
+  };
 
   /** The subject as a live inline field of the root, the way <InlineVariableField> registers it. */
   function subject(root: EditorRootRuntime): Editor {
-    root.registerField({ id: "subject", label: "Email subject", kind: "inline" }, SUBJECT);
+    root.registerField(
+      { id: "subject", label: "Email subject", kind: "inline" },
+      SUBJECT,
+    );
     const editor = new Editor({
       element: document.createElement("div"),
-      extensions: inlineFieldExtensions({ store: root.variables, binding: { fieldId: "subject", kind: "inline", root, chip: createChipPopoverStore() } }),
+      extensions: inlineFieldExtensions({
+        store: root.variables,
+        binding: {
+          fieldId: "subject",
+          kind: "inline",
+          root,
+          chip: createChipPopoverStore(),
+        },
+      }),
       content: SUBJECT,
     });
     editors.push(editor);
@@ -476,23 +656,49 @@ describe("a field the host hides (the email subject while Email is off)", () => 
   /** Where `key` is used, field by field. */
   const usedIn = (root: EditorRootRuntime, key: string) => {
     root.flushUsage();
-    return root.usage.getState().byKey.get(key)?.places.map((p) => `${p.field}: ${p.count}`) ?? [];
+    return (
+      root.usage
+        .getState()
+        .byKey.get(key)
+        ?.places.map((p) => `${p.field}: ${p.count}`) ?? []
+    );
   };
 
   it("still counts, and a rename or delete while hidden reaches its chips", () => {
-    const promo: Variable = { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "" };
+    const promo: Variable = {
+      key: "promo_code",
+      label: "Promo code",
+      type: "text",
+      required: false,
+      sample: "",
+    };
     const { root, editor } = setup(DOC, [...VARIABLES, promo]);
     const field = subject(root);
     root.setFieldHidden("subject", true);
-    expect(usedIn(root, "first_name")).toEqual(["Document: 1", "Document: 1", "Email subject: 1"]);
+    expect(usedIn(root, "first_name")).toEqual([
+      "Document: 1",
+      "Document: 1",
+      "Email subject: 1",
+    ]);
 
     root.updateVariable("first_name", { key: "given_name" });
     expect(chipKeys(field)).toEqual(["given_name"]);
-    expect(chipKeys(editor)).toEqual(["given_name", "purchase_apr", "given_name"]);
-    expect(usedIn(root, "given_name")).toEqual(["Document: 1", "Document: 1", "Email subject: 1"]);
+    expect(chipKeys(editor)).toEqual([
+      "given_name",
+      "purchase_apr",
+      "given_name",
+    ]);
+    expect(usedIn(root, "given_name")).toEqual([
+      "Document: 1",
+      "Document: 1",
+      "Email subject: 1",
+    ]);
 
     // A variable used only in the hidden subject is in use: the panel asks before deleting it.
-    field.commands.setContent({ type: "doc", content: [{ type: "paragraph", content: [chip("promo_code")] }] });
+    field.commands.setContent({
+      type: "doc",
+      content: [{ type: "paragraph", content: [chip("promo_code")] }],
+    });
     expect(usedIn(root, "promo_code")).toEqual(["Email subject: 1"]);
     root.deleteVariable("promo_code", { removeChips: true });
     expect(chipKeys(field)).toEqual([]);
@@ -502,7 +708,11 @@ describe("a field the host hides (the email subject while Email is off)", () => 
     const { root, editor } = setup();
     const field = subject(root);
     root.noteFocus("subject");
-    field.view.dispatch(closeHistory(field.state.tr.insertText("!", field.state.doc.content.size - 1)));
+    field.view.dispatch(
+      closeHistory(
+        field.state.tr.insertText("!", field.state.doc.content.size - 1),
+      ),
+    );
     expect(root.history.getState()).toEqual({ canUndo: true, canRedo: false });
 
     root.setFieldHidden("subject", true);
@@ -511,7 +721,9 @@ describe("a field the host hides (the email subject while Email is off)", () => 
     expect(root.undo()).toBe(false);
     expect(field.state.doc.textContent).toBe("Hi !");
     expect(root.insertVariable("purchase_apr")).toBe(true);
-    expect(line(editor, 2)).toBe("{{purchase_apr}} Hi {{first_name}}, your APR is {{purchase_apr}}.");
+    expect(line(editor, 2)).toBe(
+      "{{purchase_apr}} Hi {{first_name}}, your APR is {{purchase_apr}}.",
+    );
     expect(chipKeys(field)).toEqual(["first_name"]);
 
     // Shown again, it is a target once it has focus.

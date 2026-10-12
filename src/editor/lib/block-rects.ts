@@ -9,18 +9,27 @@ const attr = (value: string) => value.replace(/["\\]/g, "\\$&");
 
 /** A rendered element's box, or null when it isn't laid out (missing, `display: none`, hidden route). */
 export function rectOf(element: Element | null | undefined): DOMRect | null {
-  if (!element || !element.isConnected || element.getClientRects().length === 0) return null;
+  if (!element || !element.isConnected || element.getClientRects().length === 0)
+    return null;
   return element.getBoundingClientRect();
 }
 
 /** The block element with this id inside the editor's wrapper. */
-export function blockElement(wrapper: HTMLElement | null, blockId: string): HTMLElement | null {
+export function blockElement(
+  wrapper: HTMLElement | null,
+  blockId: string,
+): HTMLElement | null {
   if (!wrapper || !blockId) return null;
-  return wrapper.querySelector<HTMLElement>(`.ucomp-doc [data-id="${attr(blockId)}"]`);
+  return wrapper.querySelector<HTMLElement>(
+    `.ucomp-doc [data-id="${attr(blockId)}"]`,
+  );
 }
 
 /** The thread's highlight: its first text run, or its highlighted block. */
-export function threadElement(wrapper: HTMLElement | null, threadId: string): HTMLElement | null {
+export function threadElement(
+  wrapper: HTMLElement | null,
+  threadId: string,
+): HTMLElement | null {
   if (!wrapper || !threadId) return null;
   const id = attr(threadId);
   return (
@@ -32,9 +41,19 @@ export function threadElement(wrapper: HTMLElement | null, threadId: string): HT
 /** The nearest ancestor the user can scroll vertically; null when only the page scrolls. */
 function scrollContainer(element: HTMLElement): HTMLElement | null {
   const root = element.ownerDocument;
-  for (let node = element.parentElement; node && node !== root.body && node !== root.documentElement; node = node.parentElement) {
+  for (
+    let node = element.parentElement;
+    node && node !== root.body && node !== root.documentElement;
+    node = node.parentElement
+  ) {
     const { overflowY } = getComputedStyle(node);
-    if ((overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && node.scrollHeight > node.clientHeight) return node;
+    if (
+      (overflowY === "auto" ||
+        overflowY === "scroll" ||
+        overflowY === "overlay") &&
+      node.scrollHeight > node.clientHeight
+    )
+      return node;
   }
   return null;
 }
@@ -51,12 +70,21 @@ export function revealInContainer(element: HTMLElement) {
   const box = element.getBoundingClientRect();
   const container = scrollContainer(element);
   const win = element.ownerDocument.defaultView;
-  const view = container ? container.getBoundingClientRect() : { top: 0, height: win?.innerHeight ?? 0 };
+  const view = container
+    ? container.getBoundingClientRect()
+    : { top: 0, height: win?.innerHeight ?? 0 };
   const bottom = view.top + view.height;
   if (box.top >= view.top + MARGIN && box.bottom <= bottom - MARGIN) return;
-  const offset = box.height > view.height - 2 * MARGIN ? MARGIN : (view.height - box.height) / 2;
+  const offset =
+    box.height > view.height - 2 * MARGIN
+      ? MARGIN
+      : (view.height - box.height) / 2;
   const delta = box.top - view.top - offset;
-  const behavior: ScrollBehavior = win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  const behavior: ScrollBehavior = win?.matchMedia?.(
+    "(prefers-reduced-motion: reduce)",
+  ).matches
+    ? "auto"
+    : "smooth";
   const scroller = container ?? element.ownerDocument.scrollingElement;
   scroller?.scrollTo({ top: scroller.scrollTop + delta, behavior });
 }
@@ -83,7 +111,12 @@ export function createRectSignal(): RectSignal {
     for (const listener of [...listeners]) listener();
   };
   const notify = () => {
-    if (!listeners.size || frame || typeof requestAnimationFrame === "undefined") return;
+    if (
+      !listeners.size ||
+      frame ||
+      typeof requestAnimationFrame === "undefined"
+    )
+      return;
     frame = requestAnimationFrame(fire);
   };
   const connect = () => {

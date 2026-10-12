@@ -6,15 +6,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The page and global error boundaries (src/app/(product)/error.tsx, src/app/global-error.tsx): what they
 // say, their two ways out, and the digest. The error's own message never shows.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let params: Record<string, string> = { team: "coral-offers" };
 vi.mock("next/navigation", () => ({ useParams: () => params }));
 
-const { GlobalErrorView, PAGE_FAILED, PageError } = await import("./route-error");
+const { GlobalErrorView, PAGE_FAILED, PageError } =
+  await import("./route-error");
 
 /** A server error as Next hands it to the client: a generic message, and the digest its log line carries. */
-const serverError = () => Object.assign(new Error("Unexpected token in JSON: card ending 4242"), { digest: "4215074262" });
+const serverError = () =>
+  Object.assign(new Error("Unexpected token in JSON: card ending 4242"), {
+    digest: "4215074262",
+  });
 
 let root: Root;
 let container: HTMLElement;
@@ -36,7 +42,9 @@ async function render(node: React.ReactNode) {
 }
 
 const button = (name: string) =>
-  [...container.querySelectorAll<HTMLElement>("button, a")].find((el) => el.textContent?.trim() === name) ?? null;
+  [...container.querySelectorAll<HTMLElement>("button, a")].find(
+    (el) => el.textContent?.trim() === name,
+  ) ?? null;
 
 describe("PageError", () => {
   it("says the page didn't load, as the page's title", async () => {
@@ -85,7 +93,9 @@ describe("GlobalErrorView", () => {
     const retry = vi.fn();
     await render(<GlobalErrorView error={serverError()} retry={retry} />);
     expect(container.querySelector("main h1")?.textContent).toBe(PAGE_FAILED);
-    expect(button("Back to library")?.getAttribute("href")).toBe("/coral-offers/library");
+    expect(button("Back to library")?.getAttribute("href")).toBe(
+      "/coral-offers/library",
+    );
     expect(container.textContent).toContain("Error ID 4215074262");
     await act(async () => button("Try again")!.click());
     expect(retry).toHaveBeenCalledTimes(1);

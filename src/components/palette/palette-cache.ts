@@ -35,8 +35,13 @@ export function emptyPaletteCache(viewerId: string): PaletteCache {
 }
 
 /** The cache with `results` filed under `ask`; the same cache when the question or the answer is somebody else's. */
-export function withAnswer(cache: PaletteCache, ask: PaletteAsk, results: PaletteResults): PaletteCache {
-  if (ask.viewerId !== cache.viewerId || results.viewerId !== cache.viewerId) return cache;
+export function withAnswer(
+  cache: PaletteCache,
+  ask: PaletteAsk,
+  results: PaletteResults,
+): PaletteCache {
+  if (ask.viewerId !== cache.viewerId || results.viewerId !== cache.viewerId)
+    return cache;
   const key = paletteAskKey(ask);
   const answers = new Map(cache.answers);
   answers.delete(key);
@@ -54,14 +59,19 @@ export function withAnswer(cache: PaletteCache, ask: PaletteAsk, results: Palett
  * was typed. Every match of the longer search is a match of the shorter one. Null when there's neither,
  * or when `ask` is another viewer's.
  */
-export function nearestAnswer(cache: PaletteCache, ask: PaletteAsk): { results: PaletteResults; exact: boolean } | null {
+export function nearestAnswer(
+  cache: PaletteCache,
+  ask: PaletteAsk,
+): { results: PaletteResults; exact: boolean } | null {
   if (ask.viewerId !== cache.viewerId) return null;
   const exact = cache.answers.get(paletteAskKey(ask));
   if (exact) return { results: exact, exact: true };
   for (let length = ask.query.length - 1; length >= 0; length--) {
     const shorter = ask.query.slice(0, length);
     if (normalizePaletteQuery(shorter) !== shorter) continue; // "cash " is "cash", asked one step later
-    const results = cache.answers.get(paletteAskKey({ ...ask, query: shorter }));
+    const results = cache.answers.get(
+      paletteAskKey({ ...ask, query: shorter }),
+    );
     if (results) return { results, exact: false };
   }
   return null;

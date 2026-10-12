@@ -13,19 +13,19 @@ is [docs/README.md](docs/README.md). Ignore `docs/archive/`: it records how the 
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Dev server on port 3000. |
-| `npm run db:reset` | Drops and reseeds `data/ucomp.db` and empties `data/uploads` (the folder `UPLOADS_DIR` names, if set). Needed once after cloning. |
-| `npm run typecheck` | `next typegen && tsc --noEmit`. Run it after adding or renaming a route. |
-| `npm run lint` | ESLint, including the import boundaries below. |
-| `npm test` | Vitest, about 10 seconds. Never touches `data/ucomp.db`. Tests run in a random order; a failure prints the seed to replay it with. |
-| `npm run docs:check` | Fails on broken doc links and paths, and on a `src/` folder without a README. |
-| `npm run golden:update` | Regenerates the render golden files after an intended change to render output. Read the diff. |
-| `npm run build` | The production build. It is the only check that enforces the Cache Components rules. |
-| `npm run e2e` | Playwright against the production build, in parallel: `E2E_WORKERS` workers (default 4), each with its own server (port 3100 and up), `data/e2e-<n>.db` and `data/e2e-uploads-<n>`, never the demo's. About 4.5 minutes (11 with one worker); `E2E_WORKERS=1` for one server (also for a single spec). |
-| `npx playwright test --project=demo` | Opt-in: plays the whole demo script (`e2e/demo-script.spec.ts`) and the scenario specs paced for a recording. `npm run e2e` never runs the script. |
-| `npm run db:generate`, `npm run db:migrate` | Generate a migration from the schema; apply migrations. |
+| Command                                     | What it does                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev`                               | Dev server on port 3000.                                                                                                                                                                                                                                                                               |
+| `npm run db:reset`                          | Drops and reseeds `data/ucomp.db` and empties `data/uploads` (the folder `UPLOADS_DIR` names, if set). Needed once after cloning.                                                                                                                                                                      |
+| `npm run typecheck`                         | `next typegen && tsc --noEmit`. Run it after adding or renaming a route.                                                                                                                                                                                                                               |
+| `npm run lint`                              | ESLint, including the import boundaries below.                                                                                                                                                                                                                                                         |
+| `npm test`                                  | Vitest, about 10 seconds. Never touches `data/ucomp.db`. Tests run in a random order; a failure prints the seed to replay it with.                                                                                                                                                                     |
+| `npm run docs:check`                        | Fails on broken doc links and paths, and on a `src/` folder without a README.                                                                                                                                                                                                                          |
+| `npm run golden:update`                     | Regenerates the render golden files after an intended change to render output. Read the diff.                                                                                                                                                                                                          |
+| `npm run build`                             | The production build. It is the only check that enforces the Cache Components rules.                                                                                                                                                                                                                   |
+| `npm run e2e`                               | Playwright against the production build, in parallel: `E2E_WORKERS` workers (default 4), each with its own server (port 3100 and up), `data/e2e-<n>.db` and `data/e2e-uploads-<n>`, never the demo's. About 4.5 minutes (11 with one worker); `E2E_WORKERS=1` for one server (also for a single spec). |
+| `npx playwright test --project=demo`        | Opt-in: plays the whole demo script (`e2e/demo-script.spec.ts`) and the scenario specs paced for a recording. `npm run e2e` never runs the script.                                                                                                                                                     |
+| `npm run db:generate`, `npm run db:migrate` | Generate a migration from the schema; apply migrations.                                                                                                                                                                                                                                                |
 
 Before you finish: `npm run typecheck`, `npm run lint`, `npm test`, and `npm run docs:check`. Add `npm run build`
 when you changed a page, a layout, a route handler, or anything a server component reads. Don't run `npm run db:reset`
@@ -34,15 +34,15 @@ uploads folder, so it is safe for the demo.
 
 ## Layers and boundaries
 
-| Folder | Holds | README |
-| --- | --- | --- |
-| `src/app` | Routes, layouts, route handlers. Thin. | [src/app](src/app/README.md) |
-| `src/components` | The React UI. `ui/` is generated shadcn. | [src/components](src/components/README.md) |
-| `src/editor` | The TipTap document editor, framework-agnostic. | [src/editor](src/editor/README.md) |
-| `src/domain` | Business rules, pure TypeScript. | [src/domain](src/domain/README.md) |
-| `src/server` | Database, identity, clock, server actions, read models, render, import, seed. | [src/server](src/server/README.md) |
-| `src/contracts` | `/api/v1` wire types. No imports. | [src/contracts](src/contracts/README.md) |
-| `src/simulator` | Coral, a simulated consumer that reaches Stencil only over `/api/v1`. | [src/simulator](src/simulator/README.md) |
+| Folder           | Holds                                                                         | README                                     |
+| ---------------- | ----------------------------------------------------------------------------- | ------------------------------------------ |
+| `src/app`        | Routes, layouts, route handlers. Thin.                                        | [src/app](src/app/README.md)               |
+| `src/components` | The React UI. `ui/` is generated shadcn.                                      | [src/components](src/components/README.md) |
+| `src/editor`     | The TipTap document editor, framework-agnostic.                               | [src/editor](src/editor/README.md)         |
+| `src/domain`     | Business rules, pure TypeScript.                                              | [src/domain](src/domain/README.md)         |
+| `src/server`     | Database, identity, clock, server actions, read models, render, import, seed. | [src/server](src/server/README.md)         |
+| `src/contracts`  | `/api/v1` wire types. No imports.                                             | [src/contracts](src/contracts/README.md)   |
+| `src/simulator`  | Coral, a simulated consumer that reaches Stencil only over `/api/v1`.         | [src/simulator](src/simulator/README.md)   |
 
 Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 
@@ -131,20 +131,20 @@ Next.js API; Next's own note about it is at the end of this file.
 
 ## Copy these
 
-| To… | Copy |
-| --- | --- |
-| Write a server action | `serverAction` in [src/server/actions/kit.ts](src/server/actions/kit.ts), as `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) uses it |
-| Write a domain transition | `setSunset` in [src/domain/lifecycle/sunset.ts](src/domain/lifecycle/sunset.ts), `startRevoke` in [src/domain/lifecycle/revoke.ts](src/domain/lifecycle/revoke.ts) |
-| Build a read model with permissions | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts) |
-| Stream a page | [versions/page.tsx](src/app/(product)/[team]/templates/[templateId]/versions/page.tsx) with [versions-content.tsx](src/components/versions/versions-content.tsx) |
-| Run an action from a dialog, with validation | [src/components/review/request-dialog.tsx](src/components/review/request-dialog.tsx) on [action-dialog.tsx](src/components/versions/action-dialog.tsx) |
-| Render server-decided actions | [src/components/settings/team/members-table.tsx](src/components/settings/team/members-table.tsx) |
-| Update optimistically | [use-review-threads.ts](src/components/comments/use-review-threads.ts) with [thread-list.tsx](src/components/comments/thread-list.tsx) |
-| Load heavy code on demand | [compare-dialog.tsx](src/components/versions/compare-dialog.tsx), [load-pdfjs.ts](src/components/preview/pdf/load-pdfjs.ts) |
-| Add an `/api/v1` route | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts) |
-| Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts) |
-| Format a count or a plural | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts) |
-| Test an action against a database | [src/server/actions/review.test.ts](src/server/actions/review.test.ts): a database of its own for every test (`seededDatabasePerTest`); each test builds the state it needs |
+| To…                                            | Copy                                                                                                                                                                        |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Write a server action                          | `serverAction` in [src/server/actions/kit.ts](src/server/actions/kit.ts), as `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) uses it            |
+| Write a domain transition                      | `setSunset` in [src/domain/lifecycle/sunset.ts](src/domain/lifecycle/sunset.ts), `startRevoke` in [src/domain/lifecycle/revoke.ts](src/domain/lifecycle/revoke.ts)          |
+| Build a read model with permissions            | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts)                                                                                           |
+| Stream a page                                  | [versions/page.tsx](<src/app/(product)/[team]/templates/[templateId]/versions/page.tsx>) with [versions-content.tsx](src/components/versions/versions-content.tsx)          |
+| Run an action from a dialog, with validation   | [src/components/review/request-dialog.tsx](src/components/review/request-dialog.tsx) on [action-dialog.tsx](src/components/versions/action-dialog.tsx)                      |
+| Render server-decided actions                  | [src/components/settings/team/members-table.tsx](src/components/settings/team/members-table.tsx)                                                                            |
+| Update optimistically                          | [use-review-threads.ts](src/components/comments/use-review-threads.ts) with [thread-list.tsx](src/components/comments/thread-list.tsx)                                      |
+| Load heavy code on demand                      | [compare-dialog.tsx](src/components/versions/compare-dialog.tsx), [load-pdfjs.ts](src/components/preview/pdf/load-pdfjs.ts)                                                 |
+| Add an `/api/v1` route                         | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts)                                                                                                      |
+| Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts)                                                                                                                                  |
+| Format a count or a plural                     | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts)                                                                                |
+| Test an action against a database              | [src/server/actions/review.test.ts](src/server/actions/review.test.ts): a database of its own for every test (`seededDatabasePerTest`); each test builds the state it needs |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
 bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are the editor and PDF labs on fixture data.

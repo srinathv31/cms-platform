@@ -12,7 +12,13 @@ import { getAuditPage } from "@/server/queries/audit";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { AuditFilterBar } from "./audit-filters";
 import { AuditTable } from "./audit-table";
-import { AUDIT_CELL as at, AUDIT_ROW, AUDIT_TABLE, CHIP_ROW, auditGrid } from "./columns";
+import {
+  AUDIT_CELL as at,
+  AUDIT_ROW,
+  AUDIT_TABLE,
+  CHIP_ROW,
+  auditGrid,
+} from "./columns";
 import { ExportLink } from "./export-link";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +39,13 @@ async function SpaceEyebrow({ params }: { params: TeamParams }) {
 const EXPORT_WIDTH = "w-[10.75rem] min-w-fit";
 
 /** The Export link follows the filters (same query, no page limit); a download anchor that reads a refusal (`ExportLink`). */
-async function ExportAction({ params, searchParams }: { params: TeamParams; searchParams: SearchParams }) {
+async function ExportAction({
+  params,
+  searchParams,
+}: {
+  params: TeamParams;
+  searchParams: SearchParams;
+}) {
   const data = await load(params, searchParams);
   const label = `Export ${plural(data.total, "event")}`;
   if (data.total === 0) {
@@ -44,10 +56,18 @@ async function ExportAction({ params, searchParams }: { params: TeamParams; sear
       </Button>
     );
   }
-  return <ExportLink href={data.csvHref} label={label} className={EXPORT_WIDTH} />;
+  return (
+    <ExportLink href={data.csvHref} label={label} className={EXPORT_WIDTH} />
+  );
 }
 
-async function AuditBody({ params, searchParams }: { params: TeamParams; searchParams: SearchParams }) {
+async function AuditBody({
+  params,
+  searchParams,
+}: {
+  params: TeamParams;
+  searchParams: SearchParams;
+}) {
   const data = await load(params, searchParams);
   const basePath = `/${data.space.slug}/audit`;
   const filtered = activeFilterCount(data.applied) > 0;
@@ -57,19 +77,32 @@ async function AuditBody({ params, searchParams }: { params: TeamParams; searchP
       : plural(data.total, "event");
   return (
     <div>
-      <AuditFilterBar basePath={basePath} applied={data.applied} options={data.options} clearInEmpty={data.total === 0} />
+      <AuditFilterBar
+        basePath={basePath}
+        applied={data.applied}
+        options={data.options}
+        clearInEmpty={data.total === 0}
+      />
       {data.rows.length === 0 ? (
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-hairline py-12">
-          <p className="text-[15px] text-text-muted">{filtered ? "No events match these filters." : "No events yet."}</p>
+          <p className="text-[15px] text-text-muted">
+            {filtered ? "No events match these filters." : "No events yet."}
+          </p>
           {filtered ? (
-            <Button variant="ghost" render={<Link href={basePath as Route} scroll={false} />} nativeButton={false}>
+            <Button
+              variant="ghost"
+              render={<Link href={basePath as Route} scroll={false} />}
+              nativeButton={false}
+            >
               Clear all
             </Button>
           ) : null}
         </div>
       ) : (
         <>
-          <p className="mt-4 flex h-6 items-center text-[14px] text-text-muted tabular-nums">{count}</p>
+          <p className="mt-4 flex h-6 items-center text-[14px] text-text-muted tabular-nums">
+            {count}
+          </p>
           <AuditTable rows={data.rows} showTeam={data.space.isAll} />
         </>
       )}
@@ -92,11 +125,23 @@ function AuditSkeleton() {
       <div className="mt-4 flex h-6 items-center">
         <Skeleton className="h-4 w-20" />
       </div>
-      <div className={cn("min-h-9 items-center border-b border-hairline py-1.5", grid)}>
+      <div
+        className={cn(
+          "min-h-9 items-center border-b border-hairline py-1.5",
+          grid,
+        )}
+      >
         <Skeleton className={cn("h-3 w-10", at.when)} />
       </div>
       {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className={cn("items-center border-b border-hairline py-2", grid, AUDIT_ROW)}>
+        <div
+          key={i}
+          className={cn(
+            "items-center border-b border-hairline py-2",
+            grid,
+            AUDIT_ROW,
+          )}
+        >
           <span className={at.when}>
             <Skeleton className="h-4 w-28" />
             <Skeleton className="mt-1 h-3 w-16" />
@@ -118,7 +163,13 @@ function AuditSkeleton() {
   );
 }
 
-export function AuditView({ params, searchParams }: { params: TeamParams; searchParams: SearchParams }) {
+export function AuditView({
+  params,
+  searchParams,
+}: {
+  params: TeamParams;
+  searchParams: SearchParams;
+}) {
   return (
     <div>
       <PageHeader
@@ -129,7 +180,11 @@ export function AuditView({ params, searchParams }: { params: TeamParams; search
           </Stream>
         }
         action={
-          <Stream fallback={<Skeleton className={cn("h-8 rounded-lg", EXPORT_WIDTH)} />}>
+          <Stream
+            fallback={
+              <Skeleton className={cn("h-8 rounded-lg", EXPORT_WIDTH)} />
+            }
+          >
             <ExportAction params={params} searchParams={searchParams} />
           </Stream>
         }

@@ -16,13 +16,19 @@ const failed: Refused = { ok: false, code: "failed", reason: EXPORT_FAILED };
 
 /** `filename` from a `Content-Disposition: attachment; filename="…"` header. */
 function filenameOf(response: Response): string {
-  const match = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "");
+  const match = /filename="([^"]+)"/.exec(
+    response.headers.get("Content-Disposition") ?? "",
+  );
   return match?.[1] ?? FALLBACK_FILENAME;
 }
 
 function isRefusal(body: unknown): body is Refused {
   if (typeof body !== "object" || body === null) return false;
-  const { ok, code, reason } = body as { ok?: unknown; code?: unknown; reason?: unknown };
+  const { ok, code, reason } = body as {
+    ok?: unknown;
+    code?: unknown;
+    reason?: unknown;
+  };
   return ok === false && typeof code === "string" && typeof reason === "string";
 }
 
@@ -31,7 +37,10 @@ function isRefusal(body: unknown): body is Refused {
  * sent, or the refusal with its code and reason. An answer that is neither (offline, a server error
  * page) is the code `failed`.
  */
-export async function requestAuditExport(href: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): Promise<AuditFile> {
+export async function requestAuditExport(
+  href: string,
+  fetchImpl: typeof fetch = (...args) => fetch(...args),
+): Promise<AuditFile> {
   let response: Response;
   try {
     response = await fetchImpl(href, { cache: "no-store" });
@@ -39,7 +48,12 @@ export async function requestAuditExport(href: string, fetchImpl: typeof fetch =
     return failed;
   }
   try {
-    if (response.ok) return { ok: true, blob: await response.blob(), filename: filenameOf(response) };
+    if (response.ok)
+      return {
+        ok: true,
+        blob: await response.blob(),
+        filename: filenameOf(response),
+      };
     const body: unknown = await response.json();
     return isRefusal(body) ? body : failed;
   } catch {

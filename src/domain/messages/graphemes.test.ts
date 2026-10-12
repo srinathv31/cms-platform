@@ -6,8 +6,15 @@ import { UNICODE_VERSION, graphemeCount, graphemes } from "./graphemes";
 const segments = (text: string) => graphemes(text).map((g) => g.segment);
 
 /** GraphemeBreakTest.txt's cases: the text, and its clusters as the file marks them with ÷ and ×. */
-function conformanceCases(): { line: number; text: string; clusters: string[] }[] {
-  const file = readFileSync(path.join(import.meta.dirname, "GraphemeBreakTest.txt"), "utf8");
+function conformanceCases(): {
+  line: number;
+  text: string;
+  clusters: string[];
+}[] {
+  const file = readFileSync(
+    path.join(import.meta.dirname, "GraphemeBreakTest.txt"),
+    "utf8",
+  );
   expect(file).toContain(`GraphemeBreakTest-${UNICODE_VERSION}.txt`);
   const cases: { line: number; text: string; clusters: string[] }[] = [];
   file.split("\n").forEach((raw, i) => {
@@ -17,7 +24,11 @@ function conformanceCases(): { line: number; text: string; clusters: string[] }[
       .split("÷")
       .map((cluster) => cluster.trim())
       .filter(Boolean)
-      .map((cluster) => String.fromCodePoint(...cluster.split("×").map((hex) => parseInt(hex.trim(), 16))));
+      .map((cluster) =>
+        String.fromCodePoint(
+          ...cluster.split("×").map((hex) => parseInt(hex.trim(), 16)),
+        ),
+      );
     cases.push({ line: i + 1, text: clusters.join(""), clusters });
   });
   return cases;
@@ -31,7 +42,11 @@ describe("graphemes: Unicode's extended grapheme clusters, pinned", () => {
   it("passes every case of Unicode's GraphemeBreakTest.txt", () => {
     const cases = conformanceCases();
     expect(cases.length).toBe(766);
-    const failures = cases.filter((c) => JSON.stringify(segments(c.text)) !== JSON.stringify(c.clusters)).map((c) => c.line);
+    const failures = cases
+      .filter(
+        (c) => JSON.stringify(segments(c.text)) !== JSON.stringify(c.clusters),
+      )
+      .map((c) => c.line);
     expect(failures).toEqual([]);
   });
 
@@ -39,7 +54,11 @@ describe("graphemes: Unicode's extended grapheme clusters, pinned", () => {
     ["an emoji ZWJ sequence", "👨\u200D👩\u200D👧", 1],
     ["an emoji with its presentation selector", "❤\uFE0F", 1],
     ["a keycap", "1\uFE0F\u20E3", 1],
-    ["a flag tag sequence", "🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}", 1],
+    [
+      "a flag tag sequence",
+      "🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}",
+      1,
+    ],
     ["a regional indicator flag pair, and a third alone", "🇺🇸🇫", 2],
     ["a skin tone", "👋🏽", 1],
     ["a Devanagari conjunct (GB9c)", "क\u094Dष", 1],
@@ -69,8 +88,11 @@ describe("graphemes: Unicode's extended grapheme clusters, pinned", () => {
   it.runIf(process.versions.unicode === UNICODE_VERSION.replace(/\.0$/, ""))(
     "agrees with this runtime's Intl.Segmenter on every code point, which is also Unicode 17.0",
     () => {
-      const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-      const native = (text: string) => Array.from(segmenter.segment(text), (s) => s.segment);
+      const segmenter = new Intl.Segmenter(undefined, {
+        granularity: "grapheme",
+      });
+      const native = (text: string) =>
+        Array.from(segmenter.segment(text), (s) => s.segment);
       const contexts = [
         (c: string) => `a${c}`,
         (c: string) => `${c}\u0308`,

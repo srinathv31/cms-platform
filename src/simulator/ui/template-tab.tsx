@@ -6,7 +6,13 @@ import { channelList, dayLabel, linkStatus } from "./format";
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid min-h-9 grid-cols-[9rem_minmax(0,1fr)] items-center gap-3 border-b border-(--sim-line) px-4 py-2 text-[13px] last:border-0">
       <dt className="text-(--sim-muted)">{label}</dt>
@@ -50,7 +56,9 @@ export function TemplateTab({ page }: { page: SimOfferPage }) {
           </dl>
         ) : (
           <div className="flex items-center justify-between gap-4 p-4">
-            <span className="text-[13px] text-(--sim-muted)">No template linked.</span>
+            <span className="text-[13px] text-(--sim-muted)">
+              No template linked.
+            </span>
             <NavButton href={linkHref} kind="primary">
               Link template
             </NavButton>
@@ -63,8 +71,20 @@ export function TemplateTab({ page }: { page: SimOfferPage }) {
             <Row label="Spend">{money(t.spend)}</Row>
             <Row label="Bonus">{money(t.bonus)}</Row>
             <Row label="Months">{t.months}</Row>
-            <Row label="Annual fee">{t.annualFee === undefined ? <span className="text-(--sim-muted)">None</span> : money(t.annualFee)}</Row>
-            <Row label="Ends on">{t.endsOn ? dayLabel(t.endsOn) : <span className="text-(--sim-muted)">None</span>}</Row>
+            <Row label="Annual fee">
+              {t.annualFee === undefined ? (
+                <span className="text-(--sim-muted)">None</span>
+              ) : (
+                money(t.annualFee)
+              )}
+            </Row>
+            <Row label="Ends on">
+              {t.endsOn ? (
+                dayLabel(t.endsOn)
+              ) : (
+                <span className="text-(--sim-muted)">None</span>
+              )}
+            </Row>
           </dl>
         </Panel>
       ) : (

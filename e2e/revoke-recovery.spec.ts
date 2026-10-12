@@ -69,10 +69,14 @@ let v1Id = "";
  * and with no sunset, so it still renders.
  */
 async function insertV1(spring: SpringFixture): Promise<string> {
-  const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [spring.v2Id]);
+  const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
+    spring.v2Id,
+  ]);
   const live = Number(v2.activated_at);
   const id = `v_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`;
-  const variables = spring.variables.map((v) => (v.key === "offer_end_date" ? { ...v, required: true } : v));
+  const variables = spring.variables.map((v) =>
+    v.key === "offer_end_date" ? { ...v, required: true } : v,
+  );
   const row: Row = {
     ...v2,
     id,
@@ -87,7 +91,11 @@ async function insertV1(spring: SpringFixture): Promise<string> {
     superseded_at: live,
   };
   const columns = Object.keys(row);
-  await run(db, `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`, columns.map((c) => row[c]));
+  await run(
+    db,
+    `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
+    columns.map((c) => row[c]),
+  );
   return id;
 }
 
@@ -101,7 +109,11 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (!db) return;
   try {
-    if (snapshot) await restore(db, snapshot, { templates: fixture ? [fixture.templateId] : [], clock: false });
+    if (snapshot)
+      await restore(db, snapshot, {
+        templates: fixture ? [fixture.templateId] : [],
+        clock: false,
+      });
   } finally {
     db.close();
   }
@@ -110,26 +122,39 @@ test.afterAll(async () => {
 // ── The screens ──────────────────────────────────────────────────────────────
 
 const versionEntry = (page: Page, number: number): Locator =>
-  page.locator(`[data-slot="version-entry"][data-version="${number}"]`).filter({ visible: true });
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
-const decision = (page: Page) => page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+  page
+    .locator(`[data-slot="version-entry"][data-version="${number}"]`)
+    .filter({ visible: true });
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
+const decision = (page: Page) =>
+  page.locator('aside[aria-label="Decision"]').filter({ visible: true });
 
 async function openVersions(page: Page, persona: string, templateId: string) {
   await asPersona(page, persona);
   await page.goto(`/${TEAM}/templates/${templateId}/versions`);
-  await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: SPRING_NAME }),
+  ).toBeVisible();
   await hydrated(page);
 }
 
 async function openWorkspace(page: Page, persona: string, templateId: string) {
   await asPersona(page, persona);
   await page.goto(`/${TEAM}/templates/${templateId}`);
-  await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: SPRING_NAME }),
+  ).toBeVisible();
   await liveEditor(page);
   await hydrated(page);
 }
 
-test("after the Active version is revoked, an author corrects it from its content, and the correction goes live", async ({ page, request }) => {
+test("after the Active version is revoked, an author corrects it from its content, and the correction goes live", async ({
+  page,
+  request,
+}) => {
   test.setTimeout(180_000);
   const spring = fixture!;
   const { templateId } = spring;
@@ -152,30 +177,66 @@ test("after the Active version is revoked, an author corrects it from its conten
 
     const dialog = page.getByRole("dialog", { name: "Revoke v2" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator('[data-slot="consequences"]')).toContainText("Once confirmed, no version will be Active until a new one is approved.");
+    await expect(dialog.locator('[data-slot="consequences"]')).toContainText(
+      "Once confirmed, no version will be Active until a new one is approved.",
+    );
     await expect(dialog.getByLabel("Reason")).toBeFocused();
     await typeSlowly(page, REASON);
-    await click(dialog.getByRole("button", { name: "Start revoke", exact: true }));
+    await click(
+      dialog.getByRole("button", { name: "Start revoke", exact: true }),
+    );
     await expect(dialog).toBeHidden({ timeout: 20_000 });
-    await expect(v2.locator('[data-slot="revoke"]')).toHaveAttribute("data-pending", "", { timeout: 20_000 });
+    await expect(v2.locator('[data-slot="revoke"]')).toHaveAttribute(
+      "data-pending",
+      "",
+      { timeout: 20_000 },
+    );
   });
 
   await test.step("1.2 Alex confirms: v2 is Revoked, and Coral's renders of it fail while v1 still renders", async () => {
     await openVersions(page, "alex", templateId);
     const v2 = versionEntry(page, 2);
-    await click(v2.locator('[data-slot="revoke"]').getByRole("button", { name: "Confirm revoke", exact: true }));
+    await click(
+      v2
+        .locator('[data-slot="revoke"]')
+        .getByRole("button", { name: "Confirm revoke", exact: true }),
+    );
     const dialog = page.getByRole("dialog", { name: "Confirm revoke of v2" });
     await expect(dialog).toBeVisible();
-    await click(dialog.getByRole("button", { name: "Confirm revoke", exact: true }));
+    await click(
+      dialog.getByRole("button", { name: "Confirm revoke", exact: true }),
+    );
     await expect(dialog).toBeHidden({ timeout: 20_000 });
-    await expect(v2).toHaveAttribute("data-state", "revoked", { timeout: 20_000 });
-    await expect(versionEntry(page, 1)).toHaveAttribute("data-state", "superseded");
+    await expect(v2).toHaveAttribute("data-state", "revoked", {
+      timeout: 20_000,
+    });
+    await expect(versionEntry(page, 1)).toHaveAttribute(
+      "data-state",
+      "superseded",
+    );
 
-    const [row] = await rows(db, "SELECT revoke FROM versions WHERE id = ?", [spring.v2Id]);
+    const [row] = await rows(db, "SELECT revoke FROM versions WHERE id = ?", [
+      spring.v2Id,
+    ]);
     const day = longDate(json(row.revoke).confirmedAt);
-    const revoked = await coralRender(request, spring, 2, "revoke-recovery-v2-revoked");
-    await expectError(revoked.res, 410, "version_revoked", `Version 2 was revoked on ${day}. No version is active.`);
-    const v1 = await coralRender(request, spring, 1, "revoke-recovery-v1-after");
+    const revoked = await coralRender(
+      request,
+      spring,
+      2,
+      "revoke-recovery-v2-revoked",
+    );
+    await expectError(
+      revoked.res,
+      410,
+      "version_revoked",
+      `Version 2 was revoked on ${day}. No version is active.`,
+    );
+    const v1 = await coralRender(
+      request,
+      spring,
+      1,
+      "revoke-recovery-v1-after",
+    );
     expect(v1.res.status(), "v1 still renders").toBe(200);
   });
 
@@ -184,29 +245,62 @@ test("after the Active version is revoked, an author corrects it from its conten
   await test.step("2.1 Maya opens the template: Revoked, and Edit is hers to press", async () => {
     await openWorkspace(page, "maya", templateId);
     await expect(statusBadge(page)).toHaveText("Revoked");
-    await expect(documentEditor(page)).toHaveAttribute("contenteditable", "false");
-    await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeEnabled();
+    await expect(documentEditor(page)).toHaveAttribute(
+      "contenteditable",
+      "false",
+    );
+    await expect(
+      page.getByRole("button", { name: "Edit", exact: true }),
+    ).toBeEnabled();
   });
 
   await test.step("2.2 Edit opens a draft Based on v2, with v2's content; the variable flags compare with v1", async () => {
     await tap(page.getByRole("button", { name: "Edit", exact: true }));
     await expect(statusBadge(page)).toHaveText("Draft", { timeout: 20_000 });
-    await expect(page).toHaveURL(new RegExp(`/${TEAM}/templates/${templateId}$`));
-    await expect(page.locator("header").filter({ visible: true }).getByText("Based on v2", { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(
+      new RegExp(`/${TEAM}/templates/${templateId}$`),
+    );
+    await expect(
+      page
+        .locator("header")
+        .filter({ visible: true })
+        .getByText("Based on v2", { exact: true }),
+    ).toBeVisible();
     await liveEditor(page);
-    await expect(documentEditor(page)).toHaveAttribute("contenteditable", "true");
-    await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+    await expect(documentEditor(page)).toHaveAttribute(
+      "contenteditable",
+      "true",
+    );
+    await expect(
+      page.getByRole("button", { name: "Edit", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Submit for review" }),
+    ).toBeEnabled();
 
-    const [draft] = await rows(db, "SELECT * FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
-    const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [spring.v2Id]);
-    expect(draft.based_on_version_id, "based on the revoked version").toBe(spring.v2Id);
-    expect(json(draft.body), "v2's body, block ids and all").toEqual(json(v2.body));
+    const [draft] = await rows(
+      db,
+      "SELECT * FROM versions WHERE template_id = ? AND state = 'draft'",
+      [templateId],
+    );
+    const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
+      spring.v2Id,
+    ]);
+    expect(draft.based_on_version_id, "based on the revoked version").toBe(
+      spring.v2Id,
+    );
+    expect(json(draft.body), "v2's body, block ids and all").toEqual(
+      json(v2.body),
+    );
     expect(json(draft.variables)).toEqual(json(v2.variables));
 
     // Against v1, offer_end_date is no longer required; against the revoked v2 nothing would be flagged.
-    await expect(panelRow(page, "offer_end_date")).toContainText("Now optional");
-    await expect(panelRow(page, "first_name")).not.toContainText("Now optional");
+    await expect(panelRow(page, "offer_end_date")).toContainText(
+      "Now optional",
+    );
+    await expect(panelRow(page, "first_name")).not.toContainText(
+      "Now optional",
+    );
   });
 
   await test.step("2.3 She fixes the sentence", async () => {
@@ -234,11 +328,23 @@ test("after the Active version is revoked, an author corrects it from its conten
     await expect(dialog).not.toContainText("No contract changes from v2");
     await tap(dialog.getByRole("button", { name: "Submit v3", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
-    await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
+    await expect(statusBadge(page)).toHaveText("In review", {
+      timeout: 20_000,
+    });
 
-    const [v3] = await rows(db, "SELECT * FROM versions WHERE template_id = ? AND number = 3", [templateId]);
-    expect(v3).toMatchObject({ state: "in_review", submitted_by: "maya", based_on_version_id: spring.v2Id });
-    expect(json(v3.contract_changes)).toEqual([{ kind: "made_optional", key: "offer_end_date", breaking: false }]);
+    const [v3] = await rows(
+      db,
+      "SELECT * FROM versions WHERE template_id = ? AND number = 3",
+      [templateId],
+    );
+    expect(v3).toMatchObject({
+      state: "in_review",
+      submitted_by: "maya",
+      based_on_version_id: spring.v2Id,
+    });
+    expect(json(v3.contract_changes)).toEqual([
+      { kind: "made_optional", key: "offer_end_date", breaking: false },
+    ]);
   });
 
   // ── 4. Approve and render ──────────────────────────────────────────────────
@@ -246,27 +352,47 @@ test("after the Active version is revoked, an author corrects it from its conten
   await test.step("4.1 Jordan's review screen redlines v3 against the revoked v2: the fix is the one change", async () => {
     await asPersona(page, "jordan");
     await page.goto(`/${TEAM}/review/${templateId}/3`);
-    await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: SPRING_NAME }),
+    ).toBeVisible();
     await liveEditor(page);
     await hydrated(page);
-    await expect(decision(page).getByRole("region", { name: "Contract changes" })).toContainText("v3 makes offer_end_date optional.");
+    await expect(
+      decision(page).getByRole("region", { name: "Contract changes" }),
+    ).toContainText("v3 makes offer_end_date optional.");
     await expect(documentEditor(page)).toContainText(FIX.trim());
 
     // Nothing is Active, so the redline is against the version the correction started from, not v1 (what still renders).
-    const toggles = page.locator("[data-change-toggles]").filter({ visible: true });
+    const toggles = page
+      .locator("[data-change-toggles]")
+      .filter({ visible: true });
     const showChanges = page.getByRole("switch", { name: "Show changes" });
-    await expect(toggles.locator('label[title="Show changes"] span[title]'), "one change: the fixed paragraph").toHaveText("1");
+    await expect(
+      toggles.locator('label[title="Show changes"] span[title]'),
+      "one change: the fixed paragraph",
+    ).toHaveText("1");
     await click(showChanges);
     await expect(showChanges).toBeChecked();
-    await expect(toggles.locator('[data-slot="baseline-label"]')).toHaveText("vs v2 (revoked)");
-    const redline = page.locator("[data-redline-document]").filter({ visible: true });
+    await expect(toggles.locator('[data-slot="baseline-label"]')).toHaveText(
+      "vs v2 (revoked)",
+    );
+    const redline = page
+      .locator("[data-redline-document]")
+      .filter({ visible: true });
     await expect(redline).toBeVisible();
     const changed = redline.locator('[data-redline="changed"]');
     await expect(changed).toHaveCount(1);
     await expect(changed).toContainText(GREETING);
     await expect(changed.locator("ins")).toContainText(FIX.trim());
-    await expect(changed.locator("del"), "the sentence was added to, nothing taken out").toHaveCount(0);
-    await expect(redline.locator('[data-redline="added"], [data-redline="removed"], [data-redline="moved"]')).toHaveCount(0);
+    await expect(
+      changed.locator("del"),
+      "the sentence was added to, nothing taken out",
+    ).toHaveCount(0);
+    await expect(
+      redline.locator(
+        '[data-redline="added"], [data-redline="removed"], [data-redline="moved"]',
+      ),
+    ).toHaveCount(0);
 
     await click(showChanges);
     await expect(showChanges).not.toBeChecked();
@@ -275,14 +401,25 @@ test("after the Active version is revoked, an author corrects it from its conten
 
   await test.step("4.2 Jordan approves v3: it goes live over nothing, with no sunset to set", async () => {
     await viewEveryOutput(page);
-    await click(decision(page).getByRole("button", { name: "Approve", exact: true }));
+    await click(
+      decision(page).getByRole("button", { name: "Approve", exact: true }),
+    );
     const dialog = page.getByRole("dialog", { name: "Approve v3" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText("v3 becomes Active.");
+    await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText(
+      "v3 becomes Active.",
+    );
     // N3: nothing is Active, but v1 still renders, so its consumers are who move to v3: not a first version.
-    await expect(dialog.locator('[data-slot="consequences"]')).toContainText("v1");
-    await expect(dialog).not.toContainText("Consumers can start using it right away.");
-    await expect(dialog.getByRole("checkbox"), "no previous Active version to sunset").toHaveCount(0);
+    await expect(dialog.locator('[data-slot="consequences"]')).toContainText(
+      "v1",
+    );
+    await expect(dialog).not.toContainText(
+      "Consumers can start using it right away.",
+    );
+    await expect(
+      dialog.getByRole("checkbox"),
+      "no previous Active version to sunset",
+    ).toHaveCount(0);
     await expect(dialog.getByText(/sunset/i)).toHaveCount(0);
     await tap(dialog.getByRole("button", { name: "Approve v3", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
@@ -290,22 +427,47 @@ test("after the Active version is revoked, an author corrects it from its conten
   });
 
   await test.step("4.3 The database: v3 Active, v2 still Revoked, v1 still Superseded; Coral is told about v3", async () => {
-    const list = await rows(db, "SELECT id, number, state, sunset_at FROM versions WHERE template_id = ? ORDER BY number", [templateId]);
+    const list = await rows(
+      db,
+      "SELECT id, number, state, sunset_at FROM versions WHERE template_id = ? ORDER BY number",
+      [templateId],
+    );
     expect(list).toEqual([
       { id: v1Id, number: 1, state: "superseded", sunset_at: null },
       { id: spring.v2Id, number: 2, state: "revoked", sunset_at: null },
       { id: expect.any(String), number: 3, state: "active", sunset_at: null },
     ]);
-    const [activated] = await rows(db, "SELECT details FROM audit_events WHERE template_id = ? AND action = 'version.activated' ORDER BY at DESC LIMIT 1", [templateId]);
-    expect(json(activated.details)).toMatchObject({ number: 3, supersedes: null });
-    expect(await rows(db, "SELECT id FROM audit_events WHERE template_id = ? AND action IN ('version.superseded', 'version.sunset_set')", [templateId])).toEqual([]);
+    const [activated] = await rows(
+      db,
+      "SELECT details FROM audit_events WHERE template_id = ? AND action = 'version.activated' ORDER BY at DESC LIMIT 1",
+      [templateId],
+    );
+    expect(json(activated.details)).toMatchObject({
+      number: 3,
+      supersedes: null,
+    });
+    expect(
+      await rows(
+        db,
+        "SELECT id FROM audit_events WHERE template_id = ? AND action IN ('version.superseded', 'version.sunset_set')",
+        [templateId],
+      ),
+    ).toEqual([]);
 
-    const notices = await rows(db, "SELECT consumer_id, kind, payload FROM consumer_notices WHERE template_id = ? ORDER BY created_at, id", [templateId]);
+    const notices = await rows(
+      db,
+      "SELECT consumer_id, kind, payload FROM consumer_notices WHERE template_id = ? ORDER BY created_at, id",
+      [templateId],
+    );
     expect(notices.map((n) => [n.consumer_id, n.kind])).toEqual([
       ["coral", "revoked"],
       ["coral", "new_version"],
     ]);
-    expect(json(notices[0].payload)).toMatchObject({ versionNumber: 2, activeVersion: null, reason: REASON });
+    expect(json(notices[0].payload)).toMatchObject({
+      versionNumber: 2,
+      activeVersion: null,
+      reason: REASON,
+    });
     expect(json(notices[1].payload)).toMatchObject({
       versionNumber: 3,
       activeVersion: 3,
@@ -319,8 +481,20 @@ test("after the Active version is revoked, an author corrects it from its conten
     expect(v3.res.headers()["x-stencil-version"]).toBe("3");
     expect(await v3.res.text()).toContain(FIX.trim());
 
-    const [row] = await rows(db, "SELECT revoke FROM versions WHERE id = ?", [spring.v2Id]);
-    const v2 = await coralRender(request, spring, 2, "revoke-recovery-v2-final");
-    await expectError(v2.res, 410, "version_revoked", `Version 2 was revoked on ${longDate(json(row.revoke).confirmedAt)}. Version 3 is active.`);
+    const [row] = await rows(db, "SELECT revoke FROM versions WHERE id = ?", [
+      spring.v2Id,
+    ]);
+    const v2 = await coralRender(
+      request,
+      spring,
+      2,
+      "revoke-recovery-v2-final",
+    );
+    await expectError(
+      v2.res,
+      410,
+      "version_revoked",
+      `Version 2 was revoked on ${longDate(json(row.revoke).confirmedAt)}. Version 3 is active.`,
+    );
   });
 });

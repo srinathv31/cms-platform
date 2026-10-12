@@ -14,13 +14,25 @@ export interface DayGroup {
   items: ActivityItem[];
 }
 
-export function dayGroups(items: readonly ActivityItem[], now: Date): DayGroup[] {
+export function dayGroups(
+  items: readonly ActivityItem[],
+  now: Date,
+): DayGroup[] {
   const groups: DayGroup[] = [];
   for (const item of items) {
     const key = utcDay(item.at);
     const last = groups[groups.length - 1];
     if (last && last.key === key) last.items.push(item);
-    else groups.push({ key, label: formatAgo(item.at, now, { precision: "day", dateFrom: 2, capitalize: true }), items: [item] });
+    else
+      groups.push({
+        key,
+        label: formatAgo(item.at, now, {
+          precision: "day",
+          dateFrom: 2,
+          capitalize: true,
+        }),
+        items: [item],
+      });
   }
   return groups;
 }

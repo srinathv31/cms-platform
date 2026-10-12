@@ -11,7 +11,11 @@ import {
   type MessageInput,
   type MessageResult,
 } from "@/domain/render";
-import { channelFieldValue, channelFieldsOf, type ChannelFields } from "@/domain/channel-fields";
+import {
+  channelFieldValue,
+  channelFieldsOf,
+  type ChannelFields,
+} from "@/domain/channel-fields";
 import type {
   CanonicalValues,
   EmailFields,
@@ -23,7 +27,13 @@ import type {
   ResolveContext,
   SmsRender,
 } from "@/domain/render/types";
-import { isDocumentChannel, type Channel, type DocumentChannel, type JSONContent, type Variable } from "@/domain/types";
+import {
+  isDocumentChannel,
+  type Channel,
+  type DocumentChannel,
+  type JSONContent,
+  type Variable,
+} from "@/domain/types";
 import { renderEmail } from "./channels/email";
 import { renderPdf, UnrenderableCharactersError } from "./channels/pdf";
 import { renderPush } from "./channels/push";
@@ -70,7 +80,8 @@ export interface EngineInput {
 }
 
 /** pdf: bytes; web: the HTML document; email: subject, preheader, html and text; push and sms: their JSON. */
-export type RenderBody = Uint8Array | string | EmailRender | PushRender | SmsRender;
+export type RenderBody =
+  Uint8Array | string | EmailRender | PushRender | SmsRender;
 
 export type EngineResult =
   | {
@@ -92,9 +103,18 @@ export type EngineResult =
  * Renders one target: a channel, and for a push its platform. `at` is the render time, used only as the
  * PDF's creation and modification date, so the same input at the same time gives the same bytes.
  */
-export async function runEngine(input: EngineInput, target: RenderTarget, at: Date): Promise<EngineResult> {
+export async function runEngine(
+  input: EngineInput,
+  target: RenderTarget,
+  at: Date,
+): Promise<EngineResult> {
   const { channel } = target;
-  const thrown = (stage: 7 | 8 | 9, cause: unknown): EngineResult => ({ ok: false, stage, error: renderFailure(channel, cause), cause });
+  const thrown = (stage: 7 | 8 | 9, cause: unknown): EngineResult => ({
+    ok: false,
+    stage,
+    error: renderFailure(channel, cause),
+    cause,
+  });
 
   // 6. Values, canonicalized.
   const validated = validateValues(input.variables, input.values);
@@ -118,7 +138,13 @@ export async function runEngine(input: EngineInput, target: RenderTarget, at: Da
     case "pdf":
     case "web":
     case "email":
-      return renderDocument(input, target.channel, validated.values, at, thrown);
+      return renderDocument(
+        input,
+        target.channel,
+        validated.values,
+        at,
+        thrown,
+      );
     case "push":
     case "sms": {
       // 8 and 9: resolve and measure, in the domain (the browser preview runs the same function).
@@ -130,11 +156,16 @@ export async function runEngine(input: EngineInput, target: RenderTarget, at: Da
       };
       let result: MessageResult<PushRender | SmsRender>;
       try {
-        result = target.channel === "push" ? renderPush(target.platform, message) : renderSms(message);
+        result =
+          target.channel === "push"
+            ? renderPush(target.platform, message)
+            : renderSms(message);
       } catch (error) {
         return thrown(8, error);
       }
-      return result.ok ? { ok: true, doc: null, body: result.output } : { ok: false, stage: 9, error: result.error };
+      return result.ok
+        ? { ok: true, doc: null, body: result.output }
+        : { ok: false, stage: 9, error: result.error };
     }
     default:
       return assertNever(target, "render target");
@@ -164,7 +195,11 @@ async function renderDocument(
     fields = Object.fromEntries(
       channelFieldsOf(channel).map((field) => [
         field.key,
-        resolveChannelField(channelFieldValue(input.channelFields, field), field, ctx),
+        resolveChannelField(
+          channelFieldValue(input.channelFields, field),
+          field,
+          ctx,
+        ),
       ]),
     );
   } catch (error) {
@@ -182,7 +217,12 @@ async function renderDocument(
 /** The rendered channel's own fields as text, by key: a field with no value is "". */
 type ResolvedFields = Readonly<Record<string, string>>;
 
-async function adapt(channel: DocumentChannel, doc: RenderDoc, fields: ResolvedFields, at: Date): Promise<RenderBody> {
+async function adapt(
+  channel: DocumentChannel,
+  doc: RenderDoc,
+  fields: ResolvedFields,
+  at: Date,
+): Promise<RenderBody> {
   switch (channel) {
     case "pdf":
       return renderPdf(doc, { createdAt: at });
@@ -203,7 +243,9 @@ async function adapt(channel: DocumentChannel, doc: RenderDoc, fields: ResolvedF
  * a value (the glyphs message shows single characters only).
  */
 export function renderFailure(channel: Channel, error: unknown): RenderError {
-  if (error instanceof RenderDocumentError || error instanceof ResolveError) return renderFailedDocument(channel, error.message);
-  if (error instanceof UnrenderableCharactersError) return renderFailedGlyphs(error.characters);
+  if (error instanceof RenderDocumentError || error instanceof ResolveError)
+    return renderFailedDocument(channel, error.message);
+  if (error instanceof UnrenderableCharactersError)
+    return renderFailedGlyphs(error.characters);
   return renderFailed(channel);
 }

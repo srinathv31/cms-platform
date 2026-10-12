@@ -2,7 +2,12 @@
 
 import { useLayoutEffect } from "react";
 import Link from "next/link";
-import { ErrorDigest, RetryButton, useLibraryHref, type RouteErrorProps } from "@/components/app-shell/route-error";
+import {
+  ErrorDigest,
+  RetryButton,
+  useLibraryHref,
+  type RouteErrorProps,
+} from "@/components/app-shell/route-error";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useWorkspaceSession } from "./session/workspace-session";
@@ -25,13 +30,27 @@ export function TabError({ error, retry }: RouteErrorProps) {
   // Before paint, so the bar never shows its actions live beside an error.
   useLayoutEffect(() => session.failTab(), [session]);
   return (
-    <div data-slot="tab-error" className={cn(WS.doc, "flex flex-col items-start gap-4")}>
+    <div
+      data-slot="tab-error"
+      className={cn(WS.doc, "flex flex-col items-start gap-4")}
+    >
       <p role="alert" className="text-[15px] leading-6 text-text">
         {TAB_FAILED}
       </p>
       <div className="flex items-center gap-2">
-        <RetryButton retry={retry} variant="outline" size="lg" className="bg-surface px-3.5" />
-        <Button variant="ghost" size="lg" className="px-3.5" nativeButton={false} render={<Link href={library} />}>
+        <RetryButton
+          retry={retry}
+          variant="outline"
+          size="lg"
+          className="bg-surface px-3.5"
+        />
+        <Button
+          variant="ghost"
+          size="lg"
+          className="px-3.5"
+          nativeButton={false}
+          render={<Link href={library} />}
+        >
           Back to library
         </Button>
       </div>

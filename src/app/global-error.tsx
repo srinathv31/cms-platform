@@ -1,7 +1,10 @@
 "use client";
 
 import "./globals.css";
-import { GlobalErrorView, type RouteErrorProps } from "@/components/app-shell/route-error";
+import {
+  GlobalErrorView,
+  type RouteErrorProps,
+} from "@/components/app-shell/route-error";
 import { fontVariables } from "@/styles/fonts";
 
 // The root layout, or the app frame in (product)/layout.tsx, threw. This replaces the root layout, so it

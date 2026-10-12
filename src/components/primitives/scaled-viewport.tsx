@@ -1,6 +1,13 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { cn } from "@/lib/utils";
 
 // Content laid out at a fixed size in CSS px, then scaled down evenly with a CSS transform to fit its box. A
@@ -29,7 +36,11 @@ export function useBoxSize(ref: RefObject<HTMLElement | null>): BoxSize | null {
     if (!el) return;
     const measure = () => {
       const next = { width: el.clientWidth, height: el.clientHeight };
-      setBox((now) => (now && now.width === next.width && now.height === next.height ? now : next));
+      setBox((now) =>
+        now && now.width === next.width && now.height === next.height
+          ? now
+          : next,
+      );
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -44,8 +55,19 @@ export function useBoxSize(ref: RefObject<HTMLElement | null>): BoxSize | null {
  * `minScale`: in a box shorter than that, the content keeps `minScale` and runs past the box's bottom, so a
  * scroller around it scrolls instead of the content becoming unreadably small.
  */
-export function containScale(box: BoxSize, size: BoxSize, minScale = 0): number {
-  return Math.max(0, Math.min(1, box.width / size.width, Math.max(minScale, box.height / size.height)));
+export function containScale(
+  box: BoxSize,
+  size: BoxSize,
+  minScale = 0,
+): number {
+  return Math.max(
+    0,
+    Math.min(
+      1,
+      box.width / size.width,
+      Math.max(minScale, box.height / size.height),
+    ),
+  );
 }
 
 /** Hidden, and taking no room, until the box has been measured. */
@@ -78,7 +100,11 @@ export function ScaledViewport({
     >
       <div
         className="absolute top-0 left-0 origin-top-left"
-        style={{ width, height: box ? box.height / scale : "100%", transform: `scale(${scale})` }}
+        style={{
+          width,
+          height: box ? box.height / scale : "100%",
+          transform: `scale(${scale})`,
+        }}
       >
         {children}
       </div>
@@ -112,7 +138,11 @@ export function ScaledBox({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const box = useBoxSize(ref);
-  const scale = box ? (scaleFor ? scaleFor(box) : containScale(box, { width, height })) : 1;
+  const scale = box
+    ? scaleFor
+      ? scaleFor(box)
+      : containScale(box, { width, height })
+    : 1;
   // Half a px of slack: a content that fits to the rounding is not running past the box.
   const overflows = box !== null && height * scale > box.height + 0.5;
   return (
@@ -121,9 +151,19 @@ export function ScaledBox({
         data-slot="scaled-reserve"
         data-scale={box ? scale.toFixed(3) : undefined}
         className="relative mx-auto"
-        style={box ? { width: width * scale, height: height * scale + (overflows ? room : 0) } : { ...UNMEASURED, width: 0, height: 0 }}
+        style={
+          box
+            ? {
+                width: width * scale,
+                height: height * scale + (overflows ? room : 0),
+              }
+            : { ...UNMEASURED, width: 0, height: 0 }
+        }
       >
-        <div className="absolute top-0 left-0 origin-top-left" style={{ width, height, transform: `scale(${scale})` }}>
+        <div
+          className="absolute top-0 left-0 origin-top-left"
+          style={{ width, height, transform: `scale(${scale})` }}
+        >
           {children}
         </div>
       </div>

@@ -49,28 +49,55 @@ export interface TruncationWarnings {
  * The warnings for a push, from each platform's lock screen as measured: "iPhone lock screen cuts after
  * “…payment of”." When both platforms cut a title at the same word, one sentence names both.
  */
-export function truncationWarnings(fits: readonly LockScreenFit[], text: PushFullText): TruncationWarnings {
+export function truncationWarnings(
+  fits: readonly LockScreenFit[],
+  text: PushFullText,
+): TruncationWarnings {
   const ios = fits.find((fit) => fit.platform === "ios") ?? null;
   return {
     title: cutSentence(
-      fits.filter((fit) => fit.title.shown && fit.title.cut).map((fit) => ({ platform: fit.platform, visible: fit.title.visibleText })),
+      fits
+        .filter((fit) => fit.title.shown && fit.title.cut)
+        .map((fit) => ({
+          platform: fit.platform,
+          visible: fit.title.visibleText,
+        })),
       text.title,
     ),
     subtitle:
       ios?.subtitle?.shown && ios.subtitle.cut
-        ? cutSentence([{ platform: "ios", visible: ios.subtitle.visibleText }], text.subtitle ?? "")
+        ? cutSentence(
+            [{ platform: "ios", visible: ios.subtitle.visibleText }],
+            text.subtitle ?? "",
+          )
         : null,
-    body: ios?.body.shown && ios.body.cut ? cutSentence([{ platform: "ios", visible: ios.body.visibleText }], text.body) : null,
+    body:
+      ios?.body.shown && ios.body.cut
+        ? cutSentence(
+            [{ platform: "ios", visible: ios.body.visibleText }],
+            text.body,
+          )
+        : null,
   };
 }
 
-function cutSentence(cuts: readonly { platform: PushPlatform; visible: string }[], full: string): string | null {
+function cutSentence(
+  cuts: readonly { platform: PushPlatform; visible: string }[],
+  full: string,
+): string | null {
   if (cuts.length === 0) return null;
-  const tails = cuts.map((cut) => ({ platform: cut.platform, tail: quotedTail(roundToWord(full, cut.visible)) }));
+  const tails = cuts.map((cut) => ({
+    platform: cut.platform,
+    tail: quotedTail(roundToWord(full, cut.visible)),
+  }));
   if (tails.length > 1 && tails.every((t) => t.tail === tails[0]!.tail)) {
     return `${tails.map((t) => PLATFORM_LABELS[t.platform]).join(" and ")} lock screens cut after ${tails[0]!.tail}.`;
   }
-  return tails.map((t) => `${PLATFORM_LABELS[t.platform]} lock screen cuts after ${t.tail}.`).join(" ");
+  return tails
+    .map(
+      (t) => `${PLATFORM_LABELS[t.platform]} lock screen cuts after ${t.tail}.`,
+    )
+    .join(" ");
 }
 
 /**
@@ -98,7 +125,8 @@ export function quotedTail(text: string): string {
   const tail: string[] = [];
   for (let i = words.length - 1; i >= 0; i--) {
     tail.unshift(words[i]!);
-    if (tail.length >= 3 || (tail.length === 2 && tail.join(" ").length >= 8)) break;
+    if (tail.length >= 3 || (tail.length === 2 && tail.join(" ").length >= 8))
+      break;
   }
   const more = tail.length < words.length ? "…" : "";
   return `“${more}${tail.join(" ")}”`;

@@ -6,7 +6,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PushContent } from "@/components/device";
-import { channelFieldValues, type ChannelFieldValues } from "@/domain/channel-fields";
+import {
+  channelFieldValues,
+  type ChannelFieldValues,
+} from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
 import { usePushContent, usePushFit } from "./push-fit";
 
@@ -21,7 +24,9 @@ vi.mock("@/components/device", () => ({
   },
 }));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
@@ -36,7 +41,10 @@ afterEach(() => {
   container.remove();
 });
 
-const doc = (text: string): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+const doc = (text: string): JSONContent => ({
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
 // As the composer has them: the same objects from one render to the next.
 const RULES = { smsFooter: null, smsMaxParts: 3 };
 const VARIABLES: never[] = [];
@@ -44,21 +52,38 @@ const VALUES = {};
 const contents: (PushContent | null)[] = [];
 
 function Composer({ fields }: { fields: ChannelFieldValues }) {
-  const content = usePushContent({ on: true, fields, variables: VARIABLES, values: VALUES, rules: RULES, appName: "Coral" });
+  const content = usePushContent({
+    on: true,
+    fields,
+    variables: VARIABLES,
+    values: VALUES,
+    rules: RULES,
+    appName: "Coral",
+  });
   contents.push(content);
   return <>{usePushFit(content).probe}</>;
 }
 
-const show = (fields: ChannelFieldValues) => act(() => root.render(<Composer fields={fields} />));
+const show = (fields: ChannelFieldValues) =>
+  act(() => root.render(<Composer fields={fields} />));
 
 describe("the phones that measure the push", () => {
   it("aren't redrawn by a keystroke in the SMS, and are by one in the push", () => {
     contents.length = 0;
     const title = doc("Payment due");
-    const fields = { ...channelFieldValues({}), "push.title": title, "push.body": doc("Hi Maya."), "sms.text": doc("Hi") };
+    const fields = {
+      ...channelFieldValues({}),
+      "push.title": title,
+      "push.body": doc("Hi Maya."),
+      "sms.text": doc("Hi"),
+    };
     show(fields);
     const first = contents.at(-1);
-    expect(first).toMatchObject({ appName: "Coral", title: "Payment due", body: "Hi Maya." });
+    expect(first).toMatchObject({
+      appName: "Coral",
+      title: "Payment due",
+      body: "Hi Maya.",
+    });
     const drawnFirst = drawn.count;
     expect(drawnFirst).toBe(2);
 
@@ -67,7 +92,11 @@ describe("the phones that measure the push", () => {
     expect(contents.at(-1)).toBe(first);
     expect(drawn.count).toBe(drawnFirst);
 
-    show({ ...fields, "sms.text": doc("Hi there"), "push.title": doc("Payment due Friday") });
+    show({
+      ...fields,
+      "sms.text": doc("Hi there"),
+      "push.title": doc("Payment due Friday"),
+    });
     expect(contents.at(-1)).toMatchObject({ title: "Payment due Friday" });
     expect(drawn.count).toBe(drawnFirst + 2);
   });

@@ -7,7 +7,10 @@ import { MOBILE_BREAKPOINT } from "./use-mobile";
 // The two must be the same number: a gap would show the column and the drawer's button together, or neither.
 // A `shadcn add sidebar` that overwrites the hook brings back 768 and fails this.
 
-const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+const css = readFileSync(
+  new URL("../app/globals.css", import.meta.url),
+  "utf8",
+);
 
 describe("the shell's breakpoint", () => {
   it("is 800px", () => {
@@ -15,12 +18,19 @@ describe("the shell's breakpoint", () => {
   });
 
   it("is the number in globals.css's `narrow:` and `wide:` variants", () => {
-    expect(css).toContain(`@custom-variant narrow (@media (max-width: ${MOBILE_BREAKPOINT - 1}px));`);
-    expect(css).toContain(`@custom-variant wide (@media (min-width: ${MOBILE_BREAKPOINT}px));`);
+    expect(css).toContain(
+      `@custom-variant narrow (@media (max-width: ${MOBILE_BREAKPOINT - 1}px));`,
+    );
+    expect(css).toContain(
+      `@custom-variant wide (@media (min-width: ${MOBILE_BREAKPOINT}px));`,
+    );
   });
 
   it("is the one tokens.css gives the canvas a narrow padding below", () => {
-    const tokens = readFileSync(new URL("../styles/tokens.css", import.meta.url), "utf8");
+    const tokens = readFileSync(
+      new URL("../styles/tokens.css", import.meta.url),
+      "utf8",
+    );
     expect(tokens).toContain(`@media (max-width: ${MOBILE_BREAKPOINT - 1}px)`);
   });
 });
