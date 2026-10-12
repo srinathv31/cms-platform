@@ -95,7 +95,6 @@ export const API_ERROR_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   push_payload_too_large: 422,
   sms_too_long: 422,
   render_failed: 500,
-  consumer_not_found: 404,
   consumer_mismatch: 403,
 };
 

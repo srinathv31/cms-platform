@@ -215,6 +215,46 @@ describe("POST /api/templates/[templateId]/preview: the session's person", () =>
     );
     await expectError(forbidden, 403, "preview_forbidden");
   });
+
+  // The session is resolved before a byte of the body is read, as drafts and imports do, so a sign-in
+  // that refuses (`getViewer()` failing closed) stops the request before the body is buffered.
+  it("resolves the person before it reads the body", async () => {
+    const events: string[] = [];
+    vi.mocked(getViewer).mockImplementation(async () => {
+      events.push("viewer");
+      return people.maya!;
+    });
+    const json = new TextEncoder().encode(
+      JSON.stringify({ version: 2, channel: "web", values: CUSTOMER }),
+    );
+    // No queue ahead of a read (highWaterMark 0), so `pull` runs only when the route reads the body.
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          events.push("body");
+          controller.enqueue(json);
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const templateId = ids["balance-transfer"]!;
+    const request = new Request(
+      `http://localhost/api/templates/${templateId}/preview`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        duplex: "half",
+      } as RequestInit,
+    ) as NextRequest;
+    const res = await POST(request, {
+      params: Promise.resolve({ templateId }),
+    } as Parameters<typeof POST>[1]);
+    expect(res.status).toBe(200);
+    expect(events[0]).toBe("viewer");
+    expect(events).toContain("body");
+  });
 });
 
 // ── Rounds ───────────────────────────────────────────────────────────────────
@@ -396,7 +436,6 @@ describe("POST …/preview: bodies and errors", () => {
       { "Content-Length": String(MAX_BODY_BYTES + 1) },
     );
     await expectError(res, 413, "body_too_large");
-    expect(getViewer).not.toHaveBeenCalled();
   });
 
   it("generates a correlation id when none is sent", async () => {
