@@ -134,6 +134,9 @@ export default defineConfig({
           env: {
             DATABASE_URL: e2eDatabaseUrl(slot),
             UPLOADS_DIR: e2eUploadsDir(slot),
+            // The specs use the Demo pill, the clock and the persona switcher, which are off unless this is set
+            // (decision 0051). The production build is the same either way: the flag is read when the server starts.
+            DEMO_MODE: "1",
           },
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,

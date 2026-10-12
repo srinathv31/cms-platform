@@ -1,5 +1,5 @@
 // Phase 1 walkthrough recording (1440x900, under 60s) against a fresh demo on :3100.
-// Usage: npm run db:reset && npx next start -p 3100   (then)   node e2e/qa/walkthrough-phase-1.mjs
+// Usage: npm run db:reset && DEMO_MODE=1 npx next start -p 3100   (then)   node e2e/qa/walkthrough-phase-1.mjs
 import { chromium } from "@playwright/test";
 import { mkdirSync, renameSync, rmSync } from "node:fs";
 
