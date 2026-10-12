@@ -12,6 +12,7 @@ the root [README.md](../README.md).
 | [architecture.md](architecture.md) | The layers, what may import what, how a page, a mutation, an autosave and a consumer render flow through the code, and the data model. |
 | [render-spec.md](render-spec.md) | The render engine's specification: the stored document, normalization at save, values, links, lists, the `RenderDoc`, each channel, errors, and the golden-file contract. Normative: a second engine is built from it. Its golden files are in [src/server/render/golden](../src/server/render/golden/README.md). |
 | [handoff-review.md](handoff-review.md) | The October 2026 codebase review as a working backlog: every finding's severity, status, location and fix, and what the fixes turned up. Its "Fix first" list is done; agents pick work from "Found while fixing" and "Alongside: tooling and hygiene", and the PR that fixes a finding updates its status. |
+| [quality-review-2026-10-12.md](quality-review-2026-10-12.md) | The October 12, 2026 quality review: scores, new findings (H-, M- and L- ids), the decisions the Java team needs, and a reading order. A dated snapshot; its [nine slice reports](quality-review-2026-10-12/reports/) sit beside it. The work it led to is planned in [to-do.md](../to-do.md). |
 | Layer READMEs | One per folder under `src/`, next to the code: [app](../src/app/README.md), [components](../src/components/README.md), [contracts](../src/contracts/README.md), [domain](../src/domain/README.md), [editor](../src/editor/README.md), [server](../src/server/README.md), [simulator](../src/simulator/README.md). |
 | [guides/](guides/) | Step-by-step how-tos. Today: the [demo script](guides/demo-script.md). |
 | [reference/](reference/) | Lookup material. Today: the [UI checklist](reference/ui-checklist.md). |
@@ -28,8 +29,9 @@ the root [README.md](../README.md).
   [render-spec.md](render-spec.md) stays at the top of `docs/` because so much code cites it there.
 - **It's a choice someone might question later**: a record in [decisions/](decisions/README.md).
 - **It's a plan, a brief or a status report**: not here. Put it in the PR or issue; it goes stale as soon as the
-  work lands. The one exception is [handoff-review.md](handoff-review.md): a backlog that stays true because
-  each PR that fixes a finding updates it.
+  work lands. The exceptions are [handoff-review.md](handoff-review.md), a backlog that stays true because each PR that
+  fixes a finding updates it, and the dated [October 12 quality review](quality-review-2026-10-12.md) with the
+  [to-do.md](../to-do.md) plan built from it.
 
 ## Keeping them true
 
