@@ -43,3 +43,34 @@ npm run build && npm run e2e   # Playwright, against the production build (4 wor
 
 The formatting commit is listed in [.git-blame-ignore-revs](.git-blame-ignore-revs), so `git blame` can skip it. GitHub
 does this by itself; for a local clone run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once.
+
+If `npm run build` fails on files under `.next/dev/types` (left by an older `next dev`), run `npm run typecheck` once: its
+first step deletes that folder.
+
+## Windows
+
+The commands above run on Windows, in PowerShell or cmd.exe, with Node.js 22.12 or newer (Vitest 5's minimum). npm
+scripts that set a variable use `cross-env`, so they work in either shell. What differs is the one-off settings the docs
+write the Unix way, in front of a command.
+
+| Documented                                                                       | PowerShell                                                                                           |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `E2E_WORKERS=1 npm run e2e`                                                      | `$env:E2E_WORKERS = 1; npm run e2e`                                                                  |
+| `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts`                     | `$env:E2E_PORT = 3000; npx playwright test principles-` (no glob; see below)                         |
+| `DATABASE_URL=file:./data/e2e-0.db UPLOADS_DIR=./data/e2e-uploads-0 npm run dev` | `$env:DATABASE_URL = "file:./data/e2e-0.db"; $env:UPLOADS_DIR = "./data/e2e-uploads-0"; npm run dev` |
+
+- **Variables stay set.** A `$env:` value lasts for the rest of the PowerShell session, so the next `npm run e2e` still
+  runs one worker until you clear it with `Remove-Item Env:E2E_WORKERS`.
+- **No globs.** PowerShell and cmd.exe don't expand `e2e/principles-*.spec.ts`, and Playwright reads each argument as a
+  regular expression on the file path. Give it a fragment of the name instead: `npx playwright test principles-`.
+- **Line endings.** [.gitattributes](.gitattributes) keeps text files LF whatever `core.autocrlf` says. The render golden
+  files are compared byte for byte and Prettier expects LF. If your editor saves CRLF, `npm run format` puts it back.
+- **Database URLs.** `file:./data/app.db` and `file:C:/work/stencil/data/app.db` work; write `/` between folders, and
+  escape `#`, `?` and `%` in a folder name as `%23`, `%3F` and `%25`.
+- **Sync folders.** Keep the checkout out of OneDrive and Dropbox. They hold files open while they sync, which SQLite
+  and `npm run db:reset` don't tolerate.
+- **Symlinks.** The 14 links under `.claude/skills/` point into `.agents/` (agent tooling, which nothing in the app
+  reads). Without symlink support, git writes each as a one-line text file. Ignore them, or turn on Developer Mode and set
+  `git config core.symlinks true` before cloning.
+- **Recording tools.** `npm run gate:media` and `e2e/qa/contact-sheet.mjs` were built on macOS: they call `ffmpeg` at a
+  Homebrew path (set `FFMPEG` to override it) and `sips`. The rest of e2e doesn't need either.
