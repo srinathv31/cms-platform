@@ -30,21 +30,36 @@ const BUTTON =
  * comment button (shown while the pointer or focus is in the field, as the document's hover marker is).
  * Both are 20px and pull into the label's line, so the row is as tall with them as without.
  */
-export function FieldCommentControls({ field, comments }: { field: ChannelField; comments: FieldComments }) {
+export function FieldCommentControls({
+  field,
+  comments,
+}: {
+  field: ChannelField;
+  comments: FieldComments;
+}) {
   const { threads, activeThreadId, onActivate, onRequestComment } = comments;
-  const open = threads.filter((t) => t.blockId === field.id && t.status === "open" && !t.orphaned);
+  const open = threads.filter(
+    (t) => t.blockId === field.id && t.status === "open" && !t.orphaned,
+  );
   const count = open.reduce((n, t) => n + t.comments.length, 0);
-  const active = activeThreadId !== null && open.some((t) => t.id === activeThreadId);
+  const active =
+    activeThreadId !== null && open.some((t) => t.id === activeThreadId);
 
   // Several threads on a field: each press goes on to the next, as a marker in the gutter does.
   const choose = () => {
-    const at = activeThreadId === null ? -1 : open.findIndex((t) => t.id === activeThreadId);
+    const at =
+      activeThreadId === null
+        ? -1
+        : open.findIndex((t) => t.id === activeThreadId);
     onActivate(open[(at + 1) % open.length].id);
   };
 
   if (open.length === 0 && !onRequestComment) return null;
   return (
-    <span data-slot="field-comments" className="-my-0.5 flex items-center gap-0.5">
+    <span
+      data-slot="field-comments"
+      className="-my-0.5 flex items-center gap-0.5"
+    >
       {open.length > 0 ? (
         <button
           type="button"
@@ -68,7 +83,11 @@ export function FieldCommentControls({ field, comments }: { field: ChannelField;
             "text-text-subtle opacity-0 transition-[opacity,color,background-color] duration-(--dur-fast) group-focus-within/field:opacity-100 group-hover/field:opacity-100 hover:bg-hover hover:text-text-muted focus-visible:opacity-100",
           )}
         >
-          <MessageSquarePlus aria-hidden strokeWidth={1.75} className="size-3.5" />
+          <MessageSquarePlus
+            aria-hidden
+            strokeWidth={1.75}
+            className="size-3.5"
+          />
         </button>
       ) : null}
     </span>

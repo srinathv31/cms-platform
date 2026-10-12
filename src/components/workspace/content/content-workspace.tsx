@@ -1,11 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { blockTextOf, fieldTextOf } from "@/components/comments/block-text";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
-import { ThreadList, type ComposerOutcome } from "@/components/comments/thread-list";
+import {
+  ThreadList,
+  type ComposerOutcome,
+} from "@/components/comments/thread-list";
 import { openCount } from "@/components/comments/thread-state";
-import { COMPOSER_THREAD_ID, useReviewThreads } from "@/components/comments/use-review-threads";
+import {
+  COMPOSER_THREAD_ID,
+  useReviewThreads,
+} from "@/components/comments/use-review-threads";
 import { PreviewSurface } from "@/components/preview/preview-surface";
 import { phoneSenders } from "@/components/preview/preview-sender";
 import {
@@ -17,32 +30,57 @@ import {
 } from "@/domain/channel-fields";
 import { copilotUnavailable } from "@/domain/copilot";
 import type { ImportOriginalRef } from "@/domain/import-types";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
+import type {
+  MessageTypeRules,
+  TeamSenders,
+} from "@/domain/platform-config/limits";
 import type { Person } from "@/domain/review-types";
-import type { Channel, ChannelFamily, JSONContent, SampleSet, Variable } from "@/domain/types";
+import type {
+  Channel,
+  ChannelFamily,
+  JSONContent,
+  SampleSet,
+  Variable,
+} from "@/domain/types";
 import type { CommentRequest, DocumentEditorHandle } from "@/editor/types";
 import { cn } from "@/lib/utils";
 import type { ThreadView } from "@/server/queries/threads";
 import { CopilotPromptButton } from "../copilot/copilot-prompt";
 import { takeJustImported } from "../just-imported";
 import { createLiveDraft } from "../session/live-draft";
-import { useInert, usePreviewState, useWorkspaceSession } from "../session/workspace-session";
+import {
+  useInert,
+  usePreviewState,
+  useWorkspaceSession,
+} from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 import { ChannelSelector } from "./channels";
-import { DocumentBody, EditorScope, HistoryBridge, VariablesSection } from "./editor-adapter";
+import {
+  DocumentBody,
+  EditorScope,
+  HistoryBridge,
+  VariablesSection,
+} from "./editor-adapter";
 import { EmailDetails } from "./email-details";
 import type { FieldComments } from "./field-comments";
 import { MessageComposer } from "./message-composer";
 import { Rail } from "./rail";
 
 /** The fields this page shows, which a revert can put back: every channel field among them, by id. */
-const CONTENT_FIELDS = ["body", "variables", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
+const CONTENT_FIELDS = [
+  "body",
+  "variables",
+  "channels",
+  ...CHANNEL_FIELD_IDS,
+  "sampleSets",
+] as const;
 
 /** Before any block's position on screen: where a thread on a document's email field slots in. */
 const FIELDS_FIRST = -1e9;
 
 /** The app's one scrolling element (AppFrame's canvas), which the document scrolls in. */
-const canvasElement = () => document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
+const canvasElement = () =>
+  document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
 
 export interface ContentWorkspaceProps {
   templateId: string;
@@ -186,7 +224,9 @@ export function ContentWorkspace({
   const liveDraft = useMemo(
     () =>
       createLiveDraft({
-        fields: Object.fromEntries(CHANNEL_FIELD_IDS.map((id) => [id, shown[id]])) as ChannelFieldValues,
+        fields: Object.fromEntries(
+          CHANNEL_FIELD_IDS.map((id) => [id, shown[id]]),
+        ) as ChannelFieldValues,
         sampleSets: shown.sampleSets,
       }),
     [shown],
@@ -200,12 +240,19 @@ export function ContentWorkspace({
     const top = keptScroll.current;
     keptScroll.current = null;
     const canvas = canvasElement();
-    if (top !== null && canvas && canvas.scrollTop !== top) canvas.scrollTo({ top, behavior: "instant" });
+    if (top !== null && canvas && canvas.scrollTop !== top)
+      canvas.scrollTo({ top, behavior: "instant" });
   }, [shown.gen]);
 
   // ── Review comments: the state the document's highlights and markers, and the rail's list, share.
   const review = useReviewThreads(threads);
-  const { setActive, openComposer, closeComposer, activeThreadId, trackDocument } = review;
+  const {
+    setActive,
+    openComposer,
+    closeComposer,
+    activeThreadId,
+    trackDocument,
+  } = review;
 
   // The document as it is now: what the blocks say (a card about a whole block quotes the start of its text).
   const liveBody = useRef(body);
@@ -240,7 +287,10 @@ export function ContentWorkspace({
         if (!CONTENT_FIELDS.some((key) => key in fields)) return;
         // A channel field's null is a value (cleared), so only a missing one falls back to the opening.
         const fieldValues = Object.fromEntries(
-          CHANNEL_FIELD_IDS.map((id) => [id, values[id] === undefined ? opening[id] : values[id]]),
+          CHANNEL_FIELD_IDS.map((id) => [
+            id,
+            values[id] === undefined ? opening[id] : values[id],
+          ]),
         ) as ChannelFieldValues;
         const next = {
           body: values.body ?? opening.body,
@@ -285,7 +335,10 @@ export function ContentWorkspace({
     },
     [setActive, session],
   );
-  const onThreadClick = useCallback((id: string) => id !== COMPOSER_THREAD_ID && showThread(id), [showThread]);
+  const onThreadClick = useCallback(
+    (id: string) => id !== COMPOSER_THREAD_ID && showThread(id),
+    [showThread],
+  );
   // The caret moving through quotes follows along without taking the rail away from Variables.
   const onCaretThreadChange = useCallback(
     (id: string | null) => {
@@ -308,13 +361,22 @@ export function ContentWorkspace({
       closeComposer();
       if (outcome === "posted") return;
       // A box that came from a field in the rail isn't about the text: the list puts focus back where it began.
-      if (!message && composerBlockId !== null && isChannelFieldId(composerBlockId)) return;
+      if (
+        !message &&
+        composerBlockId !== null &&
+        isChannelFieldId(composerBlockId)
+      )
+        return;
       editorHandle.current?.focus();
       // The editor puts its selection back a frame later (TipTap focuses on the next animation frame): collapse it after that.
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           const selection = window.getSelection();
-          if (selection && !selection.isCollapsed && selection.anchorNode?.parentElement?.closest(".ProseMirror")) {
+          if (
+            selection &&
+            !selection.isCollapsed &&
+            selection.anchorNode?.parentElement?.closest(".ProseMirror")
+          ) {
             selection.collapseToEnd();
           }
         }),
@@ -331,10 +393,15 @@ export function ContentWorkspace({
         : (editorHandle.current?.getBlockRect(blockId)?.top ?? null),
     [message],
   );
-  const labels = useMemo(() => new Map(shown.variables.map((v) => [v.key, v.label])), [shown.variables]);
+  const labels = useMemo(
+    () => new Map(shown.variables.map((v) => [v.key, v.label])),
+    [shown.variables],
+  );
   // A card about a whole block quotes the start of its text; one about a channel field, the field as typed.
   const blockText = useCallback(
-    (blockId: string) => fieldTextOf(liveDraft.getFields(), blockId, labels) ?? blockTextOf(liveBody.current, blockId, labels),
+    (blockId: string) =>
+      fieldTextOf(liveDraft.getFields(), blockId, labels) ??
+      blockTextOf(liveBody.current, blockId, labels),
     [labels, liveDraft],
   );
   // The field a thread is on, for the composer's handle (a message's threads are on its fields).
@@ -342,7 +409,11 @@ export function ContentWorkspace({
   useLayoutEffect(() => {
     latestThreads.current = review.threadsForEditor;
   });
-  const threadField = useCallback((id: string) => latestThreads.current.find((t) => t.id === id)?.blockId ?? null, []);
+  const threadField = useCallback(
+    (id: string) =>
+      latestThreads.current.find((t) => t.id === id)?.blockId ?? null,
+    [],
+  );
 
   // The comments on the email fields, which sit in the rail: their markers and the button that starts a thread.
   const fieldComments = useMemo<FieldComments>(
@@ -350,7 +421,9 @@ export function ContentWorkspace({
       threads: review.threads,
       activeThreadId,
       onActivate: showThread,
-      onRequestComment: canComment ? (fieldId) => requestComment({ blockId: fieldId }) : undefined,
+      onRequestComment: canComment
+        ? (fieldId) => requestComment({ blockId: fieldId })
+        : undefined,
     }),
     [review.threads, activeThreadId, showThread, canComment, requestComment],
   );
@@ -386,7 +459,11 @@ export function ContentWorkspace({
               threads={review.threads}
               activeThreadId={activeThreadId}
               onActivate={showThread}
-              onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
+              onRequestBlockComment={
+                canComment
+                  ? (blockId) => requestComment({ blockId })
+                  : undefined
+              }
               compact={previewOpen}
               className="hidden @min-[53rem]/ws:block"
               noun="field"
@@ -412,7 +489,11 @@ export function ContentWorkspace({
               threads={review.threads}
               activeThreadId={activeThreadId}
               onActivate={showThread}
-              onRequestBlockComment={canComment ? (blockId) => requestComment({ blockId }) : undefined}
+              onRequestBlockComment={
+                canComment
+                  ? (blockId) => requestComment({ blockId })
+                  : undefined
+              }
               compact={previewOpen}
               // Below the rail's breakpoint the rail is an overlay and the text runs to the panel's edge: no gutter.
               className="hidden @min-[53rem]/ws:block"
@@ -456,11 +537,23 @@ export function ContentWorkspace({
           />
         }
         emailDetails={
-          <EmailDetails on={channels.includes("email")} editable={editable} values={shown} comments={fieldComments} />
+          <EmailDetails
+            on={channels.includes("email")}
+            editable={editable}
+            values={shown}
+            comments={fieldComments}
+          />
         }
         original={importOriginal !== null}
         takeArrival={takeArrival}
-        footer={editable ? <CopilotPromptButton templateId={templateId} blocked={copilotUnavailable(family)} /> : null}
+        footer={
+          editable ? (
+            <CopilotPromptButton
+              templateId={templateId}
+              blocked={copilotUnavailable(family)}
+            />
+          ) : null
+        }
         reviewHref={reviewHref}
         preview={
           <PreviewSurface

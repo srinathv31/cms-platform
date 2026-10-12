@@ -14,13 +14,24 @@ export const TOOLBAR = "mb-8 flex h-8 justify-end";
  */
 export function VersionsSkeleton() {
   return (
-    <div data-slot="versions" aria-hidden className={cn(WS.doc, "flex flex-col")}>
+    <div
+      data-slot="versions"
+      aria-hidden
+      className={cn(WS.doc, "flex flex-col")}
+    >
       <div className={TOOLBAR}>
         <Skeleton className="h-8 w-40 rounded-lg" />
       </div>
       <div className="flex flex-col">
         {[true, true, false].map((more, i) => (
-          <div key={i} className={cn("relative", ENTRY_GEOMETRY.indent, more ? "pb-9" : "pb-0")}>
+          <div
+            key={i}
+            className={cn(
+              "relative",
+              ENTRY_GEOMETRY.indent,
+              more ? "pb-9" : "pb-0",
+            )}
+          >
             <Skeleton className={cn(ENTRY_GEOMETRY.dot, "ring-0")} />
             {more ? <span className={ENTRY_GEOMETRY.line} /> : null}
             <div className={ENTRY_GEOMETRY.head}>

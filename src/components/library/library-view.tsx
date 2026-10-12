@@ -6,7 +6,14 @@ import { now } from "@/server/clock";
 import { getLibraryRows } from "@/server/queries/library";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { cn } from "@/lib/utils";
-import { COLUMNS, FOLDS, NAME_CELL, ROW, STACKED_HIDDEN, statusColumn } from "./columns";
+import {
+  COLUMNS,
+  FOLDS,
+  NAME_CELL,
+  ROW,
+  STACKED_HIDDEN,
+  statusColumn,
+} from "./columns";
 import { LibraryBrowser } from "./library-browser";
 import { NewTemplate } from "./new-template";
 
@@ -20,7 +27,10 @@ async function SpaceEyebrow({ params }: { params: TeamParams }) {
 /** Whether the viewer may create templates here. "All teams" has no team to create in. */
 async function canCreateIn(params: TeamParams) {
   const space = await requireSpaceFromParams(params);
-  const ok = !space.isAll && space.teamId !== null && can(space.viewer, "template.create", { teamId: space.teamId }).ok;
+  const ok =
+    !space.isAll &&
+    space.teamId !== null &&
+    can(space.viewer, "template.create", { teamId: space.teamId }).ok;
   return { space, ok };
 }
 
@@ -34,7 +44,15 @@ async function LibraryList({ params }: { params: TeamParams }) {
   const { space, ok } = await canCreateIn(params);
   const rows = await getLibraryRows(space.slug);
   const nowIso = (await now()).toISOString();
-  return <LibraryBrowser rows={rows} spaceSlug={space.slug} showTeam={space.isAll} canCreate={ok} nowIso={nowIso} />;
+  return (
+    <LibraryBrowser
+      rows={rows}
+      spaceSlug={space.slug}
+      showTeam={space.isAll}
+      canCreate={ok}
+      nowIso={nowIso}
+    />
+  );
 }
 
 /** Same geometry as the loaded list (toolbar, header row, six rows), so nothing shifts when it streams in. */

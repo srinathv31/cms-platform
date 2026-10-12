@@ -36,14 +36,22 @@ export function PdfLab() {
     const controller = new AbortController();
     fetch(url, { signal: controller.signal })
       .then((response) => response.arrayBuffer())
-      .then((buffer) => setSource({ data: new Uint8Array(buffer), fileName: url.pathname.split("/").pop() || "document.pdf" }))
+      .then((buffer) =>
+        setSource({
+          data: new Uint8Array(buffer),
+          fileName: url.pathname.split("/").pop() || "document.pdf",
+        }),
+      )
       .catch(() => {});
     return () => controller.abort();
   }, []);
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
-    setSource({ data: new Uint8Array(await file.arrayBuffer()), fileName: file.name });
+    setSource({
+      data: new Uint8Array(await file.arrayBuffer()),
+      fileName: file.name,
+    });
   };
 
   return (
@@ -79,7 +87,11 @@ export function PdfLab() {
           </ToggleGroup>
 
           <label className="flex items-center gap-2.5 text-sm text-text-muted">
-            <Switch checked={mounted} onCheckedChange={setMounted} aria-label="Viewer mounted" />
+            <Switch
+              checked={mounted}
+              onCheckedChange={setMounted}
+              aria-label="Viewer mounted"
+            />
             Mounted
           </label>
 
@@ -88,7 +100,9 @@ export function PdfLab() {
             size="sm"
             className="gap-1.5 bg-surface font-normal"
             disabled={!source}
-            onClick={() => source && setSource({ ...source, data: source.data.slice() })}
+            onClick={() =>
+              source && setSource({ ...source, data: source.data.slice() })
+            }
           >
             <RotateCw className="size-4" strokeWidth={1.75} aria-hidden />
             Same bytes, new array
@@ -119,14 +133,26 @@ export function PdfLab() {
 
         <div className="flex items-center gap-4 border-b border-hairline px-10 py-2.5 font-mono text-xs text-text-muted">
           <span data-testid="lab-file">{source?.fileName ?? "No file"}</span>
-          <span data-testid="lab-bytes">{source ? `${source.data.byteLength.toLocaleString()} bytes` : ""}</span>
-          <span data-testid="lab-pages">{pages === null ? "" : `${pages} pages`}</span>
-          <span data-testid="lab-loads">{loads ? `onLoad × ${loads}` : ""}</span>
+          <span data-testid="lab-bytes">
+            {source ? `${source.data.byteLength.toLocaleString()} bytes` : ""}
+          </span>
+          <span data-testid="lab-pages">
+            {pages === null ? "" : `${pages} pages`}
+          </span>
+          <span data-testid="lab-loads">
+            {loads ? `onLoad × ${loads}` : ""}
+          </span>
         </div>
 
         {/* The scroll root, like the app's canvas: an element, not the window. */}
-        <div data-testid="lab-scroll" className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto py-8" style={{ width: width === "fill" ? "100%" : `${width}px` }}>
+        <div
+          data-testid="lab-scroll"
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
+          <div
+            className="mx-auto py-8"
+            style={{ width: width === "fill" ? "100%" : `${width}px` }}
+          >
             {mounted ? (
               <PdfViewer
                 data={source?.data ?? null}

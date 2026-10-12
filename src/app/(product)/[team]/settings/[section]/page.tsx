@@ -7,7 +7,9 @@ import { SettingsPanel } from "@/components/settings/settings-panel";
 // section action's refresh logs a dev error.
 export const instant = false;
 
-export default function SettingsPage({ params }: PageProps<"/[team]/settings/[section]">) {
+export default function SettingsPage({
+  params,
+}: PageProps<"/[team]/settings/[section]">) {
   return (
     <Suspense fallback={<Skeleton className="h-[34px] w-48" />}>
       <SettingsPanel params={params} />

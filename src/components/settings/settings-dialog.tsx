@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { X } from "lucide-react";
@@ -53,7 +58,9 @@ export function SettingsDialog({
   const router = useRouter();
   const [open, setOpen] = useState(true);
   useRegister(closeMode);
-  const yieldToIntercepted = useSyncExternalStore(subscribe, interceptedShown, serverSnapshot) && closeMode === "library";
+  const yieldToIntercepted =
+    useSyncExternalStore(subscribe, interceptedShown, serverSnapshot) &&
+    closeMode === "library";
   // Taking over from the page's dialog: appear at once, so the scrim doesn't blink.
   const takeover = closeMode === "back" && shown.library > 0;
 

@@ -23,14 +23,26 @@ export interface QueueRowView {
   /** "Stage 1 of 2" when the chain has more than one stage; null when it has one. */
   stageStep: string | null;
   /** Recently decided only. */
-  decision?: { kind: "approved" | "changes_requested"; label: "Approved" | "Changes requested"; by: string; when: string };
+  decision?: {
+    kind: "approved" | "changes_requested";
+    label: "Approved" | "Changes requested";
+    by: string;
+    when: string;
+  };
   /** What the row says on a line under the name when its columns fold into one: "Maya Chen · 3 days ago · Team approver". */
   folded: string;
 }
 
-const DECISION_LABEL = { approved: "Approved", changes_requested: "Changes requested" } as const;
+const DECISION_LABEL = {
+  approved: "Approved",
+  changes_requested: "Changes requested",
+} as const;
 
-export function formatQueueRow(row: ReviewQueueRow, spaceSlug: string, nowDate: Date): QueueRowView {
+export function formatQueueRow(
+  row: ReviewQueueRow,
+  spaceSlug: string,
+  nowDate: Date,
+): QueueRowView {
   const submitted = formatAgo(row.submittedAt, nowDate);
   const decision = row.decision
     ? {
@@ -40,7 +52,11 @@ export function formatQueueRow(row: ReviewQueueRow, spaceSlug: string, nowDate: 
         when: formatAgo(row.decision.at, nowDate),
       }
     : undefined;
-  const version = { number: row.versionNumber, round: row.round, state: row.state };
+  const version = {
+    number: row.versionNumber,
+    round: row.round,
+    state: row.state,
+  };
   return {
     key: row.versionId,
     href: reviewPath(spaceSlug, row.templateId, version),
@@ -51,7 +67,10 @@ export function formatQueueRow(row: ReviewQueueRow, spaceSlug: string, nowDate: 
     author: row.author,
     submitted,
     stage: row.stage.name,
-    stageStep: row.stage.count > 1 ? `Stage ${row.stage.position + 1} of ${row.stage.count}` : null,
+    stageStep:
+      row.stage.count > 1
+        ? `Stage ${row.stage.position + 1} of ${row.stage.count}`
+        : null,
     decision,
     folded: decision
       ? decision.kind === "approved"
@@ -73,8 +92,14 @@ export interface QueueTab {
 
 export const TAB_META: Record<QueueTabKey, { label: string; empty: string }> = {
   waiting: { label: "Waiting on me", empty: "Nothing waiting on you." },
-  submitted: { label: "Submitted by me", empty: "You haven't submitted anything for review." },
-  decided: { label: "Recently decided", empty: "No decisions in the last 30 days." },
+  submitted: {
+    label: "Submitted by me",
+    empty: "You haven't submitted anything for review.",
+  },
+  decided: {
+    label: "Recently decided",
+    empty: "No decisions in the last 30 days.",
+  },
 };
 
 const TAB_KEYS: readonly QueueTabKey[] = ["waiting", "submitted", "decided"];
@@ -88,14 +113,21 @@ export function parseTab(value: string | null | undefined): QueueTabKey | null {
  * The tab the queue opens on with no `?tab=`: Waiting on me, unless nothing waits on the viewer, then
  * the first tab that has rows (Submitted by me, then Recently decided). All three empty: Waiting on me.
  */
-export function defaultTab(tabs: readonly Pick<QueueTab, "key" | "rows">[]): QueueTabKey {
-  if (tabs.some((tab) => tab.key === "waiting" && tab.rows.length > 0)) return "waiting";
+export function defaultTab(
+  tabs: readonly Pick<QueueTab, "key" | "rows">[],
+): QueueTabKey {
+  if (tabs.some((tab) => tab.key === "waiting" && tab.rows.length > 0))
+    return "waiting";
   return tabs.find((tab) => tab.rows.length > 0)?.key ?? "waiting";
 }
 
 /** The three tabs, in order, from the queue's three lists. */
 export function queueTabs(
-  queue: { waiting: ReviewQueueRow[]; submitted: ReviewQueueRow[]; decided: ReviewQueueRow[] },
+  queue: {
+    waiting: ReviewQueueRow[];
+    submitted: ReviewQueueRow[];
+    decided: ReviewQueueRow[];
+  },
   spaceSlug: string,
   nowDate: Date,
 ): QueueTab[] {

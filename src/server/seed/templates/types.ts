@@ -1,5 +1,11 @@
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { Channel, ContractChange, JSONContent, Variable, VersionState } from "@/domain/types";
+import type {
+  Channel,
+  ContractChange,
+  JSONContent,
+  Variable,
+  VersionState,
+} from "@/domain/types";
 import type { ConsumerId, SeedContentType } from "../platform";
 import type { TeamId } from "../teams";
 

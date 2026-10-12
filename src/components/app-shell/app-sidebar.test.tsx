@@ -8,7 +8,9 @@ import { AppSidebar, NavDrawerTrigger } from "./app-sidebar";
 // Below 800px the sidebar is the shadcn sidebar's sheet, opened from a top-bar button; from 800px up it is the column
 // it always was (decision 0045).
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
@@ -37,8 +39,10 @@ function mount() {
   );
 }
 
-const trigger = () => container.querySelector<HTMLButtonElement>('[data-slot="sidebar-trigger"]')!;
-const drawer = () => document.querySelector('[data-slot="sidebar"][data-mobile="true"]');
+const trigger = () =>
+  container.querySelector<HTMLButtonElement>('[data-slot="sidebar-trigger"]')!;
+const drawer = () =>
+  document.querySelector('[data-slot="sidebar"][data-mobile="true"]');
 
 beforeEach(() => {
   container = document.createElement("div");
@@ -97,7 +101,9 @@ describe("AppSidebar from 800px up", () => {
   });
 
   it("keeps the CSS that hides the column in a narrow window before the page has scripts", () => {
-    expect(container.querySelector('[data-slot="sidebar"]')?.className).toContain("narrow:hidden");
+    expect(
+      container.querySelector('[data-slot="sidebar"]')?.className,
+    ).toContain("narrow:hidden");
   });
 
   it("has a trigger that the CSS hides at this width", () => {

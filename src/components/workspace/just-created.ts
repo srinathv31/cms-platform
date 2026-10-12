@@ -17,8 +17,14 @@ import { JUST_CREATED_COOKIE } from "@/domain/arrival-cookies";
 export function takeJustCreated(templateId: string | undefined): boolean {
   if (!templateId || typeof document === "undefined") return false;
   const prefix = `${JUST_CREATED_COOKIE}=`;
-  const entry = document.cookie.split("; ").find((part) => part.startsWith(prefix));
-  if (entry === undefined || decodeURIComponent(entry.slice(prefix.length)) !== templateId) return false;
+  const entry = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(prefix));
+  if (
+    entry === undefined ||
+    decodeURIComponent(entry.slice(prefix.length)) !== templateId
+  )
+    return false;
   document.cookie = `${JUST_CREATED_COOKIE}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax`;
   return true;
 }

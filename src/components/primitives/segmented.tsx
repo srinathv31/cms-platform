@@ -85,7 +85,14 @@ export function Segmented<T extends string>({
         >
           {option.icon ?? option.label}
           {option.done === undefined ? null : (
-            <Check aria-hidden strokeWidth={2.5} className={cn("size-3 text-positive", !option.done && "invisible")} />
+            <Check
+              aria-hidden
+              strokeWidth={2.5}
+              className={cn(
+                "size-3 text-positive",
+                !option.done && "invisible",
+              )}
+            />
           )}
         </ToggleGroupItem>
       ))}
@@ -117,7 +124,11 @@ export function SegmentedRadio<T extends string>({
   };
 
   return (
-    <div role="radiogroup" aria-labelledby={labelledBy} className={cn("flex items-center gap-0.5", TRACK, className)}>
+    <div
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      className={cn("flex items-center gap-0.5", TRACK, className)}
+    >
       {options.map((option, index) => {
         const checked = option.value === value;
         return (
@@ -142,7 +153,12 @@ export function SegmentedRadio<T extends string>({
               }
             }}
             // The toggle's own base (focus ring, transitions), so a radio segment looks like a toggle one.
-            className={cn(toggleVariants(), "shrink-0 focus-visible:z-10", SEGMENT, option.icon ? ICON_SEGMENT : null)}
+            className={cn(
+              toggleVariants(),
+              "shrink-0 focus-visible:z-10",
+              SEGMENT,
+              option.icon ? ICON_SEGMENT : null,
+            )}
           >
             {option.icon ?? option.label}
           </button>

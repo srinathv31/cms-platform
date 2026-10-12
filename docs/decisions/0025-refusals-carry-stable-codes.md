@@ -25,7 +25,7 @@ Stable codes are also step 3 of [the backend seam](../handoff-review.md#the-back
   the types, `refusal()`, `refuse()`, and `RefusalCode`, the union of every code.
 - **Codes live beside their sentences.** Each area keeps its table (`REASONS`, `REFUSALS`, `STAGE_REFUSALS`,
   `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`), and every entry is `refusal("own_revoke", "You started
-  this revoke. …")`, or a function of what the sentence names (`refusal("last_admin", (team) => …)`) whose `code` is
+this revoke. …")`, or a function of what the sentence names (`refusal("last_admin", (team) => …)`) whose `code` is
   readable without calling it. `RefusalCode` is derived from the tables, so a refusal without an entry doesn't
   type-check.
 - **Codes are short snake_case identifiers, unique across every table**, like the `/api/v1` error codes.

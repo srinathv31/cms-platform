@@ -18,14 +18,26 @@ afterEach(destroyEditors);
 const empty = () => {
   const root = createEditorRootRuntime({ variables: [] });
   root.registerField({ id: "body", label: "Document", kind: "body" });
-  const binding = { fieldId: "body", kind: "body" as const, root, chip: createChipPopoverStore() };
-  return mountEditor(doc(p()), { extensions: editorExtensions({ store: root.variables, binding }) });
+  const binding = {
+    fieldId: "body",
+    kind: "body" as const,
+    root,
+    chip: createChipPopoverStore(),
+  };
+  return mountEditor(doc(p()), {
+    extensions: editorExtensions({ store: root.variables, binding }),
+  });
 };
 
 /** The document's blocks without the empty line the paste landed in. */
 function blocks(editor: Editor): JSONContent[] {
   const content = editor.getJSON().content ?? [];
-  while (content.length > 1 && content.at(-1)?.type === "paragraph" && !content.at(-1)?.content) content.pop();
+  while (
+    content.length > 1 &&
+    content.at(-1)?.type === "paragraph" &&
+    !content.at(-1)?.content
+  )
+    content.pop();
   return content;
 }
 
@@ -35,7 +47,10 @@ function texts(node: JSONContent): string[] {
 }
 
 function find(node: JSONContent, type: string): JSONContent[] {
-  return [...(node.type === type ? [node] : []), ...(node.content ?? []).flatMap((child) => find(child, type))];
+  return [
+    ...(node.type === type ? [node] : []),
+    ...(node.content ?? []).flatMap((child) => find(child, type)),
+  ];
 }
 
 describe("paste: text", () => {
@@ -60,26 +75,38 @@ describe("paste: text", () => {
 
 describe("paste: links", () => {
   const hrefs = (editor: Editor) =>
-    find(editor.getJSON(), "text").flatMap((node) => (node.marks ?? []).filter((m) => m.type === "link").map((m) => m.attrs?.href));
+    find(editor.getJSON(), "text").flatMap((node) =>
+      (node.marks ?? [])
+        .filter((m) => m.type === "link")
+        .map((m) => m.attrs?.href),
+    );
 
   it("keeps web, email and phone links, normalized", () => {
     const editor = empty();
     editor.view.pasteHTML(
       '<p><a href="HTTPS://Coral.Example/café">terms</a> <a href="mailto:help@coral.example">mail</a> <a href="tel:+18005550100">call</a></p>',
     );
-    expect(hrefs(editor)).toEqual(["https://Coral.Example/caf%C3%A9", "mailto:help@coral.example", "tel:+18005550100"]);
+    expect(hrefs(editor)).toEqual([
+      "https://Coral.Example/caf%C3%A9",
+      "mailto:help@coral.example",
+      "tel:+18005550100",
+    ]);
   });
 
   it("anything else is its text only", () => {
     const editor = empty();
-    editor.view.pasteHTML('<p><a href="javascript:alert(1)">a</a> <a href="/terms">b</a> <a href="https://x.example/a b">c</a></p>');
+    editor.view.pasteHTML(
+      '<p><a href="javascript:alert(1)">a</a> <a href="/terms">b</a> <a href="https://x.example/a b">c</a></p>',
+    );
     expect(hrefs(editor)).toEqual([]);
     expect(texts(editor.getJSON()).join("")).toBe("a b c");
   });
 
   it("the same from the editor's own HTML (passed through untouched until the schema reads it)", () => {
     const editor = empty();
-    editor.view.pasteHTML('<p data-pm-slice="1 1 []"><a href="ftp://x.example">ftp</a> <a href=" https://ok.example ">ok</a></p>');
+    editor.view.pasteHTML(
+      '<p data-pm-slice="1 1 []"><a href="ftp://x.example">ftp</a> <a href=" https://ok.example ">ok</a></p>',
+    );
     expect(hrefs(editor)).toEqual(["https://ok.example"]);
   });
 });
@@ -96,17 +123,29 @@ describe("paste: headings and lists", () => {
 
   it("a list start outside 0 to 9999 is brought inside it, so the editor shows what every channel prints", () => {
     // Only a ProseMirror editor's HTML keeps a list's start (other HTML is rebuilt without it).
-    for (const [given, shown] of [["20000", 9999], ["-3", 0], ["x", 1], ["12", 12]] as const) {
+    for (const [given, shown] of [
+      ["20000", 9999],
+      ["-3", 0],
+      ["x", 1],
+      ["12", 12],
+    ] as const) {
       const editor = empty();
-      editor.view.pasteHTML(`<ol data-pm-slice="0 0 []" start="${given}"><li><p>x</p></li></ol>`);
-      expect(find(editor.getJSON(), "orderedList")[0]?.attrs?.start, given).toBe(shown);
+      editor.view.pasteHTML(
+        `<ol data-pm-slice="0 0 []" start="${given}"><li><p>x</p></li></ol>`,
+      );
+      expect(
+        find(editor.getJSON(), "orderedList")[0]?.attrs?.start,
+        given,
+      ).toBe(shown);
       expect(documentProblem(editor.getJSON())).toBeNull();
     }
   });
 
   it("TipTap's orderedList `type` is cleared; start stays", () => {
     const editor = empty();
-    editor.view.pasteHTML('<ol data-pm-slice="0 0 []" type="a" start="3"><li><p>x</p></li></ol>');
+    editor.view.pasteHTML(
+      '<ol data-pm-slice="0 0 []" type="a" start="3"><li><p>x</p></li></ol>',
+    );
     const list = find(editor.getJSON(), "orderedList")[0];
     expect(list.attrs?.type).toBeNull();
     expect(list.attrs?.start).toBe(3);
@@ -136,18 +175,36 @@ describe("paste: tables", () => {
     expect(content.map((b) => b.type)).toEqual(["table"]);
     const [table] = content;
     expect(tableGrid(table).width).toBe(2);
-    const cellTexts = find(table, "tableRow").map((row) => (row.content ?? []).map((cell) => (cell.content ?? []).map((b) => `${b.type}:${texts(b).join("")}`)));
+    const cellTexts = find(table, "tableRow").map((row) =>
+      (row.content ?? []).map((cell) =>
+        (cell.content ?? []).map((b) => `${b.type}:${texts(b).join("")}`),
+      ),
+    );
     expect(cellTexts).toEqual([
       [["paragraph:Fees"], ["paragraph:Amount"]],
-      [["paragraph:Annual", "paragraph:"], ["paragraph:$95", "paragraph:first year", "paragraph:then", "paragraph:$0"]],
+      [
+        ["paragraph:Annual", "paragraph:"],
+        [
+          "paragraph:$95",
+          "paragraph:first year",
+          "paragraph:then",
+          "paragraph:$0",
+        ],
+      ],
     ]);
     expect(documentProblem(editor.getJSON())).toBeNull();
   });
 
   it("a table wider than 12 columns arrives as tables of at most 12, every cell kept", () => {
     const editor = empty();
-    const cells = (tag: string, prefix: string) => Array.from({ length: 15 }, (_, i) => `<${tag}>${prefix}${i + 1}</${tag}>`).join("");
-    editor.view.pasteHTML(`<table><tr>${cells("th", "H")}</tr><tr>${cells("td", "c")}</tr></table>`);
+    const cells = (tag: string, prefix: string) =>
+      Array.from(
+        { length: 15 },
+        (_, i) => `<${tag}>${prefix}${i + 1}</${tag}>`,
+      ).join("");
+    editor.view.pasteHTML(
+      `<table><tr>${cells("th", "H")}</tr><tr>${cells("td", "c")}</tr></table>`,
+    );
     const tables = blocks(editor).filter((b) => b.type === "table");
     expect(tables.map((t) => tableGrid(t).width)).toEqual([12, 3]);
     expect(tables.flatMap(texts)).toEqual([

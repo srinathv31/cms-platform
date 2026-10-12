@@ -25,7 +25,10 @@ export type FocusTargetName = keyof FocusTargetElements;
 
 export interface WaitForFocusTarget<N extends FocusTargetName> {
   /** Whether this is the one to wait for. `state` is what it registered with. Without it, any one will do. */
-  accept?: (element: FocusTargetElements[N], state: string | undefined) => boolean;
+  accept?: (
+    element: FocusTargetElements[N],
+    state: string | undefined,
+  ) => boolean;
   /** How long to wait, in milliseconds, before giving up. */
   timeout: number;
 }
@@ -36,14 +39,21 @@ export interface FocusTargets {
    * for a caller waiting for a particular one (the status row: the version's state). A later registration under
    * the same name replaces it, and taking out one that was replaced does nothing.
    */
-  register: <N extends FocusTargetName>(name: N, element: FocusTargetElements[N], state?: string) => () => void;
+  register: <N extends FocusTargetName>(
+    name: N,
+    element: FocusTargetElements[N],
+    state?: string,
+  ) => () => void;
   /** The control registered under `name`, or null while none is mounted. */
   get: <N extends FocusTargetName>(name: N) => FocusTargetElements[N] | null;
   /**
    * Resolves with the control registered under `name` once `accept` takes it: at once when the one registered now
    * does, otherwise when one that does registers. Resolves with null when none has by `timeout`.
    */
-  waitFor: <N extends FocusTargetName>(name: N, options: WaitForFocusTarget<N>) => Promise<FocusTargetElements[N] | null>;
+  waitFor: <N extends FocusTargetName>(
+    name: N,
+    options: WaitForFocusTarget<N>,
+  ) => Promise<FocusTargetElements[N] | null>;
 }
 
 interface Entry {
@@ -68,7 +78,8 @@ export function createFocusTargets(): FocusTargets {
       const entry: Entry = { element, state };
       entries.set(name, entry);
       for (const waiter of [...waiters]) {
-        if (waiter.name === name && waiter.accept(element, state)) waiter.settle(element);
+        if (waiter.name === name && waiter.accept(element, state))
+          waiter.settle(element);
       }
       return () => {
         if (entries.get(name) === entry) entries.delete(name);
@@ -76,13 +87,18 @@ export function createFocusTargets(): FocusTargets {
     },
 
     get<N extends FocusTargetName>(name: N) {
-      return (entries.get(name)?.element ?? null) as FocusTargetElements[N] | null;
+      return (entries.get(name)?.element ?? null) as
+        FocusTargetElements[N] | null;
     },
 
-    waitFor<N extends FocusTargetName>(name: N, { accept = anyOne, timeout }: WaitForFocusTarget<N>) {
+    waitFor<N extends FocusTargetName>(
+      name: N,
+      { accept = anyOne, timeout }: WaitForFocusTarget<N>,
+    ) {
       const test = accept as Waiter["accept"];
       const now = entries.get(name);
-      if (now && test(now.element, now.state)) return Promise.resolve(now.element as FocusTargetElements[N]);
+      if (now && test(now.element, now.state))
+        return Promise.resolve(now.element as FocusTargetElements[N]);
       return new Promise<FocusTargetElements[N] | null>((resolve) => {
         const waiter: Waiter = {
           name,

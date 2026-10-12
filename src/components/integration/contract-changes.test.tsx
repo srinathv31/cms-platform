@@ -5,7 +5,8 @@ import { ContractChanges } from "./contract-changes";
 
 type Since = IntegrationPanelData["since"];
 
-const html = (since: Since) => renderToStaticMarkup(<ContractChanges since={since} activeNumber={3} />);
+const html = (since: Since) =>
+  renderToStaticMarkup(<ContractChanges since={since} activeNumber={3} />);
 
 const v2: Since[number] = {
   number: 2,
@@ -15,12 +16,30 @@ const v2: Since[number] = {
   diff: {
     breaking: true,
     items: [
-      { kind: "added", key: "annual_fee", breaking: true, text: "v3 adds required `annual_fee` (Currency)." },
-      { kind: "label_changed", key: "purchase_apr", breaking: false, from: "APR", to: "Purchase APR", text: "v3 changes the label of `purchase_apr` to “Purchase APR”." },
+      {
+        kind: "added",
+        key: "annual_fee",
+        breaking: true,
+        text: "v3 adds required `annual_fee` (Currency).",
+      },
+      {
+        kind: "label_changed",
+        key: "purchase_apr",
+        breaking: false,
+        from: "APR",
+        to: "Purchase APR",
+        text: "v3 changes the label of `purchase_apr` to “Purchase APR”.",
+      },
     ],
   },
 };
-const v1: Since[number] = { number: 1, state: "revoked", sunsetDay: null, sunsetPassed: false, diff: { breaking: false, items: [] } };
+const v1: Since[number] = {
+  number: 1,
+  state: "revoked",
+  sunsetDay: null,
+  sunsetPassed: false,
+  diff: { breaking: false, items: [] },
+};
 
 describe("ContractChanges", () => {
   it("names the version, marks breaking items and sets keys in mono", () => {
@@ -41,7 +60,9 @@ describe("ContractChanges", () => {
   it("words a sunset that has passed as passed on the version's badge", () => {
     const text = (since: Since) => html(since).replace(/<[^>]+>/g, "");
     expect(text([v2])).toContain("Sunset Dec 1");
-    expect(text([{ ...v2, sunsetPassed: true }])).toContain("Sunset passed Dec 1");
+    expect(text([{ ...v2, sunsetPassed: true }])).toContain(
+      "Sunset passed Dec 1",
+    );
   });
 
   it("says so when the contract did not change", () => {

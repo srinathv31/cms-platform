@@ -3,7 +3,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PALETTE_QUERY_MAX } from "@/domain/palette";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { GET } from "./route";
 
@@ -36,9 +39,21 @@ const CORAL = [
   "Rate Change Heads-up",
   "Rate Change Notice",
 ];
-const DEPOSITS = ["Everyday Checking — Fee Schedule", "High-Yield Savings — Rate Disclosure", "Overdraft Protection — Terms"];
-const INVALID = { ok: false, code: "invalid_search", reason: "This search can't be run." };
-const NOT_YOURS = { ok: false, code: "space_unavailable", reason: "This team isn't available to you." };
+const DEPOSITS = [
+  "Everyday Checking — Fee Schedule",
+  "High-Yield Savings — Rate Disclosure",
+  "Overdraft Protection — Terms",
+];
+const INVALID = {
+  ok: false,
+  code: "invalid_search",
+  reason: "This search can't be run.",
+};
+const NOT_YOURS = {
+  ok: false,
+  code: "space_unavailable",
+  reason: "This team isn't available to you.",
+};
 
 let db: Db;
 const people: Record<string, Viewer> = {};
@@ -47,7 +62,8 @@ const ids = seededDatabasePerTest({ base: env.now });
 
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
-  for (const id of ["maya", "sam", "eli", "morgan", "taylor"]) people[id] = await loadPersona(db, id);
+  for (const id of ["maya", "sam", "eli", "morgan", "taylor"])
+    people[id] = await loadPersona(db, id);
 });
 
 beforeEach(() => as("maya"));
@@ -57,13 +73,29 @@ function as(userId: string) {
 }
 
 type Row = { id: string; name: string; teamSlug: string; status: string };
-type Body = { ok: boolean; code?: string; reason?: string; viewerId?: string; space?: string; query?: string; canCreate?: boolean; current?: boolean; recent?: Row[]; templates?: Row[] };
+type Body = {
+  ok: boolean;
+  code?: string;
+  reason?: string;
+  viewerId?: string;
+  space?: string;
+  query?: string;
+  canCreate?: boolean;
+  current?: boolean;
+  recent?: Row[];
+  templates?: Row[];
+};
 
 /** GET /api/palette/{space}{query}: the status and the body, checking the headers every answer has. */
 async function search(space: string, query = "") {
-  const res = await GET(new NextRequest(`http://localhost/api/palette/${encodeURIComponent(space)}${query}`), {
-    params: Promise.resolve({ space }),
-  });
+  const res = await GET(
+    new NextRequest(
+      `http://localhost/api/palette/${encodeURIComponent(space)}${query}`,
+    ),
+    {
+      params: Promise.resolve({ space }),
+    },
+  );
   expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
   expect(res.headers.get("Cache-Control")).toBe("private, no-store");
   return { status: res.status, body: (await res.json()) as Body };
@@ -75,7 +107,14 @@ describe("GET /api/palette/[space]", () => {
   it("at rest: the viewer's recent templates, then the rest of the space's by name, and what they may do", async () => {
     const { status, body } = await search("coral-offers");
     expect(status).toBe(200);
-    expect(body).toMatchObject({ ok: true, viewerId: "maya", space: "coral-offers", query: "", canCreate: true, current: false });
+    expect(body).toMatchObject({
+      ok: true,
+      viewerId: "maya",
+      space: "coral-offers",
+      query: "",
+      canCreate: true,
+      current: false,
+    });
     expect(names(body.recent)).toEqual([
       "Cash Back Welcome Bonus — Terms",
       "Rate Change Heads-up",
@@ -83,14 +122,37 @@ describe("GET /api/palette/[space]", () => {
       "Payment Due Reminder",
       "Rate Change Notice",
     ]);
-    expect(names(body.templates)).toEqual(["Balance Transfer Intro — Terms", "Card Used Abroad", "Holiday Points Promo — Terms"]);
-    expect(body.recent![0]).toEqual({ id: ids["cash-back"], name: "Cash Back Welcome Bonus — Terms", teamSlug: "coral-offers", teamName: "Coral Offers", status: "in_review" });
+    expect(names(body.templates)).toEqual([
+      "Balance Transfer Intro — Terms",
+      "Card Used Abroad",
+      "Holiday Points Promo — Terms",
+    ]);
+    expect(body.recent![0]).toEqual({
+      id: ids["cash-back"],
+      name: "Cash Back Welcome Bonus — Terms",
+      teamSlug: "coral-offers",
+      teamName: "Coral Offers",
+      status: "in_review",
+    });
   });
 
   it("searches by q: every word, in the name, the team, the id or the status, without Recent", async () => {
-    expect(names((await search("coral-offers", "?q=balance")).body.templates)).toEqual(["Balance Transfer Intro — Terms"]);
-    expect(names((await search("coral-offers", "?q=In%20review")).body.templates)).toEqual(["Cash Back Welcome Bonus — Terms", "Card Used Abroad"]);
-    expect(names((await search("coral-offers", `?q=${ids["holiday-points"]!.toLowerCase()}`)).body.templates)).toEqual(["Holiday Points Promo — Terms"]);
+    expect(
+      names((await search("coral-offers", "?q=balance")).body.templates),
+    ).toEqual(["Balance Transfer Intro — Terms"]);
+    expect(
+      names((await search("coral-offers", "?q=In%20review")).body.templates),
+    ).toEqual(["Cash Back Welcome Bonus — Terms", "Card Used Abroad"]);
+    expect(
+      names(
+        (
+          await search(
+            "coral-offers",
+            `?q=${ids["holiday-points"]!.toLowerCase()}`,
+          )
+        ).body.templates,
+      ),
+    ).toEqual(["Holiday Points Promo — Terms"]);
     const terms = await search("coral-offers", "?q=++Terms++Coral");
     expect(terms.body).toMatchObject({ query: "terms coral", recent: [] });
     // Recently touched ones first among equal matches.
@@ -106,45 +168,96 @@ describe("GET /api/palette/[space]", () => {
   it("lists only the space's templates, and only to people who can see it", async () => {
     as("sam");
     const sam = await search("coral-offers");
-    expect(sam.body).toMatchObject({ ok: true, viewerId: "sam", canCreate: false, recent: [] });
+    expect(sam.body).toMatchObject({
+      ok: true,
+      viewerId: "sam",
+      canCreate: false,
+      recent: [],
+    });
     expect(names(sam.body.templates)).toEqual(CORAL);
 
     as("eli");
     const eli = await search("deposits", "?q=balance");
-    expect(eli.body).toMatchObject({ ok: true, viewerId: "eli", templates: [] });
+    expect(eli.body).toMatchObject({
+      ok: true,
+      viewerId: "eli",
+      templates: [],
+    });
     const atRest = (await search("deposits")).body;
-    expect([...names(atRest.recent), ...names(atRest.templates)].sort()).toEqual(DEPOSITS);
-    expect(await search("coral-offers")).toEqual({ status: 404, body: NOT_YOURS });
+    expect(
+      [...names(atRest.recent), ...names(atRest.templates)].sort(),
+    ).toEqual(DEPOSITS);
+    expect(await search("coral-offers")).toEqual({
+      status: 404,
+      body: NOT_YOURS,
+    });
     expect(await search("all")).toEqual({ status: 404, body: NOT_YOURS });
 
     as("morgan");
-    expect(await search("coral-offers")).toEqual({ status: 404, body: NOT_YOURS });
+    expect(await search("coral-offers")).toEqual({
+      status: 404,
+      body: NOT_YOURS,
+    });
   });
 
   it("the cross-team space searches every team, for the people who have it", async () => {
     as("taylor");
     const statements = await search("all", "?q=statement+insert");
-    expect(statements.body).toMatchObject({ ok: true, viewerId: "taylor", canCreate: false });
-    expect(statements.body.templates!.map((t) => t.teamSlug)).toEqual(["card-statements", "card-statements", "card-statements"]);
+    expect(statements.body).toMatchObject({
+      ok: true,
+      viewerId: "taylor",
+      canCreate: false,
+    });
+    expect(statements.body.templates!.map((t) => t.teamSlug)).toEqual([
+      "card-statements",
+      "card-statements",
+      "card-statements",
+    ]);
     expect((await search("all")).body.templates).toHaveLength(8); // a first page of the fourteen
-    expect(names((await search("all", "?q=overdraft")).body.templates)).toEqual(["Overdraft Protection — Terms"]);
+    expect(names((await search("all", "?q=overdraft")).body.templates)).toEqual(
+      ["Overdraft Protection — Terms"],
+    );
   });
 
   it("says whether the template being viewed is the viewer's to see here, and leaves it out of Recent", async () => {
-    const onCashBack = await search("coral-offers", `?template=${ids["cash-back"]}`);
+    const onCashBack = await search(
+      "coral-offers",
+      `?template=${ids["cash-back"]}`,
+    );
     expect(onCashBack.body).toMatchObject({ current: true });
-    expect(names(onCashBack.body.recent)).toEqual(["Rate Change Heads-up", "Annual Fee Waiver — Terms", "Payment Due Reminder", "Rate Change Notice"]);
-    expect(names(onCashBack.body.templates)).toContain("Cash Back Welcome Bonus — Terms");
+    expect(names(onCashBack.body.recent)).toEqual([
+      "Rate Change Heads-up",
+      "Annual Fee Waiver — Terms",
+      "Payment Due Reminder",
+      "Rate Change Notice",
+    ]);
+    expect(names(onCashBack.body.templates)).toContain(
+      "Cash Back Welcome Bonus — Terms",
+    );
 
-    expect((await search("coral-offers", "?template=UC-ZZZZZZ")).body).toMatchObject({ ok: true, current: false });
+    expect(
+      (await search("coral-offers", "?template=UC-ZZZZZZ")).body,
+    ).toMatchObject({ ok: true, current: false });
     as("eli");
-    expect((await search("deposits", `?template=${ids["cash-back"]}`)).body).toMatchObject({ ok: true, current: false });
+    expect(
+      (await search("deposits", `?template=${ids["cash-back"]}`)).body,
+    ).toMatchObject({ ok: true, current: false });
   });
 
   it("400 for a search that doesn't parse: too long, or an empty or overlong template", async () => {
-    expect(await search("coral-offers", `?q=${"a".repeat(PALETTE_QUERY_MAX + 1)}`)).toEqual({ status: 400, body: INVALID });
-    expect(await search("coral-offers", "?template=")).toEqual({ status: 400, body: INVALID });
-    expect(await search("coral-offers", `?template=${"U".repeat(65)}`)).toEqual({ status: 400, body: INVALID });
-    expect((await search("coral-offers", `?q=${"a".repeat(PALETTE_QUERY_MAX)}`)).status).toBe(200);
+    expect(
+      await search("coral-offers", `?q=${"a".repeat(PALETTE_QUERY_MAX + 1)}`),
+    ).toEqual({ status: 400, body: INVALID });
+    expect(await search("coral-offers", "?template=")).toEqual({
+      status: 400,
+      body: INVALID,
+    });
+    expect(await search("coral-offers", `?template=${"U".repeat(65)}`)).toEqual(
+      { status: 400, body: INVALID },
+    );
+    expect(
+      (await search("coral-offers", `?q=${"a".repeat(PALETTE_QUERY_MAX)}`))
+        .status,
+    ).toBe(200);
   });
 });

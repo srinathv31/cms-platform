@@ -62,7 +62,12 @@ describe("waitFor", () => {
     const targets = createFocusTargets();
     const row = element();
     targets.register("statusRow", row, "in_review");
-    await expect(targets.waitFor("statusRow", { accept: (_, state) => state === "in_review", timeout: 3000 })).resolves.toBe(row);
+    await expect(
+      targets.waitFor("statusRow", {
+        accept: (_, state) => state === "in_review",
+        timeout: 3000,
+      }),
+    ).resolves.toBe(row);
   });
 
   it("waits for the control to register, passing over the ones it doesn't accept", async () => {
@@ -71,7 +76,12 @@ describe("waitFor", () => {
     const inReview = element();
     targets.register("statusRow", draft, "draft");
     const settled = vi.fn();
-    const waiting = targets.waitFor("statusRow", { accept: (_, state) => state === "in_review", timeout: 3000 }).then(settled);
+    const waiting = targets
+      .waitFor("statusRow", {
+        accept: (_, state) => state === "in_review",
+        timeout: 3000,
+      })
+      .then(settled);
     await Promise.resolve();
     expect(settled).not.toHaveBeenCalled();
 
@@ -89,7 +99,10 @@ describe("waitFor", () => {
     const widened = element();
     const plain = element();
     const unregister = targets.register("originalTab", widened);
-    const waiting = targets.waitFor("originalTab", { accept: (tab) => tab !== widened, timeout: 1000 });
+    const waiting = targets.waitFor("originalTab", {
+      accept: (tab) => tab !== widened,
+      timeout: 1000,
+    });
     unregister();
     targets.register("originalTab", plain);
     await expect(waiting).resolves.toBe(plain);
@@ -107,7 +120,12 @@ describe("waitFor", () => {
     vi.useFakeTimers();
     const targets = createFocusTargets();
     const settled = vi.fn();
-    const waiting = targets.waitFor("statusRow", { accept: (_, state) => state === "in_review", timeout: 3000 }).then(settled);
+    const waiting = targets
+      .waitFor("statusRow", {
+        accept: (_, state) => state === "in_review",
+        timeout: 3000,
+      })
+      .then(settled);
     await vi.advanceTimersByTimeAsync(2999);
     expect(settled).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);

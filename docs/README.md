@@ -6,18 +6,18 @@ the root [README.md](../README.md).
 
 ## Map
 
-| Where | What it's for |
-| --- | --- |
-| [AGENTS.md](../AGENTS.md) | The rules every change follows: commands, Next.js 16 rules, boundaries, UI rules, files to copy. |
-| [architecture.md](architecture.md) | The layers, what may import what, how a page, a mutation, an autosave and a consumer render flow through the code, and the data model. |
-| [render-spec.md](render-spec.md) | The render engine's specification: the stored document, normalization at save, values, links, lists, the `RenderDoc`, each channel, errors, and the golden-file contract. Normative: a second engine is built from it. Its golden files are in [src/server/render/golden](../src/server/render/golden/README.md). |
-| [handoff-review.md](handoff-review.md) | The October 2026 codebase review as a working backlog: every finding's severity, status, location and fix, and what the fixes turned up. Its "Fix first" list is done; agents pick work from "Found while fixing" and "Alongside: tooling and hygiene", and the PR that fixes a finding updates its status. |
-| [quality-review-2026-10-12.md](quality-review-2026-10-12.md) | The October 12, 2026 quality review: scores, new findings (H-, M- and L- ids), the decisions the Java team needs, and a reading order. A dated snapshot; its [nine slice reports](quality-review-2026-10-12/reports/) sit beside it. The work it led to is planned in [to-do.md](../to-do.md). |
-| Layer READMEs | One per folder under `src/`, next to the code: [app](../src/app/README.md), [components](../src/components/README.md), [contracts](../src/contracts/README.md), [domain](../src/domain/README.md), [editor](../src/editor/README.md), [server](../src/server/README.md), [simulator](../src/simulator/README.md). |
-| [guides/](guides/) | Step-by-step how-tos. Today: the [demo script](guides/demo-script.md). |
-| [reference/](reference/) | Lookup material. Today: the [UI checklist](reference/ui-checklist.md). |
-| [decisions/](decisions/README.md) | Decision records: what was chosen, why, and what was rejected. |
-| [archive/](archive/README.md) | How the prototype was planned and built. History only; doesn't describe the current code. |
+| Where                                                        | What it's for                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [AGENTS.md](../AGENTS.md)                                    | The rules every change follows: commands, Next.js 16 rules, boundaries, UI rules, files to copy.                                                                                                                                                                                                                  |
+| [architecture.md](architecture.md)                           | The layers, what may import what, how a page, a mutation, an autosave and a consumer render flow through the code, and the data model.                                                                                                                                                                            |
+| [render-spec.md](render-spec.md)                             | The render engine's specification: the stored document, normalization at save, values, links, lists, the `RenderDoc`, each channel, errors, and the golden-file contract. Normative: a second engine is built from it. Its golden files are in [src/server/render/golden](../src/server/render/golden/README.md). |
+| [handoff-review.md](handoff-review.md)                       | The October 2026 codebase review as a working backlog: every finding's severity, status, location and fix, and what the fixes turned up. Its "Fix first" list is done; agents pick work from "Found while fixing" and "Alongside: tooling and hygiene", and the PR that fixes a finding updates its status.       |
+| [quality-review-2026-10-12.md](quality-review-2026-10-12.md) | The October 12, 2026 quality review: scores, new findings (H-, M- and L- ids), the decisions the Java team needs, and a reading order. A dated snapshot; its [nine slice reports](quality-review-2026-10-12/reports/) sit beside it. The work it led to is planned in [to-do.md](../to-do.md).                    |
+| Layer READMEs                                                | One per folder under `src/`, next to the code: [app](../src/app/README.md), [components](../src/components/README.md), [contracts](../src/contracts/README.md), [domain](../src/domain/README.md), [editor](../src/editor/README.md), [server](../src/server/README.md), [simulator](../src/simulator/README.md). |
+| [guides/](guides/)                                           | Step-by-step how-tos. Today: the [demo script](guides/demo-script.md).                                                                                                                                                                                                                                            |
+| [reference/](reference/)                                     | Lookup material. Today: the [UI checklist](reference/ui-checklist.md).                                                                                                                                                                                                                                            |
+| [decisions/](decisions/README.md)                            | Decision records: what was chosen, why, and what was rejected.                                                                                                                                                                                                                                                    |
+| [archive/](archive/README.md)                                | How the prototype was planned and built. History only; doesn't describe the current code.                                                                                                                                                                                                                         |
 
 ## Where a new doc goes
 
@@ -40,6 +40,8 @@ the root [README.md](../README.md).
 - Link files with relative links, and name paths exactly. `npm run docs:check` fails on links and headings that don't
   resolve, backticked paths (`src/…`, `@/…`, `docs/…`, `e2e/…`, `scripts/…`) that don't exist, `docs/` paths in code
   comments that don't exist, and a folder under `src/` without a README.
+- Prettier formats these Markdown files too: run `npm run format` before you commit. It skips `docs/archive/` and the
+  dated quality review, which are never edited.
 - Write plainly: short sentences, present tense, Oxford comma, no filler. [src/editor/README.md](../src/editor/README.md)
   is a good model for depth.
 - Don't copy what a file's header comment already says. Summarize, and link the file.

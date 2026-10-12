@@ -26,16 +26,24 @@ async function Members({ teamSlug }: SectionBodyProps) {
 }
 
 async function AccessRequests({ teamSlug }: SectionBodyProps) {
-  const [section, today] = await Promise.all([getAccessRequestsSection(teamSlug), demoToday()]);
+  const [section, today] = await Promise.all([
+    getAccessRequestsSection(teamSlug),
+    demoToday(),
+  ]);
   return <AccessRequestsTable section={section} today={today} />;
 }
 
 async function Recertification({ teamSlug }: SectionBodyProps) {
-  return <RecertificationView section={await getRecertificationSection(teamSlug)} />;
+  return (
+    <RecertificationView section={await getRecertificationSection(teamSlug)} />
+  );
 }
 
 async function Inactivity({ teamSlug }: SectionBodyProps) {
-  const [section, today] = await Promise.all([getInactivitySection(teamSlug), demoToday()]);
+  const [section, today] = await Promise.all([
+    getInactivitySection(teamSlug),
+    demoToday(),
+  ]);
   return <InactivityView section={section} today={today} />;
 }
 

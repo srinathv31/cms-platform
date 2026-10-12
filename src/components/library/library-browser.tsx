@@ -8,9 +8,18 @@ import { Segmented } from "@/components/primitives/segmented";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { NAV_ICON_STROKE } from "@/components/app-shell/nav";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { statusLabel } from "@/domain/status";
-import { TEMPLATE_KIND_LABELS, VERSION_STATES, type VersionState } from "@/domain/types";
+import {
+  TEMPLATE_KIND_LABELS,
+  VERSION_STATES,
+  type VersionState,
+} from "@/domain/types";
 import type { LibraryRow } from "@/server/queries/library";
 import { cn } from "@/lib/utils";
 import {
@@ -31,12 +40,17 @@ type Filter = "all" | VersionState;
 
 /** Case-insensitive match on the template's name or its ID (UC-4F7K2Q). */
 function matches(row: LibraryRow, needle: string): boolean {
-  return row.name.toLowerCase().includes(needle) || row.id.toLowerCase().includes(needle);
+  return (
+    row.name.toLowerCase().includes(needle) ||
+    row.id.toLowerCase().includes(needle)
+  );
 }
 
 /** The widest status badge among the rows, which sizes the status column. */
 function widestBadge(rows: LibraryRow[]): StatusBadgeWidth {
-  const sunsets = rows.filter((row) => row.status === "superseded" && row.sunsetDay !== null);
+  const sunsets = rows.filter(
+    (row) => row.status === "superseded" && row.sunsetDay !== null,
+  );
   if (sunsets.some((row) => row.sunsetPassed)) return "sunset-passed";
   return sunsets.length > 0 ? "sunset" : "default";
 }
@@ -46,7 +60,9 @@ function ListHeader({ showTeam }: { showTeam: boolean }) {
     <div aria-hidden className={cn("border-b border-hairline", STACKED_HIDDEN)}>
       <div className={cn(ROW, "h-10", showTeam ? COLUMNS_TEAM : COLUMNS)}>
         <span className="caps-label">Template</span>
-        {showTeam ? <span className={cn("caps-label", FOLDS)}>Team</span> : null}
+        {showTeam ? (
+          <span className={cn("caps-label", FOLDS)}>Team</span>
+        ) : null}
         <span className="caps-label">Status</span>
         <span className="caps-label">Active</span>
         <span className={cn("caps-label", FOLDS)}>Last edited</span>
@@ -56,7 +72,17 @@ function ListHeader({ showTeam }: { showTeam: boolean }) {
   );
 }
 
-function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space: string; showTeam: boolean; nowIso: string }) {
+function TemplateRow({
+  row,
+  space,
+  showTeam,
+  nowIso,
+}: {
+  row: LibraryRow;
+  space: string;
+  showTeam: boolean;
+  nowIso: string;
+}) {
   return (
     <li className="border-b border-hairline last:border-b-0">
       <Link
@@ -68,23 +94,43 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
         )}
       >
         <span className={cn("min-w-0", NAME_CELL)}>
-          <span className="block truncate text-[15px] leading-5 font-medium" title={row.name}>
+          <span
+            className="block truncate text-[15px] leading-5 font-medium"
+            title={row.name}
+          >
             {row.name}
           </span>
           <span className="mt-0.5 block truncate text-xs leading-4 text-text-muted">
             <span className="font-mono">{row.id}</span>
-            <span data-kind={row.family}> · {TEMPLATE_KIND_LABELS[row.family]}</span>
-            {showTeam ? <span className={TEAM_IN_SUBLINE}> · {row.teamName}</span> : null}
+            <span data-kind={row.family}>
+              {" "}
+              · {TEMPLATE_KIND_LABELS[row.family]}
+            </span>
+            {showTeam ? (
+              <span className={TEAM_IN_SUBLINE}> · {row.teamName}</span>
+            ) : null}
           </span>
         </span>
-        {showTeam ? <span className={cn("truncate text-text-muted", FOLDS)}>{row.teamName}</span> : null}
+        {showTeam ? (
+          <span className={cn("truncate text-text-muted", FOLDS)}>
+            {row.teamName}
+          </span>
+        ) : null}
         <span>
-          <StatusBadge state={row.status} sunsetDay={row.sunsetDay} sunsetPassed={row.sunsetPassed} now={nowIso} />
+          <StatusBadge
+            state={row.status}
+            sunsetDay={row.sunsetDay}
+            sunsetPassed={row.sunsetPassed}
+            now={nowIso}
+          />
         </span>
         <span className="text-text tabular-nums @max-[26rem]/canvas:text-right">
           {row.activeNumber !== null ? (
             <>
-              <span className={cn("text-text-muted", STACKED_ONLY)}>Active </span>v{row.activeNumber}
+              <span className={cn("text-text-muted", STACKED_ONLY)}>
+                Active{" "}
+              </span>
+              v{row.activeNumber}
             </>
           ) : (
             <span className="text-text-subtle">—</span>
@@ -92,7 +138,11 @@ function TemplateRow({ row, space, showTeam, nowIso }: { row: LibraryRow; space:
         </span>
         <span className={cn("text-text-muted", FOLDS)}>{row.lastEdited}</span>
         <span className={cn("flex min-w-0 items-center gap-2.5", FOLDS)}>
-          <UserAvatar initials={row.owner.initials} hue={row.owner.hue} size="sm" />
+          <UserAvatar
+            initials={row.owner.initials}
+            hue={row.owner.hue}
+            size="sm"
+          />
           <span className="truncate">{row.owner.name}</span>
         </span>
       </Link>
@@ -125,16 +175,20 @@ export function LibraryBrowser({
 
   const counts = useMemo(() => {
     const byState: Partial<Record<VersionState, number>> = {};
-    for (const row of rows) byState[row.status] = (byState[row.status] ?? 0) + 1;
+    for (const row of rows)
+      byState[row.status] = (byState[row.status] ?? 0) + 1;
     return byState;
   }, [rows]);
   const present = VERSION_STATES.filter((state) => (counts[state] ?? 0) > 0);
 
   // A filter whose rows have gone (after a refresh) falls back to All instead of showing nothing.
-  const activeFilter: Filter = filter !== "all" && !counts[filter] ? "all" : filter;
+  const activeFilter: Filter =
+    filter !== "all" && !counts[filter] ? "all" : filter;
   const needle = query.trim().toLowerCase();
   const visible = rows.filter(
-    (row) => (activeFilter === "all" || row.status === activeFilter) && (needle === "" || matches(row, needle)),
+    (row) =>
+      (activeFilter === "all" || row.status === activeFilter) &&
+      (needle === "" || matches(row, needle)),
   );
 
   if (rows.length === 0) {
@@ -164,7 +218,11 @@ export function LibraryBrowser({
       <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2 pb-4">
         <InputGroup className="h-9 w-72 rounded-full border-hairline bg-surface">
           <InputGroupAddon>
-            <Search aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-4 text-text-muted" />
+            <Search
+              aria-hidden
+              strokeWidth={NAV_ICON_STROKE}
+              className="size-4 text-text-muted"
+            />
           </InputGroupAddon>
           <InputGroupInput
             type="text"
@@ -189,7 +247,11 @@ export function LibraryBrowser({
                 className="rounded-full text-text-muted hover:text-text"
                 onClick={() => setQuery("")}
               >
-                <X aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-3.5" />
+                <X
+                  aria-hidden
+                  strokeWidth={NAV_ICON_STROKE}
+                  className="size-3.5"
+                />
               </InputGroupButton>
             </InputGroupAddon>
           ) : null}
@@ -203,7 +265,10 @@ export function LibraryBrowser({
             options={(["all", ...present] as Filter[]).map((state) => ({
               value: state,
               // The name with its count: "Draft 3".
-              label: state === "all" ? `All ${rows.length}` : `${statusLabel(state)} ${counts[state]}`,
+              label:
+                state === "all"
+                  ? `All ${rows.length}`
+                  : `${statusLabel(state)} ${counts[state]}`,
             }))}
           />
         ) : null}
@@ -214,7 +279,13 @@ export function LibraryBrowser({
           <ListHeader showTeam={showTeam} />
           <ul>
             {visible.map((row) => (
-              <TemplateRow key={row.id} row={row} space={spaceSlug} showTeam={showTeam} nowIso={nowIso} />
+              <TemplateRow
+                key={row.id}
+                row={row}
+                space={spaceSlug}
+                showTeam={showTeam}
+                nowIso={nowIso}
+              />
             ))}
           </ul>
         </>
@@ -231,7 +302,9 @@ export function LibraryBrowser({
         </p>
       )}
       <p role="status" className="sr-only">
-        {visible.length === rows.length ? "" : `${visible.length} of ${rows.length} templates shown`}
+        {visible.length === rows.length
+          ? ""
+          : `${visible.length} of ${rows.length} templates shown`}
       </p>
     </div>
   );

@@ -9,7 +9,9 @@ export async function ClockReadout() {
     <div>
       <div className="text-[15px] leading-6 font-medium">{label}</div>
       <div className="text-sm leading-5 text-text-muted">
-        {offsetDays === 0 ? "Real time" : `+${plural(offsetDays, "day")} from today`}
+        {offsetDays === 0
+          ? "Real time"
+          : `+${plural(offsetDays, "day")} from today`}
       </div>
     </div>
   );

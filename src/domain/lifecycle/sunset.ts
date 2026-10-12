@@ -6,7 +6,11 @@
 //                  and its `sunset_passed` consumer notice, once. Not a state change: `sunsetPassed` alone
 //                  decides whether a version renders.
 
-import { sunsetDay as sunsetDayIn, sunsetInstant, todayIn } from "../business-zone";
+import {
+  sunsetDay as sunsetDayIn,
+  sunsetInstant,
+  todayIn,
+} from "../business-zone";
 import { describeChanges } from "../contract";
 import { refuse } from "../refusals";
 import { formatLongDate } from "../dates";
@@ -26,8 +30,13 @@ export type SetSunsetResult = Outcome<{
  * "sunset passed": the render rule (`checkVersion`), the consumer API, the read models, `setSunset` and
  * `sweepSunsets` all call it. An instant comparison on the demo clock; the day is in business-zone.ts.
  */
-export function sunsetPassed(version: { sunsetAt: Date | null }, now: Date): boolean {
-  return version.sunsetAt !== null && version.sunsetAt.getTime() <= now.getTime();
+export function sunsetPassed(
+  version: { sunsetAt: Date | null },
+  now: Date,
+): boolean {
+  return (
+    version.sunsetAt !== null && version.sunsetAt.getTime() <= now.getTime()
+  );
 }
 
 /**
@@ -52,11 +61,14 @@ export function setSunset(input: {
   templateName: string;
   contractChanges?: readonly ContractChange[] | null;
 }): SetSunsetResult {
-  const { version, actorId, now, sunsetDay, zone, activeNumber, templateName } = input;
+  const { version, actorId, now, sunsetDay, zone, activeNumber, templateName } =
+    input;
 
-  if (version.state !== "superseded") return refuse(REFUSALS.sunsetNotSuperseded);
+  if (version.state !== "superseded")
+    return refuse(REFUSALS.sunsetNotSuperseded);
   if (sunsetPassed(version, now)) return refuse(REFUSALS.sunsetPassed);
-  if (!isAfterToday(sunsetDay, now, zone)) return refuse(REFUSALS.sunsetAfterToday);
+  if (!isAfterToday(sunsetDay, now, zone))
+    return refuse(REFUSALS.sunsetAfterToday);
 
   const number = numberOf(version);
   const sunset = sunsetOn(sunsetDay, zone);
@@ -66,7 +78,11 @@ export function setSunset(input: {
     {
       kind: "audit",
       action: "version.sunset_set",
-      details: { number, ...sunset.details, previousSunsetAt: version.sunsetAt?.toISOString() ?? null },
+      details: {
+        number,
+        ...sunset.details,
+        previousSunsetAt: version.sunsetAt?.toISOString() ?? null,
+      },
     },
     {
       kind: "consumer_notice",
@@ -79,7 +95,10 @@ export function setSunset(input: {
         sunsetDay,
         zone,
         ...(changes.length > 0 && activeNumber !== null
-          ? { contractChanges: changes, contractLines: describeChanges(changes, activeNumber) }
+          ? {
+              contractChanges: changes,
+              contractLines: describeChanges(changes, activeNumber),
+            }
           : {}),
       },
     },
@@ -96,7 +115,11 @@ export function setSunset(input: {
     );
   }
 
-  return { ok: true, changes: { sunsetAt: sunset.at, sunsetSetBy: actorId }, effects };
+  return {
+    ok: true,
+    changes: { sunsetAt: sunset.at, sunsetSetBy: actorId },
+    effects,
+  };
 }
 
 /**
@@ -160,31 +183,58 @@ export interface PassedSunset {
  * ([decision 0032](../../docs/decisions/0032-consumers-are-told-when-a-sunset-passes.md)). It arrives when
  * the sweep runs, which can be after the instant; its `sunsetAt` says when renders stopped.
  */
-export function sweepSunsets(input: { versions: readonly SunsetFacts[]; now: Date; zone: string }): PassedSunset[] {
+export function sweepSunsets(input: {
+  versions: readonly SunsetFacts[];
+  now: Date;
+  zone: string;
+}): PassedSunset[] {
   const { now, zone } = input;
-  const endedRenders = (v: SunsetFacts): v is SunsetFacts & { sunsetAt: Date; number: number } => {
-    if (v.sunsetAt === null || v.number === null || !sunsetPassed(v, now)) return false;
+  const endedRenders = (
+    v: SunsetFacts,
+  ): v is SunsetFacts & { sunsetAt: Date; number: number } => {
+    if (v.sunsetAt === null || v.number === null || !sunsetPassed(v, now))
+      return false;
     if (v.state === "superseded") return true;
-    return v.state === "revoked" && v.revokedAt !== null && v.revokedAt.getTime() > v.sunsetAt.getTime();
+    return (
+      v.state === "revoked" &&
+      v.revokedAt !== null &&
+      v.revokedAt.getTime() > v.sunsetAt.getTime()
+    );
   };
   return input.versions
     .filter((v) => !v.passedRecorded)
     .filter(endedRenders)
-    .sort((a, b) => a.sunsetAt.getTime() - b.sunsetAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .sort(
+      (a, b) =>
+        a.sunsetAt.getTime() - b.sunsetAt.getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )
     .map((v) => {
-      const sunset = { sunsetAt: v.sunsetAt.toISOString(), sunsetDay: sunsetDayIn(v.sunsetAt, zone), zone };
+      const sunset = {
+        sunsetAt: v.sunsetAt.toISOString(),
+        sunsetDay: sunsetDayIn(v.sunsetAt, zone),
+        zone,
+      };
       return {
         versionId: v.id,
         templateId: v.templateId,
         teamId: v.teamId,
         at: v.sunsetAt,
         effects: [
-          { kind: "audit", action: "version.sunset_passed", details: { number: v.number, ...sunset } },
+          {
+            kind: "audit",
+            action: "version.sunset_passed",
+            details: { number: v.number, ...sunset },
+          },
           {
             kind: "consumer_notice",
             notice: "sunset_passed",
             versionId: v.id,
-            payload: { versionNumber: v.number, activeVersion: v.activeNumber, ...sunset },
+            payload: {
+              versionNumber: v.number,
+              activeVersion: v.activeNumber,
+              ...sunset,
+            },
           },
         ],
       };

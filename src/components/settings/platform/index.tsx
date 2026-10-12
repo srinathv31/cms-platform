@@ -22,7 +22,9 @@ async function Teams() {
 }
 
 async function ContentTypes() {
-  return <ContentTypesSectionView types={(await getContentTypesSection()).types} />;
+  return (
+    <ContentTypesSectionView types={(await getContentTypesSection()).types} />
+  );
 }
 
 async function ChannelRules() {
@@ -30,14 +32,19 @@ async function ChannelRules() {
 }
 
 async function ApprovalChains() {
-  return <ApprovalChainsSectionView section={await getApprovalChainsSection()} />;
+  return (
+    <ApprovalChainsSectionView section={await getApprovalChainsSection()} />
+  );
 }
 
 async function TimeZone() {
   return <TimeZoneSectionView section={await getBusinessZoneSection()} />;
 }
 
-export const PLATFORM_SECTION_BODIES: Record<PlatformSettingsSection, SectionBody> = {
+export const PLATFORM_SECTION_BODIES: Record<
+  PlatformSettingsSection,
+  SectionBody
+> = {
   teams: Teams,
   "content-types": ContentTypes,
   "channel-rules": ChannelRules,

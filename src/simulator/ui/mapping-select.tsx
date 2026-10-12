@@ -33,7 +33,9 @@ export function MappingSelect({
       aria-invalid={invalid || undefined}
       disabled={disabled}
       value={value ?? ""}
-      onChange={(e) => onChange((e.target.value || null) as SimFieldPath | null)}
+      onChange={(e) =>
+        onChange((e.target.value || null) as SimFieldPath | null)
+      }
       className={cn(
         "h-8 w-full max-w-[17rem] cursor-pointer rounded-(--sim-rb) border bg-(--sim-panel) px-2 text-[13px] text-(--sim-text) disabled:cursor-not-allowed disabled:opacity-40",
         invalid ? "border-(--sim-bad)" : "border-(--sim-line)",

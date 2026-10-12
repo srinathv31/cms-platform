@@ -3,7 +3,10 @@
 import { useId, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { TeamsSection } from "@/domain/access-types";
-import { newTeamConsequences, validateNewTeam } from "@/domain/platform-config/teams";
+import {
+  newTeamConsequences,
+  validateNewTeam,
+} from "@/domain/platform-config/teams";
 import { Segmented } from "@/components/primitives/segmented";
 import { TeamIcon, teamIconLabel } from "@/components/primitives/team-icon";
 import { Button } from "@/components/ui/button";
@@ -33,9 +36,15 @@ export function TeamsSectionView({ section }: { section: TeamsSection }) {
   return (
     <div data-slot="platform-section" data-section="teams">
       <div className="mb-4 flex h-8 items-center justify-between">
-        <span className="text-[14px] text-text-muted">{plural(section.teams.length, "team")}</span>
+        <span className="text-[14px] text-text-muted">
+          {plural(section.teams.length, "team")}
+        </span>
         {creating ? null : (
-          <Button ref={opener} variant="outline" onClick={() => setCreating(true)}>
+          <Button
+            ref={opener}
+            variant="outline"
+            onClick={() => setCreating(true)}
+          >
             <Plus aria-hidden strokeWidth={1.75} data-icon="inline-start" />
             Create team
           </Button>
@@ -45,23 +54,51 @@ export function TeamsSectionView({ section }: { section: TeamsSection }) {
       {creating ? <CreateTeam section={section} onClose={close} /> : null}
 
       <div role="table" aria-label="Teams">
-        <HeaderRow cols={COLS} columns={["Team", "Team Admin", "Members", "Templates"]} />
+        <HeaderRow
+          cols={COLS}
+          columns={["Team", "Team Admin", "Members", "Templates"]}
+        />
         {section.teams.map((team) => (
-          <div key={team.id} role="row" className="grid min-h-16 items-center gap-x-4 border-b border-hairline py-2.5" style={{ gridTemplateColumns: COLS }}>
+          <div
+            key={team.id}
+            role="row"
+            className="grid min-h-16 items-center gap-x-4 border-b border-hairline py-2.5"
+            style={{ gridTemplateColumns: COLS }}
+          >
             <div role="cell" className="flex min-w-0 items-center gap-3">
-              <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-chip text-chip-icon">
+              <span
+                aria-hidden
+                className="grid size-9 shrink-0 place-items-center rounded-lg bg-chip text-chip-icon"
+              >
                 <TeamIcon name={team.icon} className="size-[18px]" />
               </span>
               <div className="min-w-0">
-                <div className="truncate text-[15px] font-medium text-text">{team.name}</div>
-                {team.description ? <div className="truncate text-[13px] text-text-muted">{team.description}</div> : null}
+                <div className="truncate text-[15px] font-medium text-text">
+                  {team.name}
+                </div>
+                {team.description ? (
+                  <div className="truncate text-[13px] text-text-muted">
+                    {team.description}
+                  </div>
+                ) : null}
               </div>
             </div>
-            <div role="cell" className="flex min-w-0 flex-col gap-1 text-[14px] text-text">
-              {team.admins.length ? team.admins.map((a) => <PersonLine key={a.id} person={a} />) : <span className="text-text-muted">None</span>}
+            <div
+              role="cell"
+              className="flex min-w-0 flex-col gap-1 text-[14px] text-text"
+            >
+              {team.admins.length ? (
+                team.admins.map((a) => <PersonLine key={a.id} person={a} />)
+              ) : (
+                <span className="text-text-muted">None</span>
+              )}
             </div>
-            <div role="cell" className="text-[14px] text-text tabular-nums">{team.members}</div>
-            <div role="cell" className="text-[14px] text-text tabular-nums">{team.templates}</div>
+            <div role="cell" className="text-[14px] text-text tabular-nums">
+              {team.members}
+            </div>
+            <div role="cell" className="text-[14px] text-text tabular-nums">
+              {team.templates}
+            </div>
           </div>
         ))}
       </div>
@@ -69,14 +106,25 @@ export function TeamsSectionView({ section }: { section: TeamsSection }) {
   );
 }
 
-function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () => void }) {
+function CreateTeam({
+  section,
+  onClose,
+}: {
+  section: TeamsSection;
+  onClose: () => void;
+}) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("building-2");
   const [adminId, setAdminId] = useState("");
 
   const admin = section.people.find((p) => p.id === adminId);
-  const check = validateNewTeam({ name, description, icon, existing: section.teams });
+  const check = validateNewTeam({
+    name,
+    description,
+    icon,
+    existing: section.teams,
+  });
   const trimmed = check.name;
   // Nothing is flagged before a name is typed; until then Create team just isn't offered.
   const problem = trimmed ? (check.problem?.reason ?? null) : null;
@@ -113,7 +161,12 @@ function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () =
           <span aria-hidden className="text-[13px] text-text-muted">
             First Team Admin
           </span>
-          <Pick label="First Team Admin" value={adminId} onChange={setAdminId} className="w-full">
+          <Pick
+            label="First Team Admin"
+            value={adminId}
+            onChange={setAdminId}
+            className="w-full"
+          >
             <option value="" disabled>
               Pick a person
             </option>
@@ -126,7 +179,10 @@ function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () =
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${id}-description`} className="text-[13px] text-text-muted">
+        <label
+          htmlFor={`${id}-description`}
+          className="text-[13px] text-text-muted"
+        >
           Description (optional)
         </label>
         <Input
@@ -156,12 +212,23 @@ function CreateTeam({ section, onClose }: { section: TeamsSection; onClose: () =
           confirmLabel="Create team"
           onCancel={onClose}
           onDone={onClose}
-          onConfirm={() => createTeam({ name: trimmed, description: check.description, icon, adminUserId: admin.id })}
+          onConfirm={() =>
+            createTeam({
+              name: trimmed,
+              description: check.description,
+              icon,
+              adminUserId: admin.id,
+            })
+          }
           className="bg-surface-sunken"
         />
       ) : (
         <div className="flex items-center justify-end gap-2">
-          {problem ? <p role="alert" className="mr-auto text-[13px] text-danger-text">{problem}</p> : null}
+          {problem ? (
+            <p role="alert" className="mr-auto text-[13px] text-danger-text">
+              {problem}
+            </p>
+          ) : null}
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

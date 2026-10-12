@@ -45,7 +45,11 @@ export function SimError({ error, retry }: RouteErrorProps) {
           </div>
         }
       />
-      {error.digest ? <p className="m-0 text-[12px] leading-4 text-(--sim-muted) tabular-nums">Error ID {error.digest}</p> : null}
+      {error.digest ? (
+        <p className="m-0 text-[12px] leading-4 text-(--sim-muted) tabular-nums">
+          Error ID {error.digest}
+        </p>
+      ) : null}
     </PageScroll>
   );
 }

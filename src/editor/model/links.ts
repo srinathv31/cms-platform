@@ -41,7 +41,8 @@ export const LINK_MESSAGES: Readonly<Record<LinkRefusal, string>> = {
   backslash: "Links can't contain a backslash.",
   "web-address": "Enter a full web address, like https://www.example.com.",
   "web-host": "Write an international site name in its xn-- form.",
-  "web-userinfo": "Web links can't have a name or password before the site's address.",
+  "web-userinfo":
+    "Web links can't have a name or password before the site's address.",
   email: "Enter an email address after mailto:, like mailto:help@example.com.",
   phone: "Enter a phone number after tel:, like tel:+18005550100.",
 };
@@ -53,7 +54,8 @@ export type LinkCheck =
 // ── Character sets (explicit, so the Java port matches code point for code point) ─────────────
 
 /** Whitespace: refused inside a link, trimmed at its ends. */
-const WHITESPACE = "\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000";
+const WHITESPACE =
+  "\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000";
 /** Zero-width characters the editor shows as nothing: also trimmed at the ends. */
 const ZERO_WIDTH = "\\u200B-\\u200D\\u2060\\uFEFF";
 /** C0 and C1 control characters. */
@@ -76,7 +78,10 @@ export const INVISIBLE_CHARACTERS =
 /** Control and invisible characters: refused inside a link. Lone surrogates are refused too. */
 const INVISIBLE = CONTROLS + INVISIBLE_CHARACTERS;
 
-const TRIM_ENDS = new RegExp(`^[${WHITESPACE}${ZERO_WIDTH}]+|[${WHITESPACE}${ZERO_WIDTH}]+$`, "gu");
+const TRIM_ENDS = new RegExp(
+  `^[${WHITESPACE}${ZERO_WIDTH}]+|[${WHITESPACE}${ZERO_WIDTH}]+$`,
+  "gu",
+);
 const HAS_WHITESPACE = new RegExp(`[${WHITESPACE}]`, "u");
 const HAS_INVISIBLE = new RegExp(`[${INVISIBLE}]`, "u");
 const INVISIBLE_IN_TEXT = new RegExp(`[${INVISIBLE_CHARACTERS}]`, "gu");
@@ -154,7 +159,8 @@ function web(scheme: "https" | "http", rest: string): LinkCheck {
   if (host === "") return refuse("web-address");
   if (!isAscii(host)) return refuse("web-host");
   if (!REG_NAME.test(host) && !IPV6.test(host)) return refuse("web-address");
-  if (port !== null && (!PORT.test(port) || Number(port) > 65535)) return refuse("web-address");
+  if (port !== null && (!PORT.test(port) || Number(port) > 65535))
+    return refuse("web-address");
 
   return accept(scheme, `//${authority}${percentEncode(tail)}`);
 }
@@ -162,7 +168,8 @@ function web(scheme: "https" | "http", rest: string): LinkCheck {
 function mailto(rest: string): LinkCheck {
   const query = rest.indexOf("?");
   const to = query < 0 ? rest : rest.slice(0, query);
-  if (to === "" || !to.split(",").every((address) => EMAIL.test(address))) return refuse("email");
+  if (to === "" || !to.split(",").every((address) => EMAIL.test(address)))
+    return refuse("email");
   return accept("mailto", percentEncode(rest));
 }
 

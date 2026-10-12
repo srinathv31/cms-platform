@@ -6,10 +6,23 @@
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/react";
 import { setReviewThreads } from "../extensions/review-threads";
-import { blockElement, createRectSignal, rectOf, revealInContainer, threadElement } from "../lib/block-rects";
-import type { CommentRequest, DocumentEditorProps, ThreadAnchor } from "../types";
+import {
+  blockElement,
+  createRectSignal,
+  rectOf,
+  revealInContainer,
+  threadElement,
+} from "../lib/block-rects";
+import type {
+  CommentRequest,
+  DocumentEditorProps,
+  ThreadAnchor,
+} from "../types";
 
-export type CommentHandlers = Pick<DocumentEditorProps, "onThreadClick" | "onCaretThreadChange" | "onRequestComment">;
+export type CommentHandlers = Pick<
+  DocumentEditorProps,
+  "onThreadClick" | "onCaretThreadChange" | "onRequestComment"
+>;
 
 const NO_THREADS: readonly ThreadAnchor[] = [];
 
@@ -61,7 +74,9 @@ export function createCommentBridge(): CommentBridge {
 
   const reveal = (threadId: string) => {
     const thread = threads.find((t) => t.id === threadId);
-    const element = threadElement(wrapper, threadId) ?? (thread ? blockElement(wrapper, thread.blockId) : null);
+    const element =
+      threadElement(wrapper, threadId) ??
+      (thread ? blockElement(wrapper, thread.blockId) : null);
     if (element && rectOf(element)) revealInContainer(element);
   };
 

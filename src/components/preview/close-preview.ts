@@ -20,7 +20,10 @@ export function focusPreviewToggle(targets: Pick<FocusTargets, "get">): void {
  * document keeps their caret).
  */
 export function closePreview(
-  session: Pick<WorkspaceSession, "closePreview" | "setRailOpen" | "focusTargets">,
+  session: Pick<
+    WorkspaceSession,
+    "closePreview" | "setRailOpen" | "focusTargets"
+  >,
   { restoreFocus }: { restoreFocus: boolean },
 ): void {
   if (restoreFocus) focusPreviewToggle(session.focusTargets);

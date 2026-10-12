@@ -6,9 +6,15 @@ import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { getNotificationsData } from "@/server/queries/notifications";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
-import { markAllNotificationsRead, markNotificationRead } from "./notifications";
+import {
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "./notifications";
 
 // The bell against a temporary database filled by the real seed. Alex has three notifications:
 // Chris's access request and the recertification (unread), Devon's inactivity flag (read).
@@ -33,7 +39,8 @@ seededDatabasePerTest({ base: BASE });
 
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
-  for (const id of ["alex", "maya", "priya", "morgan"]) people[id] = await loadPersona(db, id);
+  for (const id of ["alex", "maya", "priya", "morgan"])
+    people[id] = await loadPersona(db, id);
 }, 60_000);
 
 beforeEach(() => {
@@ -45,13 +52,20 @@ function as(userId: string) {
 }
 
 const unreadOf = (userId: string) =>
-  db.select().from(notifications).where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+  db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
 
 describe("getNotificationsData", () => {
   it("lists the viewer's notifications newest first, with the unread count and demo-clock times", async () => {
     as("alex");
     const data = await getNotificationsData();
-    expect(data.items.map((n) => n.kind)).toEqual(["access_requested", "recert_due", "inactivity_flagged"]);
+    expect(data.items.map((n) => n.kind)).toEqual([
+      "access_requested",
+      "recert_due",
+      "inactivity_flagged",
+    ]);
     expect(data.unreadCount).toBe(2);
     expect(data.items.map((n) => n.unread)).toEqual([true, true, false]);
     expect(data.items[0]).toMatchObject({
@@ -80,12 +94,16 @@ describe("getNotificationsData", () => {
     as("morgan");
     const data = await getNotificationsData();
     expect(data.unreadCount).toBe(NOTIFICATION_KINDS.length);
-    expect(new Set(data.items.map((n) => n.kind))).toEqual(new Set(NOTIFICATION_KINDS));
+    expect(new Set(data.items.map((n) => n.kind))).toEqual(
+      new Set(NOTIFICATION_KINDS),
+    );
     for (const n of data.items) {
       expect(n.title, n.kind).toMatch(/^[A-Z].*[.]$/);
       expect(n.href, n.kind).toMatch(/^\//);
     }
-    expect(data.items.find((n) => n.kind === "recert_due")!.href).toBe("/coral-offers/settings/recertification");
+    expect(data.items.find((n) => n.kind === "recert_due")!.href).toBe(
+      "/coral-offers/settings/recertification",
+    );
   });
 
   it("words each time by calendar day: 23:00 the night before is Yesterday at 01:00 (D9)", async () => {
@@ -94,7 +112,10 @@ describe("getNotificationsData", () => {
     env.now = new Date("2026-10-05T01:00:00.000Z");
     try {
       await db.insert(notifications).values(
-        [new Date("2026-10-04T23:00:00.000Z"), new Date("2026-10-05T00:30:00.000Z")].map((createdAt, i) => ({
+        [
+          new Date("2026-10-04T23:00:00.000Z"),
+          new Date("2026-10-05T00:30:00.000Z"),
+        ].map((createdAt, i) => ({
           id: ids[i]!,
           userId: "morgan",
           teamId: "coral-offers",
@@ -107,7 +128,9 @@ describe("getNotificationsData", () => {
         })),
       );
       as("morgan");
-      const ago = new Map((await getNotificationsData()).items.map((n) => [n.id, n.ago]));
+      const ago = new Map(
+        (await getNotificationsData()).items.map((n) => [n.id, n.ago]),
+      );
       expect(ago.get("nt_d9_late")).toBe("Yesterday");
       expect(ago.get("nt_d9_early")).toBe("30 minutes ago");
     } finally {
@@ -122,7 +145,9 @@ describe("markNotificationRead", () => {
     as("priya");
     const [first] = await unreadOf("priya");
     expect(await markNotificationRead({ id: first!.id })).toEqual({ ok: true });
-    const row = await db.query.notifications.findFirst({ where: eq(notifications.id, first!.id) });
+    const row = await db.query.notifications.findFirst({
+      where: eq(notifications.id, first!.id),
+    });
     expect(row!.readAt).toEqual(env.now);
     expect(refresh).toHaveBeenCalledTimes(1);
     // Again: a no-op that succeeds.
@@ -134,7 +159,11 @@ describe("markNotificationRead", () => {
     as("maya");
     const [alexs] = await unreadOf("alex");
     const refused = await markNotificationRead({ id: alexs!.id });
-    expect(refused).toEqual({ ok: false, code: "notification_gone", reason: "This notification no longer exists." });
+    expect(refused).toEqual({
+      ok: false,
+      code: "notification_gone",
+      reason: "This notification no longer exists.",
+    });
     expect(await markNotificationRead({ id: "nt_nope" })).toEqual(refused);
     expect(await markNotificationRead({ id: "" })).toEqual(refused);
     expect((await unreadOf("alex")).map((n) => n.id)).toContain(alexs!.id);

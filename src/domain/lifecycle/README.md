@@ -16,18 +16,18 @@ rules](../README.md#rules).
 In reading order: the shapes and the refusal table first, then each family of transitions in the order a version goes
 through them.
 
-| File | Holds | Exports |
-| --- | --- | --- |
-| [types.ts](types.ts) | The shapes the transitions share: what a draft and a version carry, a transition's result, and the version as the review transitions read it. | `LifecycleResult`, `StarterContent`, `VersionSnapshot`, `DraftFields`, `LifecycleError`, `Ok`, `Outcome`, `ReviewVersion`, `ApprovalRecord`, `ReasonComment` |
-| [refusals.ts](refusals.ts) | `REFUSALS`, the whole refusal table of a submit or a review transition: every code with its sentence, in one place. | `REFUSALS` |
-| [helpers.ts](helpers.ts) | The small helpers the transitions share: a version's number and round (a missing one throws, it is a bug), how a sentence names a round, the effect builders. | `numberOf`, `roundOf`, `sentence`, `trimmed`, `unique`, `notify`, `teamApproversExcept` |
-| [drafts.ts](drafts.ts) | How a draft comes to exist and who wrote it: a new template from a starter and its channels, Edit on the latest version, and the writers that maker-checker reads. | `createDraft`, `newTemplateContentType`, `newTemplateChannels`, `DEFAULT_CHANNELS`, `draftChannelsRefusal`, `planDraftStart`, `editLatest`, `copyToDraft`, `withWriter` |
-| [baselines.ts](baselines.ts) | The version a draft or a round is compared with: what consumers can still render, and what the review screen redlines against. | `contractBaseline`, `reviewBaseline`, `renameBaseline` |
-| [submit.ts](submit.ts) | Draft to In review: numbered, with its contract changes, its stages and the rules a message's channels add. | `submit`, `smsFooterOf` |
-| [request-changes.ts](request-changes.ts) | In review to Changes requested, and the new draft that carries the block ids. | `requestChanges` |
-| [approve.ts](approve.ts) | In review to the next stage, or Active at the last one, with the previous Active Superseded. | `approve` |
-| [sunset.ts](sunset.ts) | The date a Superseded version stops rendering, the one test of "passed", and the sweep that records it. | `setSunset`, `sunsetPassed`, `isAfterToday`, `sweepSunsets` |
-| [revoke.ts](revoke.ts) | Two people withdraw a released version. | `startRevoke`, `confirmRevoke`, `cancelRevoke`, `revokePending` |
+| File                                     | Holds                                                                                                                                                              | Exports                                                                                                                                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [types.ts](types.ts)                     | The shapes the transitions share: what a draft and a version carry, a transition's result, and the version as the review transitions read it.                      | `LifecycleResult`, `StarterContent`, `VersionSnapshot`, `DraftFields`, `LifecycleError`, `Ok`, `Outcome`, `ReviewVersion`, `ApprovalRecord`, `ReasonComment`            |
+| [refusals.ts](refusals.ts)               | `REFUSALS`, the whole refusal table of a submit or a review transition: every code with its sentence, in one place.                                                | `REFUSALS`                                                                                                                                                              |
+| [helpers.ts](helpers.ts)                 | The small helpers the transitions share: a version's number and round (a missing one throws, it is a bug), how a sentence names a round, the effect builders.      | `numberOf`, `roundOf`, `sentence`, `trimmed`, `unique`, `notify`, `teamApproversExcept`                                                                                 |
+| [drafts.ts](drafts.ts)                   | How a draft comes to exist and who wrote it: a new template from a starter and its channels, Edit on the latest version, and the writers that maker-checker reads. | `createDraft`, `newTemplateContentType`, `newTemplateChannels`, `DEFAULT_CHANNELS`, `draftChannelsRefusal`, `planDraftStart`, `editLatest`, `copyToDraft`, `withWriter` |
+| [baselines.ts](baselines.ts)             | The version a draft or a round is compared with: what consumers can still render, and what the review screen redlines against.                                     | `contractBaseline`, `reviewBaseline`, `renameBaseline`                                                                                                                  |
+| [submit.ts](submit.ts)                   | Draft to In review: numbered, with its contract changes, its stages and the rules a message's channels add.                                                        | `submit`, `smsFooterOf`                                                                                                                                                 |
+| [request-changes.ts](request-changes.ts) | In review to Changes requested, and the new draft that carries the block ids.                                                                                      | `requestChanges`                                                                                                                                                        |
+| [approve.ts](approve.ts)                 | In review to the next stage, or Active at the last one, with the previous Active Superseded.                                                                       | `approve`                                                                                                                                                               |
+| [sunset.ts](sunset.ts)                   | The date a Superseded version stops rendering, the one test of "passed", and the sweep that records it.                                                            | `setSunset`, `sunsetPassed`, `isAfterToday`, `sweepSunsets`                                                                                                             |
+| [revoke.ts](revoke.ts)                   | Two people withdraw a released version.                                                                                                                            | `startRevoke`, `confirmRevoke`, `cancelRevoke`, `revokePending`                                                                                                         |
 
 Tests sit beside each file. [fixtures.ts](fixtures.ts) holds the inputs more than one test file builds;
 [transitions.test.ts](transitions.test.ts) holds the tests that cross files: every review move from every state, the
@@ -89,7 +89,7 @@ The lifecycle as a diagram, with the states, is in [the domain README](../README
 
 ## Copy these
 
-| To… | Copy |
-| --- | --- |
-| Add a transition | `startRevoke` in [revoke.ts](revoke.ts) or `setSunset` in [sunset.ts](sunset.ts), with the test beside it. |
-| Add a refusal | An entry in `REFUSALS` ([refusals.ts](refusals.ts)) with a code no other refusal has ([refusals.test.ts](../refusals.test.ts) checks). |
+| To…              | Copy                                                                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Add a transition | `startRevoke` in [revoke.ts](revoke.ts) or `setSunset` in [sunset.ts](sunset.ts), with the test beside it.                             |
+| Add a refusal    | An entry in `REFUSALS` ([refusals.ts](refusals.ts)) with a code no other refusal has ([refusals.test.ts](../refusals.test.ts) checks). |

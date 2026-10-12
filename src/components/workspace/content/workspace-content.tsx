@@ -1,7 +1,14 @@
 import { reviewPath } from "@/domain/rounds";
 import { now } from "@/server/clock";
-import { getPeople, personOf, requireTemplate } from "@/server/queries/review-shared";
-import { getWorkspaceDocument, getWorkspaceHeader } from "@/server/queries/workspace";
+import {
+  getPeople,
+  personOf,
+  requireTemplate,
+} from "@/server/queries/review-shared";
+import {
+  getWorkspaceDocument,
+  getWorkspaceHeader,
+} from "@/server/queries/workspace";
 import { ContentWorkspace } from "./content-workspace";
 
 /** Reads the document the Content tab shows and hands it to the client workspace (document + rail). */

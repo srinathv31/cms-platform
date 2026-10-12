@@ -85,7 +85,13 @@ export interface SimOfferRecord {
   name: string;
   headline: string;
   /** Null for an alert, which has no terms. */
-  terms: { spend: number; bonus: number; months: number; annualFee?: number; endsOn?: string } | null;
+  terms: {
+    spend: number;
+    bonus: number;
+    months: number;
+    annualFee?: number;
+    endsOn?: string;
+  } | null;
 }
 
 // ── Read models (src/simulator/queries.ts; server-only; each reads sim_* and calls /api/v1) ─────────
@@ -135,11 +141,20 @@ export interface SimUpgrade {
 
 /** /sim/offers/[offerId] — one offer: link, mapping, send, results. */
 export interface SimOfferPage {
-  offer: { id: string; kind: SimOfferKind; name: string; headline: string; terms: SimOfferRecord["terms"] };
+  offer: {
+    id: string;
+    kind: SimOfferKind;
+    name: string;
+    headline: string;
+    terms: SimOfferRecord["terms"];
+  };
   link: (SimLinkSummary & { mapping: SimMappingRow[] }) | null;
   upgrade: SimUpgrade | null;
   /** Unmapped required variables. When non-empty, Send is disabled and `blocked.sentence` says why. */
-  blocked: { missing: { key: string; label: string }[]; sentence: string } | null;
+  blocked: {
+    missing: { key: string; label: string }[];
+    sentence: string;
+  } | null;
   customers: SimCustomerRow[];
   /** The newest send of this offer, if any. */
   lastBatch: SimBatch | null;
@@ -210,7 +225,12 @@ export interface SimApiError {
 export interface SimDeliveryView {
   id: string;
   /** The customer's phone today: the web page, the push and the texts show on it. */
-  customer: { name: string; email: string; phone: string; platform: SimPlatform };
+  customer: {
+    name: string;
+    email: string;
+    phone: string;
+    platform: SimPlatform;
+  };
   offerName: string;
   templateName: string;
   versionNumber: number;
@@ -229,7 +249,13 @@ export interface SimDeliveryView {
    */
   view:
     | { kind: "phone"; src: string }
-    | { kind: "inbox"; src: string; from: string; subject: string; preheader: string }
+    | {
+        kind: "inbox";
+        src: string;
+        from: string;
+        subject: string;
+        preheader: string;
+      }
     | { kind: "pdf"; src: string }
     | { kind: "push"; appName: string; platform: SimPlatform; push: SimPush }
     | { kind: "sms"; sender: string; thread: SimSms[] }
@@ -293,14 +319,16 @@ export interface SimLinkFlow {
 
 // ── Actions (src/simulator/actions.ts, "use server"; the writes: each returns SimResult and calls refresh()) ────
 
-export type SimResult<T = Record<never, never>> = ({ ok: true } & T) | { ok: false; reason: string };
+export type SimResult<T = Record<never, never>> =
+  ({ ok: true } & T) | { ok: false; reason: string };
 
 /**
  * What a read model answers when a GET route serves it (src/simulator/read-response.ts): the data, or the
  * sentence to show with the HTTP status that goes with it (400 the input didn't parse, 404 no such row, 502
  * Stencil's /api/v1 failed). The browser gets a `SimResult`; the status is the route's.
  */
-export type SimRead<T = Record<never, never>> = ({ ok: true } & T) | { ok: false; reason: string; status: 400 | 404 | 502 };
+export type SimRead<T = Record<never, never>> =
+  ({ ok: true } & T) | { ok: false; reason: string; status: 400 | 404 | 502 };
 
 // linkTemplate(input: { offerId: string; templateId: string; version: number; channels: ApiChannel[];
 //                       mapping: Record<string, SimFieldPath | null> }): Promise<SimResult>

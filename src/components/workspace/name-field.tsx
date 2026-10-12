@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { takeJustCreated } from "./just-created";
@@ -12,7 +18,8 @@ const MAX_NAME_LENGTH = 120;
 // The title, in display type. The field looks like the title: no box until it is hovered or focused.
 // The mirror and the textarea share these, so the textarea grows with its text and a long name wraps
 // onto a second line instead of being cut off.
-const TYPE = "col-start-1 row-start-1 min-w-0 px-2 py-0.5 font-[inherit] text-[length:inherit] leading-[inherit] tracking-[inherit] wrap-break-word whitespace-pre-wrap text-pretty";
+const TYPE =
+  "col-start-1 row-start-1 min-w-0 px-2 py-0.5 font-[inherit] text-[length:inherit] leading-[inherit] tracking-[inherit] wrap-break-word whitespace-pre-wrap text-pretty";
 
 /**
  * The template name, as the page title.
@@ -27,10 +34,19 @@ const TYPE = "col-start-1 row-start-1 min-w-0 px-2 py-0.5 font-[inherit] text-[l
  *   `just-created.ts`): the name is focused with all of its text selected, so the first thing the
  *   author types replaces it. The address is already the template's own: nothing to drop from it.
  */
-export function NameField({ name, editable }: { name: string; editable: boolean }) {
+export function NameField({
+  name,
+  editable,
+}: {
+  name: string;
+  editable: boolean;
+}) {
   if (!editable) {
     return (
-      <h1 className="display-lg min-w-0 wrap-break-word text-pretty text-text" title={name}>
+      <h1
+        className="display-lg min-w-0 wrap-break-word text-pretty text-text"
+        title={name}
+      >
         {name}
       </h1>
     );
@@ -102,7 +118,9 @@ function EditableName({ name }: { name: string }) {
     const el = event.currentTarget;
     // Pasting from a document can bring line breaks along. A name is one line.
     if (/[\r\n]/.test(el.value)) {
-      const caret = el.value.slice(0, el.selectionStart).replace(/\s*[\r\n]+\s*/g, " ").length;
+      const caret = el.value
+        .slice(0, el.selectionStart)
+        .replace(/\s*[\r\n]+\s*/g, " ").length;
       el.value = el.value.replace(/\s*[\r\n]+\s*/g, " ");
       el.setSelectionRange(caret, caret);
     }
@@ -134,7 +152,8 @@ function EditableName({ name }: { name: string }) {
       revert();
       // With the rail open (the Original view after an import, the preview) the same Esc puts it away
       // (content/rail.tsx), and the author stays in the name; otherwise Esc is the way out of the field.
-      if (!session.getPreview().open && !session.getRailOpen()) event.currentTarget.blur();
+      if (!session.getPreview().open && !session.getRailOpen())
+        event.currentTarget.blur();
     }
   }
 

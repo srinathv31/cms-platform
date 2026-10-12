@@ -47,13 +47,23 @@ export function CanvasScroll() {
 interface NavigationApi {
   readonly currentEntry: { readonly key: string } | null;
   entries(): readonly { readonly key: string }[];
-  addEventListener(type: "currententrychange", listener: EntryChangeListener): void;
-  removeEventListener(type: "currententrychange", listener: EntryChangeListener): void;
+  addEventListener(
+    type: "currententrychange",
+    listener: EntryChangeListener,
+  ): void;
+  removeEventListener(
+    type: "currententrychange",
+    listener: EntryChangeListener,
+  ): void;
 }
-type EntryChangeListener = (event: Event & { readonly navigationType: string | null }) => void;
+type EntryChangeListener = (
+  event: Event & { readonly navigationType: string | null },
+) => void;
 
-const navigationApi = () => (window as unknown as { navigation?: NavigationApi }).navigation ?? null;
-const canvasElement = () => document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
+const navigationApi = () =>
+  (window as unknown as { navigation?: NavigationApi }).navigation ?? null;
+const canvasElement = () =>
+  document.querySelector<HTMLElement>('[data-slot="canvas-scroll"]');
 
 interface ScrollState {
   /** The page last shown, as its route segments. `null` until the first one. */
@@ -89,14 +99,16 @@ function CanvasScrollEffects() {
     s.displayedKey ??= nav?.currentEntry?.key ?? null;
 
     const onScroll = () => {
-      if (!s.restoring && s.displayedKey !== null) s.saved.set(s.displayedKey, canvas.scrollTop);
+      if (!s.restoring && s.displayedKey !== null)
+        s.saved.set(s.displayedKey, canvas.scrollTop);
     };
     // The entry changes the moment the URL does, which on back and forward is before the page has
     // switched (the old page is still on screen, and scrolling it must not overwrite the entry we
     // are going back to). Next re-writes the entry when it commits the page, which lands here as
     // a replace, so the displayed entry follows then. Pushes and replaces commit with the page.
     const onEntryChange: EntryChangeListener = (event) => {
-      if (event.navigationType !== "traverse") s.displayedKey = nav?.currentEntry?.key ?? null;
+      if (event.navigationType !== "traverse")
+        s.displayedKey = nav?.currentEntry?.key ?? null;
     };
     canvas.addEventListener("scroll", onScroll, { passive: true });
     nav?.addEventListener("currententrychange", onEntryChange);
@@ -127,7 +139,11 @@ function CanvasScrollEffects() {
     if (!canvas) return;
     const top = scrollTargetOnPageChange(previousKey, key, s.saved);
     if (key !== null) s.saved.set(key, top);
-    if (nav) pruneSavedPositions(s.saved, nav.entries().map((entry) => entry.key));
+    if (nav)
+      pruneSavedPositions(
+        s.saved,
+        nav.entries().map((entry) => entry.key),
+      );
     s.restoring = true;
     s.settle = scrollTo(canvas, top, () => {
       s.restoring = false;
@@ -150,7 +166,11 @@ const TAKE_OVER = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
  * Returns a function that gives up, or `null` when the first try got there. `done` is called once,
  * whichever way it ends.
  */
-function scrollTo(canvas: HTMLElement, top: number, done: () => void): (() => void) | null {
+function scrollTo(
+  canvas: HTMLElement,
+  top: number,
+  done: () => void,
+): (() => void) | null {
   const jump = () => canvas.scrollTo({ top, behavior: "instant" }); // never animated, whatever the CSS says
   jump();
   if (canvas.scrollTop >= top - 1) {
@@ -173,6 +193,7 @@ function scrollTo(canvas: HTMLElement, top: number, done: () => void): (() => vo
     done();
   }
   if (canvas.firstElementChild) observer.observe(canvas.firstElementChild);
-  for (const type of TAKE_OVER) canvas.addEventListener(type, stop, { passive: true });
+  for (const type of TAKE_OVER)
+    canvas.addEventListener(type, stop, { passive: true });
   return stop;
 }

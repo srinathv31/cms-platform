@@ -40,7 +40,12 @@ export interface EmailDetailsProps {
  * chips still count (deleting a variable used only in the subject still asks first), and a variable
  * renamed or deleted meanwhile reaches them, and saves, as it does the document.
  */
-export function EmailDetails({ on, editable, values, comments }: EmailDetailsProps) {
+export function EmailDetails({
+  on,
+  editable,
+  values,
+  comments,
+}: EmailDetailsProps) {
   const headingId = useId();
 
   return (
@@ -80,11 +85,21 @@ function ChannelFieldInput({
 }) {
   const session = useWorkspaceSession();
   const { id } = field;
-  const onChange = useCallback((doc: JSONContent) => session.save({ [id]: doc } as ChannelFieldsPatch), [session, id]);
+  const onChange = useCallback(
+    (doc: JSONContent) => session.save({ [id]: doc } as ChannelFieldsPatch),
+    [session, id],
+  );
 
   // Every shape is one paragraph of text and chips; only `lines` (an SMS message) takes line breaks.
   return (
-    <Labelled label={field.label} controls={comments ? <FieldCommentControls field={field} comments={comments} /> : null}>
+    <Labelled
+      label={field.label}
+      controls={
+        comments ? (
+          <FieldCommentControls field={field} comments={comments} />
+        ) : null
+      }
+    >
       <InlineVariableField
         label={fieldName(field)}
         value={value}
@@ -100,7 +115,15 @@ function ChannelFieldInput({
  * A small label over its field, with the field's comment controls at the end of the label's line. The field
  * names itself to assistive tech ("Email subject"). The group lets the controls show while the field is hovered.
  */
-function Labelled({ label, controls, children }: { label: string; controls: React.ReactNode; children: React.ReactNode }) {
+function Labelled({
+  label,
+  controls,
+  children,
+}: {
+  label: string;
+  controls: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="group/field flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">

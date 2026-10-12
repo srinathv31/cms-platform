@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { changesOnly, diffDocuments, groupUnchanged } from "@/domain/redline/document";
+import {
+  changesOnly,
+  diffDocuments,
+  groupUnchanged,
+} from "@/domain/redline/document";
 import type { RedlineDoc } from "@/domain/review-types";
 import { headOf } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
@@ -16,14 +20,21 @@ const NOW = new Date("2026-10-04T12:00:00.000Z");
 
 // ── Readers (the same as in src/domain/redline/fixtures.ts) ──────────────────────
 
-const isTextblock = (node: JSONContent) => node.type === "paragraph" || node.type === "heading";
-const opOf = (x: JSONContent): unknown => x.marks?.find((m) => m.type === "redline")?.attrs?.op;
+const isTextblock = (node: JSONContent) =>
+  node.type === "paragraph" || node.type === "heading";
+const opOf = (x: JSONContent): unknown =>
+  x.marks?.find((m) => m.type === "redline")?.attrs?.op;
 
 /** A textblock's inline content with the redline drawn in: [-deleted-] {+inserted+}, chips {{key}}, bold **x**. */
 function show(node: JSONContent): string {
   return (node.content ?? [])
     .map((x) => {
-      let s = x.type === "variable" ? `{{${x.attrs?.key}}}` : x.type === "text" ? String(x.text) : `<${x.type}>`;
+      let s =
+        x.type === "variable"
+          ? `{{${x.attrs?.key}}}`
+          : x.type === "text"
+            ? String(x.text)
+            : `<${x.type}>`;
       if (x.marks?.some((m) => m.type === "bold")) s = `**${s}**`;
       const op = opOf(x);
       return op === "delete" ? `[-${s}-]` : op === "insert" ? `{+${s}+}` : s;
@@ -38,10 +49,13 @@ function lines(node: JSONContent): string[] {
 
 /** Plain text of every non-empty textblock, leaving out inline nodes marked `drop`. */
 function plain(node: JSONContent, drop?: "delete" | "insert"): string[] {
-  if (!isTextblock(node)) return (node.content ?? []).flatMap((child) => plain(child, drop));
+  if (!isTextblock(node))
+    return (node.content ?? []).flatMap((child) => plain(child, drop));
   const text = (node.content ?? [])
     .filter((x) => drop === undefined || opOf(x) !== drop)
-    .map((x) => (x.type === "variable" ? `{{${x.attrs?.key}}}` : (x.text ?? "")))
+    .map((x) =>
+      x.type === "variable" ? `{{${x.attrs?.key}}}` : (x.text ?? ""),
+    )
     .join("");
   return text ? [text] : [];
 }
@@ -61,15 +75,29 @@ function stripRedline(node: JSONContent): JSONContent {
  * The redline loses nothing: accepting every change reads as `next`, rejecting every change reads as
  * `base` (when nothing moved and no kind changed), and without the redline mark it's an editor document.
  */
-function expectFaithful(base: JSONContent, next: JSONContent, red: RedlineDoc, { reject = true } = {}) {
-  const accepted = red.blocks.filter((b) => b.status !== "removed").flatMap((b) => plain(b.node, "delete"));
+function expectFaithful(
+  base: JSONContent,
+  next: JSONContent,
+  red: RedlineDoc,
+  { reject = true } = {},
+) {
+  const accepted = red.blocks
+    .filter((b) => b.status !== "removed")
+    .flatMap((b) => plain(b.node, "delete"));
   expect(accepted).toEqual(plain(next));
   if (reject && red.blocks.every((b) => b.movedFrom === undefined)) {
-    const rejected = red.blocks.filter((b) => b.status !== "added").flatMap((b) => plain(b.node, "insert"));
+    const rejected = red.blocks
+      .filter((b) => b.status !== "added")
+      .flatMap((b) => plain(b.node, "insert"));
     expect(rejected).toEqual(plain(base));
   }
   if (red.blocks.length > 0) {
-    expect(() => checkDocument({ type: "doc", content: red.blocks.map((b) => stripRedline(b.node)) })).not.toThrow();
+    expect(() =>
+      checkDocument({
+        type: "doc",
+        content: red.blocks.map((b) => stripRedline(b.node)),
+      }),
+    ).not.toThrow();
   }
 }
 
@@ -96,15 +124,23 @@ describe("the seeded Coral versions", () => {
     expect(red.counts).toEqual({ added: 1, removed: 0, changed: 2, moved: 0 });
     const [intro, endDate, rates] = changesOnly(red);
     expect(intro.status).toBe("changed");
-    expect(show(intro.node)).toContain("pay 0% intro APR on that balance for [-12-]{+15+} months.");
+    expect(show(intro.node)).toContain(
+      "pay 0% intro APR on that balance for [-12-]{+15+} months.",
+    );
     expect(endDate.status).toBe("added");
-    expect(plain(endDate.node)).toEqual(["Open your account by {{offer_end_date}} to qualify for this offer."]);
+    expect(plain(endDate.node)).toEqual([
+      "Open your account by {{offer_end_date}} to qualify for this offer.",
+    ]);
     expect(rates.status).toBe("changed");
     expect(rates.node.type).toBe("table");
     expect(lines(rates.node)).toContain("0% for [-12-]{+15+} months");
     // The required sections stay put.
     const headings = red.blocks.filter((b) => b.node.attrs?.requiredKey);
-    expect(headings.map((b) => b.status)).toEqual(["unchanged", "unchanged", "unchanged"]);
+    expect(headings.map((b) => b.status)).toEqual([
+      "unchanged",
+      "unchanged",
+      "unchanged",
+    ]);
     expectFaithful(base, next, red);
   });
 
@@ -115,11 +151,21 @@ describe("the seeded Coral versions", () => {
     expect(red.counts).toEqual({ added: 1, removed: 0, changed: 1, moved: 0 });
     const [rates, feeNote] = changesOnly(red);
     expect(rates.status).toBe("changed");
-    expect(lines(rates.node)).toContain("$0{+ the first year, then +}{+{{annual_fee}}+}{+ per year+}");
-    expect(lines(rates.node).filter((line) => line.includes("{+") || line.includes("[-"))).toHaveLength(1);
+    expect(lines(rates.node)).toContain(
+      "$0{+ the first year, then +}{+{{annual_fee}}+}{+ per year+}",
+    );
+    expect(
+      lines(rates.node).filter(
+        (line) => line.includes("{+") || line.includes("[-"),
+      ),
+    ).toHaveLength(1);
     expect(feeNote.status).toBe("added");
-    expect(plain(feeNote.node)).toEqual(["After your first year, an annual fee of {{annual_fee}} is billed to your account each year."]);
-    expect(groupUnchanged(red).map((x) => ("status" in x ? x.status : x.count))).toEqual([6, "changed", "added", 4]);
+    expect(plain(feeNote.node)).toEqual([
+      "After your first year, an annual fee of {{annual_fee}} is billed to your account each year.",
+    ]);
+    expect(
+      groupUnchanged(red).map((x) => ("status" in x ? x.status : x.count)),
+    ).toEqual([6, "changed", "added", 4]);
     expectFaithful(base, next, red);
   });
 
@@ -129,7 +175,9 @@ describe("the seeded Coral versions", () => {
     const red = diffDocuments(base, next);
     expect(red.counts).toEqual({ added: 1, removed: 0, changed: 1, moved: 0 });
     const [intro, rule] = changesOnly(red);
-    expect(show(intro.node)).toContain("earn [-25,000-]{+20,000+} bonus points");
+    expect(show(intro.node)).toContain(
+      "earn [-25,000-]{+20,000+} bonus points",
+    );
     expect(rule.node.type).toBe("horizontalRule");
     expect(rule.status).toBe("added");
     expectFaithful(base, next, red);

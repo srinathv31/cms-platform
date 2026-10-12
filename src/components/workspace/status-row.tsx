@@ -10,10 +10,25 @@ import { useFocusTarget } from "./session/workspace-session";
  * or a revert (save-status.tsx). It registers with the session as the `statusRow` focus target, with the
  * state it shows, and `tabIndex={-1}` lets a script land there without adding a Tab stop.
  */
-export function StatusRow({ state, className, children }: { state: VersionState; className?: string; children: ReactNode }) {
+export function StatusRow({
+  state,
+  className,
+  children,
+}: {
+  state: VersionState;
+  className?: string;
+  children: ReactNode;
+}) {
   const ref = useFocusTarget("statusRow", state);
   return (
-    <div ref={ref} data-slot="status-row" role="group" aria-label="Status" tabIndex={-1} className={className}>
+    <div
+      ref={ref}
+      data-slot="status-row"
+      role="group"
+      aria-label="Status"
+      tabIndex={-1}
+      className={className}
+    >
       {children}
     </div>
   );

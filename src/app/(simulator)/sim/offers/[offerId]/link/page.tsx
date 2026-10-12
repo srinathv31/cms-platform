@@ -7,7 +7,10 @@ import { PageSkeleton } from "@/simulator/ui/page-frame";
 
 export const metadata: Metadata = { title: "Link template" };
 
-export default function SimLinkPage({ params, searchParams }: PageProps<"/sim/offers/[offerId]/link">) {
+export default function SimLinkPage({
+  params,
+  searchParams,
+}: PageProps<"/sim/offers/[offerId]/link">) {
   return (
     <Stream fallback={<PageSkeleton panels={[5]} />}>
       <LinkStep params={params} searchParams={searchParams} />
@@ -24,8 +27,14 @@ async function LinkStep({
 }) {
   const { offerId } = await params;
   const { template } = await searchParams;
-  const templateId = (Array.isArray(template) ? template[0] : template)?.trim() || null;
+  const templateId =
+    (Array.isArray(template) ? template[0] : template)?.trim() || null;
   const flow = await getSimLinkFlow(offerId, templateId);
   if (!flow) notFound();
-  return <LinkFlow key={`${offerId}:${flow.candidate?.template.id ?? "search"}:${flow.candidate?.version ?? 0}`} flow={flow} />;
+  return (
+    <LinkFlow
+      key={`${offerId}:${flow.candidate?.template.id ?? "search"}:${flow.candidate?.version ?? 0}`}
+      flow={flow}
+    />
+  );
 }

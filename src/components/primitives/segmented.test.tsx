@@ -7,7 +7,9 @@ import { Segmented, SegmentedRadio, type SegmentedOption } from "./segmented";
 // The app's one segmented control, in its two semantics: toggle buttons for a view control, a radio
 // group for a form field. One look for both.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 type Fruit = "apple" | "pear" | "plum";
 const OPTIONS: readonly SegmentedOption<Fruit>[] = [
@@ -31,24 +33,56 @@ afterEach(async () => {
 });
 
 const show = (node: React.ReactNode) => act(async () => root.render(node));
-const buttons = () => [...container.querySelectorAll<HTMLButtonElement>("button")];
-const named = (name: string) => buttons().find((b) => (b.getAttribute("aria-label") ?? b.textContent) === name)!;
+const buttons = () => [
+  ...container.querySelectorAll<HTMLButtonElement>("button"),
+];
+const named = (name: string) =>
+  buttons().find(
+    (b) => (b.getAttribute("aria-label") ?? b.textContent) === name,
+  )!;
 const press = (el: HTMLElement, key: string) =>
   act(async () => {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
   });
 
 /** The classes every segment carries, whichever semantics it has. */
-const SEGMENT_LOOK = ["h-6", "rounded-md", "px-2.5", "text-[13px]", "font-medium", "text-text-muted", "hover:bg-hover"];
-const TRACK_LOOK = ["h-8", "rounded-lg", "border", "border-hairline", "bg-surface", "p-0.5"];
-const classes = (el: Element) => new Set(el.getAttribute("class")?.split(/\s+/));
+const SEGMENT_LOOK = [
+  "h-6",
+  "rounded-md",
+  "px-2.5",
+  "text-[13px]",
+  "font-medium",
+  "text-text-muted",
+  "hover:bg-hover",
+];
+const TRACK_LOOK = [
+  "h-8",
+  "rounded-lg",
+  "border",
+  "border-hairline",
+  "bg-surface",
+  "p-0.5",
+];
+const classes = (el: Element) =>
+  new Set(el.getAttribute("class")?.split(/\s+/));
 
 describe("Segmented", () => {
   it("is a group of toggle buttons named by its label, with the chosen one pressed", async () => {
-    await show(<Segmented label="Fruit" value="pear" options={OPTIONS} onChange={() => {}} />);
+    await show(
+      <Segmented
+        label="Fruit"
+        value="pear"
+        options={OPTIONS}
+        onChange={() => {}}
+      />,
+    );
     const group = container.querySelector('[role="group"]')!;
     expect(group.getAttribute("aria-label")).toBe("Fruit");
-    expect(buttons().map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
+    expect(
+      buttons().map((b) => [b.textContent, b.getAttribute("aria-pressed")]),
+    ).toEqual([
       ["Apple", "false"],
       ["Pear", "true"],
       ["Plum", "false"],
@@ -57,7 +91,14 @@ describe("Segmented", () => {
 
   it("calls onChange with the option pressed, and never unchooses the chosen one", async () => {
     const onChange = vi.fn();
-    await show(<Segmented label="Fruit" value="pear" options={OPTIONS} onChange={onChange} />);
+    await show(
+      <Segmented
+        label="Fruit"
+        value="pear"
+        options={OPTIONS}
+        onChange={onChange}
+      />,
+    );
     await act(async () => named("Plum").click());
     expect(onChange).toHaveBeenLastCalledWith("plum");
     onChange.mockClear();
@@ -70,7 +111,10 @@ describe("Segmented", () => {
       <Segmented
         label="Icon"
         value="pear"
-        options={OPTIONS.map((o) => ({ ...o, icon: <svg data-icon={o.value} /> }))}
+        options={OPTIONS.map((o) => ({
+          ...o,
+          icon: <svg data-icon={o.value} />,
+        }))}
         onChange={() => {}}
       />,
     );
@@ -87,12 +131,23 @@ describe("SegmentedRadio", () => {
     await show(
       <>
         <span id="fruit-label">Fruit</span>
-        <SegmentedRadio labelledBy="fruit-label" value="pear" options={OPTIONS} onChange={() => {}} />
+        <SegmentedRadio
+          labelledBy="fruit-label"
+          value="pear"
+          options={OPTIONS}
+          onChange={() => {}}
+        />
       </>,
     );
     const group = container.querySelector('[role="radiogroup"]')!;
     expect(group.getAttribute("aria-labelledby")).toBe("fruit-label");
-    expect(buttons().map((b) => [b.getAttribute("role"), b.getAttribute("aria-checked"), b.tabIndex])).toEqual([
+    expect(
+      buttons().map((b) => [
+        b.getAttribute("role"),
+        b.getAttribute("aria-checked"),
+        b.tabIndex,
+      ]),
+    ).toEqual([
       ["radio", "false", -1],
       ["radio", "true", 0],
       ["radio", "false", -1],
@@ -102,10 +157,19 @@ describe("SegmentedRadio", () => {
   it("moves the choice and focus with the arrow keys, round from either end", async () => {
     function Field() {
       const [value, setValue] = useState<Fruit>("pear");
-      return <SegmentedRadio labelledBy="x" value={value} options={OPTIONS} onChange={setValue} />;
+      return (
+        <SegmentedRadio
+          labelledBy="x"
+          value={value}
+          options={OPTIONS}
+          onChange={setValue}
+        />
+      );
     }
     await show(<Field />);
-    const checked = () => buttons().find((b) => b.getAttribute("aria-checked") === "true")!.textContent;
+    const checked = () =>
+      buttons().find((b) => b.getAttribute("aria-checked") === "true")!
+        .textContent;
 
     await press(named("Pear"), "ArrowRight");
     expect(checked()).toBe("Plum");
@@ -124,7 +188,14 @@ describe("SegmentedRadio", () => {
 
   it("calls onChange on a click", async () => {
     const onChange = vi.fn();
-    await show(<SegmentedRadio labelledBy="x" value="pear" options={OPTIONS} onChange={onChange} />);
+    await show(
+      <SegmentedRadio
+        labelledBy="x"
+        value="pear"
+        options={OPTIONS}
+        onChange={onChange}
+      />,
+    );
     await act(async () => named("Apple").click());
     expect(onChange).toHaveBeenCalledWith("apple");
   });
@@ -132,10 +203,24 @@ describe("SegmentedRadio", () => {
 
 describe("one look for both", () => {
   it("has the same track and the same segment, with the tan fill under the chosen one", async () => {
-    await show(<Segmented label="Fruit" value="pear" options={OPTIONS} onChange={() => {}} />);
+    await show(
+      <Segmented
+        label="Fruit"
+        value="pear"
+        options={OPTIONS}
+        onChange={() => {}}
+      />,
+    );
     const toggleTrack = classes(container.querySelector('[role="group"]')!);
     const toggle = classes(named("Pear"));
-    await show(<SegmentedRadio labelledBy="x" value="pear" options={OPTIONS} onChange={() => {}} />);
+    await show(
+      <SegmentedRadio
+        labelledBy="x"
+        value="pear"
+        options={OPTIONS}
+        onChange={() => {}}
+      />,
+    );
     const radioTrack = classes(container.querySelector('[role="radiogroup"]')!);
     const radio = classes(named("Pear"));
 

@@ -10,27 +10,81 @@ import { EditorRoot } from "./editor-root";
 import { VariablesPanel } from "./variables-panel";
 
 const VARIABLES: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
-  { key: "bonus_points", label: "Bonus points", type: "number", required: false, sample: "20000" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "purchase_apr",
+    label: "Purchase APR",
+    type: "percent",
+    required: true,
+    sample: "21.99",
+  },
+  {
+    key: "bonus_points",
+    label: "Bonus points",
+    type: "number",
+    required: false,
+    sample: "20000",
+  },
 ];
 
 const BASELINE: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "purchase_apr", label: "Purchase APR", type: "number", required: true, sample: "21.99" },
-  { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "purchase_apr",
+    label: "Purchase APR",
+    type: "number",
+    required: true,
+    sample: "21.99",
+  },
+  {
+    key: "promo_code",
+    label: "Promo code",
+    type: "text",
+    required: false,
+    sample: "",
+  },
 ];
 
-const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
+const chip = (key: string): JSONContent => ({
+  type: "variable",
+  attrs: { key },
+});
 const DOC: JSONContent = {
   type: "doc",
   content: [
-    { type: "paragraph", attrs: { id: "p-1" }, content: [{ type: "text", text: "Hi " }, chip("first_name"), chip("first_name")] },
-    { type: "paragraph", attrs: { id: "p-2" }, content: [chip("purchase_apr")] },
+    {
+      type: "paragraph",
+      attrs: { id: "p-1" },
+      content: [
+        { type: "text", text: "Hi " },
+        chip("first_name"),
+        chip("first_name"),
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: { id: "p-2" },
+      content: [chip("purchase_apr")],
+    },
   ],
 };
 
-const rowHtml = (html: string, key: string) => html.match(new RegExp(`<li[^>]*data-variable-row="${key}"[\\s\\S]*?</li>`))?.[0] ?? "";
+const rowHtml = (html: string, key: string) =>
+  html.match(
+    new RegExp(`<li[^>]*data-variable-row="${key}"[\\s\\S]*?</li>`),
+  )?.[0] ?? "";
 
 describe("VariablesPanel server render", () => {
   it("shows counts and mutes unused rows when the document renders first", () => {
@@ -82,8 +136,12 @@ describe("VariablesPanel server render", () => {
         <VariablesPanel />
       </EditorRoot>,
     );
-    expect(rowHtml(html, "purchase_apr")).toMatch(/bg-warning-soft[^>]*>.*Type changed/);
-    expect(rowHtml(html, "bonus_points")).toMatch(/bg-surface-tinted[^>]*>New</);
+    expect(rowHtml(html, "purchase_apr")).toMatch(
+      /bg-warning-soft[^>]*>.*Type changed/,
+    );
+    expect(rowHtml(html, "bonus_points")).toMatch(
+      /bg-surface-tinted[^>]*>New</,
+    );
     expect(rowHtml(html, "first_name")).not.toContain("changed");
     expect(html).toMatch(/Removed .*promo_code/);
   });

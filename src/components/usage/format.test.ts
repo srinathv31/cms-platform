@@ -20,10 +20,33 @@ vi.hoisted(() => {
 
 /** What each screen says about the instant `at`, at `now`. */
 function screens(at: string, now: Date) {
-  const usage: ConsumerUsage[] = [{ consumerId: "coral", consumerName: "Coral", versionNumber: 1, lastRenderAt: at, renders30d: 0 }];
-  const sunset = consequences({ kind: "sunset", number: 1, sunsetAt: "2027-03-01", activeNumber: 2 }, usage, now)[0]!;
-  const revoke = consequences({ kind: "revoke", number: 1, activeNumber: 2 }, usage, now)[0]!;
-  const activity: ActivityItem = { id: "a", at, actor: null, action: "draft.edited", versionLabel: null, summary: "a" };
+  const usage: ConsumerUsage[] = [
+    {
+      consumerId: "coral",
+      consumerName: "Coral",
+      versionNumber: 1,
+      lastRenderAt: at,
+      renders30d: 0,
+    },
+  ];
+  const sunset = consequences(
+    { kind: "sunset", number: 1, sunsetAt: "2027-03-01", activeNumber: 2 },
+    usage,
+    now,
+  )[0]!;
+  const revoke = consequences(
+    { kind: "revoke", number: 1, activeNumber: 2 },
+    usage,
+    now,
+  )[0]!;
+  const activity: ActivityItem = {
+    id: "a",
+    at,
+    actor: null,
+    action: "draft.edited",
+    versionLabel: null,
+    summary: "a",
+  };
   const queue: ReviewQueueRow = {
     templateId: "UC-4F7K2Q",
     templateName: "Cash Back",
@@ -74,13 +97,18 @@ describe("today and yesterday agree across screens", () => {
   });
 
   it("counts 23:59 two days back as two days, though barely more than a day has passed", () => {
-    const { activityHeading, ...rest } = screens("2026-10-02T23:59:00.000Z", ONE_AM);
+    const { activityHeading, ...rest } = screens(
+      "2026-10-02T23:59:00.000Z",
+      ONE_AM,
+    );
     expect(Object.values(rest)).toEqual(Array(5).fill("2 days ago"));
     expect(activityHeading).toBe("Oct 2");
   });
 
   it("agrees at the end of the day too: 00:30 is still today at 23:59, and 23:59 is yesterday a minute later", () => {
-    expect(screens("2026-10-04T00:30:00.000Z", new Date("2026-10-04T23:59:00.000Z"))).toEqual({
+    expect(
+      screens("2026-10-04T00:30:00.000Z", new Date("2026-10-04T23:59:00.000Z")),
+    ).toEqual({
       sunsetDialog: "today",
       revokeDialog: "today",
       usageTable: "today",
@@ -88,7 +116,9 @@ describe("today and yesterday agree across screens", () => {
       reviewQueue: "23 hours ago",
       teamSettings: "Today",
     });
-    expect(screens("2026-10-04T23:59:00.000Z", new Date("2026-10-05T00:00:00.000Z"))).toEqual({
+    expect(
+      screens("2026-10-04T23:59:00.000Z", new Date("2026-10-05T00:00:00.000Z")),
+    ).toEqual({
       sunsetDialog: "yesterday",
       revokeDialog: "yesterday",
       usageTable: "yesterday",
@@ -102,7 +132,9 @@ describe("today and yesterday agree across screens", () => {
 describe("the Usage screens' own phrases", () => {
   it("gives the render's date from two weeks", () => {
     const now = new Date("2026-10-04T12:00:00.000Z");
-    expect(formatLastRender("2026-09-21T12:00:00.000Z", now)).toBe("13 days ago");
+    expect(formatLastRender("2026-09-21T12:00:00.000Z", now)).toBe(
+      "13 days ago",
+    );
     expect(formatLastRender("2026-09-20T12:00:00.000Z", now)).toBe("Sep 20");
   });
 

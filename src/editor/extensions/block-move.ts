@@ -9,7 +9,11 @@ import { Extension } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
-import { flashRequiredNote, isRequiredHeading, REQUIRED_KEY_ATTR } from "./required-sections";
+import {
+  flashRequiredNote,
+  isRequiredHeading,
+  REQUIRED_KEY_ATTR,
+} from "./required-sections";
 
 export type MoveDirection = "up" | "down";
 
@@ -39,7 +43,13 @@ function listItemSpan(state: EditorState): Span | null {
   for (let d = $from.depth; d > 0; d--) {
     if ($from.node(d).type.name !== "listItem") continue;
     if ($to.pos > $from.end(d)) return null; // the selection leaves the item
-    return { depth: d - 1, container: $from.node(d - 1), start: $from.start(d - 1), first: $from.index(d - 1), last: $from.index(d - 1) };
+    return {
+      depth: d - 1,
+      container: $from.node(d - 1),
+      start: $from.start(d - 1),
+      first: $from.index(d - 1),
+      last: $from.index(d - 1),
+    };
   }
   return null;
 }
@@ -48,7 +58,10 @@ function topLevelSpan(state: EditorState): Span {
   const { $from, $to } = state.selection;
   const first = $from.index(0);
   // A selection ending right at a block boundary doesn't include the next block.
-  const last = Math.max(first, $to.depth === 0 ? $to.index(0) - 1 : $to.index(0));
+  const last = Math.max(
+    first,
+    $to.depth === 0 ? $to.index(0) - 1 : $to.index(0),
+  );
   return { depth: 0, container: state.doc, start: 0, first, last };
 }
 
@@ -58,9 +71,14 @@ function childPos(span: Span, index: number): number {
   return pos;
 }
 
-function moveSpan(state: EditorState, span: Span, direction: MoveDirection): Transaction | null {
+function moveSpan(
+  state: EditorState,
+  span: Span,
+  direction: MoveDirection,
+): Transaction | null {
   const neighbourIndex = direction === "up" ? span.first - 1 : span.last + 1;
-  if (neighbourIndex < 0 || neighbourIndex >= span.container.childCount) return null;
+  if (neighbourIndex < 0 || neighbourIndex >= span.container.childCount)
+    return null;
   const neighbour = span.container.child(neighbourIndex);
   const neighbourPos = childPos(span, neighbourIndex);
   const rangeFrom = childPos(span, span.first);
@@ -69,13 +87,17 @@ function moveSpan(state: EditorState, span: Span, direction: MoveDirection): Tra
   // The selection maps through both steps on its own: it only shifts by the neighbour's size.
   const tr = state.tr;
   tr.delete(neighbourPos, neighbourPos + neighbour.nodeSize);
-  if (direction === "up") tr.insert(rangeTo - neighbour.nodeSize, neighbour); // [n][range] → [range][n]
+  if (direction === "up")
+    tr.insert(rangeTo - neighbour.nodeSize, neighbour); // [n][range] → [range][n]
   else tr.insert(rangeFrom, neighbour); // [range][n] → [n][range]
   return closeHistory(tr).scrollIntoView();
 }
 
 /** The move for the current selection: a transaction, a required heading in the way, or nothing to do. */
-export function blockMove(state: EditorState, direction: MoveDirection): MoveResult {
+export function blockMove(
+  state: EditorState,
+  direction: MoveDirection,
+): MoveResult {
   const item = listItemSpan(state);
   if (item) {
     const tr = moveSpan(state, item, direction);
@@ -85,7 +107,8 @@ export function blockMove(state: EditorState, direction: MoveDirection): MoveRes
   const span = topLevelSpan(state);
   for (let i = span.first; i <= span.last; i++) {
     const node = state.doc.child(i);
-    if (isRequiredHeading(node)) return { blocked: node.attrs[REQUIRED_KEY_ATTR] as string };
+    if (isRequiredHeading(node))
+      return { blocked: node.attrs[REQUIRED_KEY_ATTR] as string };
   }
   const tr = moveSpan(state, span, direction);
   return tr ? { tr } : null;

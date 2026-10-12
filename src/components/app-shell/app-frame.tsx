@@ -1,13 +1,21 @@
 import type { CSSProperties } from "react";
 import { Stream } from "@/components/primitives/stream";
 import { DemoPillHole } from "@/components/demo/demo-pill-hole";
-import { SidebarHeader, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  SidebarHeader,
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
 import { AppSidebar, NavDrawerTrigger } from "./app-sidebar";
 import { CanvasScroll } from "./canvas-scroll";
 import { HomeLink } from "./home-link";
 import { CanvasFade, PersonaSwitchProvider } from "./persona-switch";
 import { SidebarBodyHole, TeamSwitcherHole } from "./sidebar-holes";
-import { SidebarBodySkeleton, TeamSwitcherSkeleton, TopBarSkeleton } from "./skeletons";
+import {
+  SidebarBodySkeleton,
+  TeamSwitcherSkeleton,
+  TopBarSkeleton,
+} from "./skeletons";
 import { TopBarHole } from "./top-bar-hole";
 
 /**

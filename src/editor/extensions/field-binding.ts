@@ -18,8 +18,20 @@ import { Extension, type KeyboardShortcutCommand } from "@tiptap/core";
 import { UniqueID } from "@tiptap/extension-unique-id";
 import { isHistoryTransaction } from "@tiptap/pm/history";
 import { DOMParser, Fragment, Slice, type ResolvedPos } from "@tiptap/pm/model";
-import { NodeSelection, Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
-import { AttrStep, ReplaceAroundStep, ReplaceStep, dropPoint, type Step } from "@tiptap/pm/transform";
+import {
+  NodeSelection,
+  Plugin,
+  PluginKey,
+  type EditorState,
+  type Transaction,
+} from "@tiptap/pm/state";
+import {
+  AttrStep,
+  ReplaceAroundStep,
+  ReplaceStep,
+  dropPoint,
+  type Step,
+} from "@tiptap/pm/transform";
 import type { EditorProps, EditorView } from "@tiptap/pm/view";
 import { NODE } from "../model/types";
 import { labelFromKey } from "../model/variables";
@@ -88,7 +100,11 @@ const PanelDrop = Extension.create<FieldBindingOptions>({
               const key = transfer?.getData(VARIABLE_DRAG_TYPE);
               if (!key) {
                 // Nothing for ProseMirror to parse and no block of this editor being moved: a file.
-                if (!view.dragging && !transfer?.getData("text/plain") && !transfer?.getData("text/html")) {
+                if (
+                  !view.dragging &&
+                  !transfer?.getData("text/plain") &&
+                  !transfer?.getData("text/html")
+                ) {
                   event.preventDefault();
                   return true;
                 }
@@ -96,11 +112,25 @@ const PanelDrop = Extension.create<FieldBindingOptions>({
               }
               event.preventDefault();
               if (!view.editable) return true;
-              const hit = view.posAtCoords({ left: event.clientX, top: event.clientY });
+              const hit = view.posAtCoords({
+                left: event.clientX,
+                top: event.clientY,
+              });
               if (!hit) return true;
-              const node = view.state.schema.nodes[NODE.variable].create({ key });
-              const at = dropPoint(view.state.doc, hit.pos, new Slice(Fragment.from(node), 0, 0)) ?? hit.pos;
-              editor.chain().insertVariable(key, { from: at, to: at }).focus(undefined, { scrollIntoView: false }).run();
+              const node = view.state.schema.nodes[NODE.variable].create({
+                key,
+              });
+              const at =
+                dropPoint(
+                  view.state.doc,
+                  hit.pos,
+                  new Slice(Fragment.from(node), 0, 0),
+                ) ?? hit.pos;
+              editor
+                .chain()
+                .insertVariable(key, { from: at, to: at })
+                .focus(undefined, { scrollIntoView: false })
+                .run();
               return true;
             },
           },
@@ -156,11 +186,15 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
 
         props: {
           transformPastedHTML: (html) => normalizePastedHtml(html),
-          ...(binding.kind === "body" ? { clipboardTextParser: parseMarkdownText } : {}),
-          transformPasted: (slice, view) => chipsFromText(slice, view.state.schema),
+          ...(binding.kind === "body"
+            ? { clipboardTextParser: parseMarkdownText }
+            : {}),
+          transformPasted: (slice, view) =>
+            chipsFromText(slice, view.state.schema),
 
           handleClickOn: (_view, _pos, node, nodePos, _event, direct) => {
-            if (direct && node.type.name === NODE.variable) chip.getState().open(nodePos);
+            if (direct && node.type.name === NODE.variable)
+              chip.getState().open(nodePos);
             return false; // ProseMirror still selects the chip
           },
 
@@ -173,13 +207,18 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
             blur: (_view, event) => {
               const next = event.relatedTarget;
               const { pos, element } = chip.getState();
-              if (pos !== null && !(next instanceof Node && element?.contains(next))) chip.getState().close();
+              if (
+                pos !== null &&
+                !(next instanceof Node && element?.contains(next))
+              )
+                chip.getState().close();
               return false;
             },
           },
         },
 
-        appendTransaction: (transactions, _oldState, state) => consistency(transactions, state, root),
+        appendTransaction: (transactions, _oldState, state) =>
+          consistency(transactions, state, root),
 
         view: (view) => {
           root.attachEditor(fieldId, editor);
@@ -191,7 +230,8 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
                 root.attachEditor(fieldId, editor);
                 root.noteDoc(fieldId, next.state.doc);
               }
-              if (next.state.selection !== prev.selection) followSelection(next.state, chip);
+              if (next.state.selection !== prev.selection)
+                followSelection(next.state, chip);
               // Every update: an edit, an undo, or the history handed over after a rebuild (lib/history-carry.ts).
               root.noteHistory(fieldId);
             },
@@ -211,17 +251,28 @@ export const FieldBindingExtension = Extension.create<FieldBindingOptions>({
  * Plain text that looks like Markdown, parsed as Markdown (the document only). Anything else, and a
  * paste as plain text (Shift), returns nothing: ProseMirror then splits the text into lines itself.
  */
-const parseMarkdownText = ((text: string, $context: ResolvedPos, plain: boolean, view: EditorView): Slice | null => {
+const parseMarkdownText = ((
+  text: string,
+  $context: ResolvedPos,
+  plain: boolean,
+  view: EditorView,
+): Slice | null => {
   if (plain || !looksLikeMarkdown(text)) return null;
   const template = view.dom.ownerDocument.createElement("template");
   template.innerHTML = markdownToHtml(text);
-  const parser = view.someProp("clipboardParser") ?? view.someProp("domParser") ?? DOMParser.fromSchema(view.state.schema);
+  const parser =
+    view.someProp("clipboardParser") ??
+    view.someProp("domParser") ??
+    DOMParser.fromSchema(view.state.schema);
   return parser.parseSlice(template.content, { context: $context });
 }) as NonNullable<EditorProps["clipboardTextParser"]>; // typed as returning a Slice; a null falls back
 
 function selectedChipPos(state: EditorState): number | null {
   const { selection } = state;
-  return selection instanceof NodeSelection && selection.node.type.name === NODE.variable ? selection.from : null;
+  return selection instanceof NodeSelection &&
+    selection.node.type.name === NODE.variable
+    ? selection.from
+    : null;
 }
 
 /** The popover stays on the selected chip (and follows it); anything else closes it. */
@@ -233,7 +284,11 @@ function followSelection(state: EditorState, chip: ChipPopoverStore) {
   else popover.open(pos);
 }
 
-function consistency(transactions: readonly Transaction[], state: EditorState, root: EditorRootRuntime): Transaction | null {
+function consistency(
+  transactions: readonly Transaction[],
+  state: EditorState,
+  root: EditorRootRuntime,
+): Transaction | null {
   const { byKey, forwards, tombstones } = root.variables.getState();
   let forward = false;
   let restore: Set<string> | null = null;
@@ -249,7 +304,8 @@ function consistency(transactions: readonly Transaction[], state: EditorState, r
         if (byKey.has(key)) return;
         const target = forwards[key];
         if (target && byKey.has(target)) forward = true;
-        else if ((history || pasted) && tombstones.has(key)) (restore ??= new Set()).add(key);
+        else if ((history || pasted) && tombstones.has(key))
+          (restore ??= new Set()).add(key);
         else if (pasted) (create ??= new Set()).add(key);
       });
     }
@@ -262,7 +318,15 @@ function consistency(transactions: readonly Transaction[], state: EditorState, r
     queueMicrotask(() => {
       restoring.forEach((key) => root.restoreVariable(key));
       // Optional, so a paste never silently adds a breaking change to the contract.
-      creating.forEach((key) => root.createVariable({ key, label: labelFromKey(key), type: "text", required: false, sample: "" }));
+      creating.forEach((key) =>
+        root.createVariable({
+          key,
+          label: labelFromKey(key),
+          type: "text",
+          required: false,
+          sample: "",
+        }),
+      );
     });
   }
   if (!forward) return null;
@@ -288,7 +352,11 @@ function eachInsertedKey(step: Step, visit: (key: string) => void) {
       }
       return !node.isText;
     });
-  } else if (step instanceof AttrStep && step.attr === "key" && typeof step.value === "string") {
+  } else if (
+    step instanceof AttrStep &&
+    step.attr === "key" &&
+    typeof step.value === "string"
+  ) {
     visit(step.value);
   }
 }

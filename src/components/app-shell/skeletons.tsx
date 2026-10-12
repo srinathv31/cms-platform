@@ -43,7 +43,10 @@ function StaticRow({
 export function SidebarBodySkeleton() {
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pt-2" aria-hidden>
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pt-2"
+        aria-hidden
+      >
         <ul className="flex flex-col gap-1">
           {NAV_ITEMS.filter((i) => i.key !== "audit").map((item) => (
             <StaticRow key={item.key} icon={item.icon} label={item.label} />

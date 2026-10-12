@@ -8,15 +8,30 @@
 // a difference fails, in CI and locally. Whether the channels agree with one another is NOT decided
 // here: parity.test.ts asserts that, and -u cannot approve it.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { UPDATING, caseDir, caseSlugs, focusedInputText, inputPath, readInput } from "./files";
+import {
+  UPDATING,
+  caseDir,
+  caseSlugs,
+  focusedInputText,
+  inputPath,
+  readInput,
+} from "./files";
 import { expectedFiles, nodeFiles, runCase, type CaseRun } from "./pipeline";
 
 const HINT = "Run: npm run golden:update";
 
-const listFiles = (dir: string) => (existsSync(dir) ? readdirSync(dir).sort() : []);
+const listFiles = (dir: string) =>
+  existsSync(dir) ? readdirSync(dir).sort() : [];
 
 /**
  * Compares `files` (name -> text) with the folder, or rewrites the folder under GOLDEN_UPDATE=1. A
@@ -25,20 +40,36 @@ const listFiles = (dir: string) => (existsSync(dir) ? readdirSync(dir).sort() : 
  */
 function syncFolder(dir: string, files: Record<string, string>, label: string) {
   if (UPDATING) {
-    for (const stale of listFiles(dir)) if (!(stale in files)) rmSync(path.join(dir, stale));
+    for (const stale of listFiles(dir))
+      if (!(stale in files)) rmSync(path.join(dir, stale));
     if (Object.keys(files).length > 0) mkdirSync(dir, { recursive: true });
-    for (const [name, text] of Object.entries(files)) writeFileSync(path.join(dir, name), text);
-    if (existsSync(dir) && listFiles(dir).length === 0) rmSync(dir, { recursive: true });
+    for (const [name, text] of Object.entries(files))
+      writeFileSync(path.join(dir, name), text);
+    if (existsSync(dir) && listFiles(dir).length === 0)
+      rmSync(dir, { recursive: true });
     return;
   }
   const have = listFiles(dir);
   const want = Object.keys(files).sort();
-  expect.soft(want.filter((n) => !have.includes(n)), `${label}: files missing. ${HINT}`).toEqual([]);
-  expect.soft(have.filter((n) => !want.includes(n)), `${label}: files the engine no longer produces. ${HINT}`).toEqual([]);
+  expect
+    .soft(
+      want.filter((n) => !have.includes(n)),
+      `${label}: files missing. ${HINT}`,
+    )
+    .toEqual([]);
+  expect
+    .soft(
+      have.filter((n) => !want.includes(n)),
+      `${label}: files the engine no longer produces. ${HINT}`,
+    )
+    .toEqual([]);
   for (const name of want.filter((n) => have.includes(n))) {
     const onDisk = readFileSync(path.join(dir, name), "utf8");
     const message = `${label}/${name} differs from the engine's output. ${HINT}`;
-    if (name.endsWith(".json")) expect.soft(JSON.parse(files[name]!), message).toEqual(JSON.parse(onDisk));
+    if (name.endsWith(".json"))
+      expect
+        .soft(JSON.parse(files[name]!), message)
+        .toEqual(JSON.parse(onDisk));
     else expect.soft(files[name], message).toBe(onDisk);
   }
 }
@@ -60,14 +91,25 @@ describe.each(caseSlugs())("golden %s", (slug) => {
   it("input.json is the hand-built case", () => {
     const text = focusedInputText(slug);
     if (text === null || UPDATING) return; // frozen cases (golden:import) are the source of truth
-    expect(readFileSync(inputPath(slug), "utf8"), `${slug}/input.json differs from focused-cases.ts. ${HINT}`).toBe(text);
+    expect(
+      readFileSync(inputPath(slug), "utf8"),
+      `${slug}/input.json differs from focused-cases.ts. ${HINT}`,
+    ).toBe(text);
   });
 
   it("expected/ (engine-neutral)", () => {
-    syncFolder(path.join(caseDir(slug), "expected"), expectedFiles(run), `${slug}/expected`);
+    syncFolder(
+      path.join(caseDir(slug), "expected"),
+      expectedFiles(run),
+      `${slug}/expected`,
+    );
   });
 
   it("node/ (PDF fonts and layout)", () => {
-    syncFolder(path.join(caseDir(slug), "node"), nodeFiles(run), `${slug}/node`);
+    syncFolder(
+      path.join(caseDir(slug), "node"),
+      nodeFiles(run),
+      `${slug}/node`,
+    );
   });
 });

@@ -11,7 +11,8 @@ export const LINE_BREAKS = /\r\n|[\r\n\u2028\u2029]/g;
  * Control characters, removed from text: U+0000–U+0008, U+000B, U+000C, U+000E–U+001F,
  * U+007F–U+009F. The tab and the line breaks are handled apart.
  */
-export const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+export const CONTROL_CHARACTERS =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
 
 /**
  * Which characters a text keeps, by where it prints (docs/render-spec.md §4):
@@ -29,7 +30,10 @@ export type CharacterRules = "document" | "message";
  * One line's characters as a channel shows them: a tab becomes one space and control characters go; for a
  * document (the default) invisible characters go too.
  */
-export function cleanCharacters(text: string, rules: CharacterRules = "document"): string {
+export function cleanCharacters(
+  text: string,
+  rules: CharacterRules = "document",
+): string {
   const visible = text.replace(/\t/g, " ").replace(CONTROL_CHARACTERS, "");
   return rules === "document" ? withoutInvisible(visible) : visible;
 }

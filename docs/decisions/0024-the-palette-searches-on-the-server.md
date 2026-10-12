@@ -20,8 +20,7 @@ Recent and Actions until a refetch succeeded. With real sign-in that would be th
   `src/server/queries/palette.ts`) answers the space's templates for what was typed, with the facts the palette
   needs beside them: `canCreate`, Recent, and whether the template being viewed (`template`) is the viewer's to see
   there. It replaces the old per-space context read, so nothing is fetched twice. It parses with zod (a `q` over
-  `PALETTE_QUERY_MAX` characters is a 400), applies the same visibility as before (a space the viewer can't see is a
-  404) and answers through `readResponse`, like the other on-demand reads
+  `PALETTE_QUERY_MAX` characters is a 400), applies the same visibility as before (a space the viewer can't see is a 404) and answers through `readResponse`, like the other on-demand reads
   ([0019](0019-on-demand-reads-are-get-routes.md)).
 - **One matching rule, in the domain.** `src/domain/palette.ts` holds it: every word must appear in the name, team,
   id or status label; a name that starts with the word ranks first; recent templates win ties. `paletteTemplates`

@@ -1,8 +1,19 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
-import type { AccessEffect, AccessLink, AccessRecipients, MembershipChange } from "@/domain/access-types";
+import type {
+  AccessEffect,
+  AccessLink,
+  AccessRecipients,
+  MembershipChange,
+} from "@/domain/access-types";
 import { ALL_SPACE } from "@/domain/permissions";
-import { auditEvents, membershipRoles, memberships, notifications, users } from "@/server/db/schema/ucomp";
+import {
+  auditEvents,
+  membershipRoles,
+  memberships,
+  notifications,
+  users,
+} from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
 import type { Tx } from "./effects";
 
@@ -51,7 +62,9 @@ export async function writeAccessEffects(
       written.audit += 1;
       continue;
     }
-    const recipients = (await resolveAccessRecipients(tx, effect.to)).filter((id) => id !== ctx.actorId);
+    const recipients = (await resolveAccessRecipients(tx, effect.to)).filter(
+      (id) => id !== ctx.actorId,
+    );
     if (recipients.length === 0) continue;
     const href = accessHref(effect.link);
     await tx.insert(notifications).values(
@@ -73,16 +86,25 @@ export async function writeAccessEffects(
 }
 
 /** Sorted, without repeats. */
-export async function resolveAccessRecipients(tx: Tx, to: AccessRecipients): Promise<string[]> {
+export async function resolveAccessRecipients(
+  tx: Tx,
+  to: AccessRecipients,
+): Promise<string[]> {
   if (to.kind === "user") return [to.userId];
   if (to.kind === "platform_admins") {
-    const admins = await tx.select({ id: users.id }).from(users).where(eq(users.platformRole, "platform_admin"));
+    const admins = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.platformRole, "platform_admin"));
     return admins.map((u) => u.id).sort();
   }
   const rows = await tx
     .select({ userId: memberships.userId })
     .from(memberships)
-    .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
+    .innerJoin(
+      membershipRoles,
+      eq(membershipRoles.membershipId, memberships.id),
+    )
     .where(
       and(
         eq(memberships.teamId, to.teamId),
@@ -91,7 +113,9 @@ export async function resolveAccessRecipients(tx: Tx, to: AccessRecipients): Pro
       ),
     );
   const except = new Set(to.exceptUserIds ?? []);
-  return [...new Set(rows.map((r) => r.userId))].filter((id) => !except.has(id)).sort();
+  return [...new Set(rows.map((r) => r.userId))]
+    .filter((id) => !except.has(id))
+    .sort();
 }
 
 /** Team ids are their slugs (seed contract), so every link builds from the id. */
@@ -112,7 +136,10 @@ export function accessHref(link: AccessLink): string {
  * Applies one membership change. Returns the membership id (a new one for an insert). `roles`
  * replaces the membership_roles rows. A delete removes the roles with it (cascade).
  */
-export async function applyMembershipChange(tx: Tx, change: MembershipChange): Promise<string> {
+export async function applyMembershipChange(
+  tx: Tx,
+  change: MembershipChange,
+): Promise<string> {
   switch (change.kind) {
     case "insert": {
       const id = newId("m");
@@ -126,24 +153,42 @@ export async function applyMembershipChange(tx: Tx, change: MembershipChange): P
         inactivityFlaggedAt: null,
         inactivityKeptAt: null,
       });
-      if (roles.length) await tx.insert(membershipRoles).values(roles.map((role) => ({ membershipId: id, role })));
+      if (roles.length)
+        await tx
+          .insert(membershipRoles)
+          .values(roles.map((role) => ({ membershipId: id, role })));
       return id;
     }
     case "update": {
       const { roles, ...set } = change.set;
-      if (Object.keys(set).length) await tx.update(memberships).set(set).where(eq(memberships.id, change.membershipId));
+      if (Object.keys(set).length)
+        await tx
+          .update(memberships)
+          .set(set)
+          .where(eq(memberships.id, change.membershipId));
       if (roles) {
-        await tx.delete(membershipRoles).where(eq(membershipRoles.membershipId, change.membershipId));
+        await tx
+          .delete(membershipRoles)
+          .where(eq(membershipRoles.membershipId, change.membershipId));
         if (roles.length) {
-          await tx.insert(membershipRoles).values(roles.map((role) => ({ membershipId: change.membershipId, role })));
+          await tx.insert(membershipRoles).values(
+            roles.map((role) => ({
+              membershipId: change.membershipId,
+              role,
+            })),
+          );
         }
       }
       return change.membershipId;
     }
     case "delete": {
       // SQLite enforces the cascade only with foreign_keys on: delete the roles explicitly.
-      await tx.delete(membershipRoles).where(eq(membershipRoles.membershipId, change.membershipId));
-      await tx.delete(memberships).where(eq(memberships.id, change.membershipId));
+      await tx
+        .delete(membershipRoles)
+        .where(eq(membershipRoles.membershipId, change.membershipId));
+      await tx
+        .delete(memberships)
+        .where(eq(memberships.id, change.membershipId));
       return change.membershipId;
     }
   }

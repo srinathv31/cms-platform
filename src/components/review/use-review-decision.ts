@@ -6,7 +6,13 @@ import type { OutputKey } from "@/domain/review-outputs";
 import { reviewPath } from "@/domain/rounds";
 import type { ReviewScreenData } from "@/server/queries/review-models";
 import type { Approved } from "./approve-dialog";
-import { approvalStage, approveWaitsOn, decisionAccess, decisionRow, type LocalDecision } from "./decision-model";
+import {
+  approvalStage,
+  approveWaitsOn,
+  decisionAccess,
+  decisionRow,
+  type LocalDecision,
+} from "./decision-model";
 import type { NextRound } from "./decision-rail";
 import type { GoLiveMoment } from "./use-go-live";
 
@@ -66,14 +72,22 @@ export function useReviewDecision({
 
   function onApproved({ wentLive }: Approved) {
     decided.current = true;
-    setLocal({ kind: "approved", wentLive, nextStage: stage.next?.name ?? null });
+    setLocal({
+      kind: "approved",
+      wentLive,
+      nextStage: stage.next?.name ?? null,
+    });
     goLive.approved(wentLive);
   }
 
   // The decision went through: the buttons the dialog came from are replaced by a line, and focus goes
   // to the place they stood. (The dialog's own return of focus can land on a button just as it goes.)
   const row = decisionRow({
-    version: { number: version.number, round: version.round, state: version.state },
+    version: {
+      number: version.number,
+      round: version.round,
+      state: version.state,
+    },
     authorName: version.submittedBy.name,
     local,
     canDecideAgain: can.approve.ok,
@@ -82,10 +96,14 @@ export function useReviewDecision({
   // A sent-back round that was resubmitted links on to where its work went, in this space.
   const { replacedBy } = data;
   const next: NextRound | null = replacedBy
-    ? { label: replacedBy.label, href: reviewPath(team, template.id, replacedBy) as Route }
+    ? {
+        label: replacedBy.label,
+        href: reviewPath(team, template.id, replacedBy) as Route,
+      }
     : null;
   useEffect(() => {
-    if (line !== null && decided.current) decisionRegion.current?.focus({ preventScroll: true });
+    if (line !== null && decided.current)
+      decisionRegion.current?.focus({ preventScroll: true });
   }, [line]);
 
   const access = decisionAccess(can.approve, can.requestChanges);

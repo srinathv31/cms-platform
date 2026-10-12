@@ -30,14 +30,14 @@ Stencil is one controlled place to author, approve and publish customer content.
 
 ### Six things the audience should leave believing
 
-| Theme | What it means | Requirements |
-|---|---|---|
-| One source of truth for every channel | Write once; PDF, web and email all come from the same approved version. | R1–R4, R10, R14, R17 |
-| Speed for business users | Two clicks to typing, typed variables, starters, Word import, Copilot. | R7–R9, R11–R13 |
-| Compliance control | Maker-checker, configurable approval chains, redlines, consequences shown before you commit. | R5, R22, R23, R27, R34 |
-| Safe change for downstream systems | Consumers stay pinned, breaking changes are flagged, old versions sunset on a date, bad ones are revoked by two people. | R6, R16, R20, R30–R32 |
-| Auditability | Every version, decision and render is on record and exportable. | R6, R18, R29, R32 |
-| Self-service access that stays governed | Request access in the app; admins approve, recertify and see inactivity. | R26, R28, R29 |
+| Theme                                   | What it means                                                                                                           | Requirements           |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| One source of truth for every channel   | Write once; PDF, web and email all come from the same approved version.                                                 | R1–R4, R10, R14, R17   |
+| Speed for business users                | Two clicks to typing, typed variables, starters, Word import, Copilot.                                                  | R7–R9, R11–R13         |
+| Compliance control                      | Maker-checker, configurable approval chains, redlines, consequences shown before you commit.                            | R5, R22, R23, R27, R34 |
+| Safe change for downstream systems      | Consumers stay pinned, breaking changes are flagged, old versions sunset on a date, bad ones are revoked by two people. | R6, R16, R20, R30–R32  |
+| Auditability                            | Every version, decision and render is on record and exportable.                                                         | R6, R18, R29, R32      |
+| Self-service access that stays governed | Request access in the app; admins approve, recertify and see inactivity.                                                | R26, R28, R29          |
 
 ## Before the audience arrives
 
@@ -72,37 +72,37 @@ Stencil is one controlled place to author, approve and publish customer content.
 
 ## The cast
 
-| Persona | Role and team | Use them for |
-|---|---|---|
-| Maya Chen | Author · Coral Offers | The main character: writing, changing and importing content |
-| Jordan Ellis | Approver · Coral Offers | Reviewing, approving, setting a sunset, starting a revoke |
-| Alex Kim | Team Admin and Approver · Coral Offers | Confirming a revoke, approving access, recertification |
-| Priya Raman | Author · Coral Offers; Viewer · Deposits | Different rights on different teams |
-| Sam Ortiz | Viewer · Coral Offers | Read-only access; the integration panel |
-| Riley Brooks | Platform Admin · all teams | Channel rules and approval chains; can't edit content |
-| Taylor Nguyen | Auditor · all teams | The full audit log and export |
-| Morgan Lee | No team yet | Requesting access |
-| Dana Park | Viewer · Coral Offers; Legal reviewer once added | The second approval stage |
+| Persona       | Role and team                                    | Use them for                                                |
+| ------------- | ------------------------------------------------ | ----------------------------------------------------------- |
+| Maya Chen     | Author · Coral Offers                            | The main character: writing, changing and importing content |
+| Jordan Ellis  | Approver · Coral Offers                          | Reviewing, approving, setting a sunset, starting a revoke   |
+| Alex Kim      | Team Admin and Approver · Coral Offers           | Confirming a revoke, approving access, recertification      |
+| Priya Raman   | Author · Coral Offers; Viewer · Deposits         | Different rights on different teams                         |
+| Sam Ortiz     | Viewer · Coral Offers                            | Read-only access; the integration panel                     |
+| Riley Brooks  | Platform Admin · all teams                       | Channel rules and approval chains; can't edit content       |
+| Taylor Nguyen | Auditor · all teams                              | The full audit log and export                               |
+| Morgan Lee    | No team yet                                      | Requesting access                                           |
+| Dana Park     | Viewer · Coral Offers; Legal reviewer once added | The second approval stage                                   |
 
 In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employee. She is not Dana Park.
 
 ## Run of show
 
-| Act | Min | The audience should leave believing | Proves |
-|---|---|---|---|
-| 1 · Orientation | 3 | There's one controlled place for every customer document, and its state is visible at a glance. | R1, R6, R27, R34 |
-| 2 · Write a disclosure | 6 | A business user can write a compliant, multi-channel disclosure without help. | R2, R7, R9, R10, R12, R13, R14, R17 |
-| 3 · Review and approve | 6 | Nothing reaches a customer without a second person's approval, and the trail is automatic. | R5, R6, R16, R23 |
-| 4 · Customers receive it | 6 | One approved template serves every channel, and no customer data is kept. | R4, R16, R18, R30, R31, R32 |
-| 5 · Alerts | 5 | Push and SMS get the same control as documents, and the author sees exactly what each phone will show. | R5, R10, R14, R17, R18 |
-| 6 · Change it safely | 8 | Changes never surprise downstream systems, and a bad version can be stopped at once, by two people. | R5, R20, R32, R34 |
-| 7 · Governance | 3 | Every action is on record and exportable for compliance. | R6, R18, R27 |
-| 8 · Access and admin | 11 | Access is self-service but governed, and rules and approval chains are settings, not software releases. | R3, R10, R22, R26, R27, R28, R29 |
-| 9 · Accelerators | 5 | Existing Word and PDF content, and Copilot drafts, come in fast with the rules still enforced. | R8, R11 |
+| Act                      | Min | The audience should leave believing                                                                     | Proves                              |
+| ------------------------ | --- | ------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| 1 · Orientation          | 3   | There's one controlled place for every customer document, and its state is visible at a glance.         | R1, R6, R27, R34                    |
+| 2 · Write a disclosure   | 6   | A business user can write a compliant, multi-channel disclosure without help.                           | R2, R7, R9, R10, R12, R13, R14, R17 |
+| 3 · Review and approve   | 6   | Nothing reaches a customer without a second person's approval, and the trail is automatic.              | R5, R6, R16, R23                    |
+| 4 · Customers receive it | 6   | One approved template serves every channel, and no customer data is kept.                               | R4, R16, R18, R30, R31, R32         |
+| 5 · Alerts               | 5   | Push and SMS get the same control as documents, and the author sees exactly what each phone will show.  | R5, R10, R14, R17, R18              |
+| 6 · Change it safely     | 8   | Changes never surprise downstream systems, and a bad version can be stopped at once, by two people.     | R5, R20, R32, R34                   |
+| 7 · Governance           | 3   | Every action is on record and exportable for compliance.                                                | R6, R18, R27                        |
+| 8 · Access and admin     | 11  | Access is self-service but governed, and rules and approval chains are settings, not software releases. | R3, R10, R22, R26, R27, R28, R29    |
+| 9 · Accelerators         | 5   | Existing Word and PDF content, and Copilot drafts, come in fast with the rules still enforced.          | R8, R11                             |
 
 ## Act 1 — Orientation
 
-*About 3 minutes · Maya · no data changes*
+_About 3 minutes · Maya · no data changes_
 
 **Goal:** there's one controlled place for every customer document, and its state is visible at a glance.
 
@@ -124,7 +124,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 2 — Write a disclosure
 
-*About 6 minutes · Maya · changes data*
+_About 6 minutes · Maya · changes data_
 
 **Goal:** a business user can write a compliant, multi-channel disclosure without help.
 
@@ -149,7 +149,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 3 — Review and approve
 
-*About 6 minutes · Maya and Jordan · changes data · needs Act 2*
+_About 6 minutes · Maya and Jordan · changes data · needs Act 2_
 
 **Goal:** nothing reaches a customer without a second person's approval, and the trail is automatic.
 
@@ -174,7 +174,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 4 — Customers receive it
 
-*About 6 minutes · Jordan and the Coral simulator · changes data · needs v1 Active*
+_About 6 minutes · Jordan and the Coral simulator · changes data · needs v1 Active_
 
 **Goal:** one approved template serves every channel, and no customer data is kept.
 
@@ -197,7 +197,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 5 — Alerts: push and SMS
 
-*About 5 minutes · Maya and Jordan · changes data · before the clock moves*
+_About 5 minutes · Maya and Jordan · changes data · before the clock moves_
 
 **Goal:** push and SMS get the same control as documents, and the author sees exactly what each phone will show.
 
@@ -224,7 +224,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 6 — Change it safely
 
-*About 8 minutes · Maya, Jordan and Alex · changes data · moves the clock +15 days · needs Coral pinned to v1*
+_About 8 minutes · Maya, Jordan and Alex · changes data · moves the clock +15 days · needs Coral pinned to v1_
 
 **Goal:** changes never surprise downstream systems, and a bad version can be stopped at once, by two people.
 
@@ -253,7 +253,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 7 — Governance
 
-*About 3 minutes · Alex and Taylor · no data changes*
+_About 3 minutes · Alex and Taylor · no data changes_
 
 **Goal:** every action is on record and exportable for compliance.
 
@@ -267,7 +267,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 8 — Access and admin
 
-*About 11 minutes · Priya, Sam, Morgan, Alex, Riley, Jordan, Maya and Dana · changes data · moves the clock +16 days*
+_About 11 minutes · Priya, Sam, Morgan, Alex, Riley, Jordan, Maya and Dana · changes data · moves the clock +16 days_
 
 **Goal:** access is self-service but governed, and rules and approval chains are settings, not software releases.
 
@@ -305,7 +305,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
 ## Act 9 — Accelerators and reset
 
-*About 5 minutes · Maya · changes data, then resets*
+_About 5 minutes · Maya · changes data, then resets_
 
 **Goal:** existing Word and PDF content, and Copilot drafts, come in fast with the rules still enforced.
 
@@ -325,6 +325,7 @@ In the Coral simulator, the operator shown is **Dana Whitfield**, a Coral employ
 
    - **They see:** `{{purchase_apr}}` become a chip and the heading merge into the existing section. ⌘Z undoes the whole paste.
    - **Say:** "Teams can draft with Copilot, which the bank already approves, and Stencil turns the answer into a governed draft. No AI runs inside Stencil."
+
 3. **Do:** **New template → Import a file** → choose `rate-change-notice.pdf`.
    - **They see:** a draft "Rate Change Notice" with 6 variables. The PDF's layout is dropped; its text and structure come in.
 4. **Do:** Bell → **Mark all as read**.
@@ -358,70 +359,70 @@ The business rules are written to carry over to the production API.
 
 Every requirement from the Discovery Brief (DB) and the Build Plan (BP), in their order, with where to show it.
 
-| # | Requirement (source) | How Stencil answers it | Where to show it | Status |
-|---|---|---|---|---|
-| R1 | One controlled place for customer content (DB · Purpose and problem) | A Library per team; writing, review and rendering in one app | Library (Maya), Act 1 | Covered |
-| R2 | Coral: a T&C disclosure linked to an offer (DB · Scope and first client) | Disclosure content type; Coral links an offer to it | Editor; simulator, Acts 2 and 4 | Covered |
-| R3 | Works for any business and many teams (DB · Scope and first client) | Three teams, two consumers; content types, channels and approval chains are settings | Team switcher (Priya); Settings (Riley), Act 8 | Covered |
-| R4 | Templates only, no customer data; Stencil renders; consumers can't author (DB · Guiding principles 1–3) | Documents are built on request and never stored; the consumer API can only read and render | Simulator; SHARE, Act 4 | Covered |
-| R5 | Review in the tool; maker-checker (DB · Guiding principles 4; Controls and approvals) | Review queue; the author can't approve their own version | Review (Maya, Jordan), Act 3 | Covered |
-| R6 | Automatic versioning at submit; consumers never see drafts (DB · Guiding principles 5; Versioning and lifecycle) | Six states; Versions tab with compare and each version's review rounds; Activity tab | Versions tab, Acts 1 and 3 | Covered |
-| R7 | "One click" simplicity for non-technical users (DB · Guiding principles 6; BP · Experience principles) | Two clicks to typing; a slash menu; plain-language dialogs | New template (Maya), Act 2 | Covered |
-| R8 | No AI inside the app; a Copilot prompt instead (DB · Guiding principles 7; AI roadmap) | The app writes a prompt to copy; a pasted {{key}} becomes a chip. Risk sign-off is still open | Editor rail (Maya), Act 9 | Covered |
-| R9 | Numbers never retyped; customer vs offer variables (DB · Guiding principles 8; Content model and channels) | Typed, auto-formatted variables; Coral maps each to customer or offer data. Variables carry no customer/offer flag, and offer terms are still typed into the text | Variables rail; simulator, Acts 2 and 4 | Partial |
-| R10 | One template, many channels; rules per content type (DB · Content model and channels) | Channel chips; a channel rules matrix; a disallowed channel is refused. Documents go to PDF, Web and Email; alerts to Push and SMS | Editor; alerts; Settings (Riley), Acts 2, 5 and 8 | Covered |
-| R11 | Import Word, PDF or text as drafts (DB · Content model and channels) | Import a file, with an Original tab and an import report. No step where the author confirms it matches the original | New template (Maya), Act 9 | Partial |
-| R12 | A Notion-like editor with draggable placeholders (DB · Content model; BP · The editor) | Draggable blocks; variable chips that can't be broken, inserted by drag, by typing {{ or by click | Editor (Maya), Act 2 | Covered |
-| R13 | Blueprints with required sections; a starter gallery (DB · Content model and channels) | Required headings can't be deleted; Blank plus three starters for documents, and for alerts. Required variables aren't preset | Editor; Settings (Riley), Acts 2 and 8 | Partial |
-| R14 | One version for all channels; approvers see each channel (DB · Content model and channels) | Email subject and preheader take variables; review has a tab per channel | Preview; Review (Jordan), Acts 2 and 3 | Covered |
-| R15 | Clone from a base template (DB · Content model and channels) | Not built. It matters if offer terms stay written into the text | Roadmap | Not built |
-| R16 | Render API: binary by default, base64 opt-in, email as JSON, validation (DB · Rendering; BP · Preview and rendering) | A render endpoint whose errors name the problem | SHARE; Coral results, Acts 3 and 4 | Covered |
-| R17 | Preview with sample data that matches production (DB · Rendering) | One render function for preview, review and Coral; named sample sets | Preview (Maya), Act 2 | Covered |
-| R18 | A log of every render, with no customer data (DB · Rendering) | Records template, version, consumer, channel and outcome, never the values | Usage, Acts 4 and 7 | Covered |
-| R19 | Batch rendering; PDF throughput (DB · Rendering; Timeline and risks) | Out of the prototype's scope | Roadmap | Not built |
-| R20 | Pin, sunset, and a revoke that needs a reason and two people (DB · Versioning and lifecycle) | Consumers stay pinned; a sunset date set in the Approve dialog; a two-person revoke | Versions (Jordan, Alex); simulator, Act 6 | Covered |
-| R21 | Retention, review-by dates, tamper evidence (DB · Versioning and lifecycle) | For production | Roadmap | Not built |
-| R22 | Approval chain as configuration (DB · Controls and approvals) | A chain editor; a Legal stage added live. Versions already in review keep the stages they were submitted with | Settings (Riley), Act 8 | Covered |
-| R23 | Side-by-side redline; comments pinned to blocks (DB · Controls and approvals) | Redline with "Changes only"; comments in the margin | Review (Jordan), Acts 3 and 6 | Covered |
-| R24 | Optional approval on the consumer's side (DB · Controls and approvals) | Not built | Roadmap | Not built |
-| R25 | State-specific language (DB · State- and regulation-specific language) | Parked; there's only a US-state variable type | Roadmap | Not built |
-| R26 | Teams see only their own content; access per team (DB · Teams and access control) | Each team is its own space; View only mode elsewhere | Team switcher (Priya), Act 8 | Covered |
-| R27 | Roles, including Auditor, Legal reviewer, and a Platform Admin who can't edit (DB · Teams and access control; BP · Personas and permissions) | One central permission check for every action | Persona switcher, Acts 1, 7 and 8 | Covered |
-| R28 | Access requests in the app, with no self-approval (DB · Teams and access control) | Request access; Access requests; Teams | Request access (Morgan); Settings (Alex), Act 8 | Covered |
-| R29 | Recertification, inactivity expiry, detecting team moves (DB · Teams and access control) | Unconfirmed access lapses; flagged at 90 days idle, suspended at 120; every grant audited. Team moves aren't detected | Settings (Alex), Act 8 | Partial |
-| R30 | Consumer API: search with paging, get, preview, render (DB · Consumer integration and API surface) | Search, get (contract and JSON Schema) and render work. No paging, no consumer preview with dummy data, and consumers aren't limited to their team's templates | SHARE (Sam), Acts 3 and 8 | Partial |
-| R31 | The offer-to-template link lives in the consumer (DB · Consumer integration and API surface) | Coral searches, links and pins Active versions in its own tables | Simulator, Act 4 | Covered |
-| R32 | Lifecycle events; "who uses v3?" (DB · Consumer integration; BP · Usage) | A notices API; Coral's Notices page; the Usage dashboard | Usage; simulator, Acts 4 and 6 | Covered |
-| R33 | An endpoint for consumers to request a draft (DB · Consumer integration and API surface) | Later; not built | Roadmap | Not built |
-| R34 | Status always visible; consequences shown before you commit (BP · Experience principles) | One status badge everywhere; dialogs name the consumers affected | Approve, sunset and revoke dialogs, Acts 1 and 6 | Covered |
-| R35 | Production integrations (DB · Architecture overview; BP · Out of scope and caveats) | Stand-ins for sign-in, the API layer, storage and delivery; PDF output is an approximation | Closing | Stand-in |
+| #   | Requirement (source)                                                                                                                         | How Stencil answers it                                                                                                                                            | Where to show it                                  | Status    |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------- |
+| R1  | One controlled place for customer content (DB · Purpose and problem)                                                                         | A Library per team; writing, review and rendering in one app                                                                                                      | Library (Maya), Act 1                             | Covered   |
+| R2  | Coral: a T&C disclosure linked to an offer (DB · Scope and first client)                                                                     | Disclosure content type; Coral links an offer to it                                                                                                               | Editor; simulator, Acts 2 and 4                   | Covered   |
+| R3  | Works for any business and many teams (DB · Scope and first client)                                                                          | Three teams, two consumers; content types, channels and approval chains are settings                                                                              | Team switcher (Priya); Settings (Riley), Act 8    | Covered   |
+| R4  | Templates only, no customer data; Stencil renders; consumers can't author (DB · Guiding principles 1–3)                                      | Documents are built on request and never stored; the consumer API can only read and render                                                                        | Simulator; SHARE, Act 4                           | Covered   |
+| R5  | Review in the tool; maker-checker (DB · Guiding principles 4; Controls and approvals)                                                        | Review queue; the author can't approve their own version                                                                                                          | Review (Maya, Jordan), Act 3                      | Covered   |
+| R6  | Automatic versioning at submit; consumers never see drafts (DB · Guiding principles 5; Versioning and lifecycle)                             | Six states; Versions tab with compare and each version's review rounds; Activity tab                                                                              | Versions tab, Acts 1 and 3                        | Covered   |
+| R7  | "One click" simplicity for non-technical users (DB · Guiding principles 6; BP · Experience principles)                                       | Two clicks to typing; a slash menu; plain-language dialogs                                                                                                        | New template (Maya), Act 2                        | Covered   |
+| R8  | No AI inside the app; a Copilot prompt instead (DB · Guiding principles 7; AI roadmap)                                                       | The app writes a prompt to copy; a pasted {{key}} becomes a chip. Risk sign-off is still open                                                                     | Editor rail (Maya), Act 9                         | Covered   |
+| R9  | Numbers never retyped; customer vs offer variables (DB · Guiding principles 8; Content model and channels)                                   | Typed, auto-formatted variables; Coral maps each to customer or offer data. Variables carry no customer/offer flag, and offer terms are still typed into the text | Variables rail; simulator, Acts 2 and 4           | Partial   |
+| R10 | One template, many channels; rules per content type (DB · Content model and channels)                                                        | Channel chips; a channel rules matrix; a disallowed channel is refused. Documents go to PDF, Web and Email; alerts to Push and SMS                                | Editor; alerts; Settings (Riley), Acts 2, 5 and 8 | Covered   |
+| R11 | Import Word, PDF or text as drafts (DB · Content model and channels)                                                                         | Import a file, with an Original tab and an import report. No step where the author confirms it matches the original                                               | New template (Maya), Act 9                        | Partial   |
+| R12 | A Notion-like editor with draggable placeholders (DB · Content model; BP · The editor)                                                       | Draggable blocks; variable chips that can't be broken, inserted by drag, by typing {{ or by click                                                                 | Editor (Maya), Act 2                              | Covered   |
+| R13 | Blueprints with required sections; a starter gallery (DB · Content model and channels)                                                       | Required headings can't be deleted; Blank plus three starters for documents, and for alerts. Required variables aren't preset                                     | Editor; Settings (Riley), Acts 2 and 8            | Partial   |
+| R14 | One version for all channels; approvers see each channel (DB · Content model and channels)                                                   | Email subject and preheader take variables; review has a tab per channel                                                                                          | Preview; Review (Jordan), Acts 2 and 3            | Covered   |
+| R15 | Clone from a base template (DB · Content model and channels)                                                                                 | Not built. It matters if offer terms stay written into the text                                                                                                   | Roadmap                                           | Not built |
+| R16 | Render API: binary by default, base64 opt-in, email as JSON, validation (DB · Rendering; BP · Preview and rendering)                         | A render endpoint whose errors name the problem                                                                                                                   | SHARE; Coral results, Acts 3 and 4                | Covered   |
+| R17 | Preview with sample data that matches production (DB · Rendering)                                                                            | One render function for preview, review and Coral; named sample sets                                                                                              | Preview (Maya), Act 2                             | Covered   |
+| R18 | A log of every render, with no customer data (DB · Rendering)                                                                                | Records template, version, consumer, channel and outcome, never the values                                                                                        | Usage, Acts 4 and 7                               | Covered   |
+| R19 | Batch rendering; PDF throughput (DB · Rendering; Timeline and risks)                                                                         | Out of the prototype's scope                                                                                                                                      | Roadmap                                           | Not built |
+| R20 | Pin, sunset, and a revoke that needs a reason and two people (DB · Versioning and lifecycle)                                                 | Consumers stay pinned; a sunset date set in the Approve dialog; a two-person revoke                                                                               | Versions (Jordan, Alex); simulator, Act 6         | Covered   |
+| R21 | Retention, review-by dates, tamper evidence (DB · Versioning and lifecycle)                                                                  | For production                                                                                                                                                    | Roadmap                                           | Not built |
+| R22 | Approval chain as configuration (DB · Controls and approvals)                                                                                | A chain editor; a Legal stage added live. Versions already in review keep the stages they were submitted with                                                     | Settings (Riley), Act 8                           | Covered   |
+| R23 | Side-by-side redline; comments pinned to blocks (DB · Controls and approvals)                                                                | Redline with "Changes only"; comments in the margin                                                                                                               | Review (Jordan), Acts 3 and 6                     | Covered   |
+| R24 | Optional approval on the consumer's side (DB · Controls and approvals)                                                                       | Not built                                                                                                                                                         | Roadmap                                           | Not built |
+| R25 | State-specific language (DB · State- and regulation-specific language)                                                                       | Parked; there's only a US-state variable type                                                                                                                     | Roadmap                                           | Not built |
+| R26 | Teams see only their own content; access per team (DB · Teams and access control)                                                            | Each team is its own space; View only mode elsewhere                                                                                                              | Team switcher (Priya), Act 8                      | Covered   |
+| R27 | Roles, including Auditor, Legal reviewer, and a Platform Admin who can't edit (DB · Teams and access control; BP · Personas and permissions) | One central permission check for every action                                                                                                                     | Persona switcher, Acts 1, 7 and 8                 | Covered   |
+| R28 | Access requests in the app, with no self-approval (DB · Teams and access control)                                                            | Request access; Access requests; Teams                                                                                                                            | Request access (Morgan); Settings (Alex), Act 8   | Covered   |
+| R29 | Recertification, inactivity expiry, detecting team moves (DB · Teams and access control)                                                     | Unconfirmed access lapses; flagged at 90 days idle, suspended at 120; every grant audited. Team moves aren't detected                                             | Settings (Alex), Act 8                            | Partial   |
+| R30 | Consumer API: search with paging, get, preview, render (DB · Consumer integration and API surface)                                           | Search, get (contract and JSON Schema) and render work. No paging, no consumer preview with dummy data, and consumers aren't limited to their team's templates    | SHARE (Sam), Acts 3 and 8                         | Partial   |
+| R31 | The offer-to-template link lives in the consumer (DB · Consumer integration and API surface)                                                 | Coral searches, links and pins Active versions in its own tables                                                                                                  | Simulator, Act 4                                  | Covered   |
+| R32 | Lifecycle events; "who uses v3?" (DB · Consumer integration; BP · Usage)                                                                     | A notices API; Coral's Notices page; the Usage dashboard                                                                                                          | Usage; simulator, Acts 4 and 6                    | Covered   |
+| R33 | An endpoint for consumers to request a draft (DB · Consumer integration and API surface)                                                     | Later; not built                                                                                                                                                  | Roadmap                                           | Not built |
+| R34 | Status always visible; consequences shown before you commit (BP · Experience principles)                                                     | One status badge everywhere; dialogs name the consumers affected                                                                                                  | Approve, sunset and revoke dialogs, Acts 1 and 6  | Covered   |
+| R35 | Production integrations (DB · Architecture overview; BP · Out of scope and caveats)                                                          | Stand-ins for sign-in, the API layer, storage and delivery; PDF output is an approximation                                                                        | Closing                                           | Stand-in  |
 
 Summary: 23 covered, 5 partial, 6 not built (R19 was out of the prototype's scope), 1 stand-in.
 
 ## Glossary
 
-| Term | Meaning |
-|---|---|
-| Template | Reusable customer content with a permanent ID, such as UC-4F7K2Q. |
-| Variable (chip) | A typed blank, such as APR, filled in for each customer. |
-| Version | A frozen, numbered snapshot made when a draft is submitted. Numbers count what reaches customers: v1, v2, v3, with no gaps. |
-| Round | One submission of a version for review. Sent back, the next submission is round 2 of the same version. Customers only see the version number. |
-| Draft, In review, Changes requested | Being written, waiting for approval, or sent back with a reason. |
-| Active | The approved version consumers use now. |
-| Superseded | An older approved version that still works for consumers pinned to it. |
-| Pin and relink | A consumer stays on its version until it chooses to move. |
-| Sunset | The date after which a superseded version stops working. |
-| Revoke | An emergency stop that takes two approvers. |
-| Maker-checker | The author can never approve their own version. |
-| Content type | A blueprint: required sections, allowed channels and the approval chain. Disclosure makes documents; Alert makes alerts. |
-| Alert | A template with a push notification and a text message, instead of a document. It stays an alert for life. |
-| Channel | PDF, Web or Email for a document; Push or SMS for an alert. |
-| Sample set | Named dummy data used for preview and review. |
-| Render and consumer | A consumer system such as Coral asks Stencil to fill in a template for one customer. Nothing is stored. |
-| Contract and breaking change | The variables a consumer must send. Adding a required one breaks the contract. |
-| Team (space) | A business line's private area. Platform Admin and Auditor also see "All teams". |
-| Recertification | A Team Admin's regular review to keep or remove each member. |
-| Simulator, Demo pill, demo clock | Demo-only tools that stand in for Coral, reset the data and move the date forward. |
+| Term                                | Meaning                                                                                                                                       |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Template                            | Reusable customer content with a permanent ID, such as UC-4F7K2Q.                                                                             |
+| Variable (chip)                     | A typed blank, such as APR, filled in for each customer.                                                                                      |
+| Version                             | A frozen, numbered snapshot made when a draft is submitted. Numbers count what reaches customers: v1, v2, v3, with no gaps.                   |
+| Round                               | One submission of a version for review. Sent back, the next submission is round 2 of the same version. Customers only see the version number. |
+| Draft, In review, Changes requested | Being written, waiting for approval, or sent back with a reason.                                                                              |
+| Active                              | The approved version consumers use now.                                                                                                       |
+| Superseded                          | An older approved version that still works for consumers pinned to it.                                                                        |
+| Pin and relink                      | A consumer stays on its version until it chooses to move.                                                                                     |
+| Sunset                              | The date after which a superseded version stops working.                                                                                      |
+| Revoke                              | An emergency stop that takes two approvers.                                                                                                   |
+| Maker-checker                       | The author can never approve their own version.                                                                                               |
+| Content type                        | A blueprint: required sections, allowed channels and the approval chain. Disclosure makes documents; Alert makes alerts.                      |
+| Alert                               | A template with a push notification and a text message, instead of a document. It stays an alert for life.                                    |
+| Channel                             | PDF, Web or Email for a document; Push or SMS for an alert.                                                                                   |
+| Sample set                          | Named dummy data used for preview and review.                                                                                                 |
+| Render and consumer                 | A consumer system such as Coral asks Stencil to fill in a template for one customer. Nothing is stored.                                       |
+| Contract and breaking change        | The variables a consumer must send. Adding a required one breaks the contract.                                                                |
+| Team (space)                        | A business line's private area. Platform Admin and Auditor also see "All teams".                                                              |
+| Recertification                     | A Team Admin's regular review to keep or remove each member.                                                                                  |
+| Simulator, Demo pill, demo clock    | Demo-only tools that stand in for Coral, reset the data and move the date forward.                                                            |
 
 ## Timing, cuts and rules
 

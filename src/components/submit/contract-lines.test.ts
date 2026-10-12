@@ -11,15 +11,28 @@ const v = (key: string, over: Partial<Variable> = {}): Variable => ({
   ...over,
 });
 
-const BASELINE = { number: 2, variables: [v("first_name"), v("purchase_apr", { type: "percent" })] };
+const BASELINE = {
+  number: 2,
+  variables: [v("first_name"), v("purchase_apr", { type: "percent" })],
+};
 
 describe("contractSection", () => {
   it("has no section when no version is Active: there is nothing to compare with", () => {
-    expect(contractSection({ baseline: null, variables: [v("first_name")], versionNumber: 1 })).toBeNull();
+    expect(
+      contractSection({
+        baseline: null,
+        variables: [v("first_name")],
+        versionNumber: 1,
+      }),
+    ).toBeNull();
   });
 
   it("has no lines when the list is unchanged", () => {
-    const section = contractSection({ baseline: BASELINE, variables: BASELINE.variables, versionNumber: 3 });
+    const section = contractSection({
+      baseline: BASELINE,
+      variables: BASELINE.variables,
+      versionNumber: 3,
+    });
     expect(section).toEqual({ baselineNumber: 2, lines: [], breaking: false });
   });
 
@@ -30,7 +43,9 @@ describe("contractSection", () => {
       versionNumber: 3,
     });
     expect(section?.breaking).toBe(true);
-    expect(section?.lines).toEqual([{ text: "v3 adds required `annual_fee` (Currency).", breaking: true }]);
+    expect(section?.lines).toEqual([
+      { text: "v3 adds required `annual_fee` (Currency).", breaking: true },
+    ]);
   });
 
   it("flags every line by its own change, and lists breaking ones first", () => {
@@ -67,14 +82,23 @@ describe("contractSection", () => {
     const section = contractSection({
       baseline: BASELINE,
       // As the draft saves it: the variable keeps the key it had as its id.
-      variables: [v("given_name", { id: "first_name", label: "first_name" }), BASELINE.variables[1]!],
+      variables: [
+        v("given_name", { id: "first_name", label: "first_name" }),
+        BASELINE.variables[1]!,
+      ],
       versionNumber: 3,
     });
-    expect(section?.lines).toEqual([{ text: "v3 renames `first_name` to `given_name`.", breaking: true }]);
+    expect(section?.lines).toEqual([
+      { text: "v3 renames `first_name` to `given_name`.", breaking: true },
+    ]);
   });
 
   it("reads a removed variable as breaking", () => {
-    const section = contractSection({ baseline: BASELINE, variables: [BASELINE.variables[0]!], versionNumber: 3 });
+    const section = contractSection({
+      baseline: BASELINE,
+      variables: [BASELINE.variables[0]!],
+      versionNumber: 3,
+    });
     expect(section?.breaking).toBe(true);
     expect(section?.lines[0]?.text).toContain("removes `purchase_apr`");
   });
@@ -95,13 +119,17 @@ describe("splitCode", () => {
       [" to ", false],
       ["b", true],
     ]);
-    expect(splitCode("Nothing here.")).toEqual([{ text: "Nothing here.", code: false }]);
+    expect(splitCode("Nothing here.")).toEqual([
+      { text: "Nothing here.", code: false },
+    ]);
   });
 });
 
 describe("splitKeys", () => {
   it("sets a {{key}} in a refusal apart, for Geist Mono", () => {
-    expect(splitKeys("Define or remove {{promo_code}} before submitting.")).toEqual([
+    expect(
+      splitKeys("Define or remove {{promo_code}} before submitting."),
+    ).toEqual([
       { text: "Define or remove ", code: false },
       { text: "{{promo_code}}", code: true },
       { text: " before submitting.", code: false },
@@ -109,10 +137,11 @@ describe("splitKeys", () => {
   });
 
   it("handles a list of keys and a sentence with none", () => {
-    expect(splitKeys("Define or remove {{a}} and {{b}} before submitting.").filter((p) => p.code).map((p) => p.text)).toEqual([
-      "{{a}}",
-      "{{b}}",
-    ]);
+    expect(
+      splitKeys("Define or remove {{a}} and {{b}} before submitting.")
+        .filter((p) => p.code)
+        .map((p) => p.text),
+    ).toEqual(["{{a}}", "{{b}}"]);
     expect(splitKeys("Add an email subject before submitting.")).toEqual([
       { text: "Add an email subject before submitting.", code: false },
     ]);

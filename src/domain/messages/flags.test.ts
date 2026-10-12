@@ -10,16 +10,37 @@ describe("messageFieldFlags", () => {
   it("flags each character outside GSM-7 in an SMS, with its fix when there is an obvious one", () => {
     const text = "Don’t miss it – pay now";
     expect(messageFieldFlags(sms!, text)).toEqual([
-      { index: 3, length: 1, kind: "character", message: "’ isn't in the SMS character set.", replacement: "'" },
-      { index: 14, length: 1, kind: "character", message: "– isn't in the SMS character set.", replacement: "-" },
+      {
+        index: 3,
+        length: 1,
+        kind: "character",
+        message: "’ isn't in the SMS character set.",
+        replacement: "'",
+      },
+      {
+        index: 14,
+        length: 1,
+        kind: "character",
+        message: "– isn't in the SMS character set.",
+        replacement: "-",
+      },
     ]);
   });
 
   it("offers to remove an invisible character, and names a space by its code point", () => {
     expect(messageFieldFlags(sms!, "pay\u200Bnow")).toEqual([
-      { index: 3, length: 1, kind: "character", message: "U+200B isn't in the SMS character set.", replacement: "" },
+      {
+        index: 3,
+        length: 1,
+        kind: "character",
+        message: "U+200B isn't in the SMS character set.",
+        replacement: "",
+      },
     ]);
-    expect(messageFieldFlags(sms!, "pay\u00A0now")[0]).toMatchObject({ message: "U+00A0 isn't in the SMS character set.", replacement: " " });
+    expect(messageFieldFlags(sms!, "pay\u00A0now")[0]).toMatchObject({
+      message: "U+00A0 isn't in the SMS character set.",
+      replacement: " ",
+    });
   });
 
   it("only flags a letter or an emoji: changing it would change the author's words", () => {
@@ -36,10 +57,13 @@ describe("messageFieldFlags", () => {
         index: 7,
         length: 10,
         kind: "shortener",
-        message: "bit.ly is a public link shortener carriers filter. Use a link on your own domain.",
+        message:
+          "bit.ly is a public link shortener carriers filter. Use a link on your own domain.",
       },
     ]);
-    expect(messageFieldFlags(sms!, "Pay at https://bit.ly/pay’").map((f) => f.kind)).toEqual(["shortener", "character"]);
+    expect(
+      messageFieldFlags(sms!, "Pay at https://bit.ly/pay’").map((f) => f.kind),
+    ).toEqual(["shortener", "character"]);
   });
 
   it("flags nothing a field's rules don't cover: a push title can hold ’, and an email subject a shortener", () => {

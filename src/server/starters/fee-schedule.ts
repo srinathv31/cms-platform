@@ -6,13 +6,21 @@ import type { VariableKit } from "../seed/variables";
 // Every declared variable is used.
 
 export function feeScheduleVariables(kit: VariableKit): Variable[] {
-  return kit.list(["effective_date", "monthly_fee", "minimum_balance", "home_state"]);
+  return kit.list([
+    "effective_date",
+    "monthly_fee",
+    "minimum_balance",
+    "home_state",
+  ]);
 }
 
 export function feeScheduleBody(scope: string): JSONContent {
   return disclosure(scope, {
     offer: [
-      p("intro", "These fees apply to your checking account starting {effective_date}."),
+      p(
+        "intro",
+        "These fees apply to your checking account starting {effective_date}.",
+      ),
       ul("waivers", [
         "The monthly service fee is waived when your daily balance stays at or above {minimum_balance}.",
         "Online and mobile banking are always free.",
@@ -38,8 +46,14 @@ export function feeScheduleBody(scope: string): JSONContent {
         "fdic",
         "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category.",
       ),
-      callout("changes_callout", "We may change fees with 30 days' written notice."),
-      p("state_terms", "Account terms for {home_state} residents are in your deposit account agreement."),
+      callout(
+        "changes_callout",
+        "We may change fees with 30 days' written notice.",
+      ),
+      p(
+        "state_terms",
+        "Account terms for {home_state} residents are in your deposit account agreement.",
+      ),
     ],
   });
 }

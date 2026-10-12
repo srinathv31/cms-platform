@@ -11,7 +11,9 @@ import { settings } from "./db/schema/ucomp";
 export const CLOCK_OFFSET_KEY = "clock_offset_days";
 
 export async function getClockOffsetDays(): Promise<number> {
-  const row = await db.query.settings.findFirst({ where: eq(settings.key, CLOCK_OFFSET_KEY) });
+  const row = await db.query.settings.findFirst({
+    where: eq(settings.key, CLOCK_OFFSET_KEY),
+  });
   return typeof row?.value === "number" ? row.value : 0;
 }
 

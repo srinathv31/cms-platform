@@ -1,9 +1,5 @@
 import { test } from "@playwright/test";
-import {
-  WORKSPACE,
-  describeRoutes,
-  installCls,
-} from "./helpers/principles";
+import { WORKSPACE, describeRoutes, installCls } from "./helpers/principles";
 
 // Phase 7 principle checks: the template workspace (Content, Versions, Usage and Activity) on every kind of template.
 // The five checks, the personas and the route matrix are in e2e/helpers/principles.ts.
@@ -15,4 +11,8 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(installCls);
 });
 
-describeRoutes(test, "Template workspace (Content, Versions, Usage, Activity)", WORKSPACE);
+describeRoutes(
+  test,
+  "Template workspace (Content, Versions, Usage, Activity)",
+  WORKSPACE,
+);

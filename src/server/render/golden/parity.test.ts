@@ -14,7 +14,13 @@ import { PUSH_PLATFORMS } from "@/domain/messages/push";
 import type { Channel } from "@/domain/types";
 import { caseSlugs, readInput } from "./files";
 import { renderDocProblems } from "./invariants";
-import { expectedFiles, nodeFiles, parityProblems, runCase, type CaseRun } from "./pipeline";
+import {
+  expectedFiles,
+  nodeFiles,
+  parityProblems,
+  runCase,
+  type CaseRun,
+} from "./pipeline";
 
 describe.each(caseSlugs())("parity %s", (slug) => {
   let run: CaseRun;
@@ -26,7 +32,10 @@ describe.each(caseSlugs())("parity %s", (slug) => {
   it("fails, or renders, as the case promises", () => {
     const has = (channel: Channel) => run.input.channels.includes(channel);
     if (slug.startsWith("error-")) {
-      expect(run.error, "this case must be refused before any channel renders").not.toBeNull();
+      expect(
+        run.error,
+        "this case must be refused before any channel renders",
+      ).not.toBeNull();
       expect(run.pdf).toBeNull();
       expect(run.push).toBeNull();
       expect(run.sms).toBeNull();
@@ -35,18 +44,36 @@ describe.each(caseSlugs())("parity %s", (slug) => {
     expect(run.error, "this case must render").toBeNull();
     if (has("pdf")) {
       if (slug.startsWith("pdf-error-")) {
-        expect(run.pdf?.ok, "the PDF must be refused (no tofu, no silent drops)").toBe(false);
-      } else expect(run.pdf?.ok, run.pdf && !run.pdf.ok ? `the PDF failed: ${run.pdf.error.message}` : "").toBe(true);
+        expect(
+          run.pdf?.ok,
+          "the PDF must be refused (no tofu, no silent drops)",
+        ).toBe(false);
+      } else
+        expect(
+          run.pdf?.ok,
+          run.pdf && !run.pdf.ok
+            ? `the PDF failed: ${run.pdf.error.message}`
+            : "",
+        ).toBe(true);
     }
     if (has("push")) {
-      const refused = Object.values(run.push ?? {}).filter((push) => !push.ok).length;
-      if (slug.startsWith("push-error-")) expect(refused, "the push must be refused on every platform (never cut to fit)").toBe(PUSH_PLATFORMS.length);
+      const refused = Object.values(run.push ?? {}).filter(
+        (push) => !push.ok,
+      ).length;
+      if (slug.startsWith("push-error-"))
+        expect(
+          refused,
+          "the push must be refused on every platform (never cut to fit)",
+        ).toBe(PUSH_PLATFORMS.length);
       else expect(refused, "the push must render on every platform").toBe(0);
     }
     if (has("sms")) {
-      expect(run.sms?.ok, slug.startsWith("sms-error-") ? "the SMS must be refused (never cut to fit)" : "the SMS must render").toBe(
-        !slug.startsWith("sms-error-"),
-      );
+      expect(
+        run.sms?.ok,
+        slug.startsWith("sms-error-")
+          ? "the SMS must be refused (never cut to fit)"
+          : "the SMS must render",
+      ).toBe(!slug.startsWith("sms-error-"));
     }
   });
 
@@ -60,7 +87,9 @@ describe.each(caseSlugs())("parity %s", (slug) => {
 
   it("the PDF is stamped with the render time", () => {
     if (!run.pdf?.ok) return;
-    const stamp = new Date(run.input.at).toISOString().replace(/\.\d{3}Z$/, ".000Z");
+    const stamp = new Date(run.input.at)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, ".000Z");
     expect(run.pdf.extract.info.CreationDate).toBe(stamp);
     expect(run.pdf.extract.info.ModDate).toBe(stamp);
   });
@@ -69,6 +98,12 @@ describe.each(caseSlugs())("parity %s", (slug) => {
     const again = await runCase(readInput(slug));
     expect(expectedFiles(again)).toEqual(expectedFiles(run));
     expect(nodeFiles(again)).toEqual(nodeFiles(run));
-    if (run.pdf?.ok && again.pdf?.ok) expect(Buffer.compare(Buffer.from(again.pdf.bytes), Buffer.from(run.pdf.bytes))).toBe(0);
+    if (run.pdf?.ok && again.pdf?.ok)
+      expect(
+        Buffer.compare(
+          Buffer.from(again.pdf.bytes),
+          Buffer.from(run.pdf.bytes),
+        ),
+      ).toBe(0);
   }, 60_000);
 });

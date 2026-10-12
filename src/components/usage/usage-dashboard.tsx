@@ -8,12 +8,36 @@ import type { UsageDashboard } from "@/domain/golive-types";
 import { CHANNELS } from "@/domain/types";
 import { now } from "@/server/clock";
 import { getUsageDashboard } from "@/server/queries/usage";
-import { StatCard, StatLabel, StatLines, StatTrend, StatValue } from "@/components/primitives/stat-card";
-import { ChannelMix, Gauge, HBars, HeatLegend, Heatmap, Legend, RateLine, StackedBars, type RatePoint } from "./charts";
+import {
+  StatCard,
+  StatLabel,
+  StatLines,
+  StatTrend,
+  StatValue,
+} from "@/components/primitives/stat-card";
+import {
+  ChannelMix,
+  Gauge,
+  HBars,
+  HeatLegend,
+  Heatmap,
+  Legend,
+  RateLine,
+  StackedBars,
+  type RatePoint,
+} from "./charts";
 import { CHANNEL_SERIES } from "./channel-series";
 import { ConsumersCard } from "./consumers-card";
 import { sunsetPhrase } from "./format";
-import { BARS_HEIGHT, HEAT_FOOTER, LEGEND_HEIGHT, LEGEND_ROW, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
+import {
+  BARS_HEIGHT,
+  HEAT_FOOTER,
+  LEGEND_HEIGHT,
+  LEGEND_ROW,
+  RATE_HEIGHT,
+  STAT_CARD,
+  TOP_TEMPLATES,
+} from "./geometry";
 import { Panel, PanelHead } from "./panel";
 import { UsageTabs } from "./usage-tabs";
 
@@ -25,41 +49,74 @@ function Overview({ d }: { d: UsageDashboard }) {
   const { stats, onActive, heatmap } = d;
   const firstDay = heatmap.weeks[0]?.[0]?.date ?? d.today;
   const onOlder =
-    onActive.otherVersions.length === 1 ? `On v${onActive.otherVersions[0].versionNumber}` : "On older versions";
+    onActive.otherVersions.length === 1
+      ? `On v${onActive.otherVersions[0].versionNumber}`
+      : "On older versions";
   // `count` is every render that day (succeeded or failed); `errors` is the failed ones.
   const failurePoints: RatePoint[] = d.daily.slice(-30).map((day) => ({
-    title: day.date === d.today ? `${formatShortDate(day.date)} (so far)` : formatShortDate(day.date),
+    title:
+      day.date === d.today
+        ? `${formatShortDate(day.date)} (so far)`
+        : formatShortDate(day.date),
     pct: percent(day.errors, day.count) ?? 0,
-    detail: day.count === 0 ? "No renders" : `${formatCount(day.errors)} of ${plural(day.count, "render")}`,
+    detail:
+      day.count === 0
+        ? "No renders"
+        : `${formatCount(day.errors)} of ${plural(day.count, "render")}`,
   }));
   const failFrom = d.daily.slice(-30)[0]?.date ?? d.today;
-  const mid = d.daily.slice(-30)[Math.floor(Math.min(30, d.daily.length) / 2)]?.date ?? d.today;
+  const mid =
+    d.daily.slice(-30)[Math.floor(Math.min(30, d.daily.length) / 2)]?.date ??
+    d.today;
   const soonest = stats.nearingSunset.soonest;
   return (
     <div className="grid gap-6 lg:grid-cols-6">
       <StatCard className={STAT_CARD}>
         <StatValue
           value={formatCount(stats.renders.value)}
-          trend={stats.renders.trendPct === null ? null : <StatTrend pct={stats.renders.trendPct} />}
+          trend={
+            stats.renders.trendPct === null ? null : (
+              <StatTrend pct={stats.renders.trendPct} />
+            )
+          }
         />
-        <StatLabel tip="Live renders only. Previews aren't counted." className="mt-3">
+        <StatLabel
+          tip="Live renders only. Previews aren't counted."
+          className="mt-3"
+        >
           Renders · 30 days
         </StatLabel>
         <div className="mt-6 border-t border-hairline-strong pt-5">
           <ChannelMix
-            parts={CHANNELS.map((c) => ({ label: CHANNEL_LABELS[c], value: d.byChannel[c] }))}
+            parts={CHANNELS.map((c) => ({
+              label: CHANNEL_LABELS[c],
+              value: d.byChannel[c],
+            }))}
           />
         </div>
       </StatCard>
 
       <StatCard className={STAT_CARD}>
         <StatValue value={onActive.pct === null ? "—" : `${onActive.pct}%`} />
-        <StatLabel tip="Of the last 30 days' renders, the share on a version that is Active now." className="mt-3">
+        <StatLabel
+          tip="Of the last 30 days' renders, the share on a version that is Active now."
+          className="mt-3"
+        >
           Renders on active versions
         </StatLabel>
-        <Gauge pct={onActive.pct} label={onActive.pct === null ? "No renders" : `${onActive.pct}% on active versions`} className="mt-4 max-w-[13rem]">
+        <Gauge
+          pct={onActive.pct}
+          label={
+            onActive.pct === null
+              ? "No renders"
+              : `${onActive.pct}% on active versions`
+          }
+          className="mt-4 max-w-[13rem]"
+        >
           <span className="text-[14px] text-text-muted">{onOlder}</span>
-          <span className="text-[22px] text-text tabular-nums">{formatCount(onActive.other)}</span>
+          <span className="text-[22px] text-text tabular-nums">
+            {formatCount(onActive.other)}
+          </span>
         </Gauge>
       </StatCard>
 
@@ -73,7 +130,9 @@ function Overview({ d }: { d: UsageDashboard }) {
           ]}
         />
         <div className="mt-2 line-clamp-2 min-h-10 text-[13px] text-text-muted">
-          {soonest ? `${soonest.templateName} v${soonest.versionNumber} ${sunsetPhrase(soonest.daysAway)}` : null}
+          {soonest
+            ? `${soonest.templateName} v${soonest.versionNumber} ${sunsetPhrase(soonest.daysAway)}`
+            : null}
         </div>
       </StatCard>
 
@@ -93,7 +152,14 @@ function Overview({ d }: { d: UsageDashboard }) {
       </Panel>
 
       <Panel className="lg:col-span-3">
-        <PanelHead title="Daily renders" aside={heatmap.busiest ? `Busiest day | ${formatCount(heatmap.busiest.count)}` : undefined} />
+        <PanelHead
+          title="Daily renders"
+          aside={
+            heatmap.busiest
+              ? `Busiest day | ${formatCount(heatmap.busiest.count)}`
+              : undefined
+          }
+        />
         <div className="flex flex-1 items-center py-6">
           <div className="w-full">
             <Heatmap heat={heatmap} />
@@ -119,7 +185,8 @@ function Overview({ d }: { d: UsageDashboard }) {
               label: formatShortDate(w.weekStart),
               title: `Week of ${formatShortDate(w.weekStart)}`,
               parts: CHANNELS.map((c) => w.channels[c]),
-              partial: i === d.weekly.length - 1 && d.today < addDays(w.weekStart, 6),
+              partial:
+                i === d.weekly.length - 1 && d.today < addDays(w.weekStart, 6),
             }))}
           />
         </div>
@@ -127,7 +194,12 @@ function Overview({ d }: { d: UsageDashboard }) {
       </Panel>
 
       <Panel className="lg:col-span-2">
-        <PanelHead title="Failures" aside={d.success.pct === null ? undefined : `${d.success.pct}% succeeded`} />
+        <PanelHead
+          title="Failures"
+          aside={
+            d.success.pct === null ? undefined : `${d.success.pct}% succeeded`
+          }
+        />
         <div className="mt-5">
           <RateLine
             label="Failed renders per day, last 30 days"
@@ -138,7 +210,12 @@ function Overview({ d }: { d: UsageDashboard }) {
             endLabel={formatShortDate(d.today)}
           />
         </div>
-        <p className={cn(LEGEND_ROW, "m-0 flex items-center text-[13px] text-text-muted")}>
+        <p
+          className={cn(
+            LEGEND_ROW,
+            "m-0 flex items-center text-[13px] text-text-muted",
+          )}
+        >
           {d.success.pct === null
             ? "No renders in the last 30 days"
             : `${formatCount(d.success.errors)} failed of ${plural(d.success.ok + d.success.errors, "render")}`}
@@ -156,7 +233,12 @@ function Consumers({ d, nowIso }: { d: UsageDashboard; nowIso: string }) {
         <HBars
           className="mt-7"
           labelSide="right"
-          rows={d.byConsumer.map((c) => ({ key: c.consumer.id, label: c.consumer.name, value: c.renders, share: c.share }))}
+          rows={d.byConsumer.map((c) => ({
+            key: c.consumer.id,
+            label: c.consumer.name,
+            value: c.renders,
+            share: c.share,
+          }))}
         />
       </Panel>
       <ConsumersCard rows={d.rows} nowIso={nowIso} />
@@ -175,5 +257,11 @@ export async function UsageDashboardContent({
   const { tab } = await searchParams;
   const d = await getUsageDashboard(team);
   const nowDate = await now();
-  return <UsageTabs initial={tab === "consumers" ? "consumers" : "overview"} overview={<Overview d={d} />} consumers={<Consumers d={d} nowIso={nowDate.toISOString()} />} />;
+  return (
+    <UsageTabs
+      initial={tab === "consumers" ? "consumers" : "overview"}
+      overview={<Overview d={d} />}
+      consumers={<Consumers d={d} nowIso={nowDate.toISOString()} />}
+    />
+  );
 }

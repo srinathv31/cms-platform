@@ -3,7 +3,12 @@ import type { z } from "zod";
 import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS, type Refusal } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
-import type { Action, PermissionResource, PermissionResult, Viewer } from "@/domain/types";
+import type {
+  Action,
+  PermissionResource,
+  PermissionResult,
+  Viewer,
+} from "@/domain/types";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { inTransaction, type Tx } from "@/server/effects";
@@ -53,7 +58,11 @@ export function permit(result: PermissionResult): void {
 }
 
 /** `can()` for the action on the resource: refused, it stops the action with its reason. */
-export function check(viewer: Viewer, action: Action, resource: PermissionResource): void {
+export function check(
+  viewer: Viewer,
+  action: Action,
+  resource: PermissionResource,
+): void {
   permit(can(viewer, action, resource));
 }
 
@@ -79,20 +88,28 @@ export interface ActionSteps<I, F, T extends object> {
   /** The one transaction: re-read, ask the domain, compare-and-set, effects. Read and write through `tx`. */
   transaction: (tx: Tx, ctx: CommitContext<I, F>) => Promise<ActionResult<T>>;
   /** After the transaction committed with `ok`: revalidate, refresh, and redirect last. */
-  after?: (result: { ok: true } & T, ctx: CommitContext<I, F>) => void | Promise<void>;
+  after?: (
+    result: { ok: true } & T,
+    ctx: CommitContext<I, F>,
+  ) => void | Promise<void>;
 }
 
 /** Runs a server action's steps (see the top of this file) and answers with its `ActionResult`. */
-export async function serverAction<I, F, T extends object = Record<never, never>>(
-  raw: unknown,
-  steps: ActionSteps<I, F, T>,
-): Promise<ActionResult<T>> {
+export async function serverAction<
+  I,
+  F,
+  T extends object = Record<never, never>,
+>(raw: unknown, steps: ActionSteps<I, F, T>): Promise<ActionResult<T>> {
   try {
     const viewer = await getViewer();
     const parsed = steps.input.safeParse(raw);
     if (!parsed.success) {
       const { invalid } = steps;
-      refuse(typeof invalid === "function" ? invalid(parsed.error) : (invalid ?? REQUEST_REFUSALS.invalidInput()));
+      refuse(
+        typeof invalid === "function"
+          ? invalid(parsed.error)
+          : (invalid ?? REQUEST_REFUSALS.invalidInput()),
+      );
     }
     const input = parsed.data;
     const found = await steps.authorize({ viewer, input });
@@ -106,7 +123,12 @@ export async function serverAction<I, F, T extends object = Record<never, never>
     await steps.after?.(result, ctx);
     return result;
   } catch (error) {
-    if (error instanceof RefusalError) return { ok: false, code: error.refusal.code, reason: error.refusal.reason };
+    if (error instanceof RefusalError)
+      return {
+        ok: false,
+        code: error.refusal.code,
+        reason: error.refusal.reason,
+      };
     throw error;
   }
 }

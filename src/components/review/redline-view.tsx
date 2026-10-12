@@ -1,11 +1,27 @@
 "use client";
 
-import { useImperativeHandle, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
+import {
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type RefObject,
+} from "react";
 import { GutterMarkers } from "@/components/comments/gutter-markers";
-import { RedlineDocument, collapsedHosts, createRedlineHandle, groupBlocks, isCollapsedKey } from "@/components/redline";
+import {
+  RedlineDocument,
+  collapsedHosts,
+  createRedlineHandle,
+  groupBlocks,
+  isCollapsedKey,
+} from "@/components/redline";
 import type { RedlineDoc } from "@/domain/review-types";
 import type { Variable } from "@/editor/model/types";
-import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
+import type {
+  CommentRequest,
+  DocumentEditorHandle,
+  ThreadAnchor,
+} from "@/editor/types";
 import type { ThreadView } from "@/server/queries/threads";
 
 /**
@@ -53,7 +69,10 @@ export function RedlineView({
   onRequestBlockComment?: (blockId: string) => void;
 }) {
   const wrapper = useRef<HTMLDivElement>(null);
-  const markerThreads = useMemo(() => threadsForMarkers(doc, changesOnly, activeBlockId, threads), [doc, changesOnly, activeBlockId, threads]);
+  const markerThreads = useMemo(
+    () => threadsForMarkers(doc, changesOnly, activeBlockId, threads),
+    [doc, changesOnly, activeBlockId, threads],
+  );
   // The marker keys that stand for blocks the redline has collapsed (their label says so).
   const collapsedKeys = useMemo(
     () => new Set(markerThreads.map((t) => t.blockId).filter(isCollapsedKey)),
@@ -68,16 +87,27 @@ export function RedlineView({
     editorRef,
     () =>
       createRedlineHandle({
-        root: () => wrapper.current?.querySelector<HTMLElement>("[data-redline-document]") ?? null,
-        blockOfThread: (id) => latest.current.anchors.find((a) => a.id === id)?.blockId ?? null,
-        onRequestComment: (request) => latest.current.onRequestComment?.(request),
+        root: () =>
+          wrapper.current?.querySelector<HTMLElement>(
+            "[data-redline-document]",
+          ) ?? null,
+        blockOfThread: (id) =>
+          latest.current.anchors.find((a) => a.id === id)?.blockId ?? null,
+        onRequestComment: (request) =>
+          latest.current.onRequestComment?.(request),
       }),
     [],
   );
 
   return (
     <div ref={wrapper} className="relative">
-      <RedlineDocument doc={doc} variables={variables} changesOnly={changesOnly} activeBlockId={activeBlockId} align="start" />
+      <RedlineDocument
+        doc={doc}
+        variables={variables}
+        changesOnly={changesOnly}
+        activeBlockId={activeBlockId}
+        align="start"
+      />
       <GutterMarkers
         editor={editorRef}
         threads={markerThreads}
@@ -102,10 +132,14 @@ export function threadsForMarkers(
   threads: ThreadView[],
 ): ThreadView[] {
   if (!changesOnly) return threads;
-  const hosts = collapsedHosts(groupBlocks(doc, true, undefined, activeBlockId));
+  const hosts = collapsedHosts(
+    groupBlocks(doc, true, undefined, activeBlockId),
+  );
   if (hosts.size === 0) return threads;
   return threads.map((thread) => {
     const host = hosts.get(thread.blockId);
-    return host && host !== thread.blockId ? { ...thread, blockId: host } : thread;
+    return host && host !== thread.blockId
+      ? { ...thread, blockId: host }
+      : thread;
   });
 }

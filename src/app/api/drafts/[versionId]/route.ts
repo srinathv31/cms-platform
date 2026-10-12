@@ -2,7 +2,10 @@ import type { NextRequest } from "next/server";
 import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
 import type { DraftSaveResponse } from "@/domain/types";
 import { statusOf } from "@/server/drafts/http";
-import { MAX_BODY_SIZE, parseDraftPatchText } from "@/server/drafts/parse-patch";
+import {
+  MAX_BODY_SIZE,
+  parseDraftPatchText,
+} from "@/server/drafts/parse-patch";
 import { draftAccessRefusal, saveDraft } from "@/server/drafts/save-draft";
 import { readBodyCapped } from "@/server/api/read-body";
 import { getViewer } from "@/server/viewer";
@@ -18,10 +21,16 @@ import { getViewer } from "@/server/viewer";
 // Content-Length is only a hint, and a chunked body has none.
 
 function respond(body: DraftSaveResponse): Response {
-  return Response.json(body, { status: statusOf(body), headers: { "Cache-Control": "no-store" } });
+  return Response.json(body, {
+    status: statusOf(body),
+    headers: { "Cache-Control": "no-store" },
+  });
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ versionId: string }> },
+) {
   const { versionId } = await params;
   const viewer = await getViewer();
 
@@ -31,12 +40,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   // Too large: refused from the declared length when there is one, else as soon as the count passes it.
   const tooLarge = refuse(REQUEST_REFUSALS.draftTooLarge);
-  if (Number(request.headers.get("content-length")) > MAX_BODY_SIZE) return respond(tooLarge);
+  if (Number(request.headers.get("content-length")) > MAX_BODY_SIZE)
+    return respond(tooLarge);
   const body = await readBodyCapped(request.body, MAX_BODY_SIZE);
   if (!body.ok) return respond(tooLarge);
 
   const parsed = parseDraftPatchText(new TextDecoder().decode(body.bytes));
-  if (!parsed.ok) return respond(refuse(REQUEST_REFUSALS.invalidInput(parsed.message)));
+  if (!parsed.ok)
+    return respond(refuse(REQUEST_REFUSALS.invalidInput(parsed.message)));
 
   return respond(await saveDraft(viewer, versionId, parsed.patch));
 }

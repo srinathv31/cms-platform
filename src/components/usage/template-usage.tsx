@@ -2,7 +2,14 @@ import Link from "next/link";
 import type { Route } from "next";
 import { WS } from "@/components/workspace/workspace-grid";
 import { ScrollRegion } from "@/components/primitives/scroll-region";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { addDays, formatShortDate } from "@/domain/dates";
 import { errorText } from "@/domain/golive/usage";
 import { formatCount } from "@/domain/numbers";
@@ -12,8 +19,19 @@ import type { TemplateUsageData } from "@/domain/golive-types";
 import { cn } from "@/lib/utils";
 import { now } from "@/server/clock";
 import { getTemplateUsage } from "@/server/queries/usage";
-import { StatCard, StatLabel, StatTrend, StatValue } from "@/components/primitives/stat-card";
-import { ChannelMix, Legend, SERIES, StackedBars, type StackSeries } from "./charts";
+import {
+  StatCard,
+  StatLabel,
+  StatTrend,
+  StatValue,
+} from "@/components/primitives/stat-card";
+import {
+  ChannelMix,
+  Legend,
+  SERIES,
+  StackedBars,
+  type StackSeries,
+} from "./charts";
 import { templateMixParts } from "./channel-series";
 import { ConsumersTable } from "./consumers-table";
 import { formatLastRender } from "./format";
@@ -58,8 +76,15 @@ function versionSeries(versions: number[]): StackSeries[] {
   });
 }
 
-function RecentFailures({ errors, nowDate }: { errors: TemplateUsageData["recentErrors"]; nowDate: Date }) {
-  const head = "h-10 text-[11px] font-medium tracking-[0.08em] text-label uppercase";
+function RecentFailures({
+  errors,
+  nowDate,
+}: {
+  errors: TemplateUsageData["recentErrors"];
+  nowDate: Date;
+}) {
+  const head =
+    "h-10 text-[11px] font-medium tracking-[0.08em] text-label uppercase";
   return (
     <Panel className="mt-6">
       <PanelHead title="Recent failures" size="md" />
@@ -76,14 +101,23 @@ function RecentFailures({ errors, nowDate }: { errors: TemplateUsageData["recent
           </TableHeader>
           <TableBody>
             {errors.map((e, i) => (
-              <TableRow key={`${e.at}-${i}`} className="h-12 border-hairline hover:bg-hover/50">
-                <TableCell className="font-medium text-text">{e.consumer.name}</TableCell>
-                <TableCell className="font-mono text-[13px] text-text">{e.versionNumber === null ? "—" : `v${e.versionNumber}`}</TableCell>
+              <TableRow
+                key={`${e.at}-${i}`}
+                className="h-12 border-hairline hover:bg-hover/50"
+              >
+                <TableCell className="font-medium text-text">
+                  {e.consumer.name}
+                </TableCell>
+                <TableCell className="font-mono text-[13px] text-text">
+                  {e.versionNumber === null ? "—" : `v${e.versionNumber}`}
+                </TableCell>
                 <TableCell className="text-text">
                   {CHANNEL_LABELS[e.channel]}
                   {e.platform ? ` · ${PLATFORM_LABELS[e.platform]}` : ""}
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-text-muted">{formatLastRender(e.at, nowDate)}</TableCell>
+                <TableCell className="whitespace-nowrap text-text-muted">
+                  {formatLastRender(e.at, nowDate)}
+                </TableCell>
                 <TableCell className="text-text">{errorText(e.code)}</TableCell>
               </TableRow>
             ))}
@@ -94,7 +128,11 @@ function RecentFailures({ errors, nowDate }: { errors: TemplateUsageData["recent
   );
 }
 
-export async function TemplateUsageContent({ params }: { params: Promise<{ team: string; templateId: string }> }) {
+export async function TemplateUsageContent({
+  params,
+}: {
+  params: Promise<{ team: string; templateId: string }>;
+}) {
   const { team, templateId } = await params;
   const d = await getTemplateUsage(team, templateId);
   const nowDate = await now();
@@ -120,7 +158,11 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
     <section data-slot="usage" aria-label="Usage" className={USAGE_CELL}>
       <div className={USAGE_COLUMNS}>
         <Panel>
-          <PanelHead title="Renders by version" size="md" aside="Last 13 weeks" />
+          <PanelHead
+            title="Renders by version"
+            size="md"
+            aside="Last 13 weeks"
+          />
           <Legend className="mt-2 h-5" series={series} />
           <div className="mt-4">
             <StackedBars
@@ -132,7 +174,9 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
                 label: formatShortDate(w.weekStart),
                 title: `Week of ${formatShortDate(w.weekStart)}`,
                 parts: d.weeklyVersions.map((v) => w.byVersion[v] ?? 0),
-                partial: i === d.weekly.length - 1 && d.today < addDays(w.weekStart, 6),
+                partial:
+                  i === d.weekly.length - 1 &&
+                  d.today < addDays(w.weekStart, 6),
               }))}
             />
           </div>
@@ -141,25 +185,39 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
           <StatCard>
             <StatValue
               value={formatCount(d.stats.renders.value)}
-              trend={d.stats.renders.trendPct === null ? null : <StatTrend pct={d.stats.renders.trendPct} />}
+              trend={
+                d.stats.renders.trendPct === null ? null : (
+                  <StatTrend pct={d.stats.renders.trendPct} />
+                )
+              }
             />
-            <StatLabel tip="Live renders only. Previews aren't counted." className="mt-3">
+            <StatLabel
+              tip="Live renders only. Previews aren't counted."
+              className="mt-3"
+            >
               Renders · 30 days
             </StatLabel>
           </StatCard>
           <StatCard>
-            <StatValue value={d.success.pct === null ? "—" : `${d.success.pct}%`} />
+            <StatValue
+              value={d.success.pct === null ? "—" : `${d.success.pct}%`}
+            />
             <StatLabel className="mt-3">Succeeded</StatLabel>
             <div className="mt-4 flex flex-col gap-1 border-t border-hairline pt-3 text-[13px] text-text-muted">
               {d.success.errors > 0 ? (
                 <span>
-                  {formatCount(d.success.errors)} of {plural(d.stats.renders.value, "render")} failed
+                  {formatCount(d.success.errors)} of{" "}
+                  {plural(d.stats.renders.value, "render")} failed
                 </span>
               ) : null}
               {still.length === 0 ? (
                 <span>None on older versions</span>
               ) : (
-                still.map((s) => <span key={s.versionNumber}>{s.pct}% still on v{s.versionNumber}</span>)
+                still.map((s) => (
+                  <span key={s.versionNumber}>
+                    {s.pct}% still on v{s.versionNumber}
+                  </span>
+                ))
               )}
             </div>
           </StatCard>
@@ -168,15 +226,26 @@ export async function TemplateUsageContent({ params }: { params: Promise<{ team:
 
       <Panel className={MIX_CARD}>
         <PanelHead title="Renders by channel" size="md" aside="Last 30 days" />
-        <ChannelMix className={cn("mt-4", MIX_BOX)} parts={templateMixParts(d)} />
+        <ChannelMix
+          className={cn("mt-4", MIX_BOX)}
+          parts={templateMixParts(d)}
+        />
       </Panel>
 
       <Panel className="@container/usage mt-6">
         <PanelHead title="Who renders it" size="md" />
-        <ConsumersTable rows={d.rows} nowIso={nowDate.toISOString()} name="Who renders it" showTemplate={false} className="mt-3" />
+        <ConsumersTable
+          rows={d.rows}
+          nowIso={nowDate.toISOString()}
+          name="Who renders it"
+          showTemplate={false}
+          className="mt-3"
+        />
       </Panel>
 
-      {d.recentErrors.length > 0 ? <RecentFailures errors={d.recentErrors} nowDate={nowDate} /> : null}
+      {d.recentErrors.length > 0 ? (
+        <RecentFailures errors={d.recentErrors} nowDate={nowDate} />
+      ) : null}
     </section>
   );
 }

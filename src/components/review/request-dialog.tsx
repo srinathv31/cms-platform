@@ -3,7 +3,10 @@
 import { useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ActionDialog, useActionDialog } from "@/components/versions/action-dialog";
+import {
+  ActionDialog,
+  useActionDialog,
+} from "@/components/versions/action-dialog";
 import { versionLabel } from "@/domain/rounds";
 import { requestChanges } from "@/server/actions/review";
 import { reasonProblem, reasonReady } from "./decision-model";
@@ -42,14 +45,19 @@ export function RequestChangesDialog({
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
-  const { pending, error, setError, submit } = useActionDialog(() => onOpenChange(false));
+  const { pending, error, setError, submit } = useActionDialog(() =>
+    onOpenChange(false),
+  );
   const ready = reasonReady(reason);
   const problem = reasonProblem(reason);
   // Empty and tried: marked invalid, without a sentence.
   const marked = problem !== null || (tried && !ready);
   const fieldId = `request-${versionNumber}-${round}-reason`;
   // The round being sent back is in review: its label stays put while the dialog fades out.
-  const label = versionLabel({ number: versionNumber, round, state: "in_review" }, { style: "sentence" });
+  const label = versionLabel(
+    { number: versionNumber, round, state: "in_review" },
+    { style: "sentence" },
+  );
   const problemId = `${fieldId}-problem`;
 
   return (
@@ -77,7 +85,12 @@ export function RequestChangesDialog({
             return;
           }
           submit(null, async () => {
-            const result = await requestChanges({ templateId, versionNumber, round, reason: reason.trim() });
+            const result = await requestChanges({
+              templateId,
+              versionNumber,
+              round,
+              reason: reason.trim(),
+            });
             if (result.ok) onRequested();
             return result;
           });
@@ -90,7 +103,10 @@ export function RequestChangesDialog({
             Reason
           </Label>
           {problem ? (
-            <p id={problemId} className="text-[13px] leading-5 text-danger-text">
+            <p
+              id={problemId}
+              className="text-[13px] leading-5 text-danger-text"
+            >
               {problem}
             </p>
           ) : null}

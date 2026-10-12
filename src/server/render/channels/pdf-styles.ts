@@ -82,7 +82,8 @@ export const TABLE = {
 } as const;
 
 /** The shared callout shape (look.ts) in points of the callout's 10 pt text. */
-const calloutPt = (em: number) => Math.round(em * TYPE.callout.size * 100) / 100;
+const calloutPt = (em: number) =>
+  Math.round(em * TYPE.callout.size * 100) / 100;
 
 export const CALLOUT = {
   padTop: calloutPt(CALLOUT_SHAPE.padY), // 9

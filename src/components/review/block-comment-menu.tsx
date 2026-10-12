@@ -9,8 +9,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Channel, ChannelFamily, JSONContent, Variable } from "@/domain/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type {
+  Channel,
+  ChannelFamily,
+  JSONContent,
+  Variable,
+} from "@/domain/types";
 import { cn } from "@/lib/utils";
 import { commentOptions } from "./block-options";
 
@@ -37,8 +46,12 @@ export function BlockCommentMenu({
   onPick: (blockId: string) => void;
   triggerRef: Ref<HTMLButtonElement>;
 }) {
-  const options = useMemo(() => commentOptions(family, body, channels, variables), [family, body, channels, variables]);
-  const label = family === "message" ? "Comment on a field" : "Comment on a block";
+  const options = useMemo(
+    () => commentOptions(family, body, channels, variables),
+    [family, body, channels, variables],
+  );
+  const label =
+    family === "message" ? "Comment on a field" : "Comment on a block";
   if (options.length === 0) return null;
   return (
     <DropdownMenu>

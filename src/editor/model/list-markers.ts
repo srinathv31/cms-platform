@@ -14,7 +14,13 @@
 // ── Vocabulary ───────────────────────────────────────────────────────────────
 
 /** How an ordered list writes its numbers. Stored on the orderedList node as `markerFormat`. */
-export const MARKER_FORMATS = ["decimal", "lower-alpha", "upper-alpha", "lower-roman", "upper-roman"] as const;
+export const MARKER_FORMATS = [
+  "decimal",
+  "lower-alpha",
+  "upper-alpha",
+  "lower-roman",
+  "upper-roman",
+] as const;
 export type MarkerFormat = (typeof MARKER_FORMATS)[number];
 
 /** What wraps the number: "1." / "1)" / "(1)". Stored on the orderedList node as `markerDelimiter`. */
@@ -36,7 +42,10 @@ export const BULLET_GLYPHS: Readonly<Record<BulletStyle, string>> = {
  * The orderedList attributes that store a list's style (absent or null = the default for its depth
  * and "period"). The schema (schema.ts), the editor's markers and the block menu all use these names.
  */
-export const ORDERED_LIST_ATTRS = { format: "markerFormat", delimiter: "markerDelimiter" } as const;
+export const ORDERED_LIST_ATTRS = {
+  format: "markerFormat",
+  delimiter: "markerDelimiter",
+} as const;
 
 /** A resolved ordered-list style. */
 export interface NumberingStyle {
@@ -78,21 +87,36 @@ export const ROMAN_MAX = 3999;
 // ── Guards (for attribute values read from JSON) ─────────────────────────────
 
 export function isMarkerFormat(value: unknown): value is MarkerFormat {
-  return typeof value === "string" && (MARKER_FORMATS as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (MARKER_FORMATS as readonly string[]).includes(value)
+  );
 }
 
 export function isMarkerDelimiter(value: unknown): value is MarkerDelimiter {
-  return typeof value === "string" && (MARKER_DELIMITERS as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (MARKER_DELIMITERS as readonly string[]).includes(value)
+  );
 }
 
 /** A valid `start`: an integer from 0 to 9999. Strings, fractions and out-of-range numbers are not. */
 export function isListStart(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= LIST_START_MIN && value <= LIST_START_MAX;
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= LIST_START_MIN &&
+    value <= LIST_START_MAX
+  );
 }
 
 // ── Defaults by depth ────────────────────────────────────────────────────────
 
-const DEPTH_FORMATS: readonly MarkerFormat[] = ["decimal", "lower-alpha", "lower-roman"];
+const DEPTH_FORMATS: readonly MarkerFormat[] = [
+  "decimal",
+  "lower-alpha",
+  "lower-roman",
+];
 
 /**
  * The format of an ordered list nobody styled. `orderedDepth` is the number of orderedList nodes
@@ -114,7 +138,10 @@ export function resolveNumbering(
   delimiter: MarkerDelimiter | null,
   orderedDepth: number,
 ): NumberingStyle {
-  return { format: format ?? defaultMarkerFormat(orderedDepth), delimiter: delimiter ?? DEFAULT_DELIMITER };
+  return {
+    format: format ?? defaultMarkerFormat(orderedDepth),
+    delimiter: delimiter ?? DEFAULT_DELIMITER,
+  };
 }
 
 const BULLET_CYCLE: readonly BulletStyle[] = ["disc", "circle", "square"];
@@ -149,7 +176,9 @@ export function bulletGlyph(bulletDepth: number): string {
  */
 export function formatNumber(n: number, format: MarkerFormat): string {
   if (!Number.isSafeInteger(n) || n < 0) {
-    throw new RangeError(`A list number must be a non-negative integer, got ${String(n)}.`);
+    throw new RangeError(
+      `A list number must be a non-negative integer, got ${String(n)}.`,
+    );
   }
   switch (format) {
     case "decimal":
@@ -172,7 +201,11 @@ export function formatNumber(n: number, format: MarkerFormat): string {
  *   parens       "(4)"  "(d)"  "(iv)"
  * No space is included: each channel puts its own gap between the marker and the text.
  */
-export function formatMarker(n: number, format: MarkerFormat, delimiter: MarkerDelimiter): string {
+export function formatMarker(
+  n: number,
+  format: MarkerFormat,
+  delimiter: MarkerDelimiter,
+): string {
   const number = formatNumber(n, format);
   switch (delimiter) {
     case "period":
@@ -185,15 +218,23 @@ export function formatMarker(n: number, format: MarkerFormat, delimiter: MarkerD
 }
 
 /** The markers of an ordered list's items, in order: start, start + 1, … (count items). */
-export function orderedMarkers(start: number, count: number, style: NumberingStyle): string[] {
-  return Array.from({ length: count }, (_, i) => formatMarker(start + i, style.format, style.delimiter));
+export function orderedMarkers(
+  start: number,
+  count: number,
+  style: NumberingStyle,
+): string[] {
+  return Array.from({ length: count }, (_, i) =>
+    formatMarker(start + i, style.format, style.delimiter),
+  );
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function checkDepth(depth: number): number {
   if (!Number.isSafeInteger(depth) || depth < 0) {
-    throw new RangeError(`A list depth must be a non-negative integer, got ${String(depth)}.`);
+    throw new RangeError(
+      `A list depth must be a non-negative integer, got ${String(depth)}.`,
+    );
   }
   return depth;
 }

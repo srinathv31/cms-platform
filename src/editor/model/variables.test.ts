@@ -23,7 +23,16 @@
 
 import { describe, expect, it } from "vitest";
 import { VARIABLE_TYPES, type VariableType } from "./types";
-import { MAX_VALUE_LENGTH, TYPE_META, US_STATES, formatValue, isValidKey, labelFromKey, toKey, validateValue } from "./variables";
+import {
+  MAX_VALUE_LENGTH,
+  TYPE_META,
+  US_STATES,
+  formatValue,
+  isValidKey,
+  labelFromKey,
+  toKey,
+  validateValue,
+} from "./variables";
 
 describe("toKey", () => {
   it.each([
@@ -41,7 +50,12 @@ describe("toKey", () => {
   });
 
   it("produces valid keys", () => {
-    for (const label of ["Offer end date", "Purchase APR (%)", "2nd payment", "A".repeat(100)]) {
+    for (const label of [
+      "Offer end date",
+      "Purchase APR (%)",
+      "2nd payment",
+      "A".repeat(100),
+    ]) {
       expect(isValidKey(toKey(label))).toBe(true);
     }
   });
@@ -67,7 +81,16 @@ describe("isValidKey", () => {
     expect(isValidKey("apr2")).toBe(true);
   });
   it("rejects everything else", () => {
-    for (const key of ["", "First_name", "first name", "_first", "first__name", "1st", "first-name", "first_"]) {
+    for (const key of [
+      "",
+      "First_name",
+      "first name",
+      "_first",
+      "first__name",
+      "1st",
+      "first-name",
+      "first_",
+    ]) {
       expect(isValidKey(key)).toBe(false);
     }
   });
@@ -93,8 +116,18 @@ const ACCEPTED: readonly (readonly [VariableType, string, string, string])[] = [
   ["currency", "1,000", "1000", "$1,000"],
   ["currency", "$1,000.50", "1000.50", "$1,000.50"],
   ["currency", "-$5", "-5", "-$5"],
-  ["currency", "12345678901234567.89", "12345678901234567.89", "$12,345,678,901,234,567.89"],
-  ["currency", "1000000000000000000000", "1000000000000000000000", "$1,000,000,000,000,000,000,000"],
+  [
+    "currency",
+    "12345678901234567.89",
+    "12345678901234567.89",
+    "$12,345,678,901,234,567.89",
+  ],
+  [
+    "currency",
+    "1000000000000000000000",
+    "1000000000000000000000",
+    "$1,000,000,000,000,000,000,000",
+  ],
   ["currency", "0.0000001", "0.0000001", "$0.0000001"],
   ["currency", " 42 ", "42", "$42"],
   ["currency", "\u00a042\t", "42", "$42"],
@@ -127,8 +160,18 @@ const ACCEPTED: readonly (readonly [VariableType, string, string, string])[] = [
   ["percent", "-0.001", "-0.001", "-0.001%"],
   ["percent", "1000000", "1000000", "1,000,000%"],
   ["percent", "1,000", "1000", "1,000%"],
-  ["percent", "12345678901234567.89", "12345678901234567.89", "12,345,678,901,234,567.89%"],
-  ["percent", "1000000000000000000000", "1000000000000000000000", "1,000,000,000,000,000,000,000%"],
+  [
+    "percent",
+    "12345678901234567.89",
+    "12345678901234567.89",
+    "12,345,678,901,234,567.89%",
+  ],
+  [
+    "percent",
+    "1000000000000000000000",
+    "1000000000000000000000",
+    "1,000,000,000,000,000,000,000%",
+  ],
   ["percent", "0.0000001", "0.0000001", "0.0000001%"],
   ["percent", "21.99%", "21.99", "21.99%"],
   ["percent", "21.99 %", "21.99", "21.99%"],
@@ -159,8 +202,18 @@ const ACCEPTED: readonly (readonly [VariableType, string, string, string])[] = [
   ["number", "-0.001", "-0.001", "-0.001"],
   ["number", "1000000", "1000000", "1,000,000"],
   ["number", "1,000", "1000", "1,000"],
-  ["number", "12345678901234567.89", "12345678901234567.89", "12,345,678,901,234,567.89"],
-  ["number", "1000000000000000000000", "1000000000000000000000", "1,000,000,000,000,000,000,000"],
+  [
+    "number",
+    "12345678901234567.89",
+    "12345678901234567.89",
+    "12,345,678,901,234,567.89",
+  ],
+  [
+    "number",
+    "1000000000000000000000",
+    "1000000000000000000000",
+    "1,000,000,000,000,000,000,000",
+  ],
   ["number", "0.0000001", "0.0000001", "0.0000001"],
   ["number", " 42 ", "42", "42"],
   ["number", "39.995", "39.995", "39.995"],
@@ -173,8 +226,18 @@ const ACCEPTED: readonly (readonly [VariableType, string, string, string])[] = [
   ["number", "20000", "20000", "20,000"],
   ["number", "1,234,567.891", "1234567.891", "1,234,567.891"],
   ["number", "-1,234.5", "-1234.5", "-1,234.5"],
-  ["number", "1234567890123456789012345678901234567890", "1234567890123456789012345678901234567890", "1,234,567,890,123,456,789,012,345,678,901,234,567,890"],
-  ["number", "0.000000000000000000001", "0.000000000000000000001", "0.000000000000000000001"],
+  [
+    "number",
+    "1234567890123456789012345678901234567890",
+    "1234567890123456789012345678901234567890",
+    "1,234,567,890,123,456,789,012,345,678,901,234,567,890",
+  ],
+  [
+    "number",
+    "0.000000000000000000001",
+    "0.000000000000000000001",
+    "0.000000000000000000001",
+  ],
   // date
   ["date", "2027-03-04", "2027-03-04", "March 4, 2027"],
   ["date", "2027-3-4", "2027-03-04", "March 4, 2027"],
@@ -217,7 +280,12 @@ const ACCEPTED: readonly (readonly [VariableType, string, string, string])[] = [
   ["text", "Maya\r\nChen", "Maya\r\nChen", "Maya Chen"],
   ["text", "a \n\n b", "a \n\n b", "a b"],
   ["text", "Line\rbreak", "Line\rbreak", "Line break"],
-  ["text", "\u00a0Maya\u00a0\n\u00a0Chen", "\u00a0Maya\u00a0\n\u00a0Chen", "Maya Chen"],
+  [
+    "text",
+    "\u00a0Maya\u00a0\n\u00a0Chen",
+    "\u00a0Maya\u00a0\n\u00a0Chen",
+    "Maya Chen",
+  ],
 ];
 
 /** [type, input, the editor's message]. A refused value is displayed exactly as given. */
@@ -225,8 +293,16 @@ const REFUSED: readonly (readonly [VariableType, string, string])[] = [
   // currency
   ["currency", "-0", "Zero can't be negative"],
   ["currency", "1e3", "Write the number out in full, like 1000"],
-  ["currency", "1,00", "Put commas only between groups of three digits, like 1,000,000"],
-  ["currency", "1,0,0", "Put commas only between groups of three digits, like 1,000,000"],
+  [
+    "currency",
+    "1,00",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
+  [
+    "currency",
+    "1,0,0",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
   ["currency", "$-5", "Put the minus sign before the $, like -$5"],
   ["currency", "+5", "Leave out the + sign"],
   ["currency", "007", "Leave out the leading zeros"],
@@ -239,8 +315,16 @@ const REFUSED: readonly (readonly [VariableType, string, string])[] = [
   ["currency", "１２", "Enter an amount, like 1000 or 1000.50"],
   ["currency", "-$0", "Zero can't be negative"],
   ["currency", "-0.00", "Zero can't be negative"],
-  ["currency", "1000,000", "Put commas only between groups of three digits, like 1,000,000"],
-  ["currency", "1,000,00", "Put commas only between groups of three digits, like 1,000,000"],
+  [
+    "currency",
+    "1000,000",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
+  [
+    "currency",
+    "1,000,00",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
   ["currency", "00", "Leave out the leading zeros"],
   ["currency", "0,100", "Leave out the leading zeros"],
   ["currency", "-.5", "Add a 0 before the decimal point, like 0.5"],
@@ -254,8 +338,16 @@ const REFUSED: readonly (readonly [VariableType, string, string])[] = [
   // percent
   ["percent", "-0", "Zero can't be negative"],
   ["percent", "1e3", "Write the number out in full, like 1000"],
-  ["percent", "1,00", "Put commas only between groups of three digits, like 1,000,000"],
-  ["percent", "1,0,0", "Put commas only between groups of three digits, like 1,000,000"],
+  [
+    "percent",
+    "1,00",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
+  [
+    "percent",
+    "1,0,0",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
   ["percent", "$1,000.50", "Enter a percentage, like 21.99"],
   ["percent", "-$5", "Enter a percentage, like 21.99"],
   ["percent", "$-5", "Enter a percentage, like 21.99"],
@@ -272,8 +364,16 @@ const REFUSED: readonly (readonly [VariableType, string, string])[] = [
   // number
   ["number", "-0", "Zero can't be negative"],
   ["number", "1e3", "Write the number out in full, like 1000"],
-  ["number", "1,00", "Put commas only between groups of three digits, like 1,000,000"],
-  ["number", "1,0,0", "Put commas only between groups of three digits, like 1,000,000"],
+  [
+    "number",
+    "1,00",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
+  [
+    "number",
+    "1,0,0",
+    "Put commas only between groups of three digits, like 1,000,000",
+  ],
   ["number", "$1,000.50", "Enter a number, like 20000"],
   ["number", "-$5", "Enter a number, like 20000"],
   ["number", "$-5", "Enter a number, like 20000"],
@@ -311,7 +411,10 @@ describe("values: accepted (input → canonical → display)", () => {
     expect(validateValue(type, input)).toEqual({ ok: true, value: canonical });
     expect(formatValue(type, input)).toBe(display);
     // The canonical form is a fixed point and displays the same.
-    expect(validateValue(type, canonical)).toEqual({ ok: true, value: canonical });
+    expect(validateValue(type, canonical)).toEqual({
+      ok: true,
+      value: canonical,
+    });
     expect(formatValue(type, canonical)).toBe(display);
   });
 });
@@ -324,7 +427,11 @@ describe("values: refused", () => {
 
   it("blank is no value, for every type", () => {
     for (const type of VARIABLE_TYPES) {
-      for (const blank of ["", "  ", "\n"]) expect(validateValue(type, blank)).toEqual({ ok: false, message: "Enter a value" });
+      for (const blank of ["", "  ", "\n"])
+        expect(validateValue(type, blank)).toEqual({
+          ok: false,
+          message: "Enter a value",
+        });
     }
   });
 });
@@ -337,17 +444,25 @@ describe("values: the length limit", () => {
     const text = "a".repeat(MAX_VALUE_LENGTH);
     expect(validateValue("text", text)).toEqual({ ok: true, value: text });
     const digits = `1${"0".repeat(MAX_VALUE_LENGTH - 1)}`;
-    expect(validateValue("number", digits)).toEqual({ ok: true, value: digits });
+    expect(validateValue("number", digits)).toEqual({
+      ok: true,
+      value: digits,
+    });
   });
 
   it("refuses one character more, for every type, with one message", () => {
-    for (const type of VARIABLE_TYPES) expect(validateValue(type, "9".repeat(MAX_VALUE_LENGTH + 1))).toEqual(TOO_LONG);
+    for (const type of VARIABLE_TYPES)
+      expect(validateValue(type, "9".repeat(MAX_VALUE_LENGTH + 1))).toEqual(
+        TOO_LONG,
+      );
   });
 
   it("counts the value as given: whitespace around it counts", () => {
     const padded = ` NJ${" ".repeat(MAX_VALUE_LENGTH)}`;
     expect(validateValue("us_state", padded)).toEqual(TOO_LONG);
-    expect(validateValue("us_state", ` NJ${" ".repeat(MAX_VALUE_LENGTH - 3)}`)).toEqual({ ok: true, value: "NJ" });
+    expect(
+      validateValue("us_state", ` NJ${" ".repeat(MAX_VALUE_LENGTH - 3)}`),
+    ).toEqual({ ok: true, value: "NJ" });
   });
 
   it("counts code points, not UTF-16 units: 1000 emoji fit, 1001 don't", () => {
@@ -357,7 +472,10 @@ describe("values: the length limit", () => {
   });
 
   it("leaves blank as no value, however long", () => {
-    expect(validateValue("text", " ".repeat(MAX_VALUE_LENGTH * 2))).toEqual({ ok: false, message: "Enter a value" });
+    expect(validateValue("text", " ".repeat(MAX_VALUE_LENGTH * 2))).toEqual({
+      ok: false,
+      message: "Enter a value",
+    });
   });
 
   it("leaves a refused value as it was for formatValue", () => {
@@ -367,7 +485,7 @@ describe("values: the length limit", () => {
 });
 
 describe("values: a JS number from an internal caller is read as its JSON text", () => {
-  it("95 is \"95\"; an exponent form is refused, never rewritten", () => {
+  it('95 is "95"; an exponent form is refused, never rewritten', () => {
     expect(validateValue("currency", 95)).toEqual({ ok: true, value: "95" });
     expect(formatValue("currency", 95)).toBe("$95");
     expect(formatValue("percent", 21.9)).toBe("21.9%");
@@ -394,8 +512,16 @@ describe("TYPE_META and US_STATES", () => {
     expect(Object.keys(US_STATES)).toHaveLength(51);
     expect(US_STATES.NJ).toBe("New Jersey");
     for (const [code, name] of Object.entries(US_STATES)) {
-      for (const input of [code, code.toLowerCase(), name, name.toUpperCase()]) {
-        expect(validateValue("us_state", input)).toEqual({ ok: true, value: code });
+      for (const input of [
+        code,
+        code.toLowerCase(),
+        name,
+        name.toUpperCase(),
+      ]) {
+        expect(validateValue("us_state", input)).toEqual({
+          ok: true,
+          value: code,
+        });
       }
       expect(formatValue("us_state", code)).toBe(name);
     }

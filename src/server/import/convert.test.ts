@@ -2,7 +2,13 @@
 import { readFileSync } from "node:fs";
 import JSZip from "jszip";
 import React from "react";
-import { Document, Page, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  renderToBuffer,
+} from "@react-pdf/renderer";
 import { describe, expect, it } from "vitest";
 import { describeImport, finishImport } from "@/domain/import";
 import type { ConvertedFile } from "@/domain/import-types";
@@ -22,18 +28,28 @@ const SECTIONS: RequiredSection[] = [
 ];
 
 const IMPORT_LIMITS_BYTES = 10 * 1024 * 1024;
-const fixture = (name: string) => new Uint8Array(readFileSync(`e2e/fixtures/import/${name}`));
+const fixture = (name: string) =>
+  new Uint8Array(readFileSync(`e2e/fixtures/import/${name}`));
 const text = (s: string) => new TextEncoder().encode(s);
 
-async function converted(kind: "docx" | "pdf" | "txt", bytes: Uint8Array): Promise<ConvertedFile> {
+async function converted(
+  kind: "docx" | "pdf" | "txt",
+  bytes: Uint8Array,
+): Promise<ConvertedFile> {
   const result = await convertFile(kind, bytes);
   if (!result.ok) throw new Error(`refused: ${result.code}`);
   return result.file;
 }
 
-const types = (body: JSONContent) => (body.content ?? []).map((b) => (b.attrs?.requiredKey as string | undefined) ?? b.type);
+const types = (body: JSONContent) =>
+  (body.content ?? []).map(
+    (b) => (b.attrs?.requiredKey as string | undefined) ?? b.type,
+  );
 
-async function docxWith(bodyXml: string, extra: Record<string, string> = {}): Promise<Uint8Array> {
+async function docxWith(
+  bodyXml: string,
+  extra: Record<string, string> = {},
+): Promise<Uint8Array> {
   const zip = new JSZip();
   zip.file(
     "[Content_Types].xml",
@@ -50,26 +66,39 @@ async function docxWith(bodyXml: string, extra: Record<string, string> = {}): Pr
   for (const [name, data] of Object.entries(extra)) zip.file(name, data);
   return new Uint8Array(await zip.generateAsync({ type: "uint8array" }));
 }
-const wp = (s: string) => `<w:p><w:r><w:t xml:space="preserve">${s}</w:t></w:r></w:p>`;
+const wp = (s: string) =>
+  `<w:p><w:r><w:t xml:space="preserve">${s}</w:t></w:r></w:p>`;
 
 const h = React.createElement;
-const pdfOf = (pages: React.ReactElement[]) => renderToBuffer(h(Document, null, ...pages)).then((b) => new Uint8Array(b));
+const pdfOf = (pages: React.ReactElement[]) =>
+  renderToBuffer(h(Document, null, ...pages)).then((b) => new Uint8Array(b));
 
 // ── Sniffing ─────────────────────────────────────────────────────────────────
 
 describe("sniffKind: decided from the bytes", () => {
   it("knows the three fixtures", () => {
-    expect(sniffKind(fixture("spring-offer.docx"), "anything.bin")).toBe("docx");
+    expect(sniffKind(fixture("spring-offer.docx"), "anything.bin")).toBe(
+      "docx",
+    );
     expect(sniffKind(fixture("rate-change-notice.pdf"), "x")).toBe("pdf");
-    expect(sniffKind(fixture("spring_offer_notes.txt"), "notes.TXT")).toBe("txt");
+    expect(sniffKind(fixture("spring_offer_notes.txt"), "notes.TXT")).toBe(
+      "txt",
+    );
   });
 
   it("refuses a legacy .doc, a zip that isn't a Word document, binary text and a text file not named .txt", async () => {
-    const doc = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]);
+    const doc = new Uint8Array([
+      0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0,
+    ]);
     expect(sniffKind(doc, "old.doc")).toBeNull();
     const zip = new JSZip();
     zip.file("hello.txt", "hi");
-    expect(sniffKind(new Uint8Array(await zip.generateAsync({ type: "uint8array" })), "a.docx")).toBeNull();
+    expect(
+      sniffKind(
+        new Uint8Array(await zip.generateAsync({ type: "uint8array" })),
+        "a.docx",
+      ),
+    ).toBeNull();
     expect(sniffKind(new Uint8Array([0x68, 0x00, 0x69]), "a.txt")).toBeNull();
     expect(sniffKind(new Uint8Array([0xff, 0xfe, 0x41]), "a.txt")).toBeNull();
     expect(sniffKind(text("plain"), "a.md")).toBeNull();
@@ -77,7 +106,9 @@ describe("sniffKind: decided from the bytes", () => {
 
   it("decodeText takes UTF-8 with a BOM; hasAscii finds zip entry names", () => {
     expect(decodeText(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]))).toBe("a");
-    expect(hasAscii(text("xxword/document.xmlyy"), "word/document.xml")).toBe(true);
+    expect(hasAscii(text("xxword/document.xmlyy"), "word/document.xml")).toBe(
+      true,
+    );
     expect(hasAscii(text("word/documen"), "word/document.xml")).toBe(false);
   });
 });
@@ -88,10 +119,20 @@ describe(".docx", () => {
   it("the fixture: title, chips across runs, sections, a header row, and what was left out", async () => {
     const bytes = fixture("spring-offer.docx");
     const file = await converted("docx", bytes);
-    const done = finishImport({ file, filename: "spring-offer.docx", size: bytes.length, requiredSections: SECTIONS });
+    const done = finishImport({
+      file,
+      filename: "spring-offer.docx",
+      size: bytes.length,
+      requiredSections: SECTIONS,
+    });
 
     expect(done.name).toBe("Spring Balance Transfer Offer");
-    expect(done.variables.map((v) => v.key)).toEqual(["first_name", "purchase_apr", "offer_end_date", "annual_fee"]);
+    expect(done.variables.map((v) => v.key)).toEqual([
+      "first_name",
+      "purchase_apr",
+      "offer_end_date",
+      "annual_fee",
+    ]);
     expect(done.report.placeholders[0]).toEqual({
       key: "first_name",
       label: "First name",
@@ -110,9 +151,16 @@ describe(".docx", () => {
       "legal_notices",
     ]);
     // "{{Purch" + "ase APR}}" in two bold runs is one bold chip.
-    expect(done.body.content?.[1]?.content?.[2]).toEqual({ type: "variable", attrs: { key: "purchase_apr" }, marks: [{ type: "bold" }] });
+    expect(done.body.content?.[1]?.content?.[2]).toEqual({
+      type: "variable",
+      attrs: { key: "purchase_apr" },
+      marks: [{ type: "bold" }],
+    });
     const table = done.body.content?.[7];
-    expect(table?.content?.[0]?.content?.map((c) => c.type)).toEqual(["tableHeader", "tableHeader"]);
+    expect(table?.content?.[0]?.content?.map((c) => c.type)).toEqual([
+      "tableHeader",
+      "tableHeader",
+    ]);
     expect(JSON.stringify(table)).toContain('"key":"annual_fee"');
 
     expect(file.dropped).toEqual([
@@ -122,26 +170,52 @@ describe(".docx", () => {
       { kind: "styles", names: ["Quote"] },
     ]);
     expect(describeImport(done.report)).toEqual({
-      detected: ["4 variables, all Text and required: First name, Purchase APR, Offer end date, Annual fee", "1 table", "Added empty section: Legal notices"],
-      dropped: ["1 image (still shown in Original)", "1 comment", "Headers and footers", "Quote formatting"],
+      detected: [
+        "4 variables, all Text and required: First name, Purchase APR, Offer end date, Annual fee",
+        "1 table",
+        "Added empty section: Legal notices",
+      ],
+      dropped: [
+        "1 image (still shown in Original)",
+        "1 comment",
+        "Headers and footers",
+        "Quote formatting",
+      ],
       kept: ["{{#if member}} … {{/if}} shows to customers as written."],
     });
   });
 
   it("the Compare HTML is allowlisted and keeps the image as a data: URI", async () => {
     const file = await converted("docx", fixture("spring-offer.docx"));
-    expect(file.compareHtml).toMatch(/^<h1>Spring Balance Transfer Offer<\/h1><p>Dear \{\{First Name\}\},<\/p>/);
-    expect(file.compareHtml).toContain("<thead><tr><th><p><strong>Fee</strong></p></th>");
+    expect(file.compareHtml).toMatch(
+      /^<h1>Spring Balance Transfer Offer<\/h1><p>Dear \{\{First Name\}\},<\/p>/,
+    );
+    expect(file.compareHtml).toContain(
+      "<thead><tr><th><p><strong>Fee</strong></p></th>",
+    );
     expect(file.compareHtml).toContain('<img src="data:image/png;base64,');
     expect(file.compareHtml).not.toMatch(/comment|footnote|id=|class=|style=/i);
   });
 
   it("refuses an empty document, a broken zip and too much text", async () => {
-    expect(await convertFile("docx", await docxWith(""))).toEqual({ ok: false, code: "empty" });
-    const broken = text("PK\u0003\u0004 word/document.xml but not really a zip");
-    expect(await convertFile("docx", broken)).toEqual({ ok: false, code: "unreadable" });
-    const long = await docxWith(wp("x".repeat(100_001)) + wp("y".repeat(100_000)));
-    expect(await convertFile("docx", long)).toEqual({ ok: false, code: "tooLong" });
+    expect(await convertFile("docx", await docxWith(""))).toEqual({
+      ok: false,
+      code: "empty",
+    });
+    const broken = text(
+      "PK\u0003\u0004 word/document.xml but not really a zip",
+    );
+    expect(await convertFile("docx", broken)).toEqual({
+      ok: false,
+      code: "unreadable",
+    });
+    const long = await docxWith(
+      wp("x".repeat(100_001)) + wp("y".repeat(100_000)),
+    );
+    expect(await convertFile("docx", long)).toEqual({
+      ok: false,
+      code: "tooLong",
+    });
   });
 
   it("footnotes are counted and left out of the draft and the Compare view", async () => {
@@ -163,39 +237,77 @@ describe("decompression bombs: the server survives, the file is refused", () => 
   it("a .docx whose parts claim too much once inflated is refused before it is opened", async () => {
     // ~64 MB of empty paragraphs deflates to well under 1 MB: a small upload, a huge inflate.
     const zip = new JSZip();
-    zip.file("word/document.xml", `<?xml version="1.0"?><w:document xmlns:w="x"><w:body>${"<w:p/>".repeat(11_000_000)}</w:body></w:document>`);
-    const bomb = new Uint8Array(await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" }));
+    zip.file(
+      "word/document.xml",
+      `<?xml version="1.0"?><w:document xmlns:w="x"><w:body>${"<w:p/>".repeat(11_000_000)}</w:body></w:document>`,
+    );
+    const bomb = new Uint8Array(
+      await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" }),
+    );
     expect(bomb.byteLength).toBeLessThan(IMPORT_LIMITS_BYTES);
     expect(checkZip(bomb)).toMatchObject({ ok: false });
-    expect(await convertFile("docx", bomb)).toEqual({ ok: false, code: "unreadable" });
+    expect(await convertFile("docx", bomb)).toEqual({
+      ok: false,
+      code: "unreadable",
+    });
   }, 30_000);
 
   it("checkZip: entry count, one entry, the total and the ratio", async () => {
     const fixtureCheck = checkZip(fixture("spring-offer.docx"));
     expect(fixtureCheck).toMatchObject({ ok: true });
     const tight = { ...ZIP_LIMITS, maxEntries: 2 };
-    expect(checkZip(fixture("spring-offer.docx"), tight)).toEqual({ ok: false, why: expect.stringMatching(/entries$/) });
-    expect(checkZip(fixture("spring-offer.docx"), { ...ZIP_LIMITS, maxEntryBytes: 100 })).toMatchObject({ ok: false });
-    expect(checkZip(fixture("spring-offer.docx"), { ...ZIP_LIMITS, maxTotalBytes: 1_000 })).toMatchObject({ ok: false });
-    expect(checkZip(fixture("spring-offer.docx"), { ...ZIP_LIMITS, ratioFloorBytes: 0, maxRatio: 1 })).toMatchObject({ ok: false });
-    expect(checkZip(text("PK\u0003\u0004 not a zip"))).toMatchObject({ ok: false });
+    expect(checkZip(fixture("spring-offer.docx"), tight)).toEqual({
+      ok: false,
+      why: expect.stringMatching(/entries$/),
+    });
+    expect(
+      checkZip(fixture("spring-offer.docx"), {
+        ...ZIP_LIMITS,
+        maxEntryBytes: 100,
+      }),
+    ).toMatchObject({ ok: false });
+    expect(
+      checkZip(fixture("spring-offer.docx"), {
+        ...ZIP_LIMITS,
+        maxTotalBytes: 1_000,
+      }),
+    ).toMatchObject({ ok: false });
+    expect(
+      checkZip(fixture("spring-offer.docx"), {
+        ...ZIP_LIMITS,
+        ratioFloorBytes: 0,
+        maxRatio: 1,
+      }),
+    ).toMatchObject({ ok: false });
+    expect(checkZip(text("PK\u0003\u0004 not a zip"))).toMatchObject({
+      ok: false,
+    });
   });
 
   // 24 MB is plenty for the real fixtures (checked first), so a refusal under it is the bomb's doing.
   const HEAP = { maxHeapMb: 24 };
 
   it("a .docx that understates its size runs out of the worker's heap: refused, and this process carries on", async () => {
-    expect((await convertFile("docx", fixture("spring-offer.docx"), HEAP)).ok).toBe(true);
+    expect(
+      (await convertFile("docx", fixture("spring-offer.docx"), HEAP)).ok,
+    ).toBe(true);
     // 150,000 runs make an XML DOM far larger than the heap; the zip's claims are honest and small.
     const bytes = await docxWith(wp("x").repeat(150_000));
     expect(checkZip(bytes)).toMatchObject({ ok: true });
-    expect(await convertFile("docx", bytes, HEAP)).toEqual({ ok: false, code: "unreadable" });
+    expect(await convertFile("docx", bytes, HEAP)).toEqual({
+      ok: false,
+      code: "unreadable",
+    });
     // The worker died, not us: the next conversion works.
-    expect((await convertFile("docx", fixture("spring-offer.docx"), HEAP)).ok).toBe(true);
+    expect(
+      (await convertFile("docx", fixture("spring-offer.docx"), HEAP)).ok,
+    ).toBe(true);
   }, 30_000);
 
   it("a .pdf that exhausts the worker's heap is refused the same way", async () => {
-    expect((await convertFile("pdf", fixture("rate-change-notice.pdf"), HEAP)).ok).toBe(true);
+    expect(
+      (await convertFile("pdf", fixture("rate-change-notice.pdf"), HEAP)).ok,
+    ).toBe(true);
     // One page, 300,000 one-character text items: a few MB of PDF, far more as pdf.js's text items.
     const ops = "BT /F1 9 Tf 10 10 Td (x) Tj ET\n".repeat(300_000);
     const pdf = text(
@@ -206,12 +318,21 @@ describe("decompression bombs: the server survives, the file is refused", () => 
         "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n",
     );
     expect(pdf.byteLength).toBeLessThan(IMPORT_LIMITS_BYTES);
-    expect(await convertFile("pdf", pdf, HEAP)).toEqual({ ok: false, code: "unreadable" });
+    expect(await convertFile("pdf", pdf, HEAP)).toEqual({
+      ok: false,
+      code: "unreadable",
+    });
   }, 60_000);
 
   it("a conversion that takes too long is stopped: .docx and .pdf", async () => {
-    expect(await convertFile("docx", fixture("spring-offer.docx"), { timeoutMs: 1 })).toEqual({ ok: false, code: "unreadable" });
-    expect(await convertFile("pdf", fixture("rate-change-notice.pdf"), { timeoutMs: 1 })).toEqual({ ok: false, code: "unreadable" });
+    expect(
+      await convertFile("docx", fixture("spring-offer.docx"), { timeoutMs: 1 }),
+    ).toEqual({ ok: false, code: "unreadable" });
+    expect(
+      await convertFile("pdf", fixture("rate-change-notice.pdf"), {
+        timeoutMs: 1,
+      }),
+    ).toEqual({ ok: false, code: "unreadable" });
   });
 });
 
@@ -242,7 +363,10 @@ describe("dom helpers", () => {
       ).body;
       return { counts: stripNotes(root), html: root.innerHTML };
     });
-    expect(out).toEqual({ counts: { comments: 1, footnotes: 1 }, html: "<p>A B</p>" });
+    expect(out).toEqual({
+      counts: { comments: 1, footnotes: 1 },
+      html: "<p>A B</p>",
+    });
   });
 });
 
@@ -252,7 +376,12 @@ describe(".pdf", () => {
   it("the fixture: title from the large first line, sections, a list, running lines dropped", async () => {
     const bytes = fixture("rate-change-notice.pdf");
     const file = await converted("pdf", bytes);
-    const done = finishImport({ file, filename: "rate-change-notice.pdf", size: bytes.length, requiredSections: SECTIONS });
+    const done = finishImport({
+      file,
+      filename: "rate-change-notice.pdf",
+      size: bytes.length,
+      requiredSections: SECTIONS,
+    });
 
     expect(file.pages).toBe(2);
     expect(done.name).toBe("Rate Change Notice");
@@ -268,16 +397,46 @@ describe(".pdf", () => {
       "paragraph",
     ]);
     expect(done.report.sections.added).toEqual([]);
-    expect(done.variables.map((v) => v.key)).toEqual(["first_name", "effective_date", "purchase_apr", "balance_transfer_apr", "cash_apr", "annual_fee"]);
-    expect(file.dropped).toEqual([{ kind: "pdf_layout" }, { kind: "repeated_lines", count: 2 }]);
-    expect(JSON.stringify(done.body)).not.toMatch(/Coral Bank · Rate change notice|Page \d of/);
+    expect(done.variables.map((v) => v.key)).toEqual([
+      "first_name",
+      "effective_date",
+      "purchase_apr",
+      "balance_transfer_apr",
+      "cash_apr",
+      "annual_fee",
+    ]);
+    expect(file.dropped).toEqual([
+      { kind: "pdf_layout" },
+      { kind: "repeated_lines", count: 2 },
+    ]);
+    expect(JSON.stringify(done.body)).not.toMatch(
+      /Coral Bank · Rate change notice|Page \d of/,
+    );
   });
 
   it("refuses a PDF with no text and one over 50 pages", async () => {
-    const blank = await pdfOf([h(Page, { key: 1 }, h(View, { style: { width: 100, height: 100, backgroundColor: "#ccc" } }))]);
-    expect(await convertFile("pdf", blank)).toEqual({ ok: false, code: "pdfNoText" });
-    const many = await pdfOf(Array.from({ length: 51 }, (_, i) => h(Page, { key: i }, h(Text, null, `Page ${i}`))));
-    expect(await convertFile("pdf", many)).toEqual({ ok: false, code: "pdfPages" });
+    const blank = await pdfOf([
+      h(
+        Page,
+        { key: 1 },
+        h(View, {
+          style: { width: 100, height: 100, backgroundColor: "#ccc" },
+        }),
+      ),
+    ]);
+    expect(await convertFile("pdf", blank)).toEqual({
+      ok: false,
+      code: "pdfNoText",
+    });
+    const many = await pdfOf(
+      Array.from({ length: 51 }, (_, i) =>
+        h(Page, { key: i }, h(Text, null, `Page ${i}`)),
+      ),
+    );
+    expect(await convertFile("pdf", many)).toEqual({
+      ok: false,
+      code: "pdfPages",
+    });
   }, 30_000);
 
   it("refuses a password-protected PDF, and one it can't parse", async () => {
@@ -288,8 +447,14 @@ describe(".pdf", () => {
         `4 0 obj << /Filter /Standard /V 1 /R 2 /O <${hex(32)}> /U <${hex(32)}> /P -4 >> endobj\n` +
         `trailer << /Root 1 0 R /Encrypt 4 0 R /ID [<${hex(16)}> <${hex(16)}>] >>\n%%EOF\n`,
     );
-    expect(await convertFile("pdf", locked)).toEqual({ ok: false, code: "pdfLocked" });
-    expect(await convertFile("pdf", text("%PDF-1.4\nnothing else"))).toEqual({ ok: false, code: "unreadable" });
+    expect(await convertFile("pdf", locked)).toEqual({
+      ok: false,
+      code: "pdfLocked",
+    });
+    expect(await convertFile("pdf", text("%PDF-1.4\nnothing else"))).toEqual({
+      ok: false,
+      code: "unreadable",
+    });
   });
 });
 
@@ -298,39 +463,80 @@ describe(".pdf", () => {
 describe(".txt", () => {
   it("the fixture: paragraphs, chips, and every section added", async () => {
     const bytes = fixture("spring_offer_notes.txt");
-    const done = finishImport({ file: await converted("txt", bytes), filename: "spring_offer_notes.txt", size: bytes.length, requiredSections: SECTIONS });
+    const done = finishImport({
+      file: await converted("txt", bytes),
+      filename: "spring_offer_notes.txt",
+      size: bytes.length,
+      requiredSections: SECTIONS,
+    });
     expect(done.name).toBe("Spring offer notes");
-    expect(types(done.body)).toEqual(["paragraph", "paragraph", "paragraph", "paragraph", "offer_details", "rates_and_fees", "legal_notices"]);
-    expect(done.variables.map((v) => v.key)).toEqual(["first_name", "purchase_apr", "effective_date"]);
+    expect(types(done.body)).toEqual([
+      "paragraph",
+      "paragraph",
+      "paragraph",
+      "paragraph",
+      "offer_details",
+      "rates_and_fees",
+      "legal_notices",
+    ]);
+    expect(done.variables.map((v) => v.key)).toEqual([
+      "first_name",
+      "purchase_apr",
+      "effective_date",
+    ]);
   });
 
   it("refuses an empty file and too much text", async () => {
-    expect(await convertFile("txt", text(" \n\n "))).toEqual({ ok: false, code: "empty" });
-    expect(await convertFile("txt", text("a".repeat(200_001)))).toEqual({ ok: false, code: "tooLong" });
+    expect(await convertFile("txt", text(" \n\n "))).toEqual({
+      ok: false,
+      code: "empty",
+    });
+    expect(await convertFile("txt", text("a".repeat(200_001)))).toEqual({
+      ok: false,
+      code: "tooLong",
+    });
   });
 });
 
 // ── Normalization (docs/render-spec.md §3): an import is saved like any other document ──────────
 
 describe("import normalization", () => {
-  const texts = (node: JSONContent): string[] => (node.type === "text" ? [node.text ?? ""] : (node.content ?? []).flatMap(texts));
-  const tc = (...blocks: string[]) => `<w:tc>${blocks.join("") || "<w:p/>"}</w:tc>`;
-  const tbl = (...rows: string[][]) => `<w:tbl>${rows.map((cells) => `<w:tr>${cells.join("")}</w:tr>`).join("")}</w:tbl>`;
-  const width = (table: JSONContent) => Math.max(...(table.content ?? []).map((row) => row.content?.length ?? 0));
+  const texts = (node: JSONContent): string[] =>
+    node.type === "text"
+      ? [node.text ?? ""]
+      : (node.content ?? []).flatMap(texts);
+  const tc = (...blocks: string[]) =>
+    `<w:tc>${blocks.join("") || "<w:p/>"}</w:tc>`;
+  const tbl = (...rows: string[][]) =>
+    `<w:tbl>${rows.map((cells) => `<w:tr>${cells.join("")}</w:tr>`).join("")}</w:tbl>`;
+  const width = (table: JSONContent) =>
+    Math.max(...(table.content ?? []).map((row) => row.content?.length ?? 0));
 
   it(".txt: a tab becomes one space", async () => {
-    const file = await converted("txt", text("Annual fee\t$95\n\nLate fee\t\tUp to $41"));
+    const file = await converted(
+      "txt",
+      text("Annual fee\t$95\n\nLate fee\t\tUp to $41"),
+    );
     expect(texts(file.body)).toEqual(["Annual fee $95", "Late fee  Up to $41"]);
   });
 
   it(".docx: a tab becomes one space", async () => {
-    const file = await converted("docx", await docxWith(`<w:p><w:r><w:t>Fee</w:t><w:tab/><w:t>$95</w:t></w:r></w:p>`));
+    const file = await converted(
+      "docx",
+      await docxWith(
+        `<w:p><w:r><w:t>Fee</w:t><w:tab/><w:t>$95</w:t></w:r></w:p>`,
+      ),
+    );
     expect(texts(file.body)).toEqual(["Fee $95"]);
   });
 
   it(".docx: a table wider than 12 columns comes in as tables of at most 12, every cell kept", async () => {
-    const row = (prefix: string) => Array.from({ length: 14 }, (_, i) => tc(wp(`${prefix}${i + 1}`)));
-    const file = await converted("docx", await docxWith(tbl(row("h"), row("c")) + wp("after")));
+    const row = (prefix: string) =>
+      Array.from({ length: 14 }, (_, i) => tc(wp(`${prefix}${i + 1}`)));
+    const file = await converted(
+      "docx",
+      await docxWith(tbl(row("h"), row("c")) + wp("after")),
+    );
     const tables = (file.body.content ?? []).filter((b) => b.type === "table");
     expect(tables.map(width)).toEqual([12, 2]);
     expect(tables.flatMap(texts)).toHaveLength(28);
@@ -341,8 +547,16 @@ describe("import normalization", () => {
   });
 
   it(".docx: a table in a table cell becomes the cell's paragraphs, in reading order", async () => {
-    const inner = tbl([tc(wp("in 1")), tc(wp("in 2"))], [tc(wp("in 3")), tc(wp("in 4"))]);
-    const file = await converted("docx", await docxWith(tbl([tc(wp("before"), inner, wp("after")), tc(wp("other"))])));
+    const inner = tbl(
+      [tc(wp("in 1")), tc(wp("in 2"))],
+      [tc(wp("in 3")), tc(wp("in 4"))],
+    );
+    const file = await converted(
+      "docx",
+      await docxWith(
+        tbl([tc(wp("before"), inner, wp("after")), tc(wp("other"))]),
+      ),
+    );
     const [table] = (file.body.content ?? []).filter((b) => b.type === "table");
     const cell = table.content?.[0].content?.[0];
     expect(cell?.content?.map((b) => [b.type, texts(b).join("")])).toEqual([

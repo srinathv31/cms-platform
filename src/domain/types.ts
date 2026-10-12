@@ -27,9 +27,16 @@ export const CHANNELS = ["pdf", "web", "email", "push", "sms"] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 /** The channels that render the template's document. */
-export const DOCUMENT_CHANNELS = ["pdf", "web", "email"] as const satisfies readonly Channel[];
+export const DOCUMENT_CHANNELS = [
+  "pdf",
+  "web",
+  "email",
+] as const satisfies readonly Channel[];
 /** The channels that render only their own short fields (channel-fields.ts). */
-export const MESSAGE_CHANNELS = ["push", "sms"] as const satisfies readonly Channel[];
+export const MESSAGE_CHANNELS = [
+  "push",
+  "sms",
+] as const satisfies readonly Channel[];
 export type DocumentChannel = (typeof DOCUMENT_CHANNELS)[number];
 export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
 
@@ -81,12 +88,16 @@ export function familyOf(channels: readonly Channel[]): ChannelFamily | null {
  * content type's, never a version's channels: a content type always allows one channel, and keeps its
  * family for life, while a version's channels are the author's to change (and a crafted save could empty them).
  */
-export function contentTypeFamily(allowedChannels: readonly Channel[]): ChannelFamily {
+export function contentTypeFamily(
+  allowedChannels: readonly Channel[],
+): ChannelFamily {
   return familyOf(allowedChannels) ?? "document";
 }
 
 /** True for PDF, Web and Email. */
-export function isDocumentChannel(channel: Channel): channel is DocumentChannel {
+export function isDocumentChannel(
+  channel: Channel,
+): channel is DocumentChannel {
   return channelFamily(channel) === "document";
 }
 
@@ -115,7 +126,12 @@ export interface RevokeRecord {
 }
 
 // ── People, teams, access ─────────────────────────────────────
-export const TEAM_ROLES = ["viewer", "author", "approver", "team_admin"] as const;
+export const TEAM_ROLES = [
+  "viewer",
+  "author",
+  "approver",
+  "team_admin",
+] as const;
 export type TeamRole = (typeof TEAM_ROLES)[number];
 
 export type PlatformRole = "platform_admin" | "auditor";
@@ -125,7 +141,8 @@ export type MembershipStatus = "active" | "suspended" | "lapsed";
  * deadline. `inactivity`: a Team Admin suspended a flagged member. `inactivity_auto`: suspended
  * automatically 120 days after the last sign-in. null while active.
  */
-export type MembershipStatusReason = "recert_unconfirmed" | "inactivity" | "inactivity_auto";
+export type MembershipStatusReason =
+  "recert_unconfirmed" | "inactivity" | "inactivity_auto";
 
 export interface ViewerMembership {
   teamId: string;
@@ -146,8 +163,7 @@ export interface Viewer {
 }
 
 export type ApproverRule =
-  | { kind: "team_role"; role: TeamRole }
-  | { kind: "user"; userId: string };
+  { kind: "team_role"; role: TeamRole } | { kind: "user"; userId: string };
 
 // ── Permissions (implemented in permissions.ts) ───────────────
 export type Action =

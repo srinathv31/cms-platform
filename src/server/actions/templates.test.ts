@@ -9,7 +9,10 @@ import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { createAppClient } from "@/lib/serialized-writes";
 import type { StarterChoice } from "@/server/starters";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { createTemplate } from "./create-template";
 import { startDraft } from "./templates";
@@ -27,8 +30,13 @@ vi.mock("@/server/db/client", async () => {
 vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
-vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ set: vi.fn() })) }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn(), RedirectType: { replace: "replace", push: "push" } }));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ set: vi.fn() })),
+}));
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn(),
+  RedirectType: { replace: "replace", push: "push" },
+}));
 
 const { contentTypes, templates, versions } = schema;
 const CT = "ct_disclosure";
@@ -51,19 +59,31 @@ async function create(starterKey: "card_offer_terms" | "rate_change_notice") {
 /** Creates a template from any starter, and returns the template row and its first draft. */
 async function createFrom(choice: StarterChoice) {
   vi.mocked(redirect).mockClear();
-  expect(await createTemplate({ teamSlug: "coral-offers", ...choice })).toEqual({ ok: true, templateId: expect.any(String) });
+  expect(await createTemplate({ teamSlug: "coral-offers", ...choice })).toEqual(
+    { ok: true, templateId: expect.any(String) },
+  );
   const to = vi.mocked(redirect).mock.calls[0]![0] as string;
   const templateId = to.split("/").pop()!;
-  const template = (await db.query.templates.findFirst({ where: eq(templates.id, templateId) }))!;
+  const template = (await db.query.templates.findFirst({
+    where: eq(templates.id, templateId),
+  }))!;
   expect(template).toBeTruthy();
-  const draft = (await db.query.versions.findFirst({ where: and(eq(versions.templateId, templateId), eq(versions.state, "draft")) }))!;
+  const draft = (await db.query.versions.findFirst({
+    where: and(
+      eq(versions.templateId, templateId),
+      eq(versions.state, "draft"),
+    ),
+  }))!;
   return { template, draft };
 }
 
 const requiredHeadings = (body: JSONContent) =>
   (body.content ?? [])
     .filter((b) => b.type === "heading" && b.attrs?.requiredKey)
-    .map((b) => [b.attrs!.requiredKey, (b.content ?? []).map((n) => n.text).join("")]);
+    .map((b) => [
+      b.attrs!.requiredKey,
+      (b.content ?? []).map((n) => n.text).join(""),
+    ]);
 
 describe("createTemplate shapes the starter to the content type", () => {
   it("as seeded: the three Disclosure sections, in the starter's order", async () => {
@@ -93,7 +113,9 @@ describe("createTemplate shapes the starter to the content type", () => {
       ["eligibility", "Eligibility"],
     ]);
     const legal = (draft.body.content ?? []).find(
-      (b) => b.type === "heading" && (b.content ?? []).some((n) => n.text === "Legal notices"),
+      (b) =>
+        b.type === "heading" &&
+        (b.content ?? []).some((n) => n.text === "Legal notices"),
     );
     expect(legal?.attrs?.requiredKey ?? null).toBeNull();
     const added = (draft.body.content ?? []).at(-1)!;
@@ -102,7 +124,10 @@ describe("createTemplate shapes the starter to the content type", () => {
   });
 
   it("leaves out a channel the content type no longer allows", async () => {
-    await db.update(contentTypes).set({ allowedChannels: ["pdf", "web"] }).where(eq(contentTypes.id, CT));
+    await db
+      .update(contentTypes)
+      .set({ allowedChannels: ["pdf", "web"] })
+      .where(eq(contentTypes.id, CT));
     const draft = await create("rate_change_notice");
     expect(draft.channels).toEqual(["pdf", "web"]);
   });
@@ -111,42 +136,91 @@ describe("createTemplate shapes the starter to the content type", () => {
 // The author chooses Document or Alert, and the kind decides the content type for life (decision 0034).
 describe("createTemplate makes an alert when Alert is chosen", () => {
   it("on the Alert content type, with Push and SMS on and the starter's fields", async () => {
-    const { template, draft } = await createFrom({ family: "message", starterKey: "payment_reminder" });
-    expect(template).toMatchObject({ contentTypeId: "ct_alert", starterKey: "payment_reminder", createdBy: "maya" });
-    expect(draft).toMatchObject({ name: "Payment reminder", channels: ["push", "sms"], writers: ["maya"], rev: 0 });
+    const { template, draft } = await createFrom({
+      family: "message",
+      starterKey: "payment_reminder",
+    });
+    expect(template).toMatchObject({
+      contentTypeId: "ct_alert",
+      starterKey: "payment_reminder",
+      createdBy: "maya",
+    });
+    expect(draft).toMatchObject({
+      name: "Payment reminder",
+      channels: ["push", "sms"],
+      writers: ["maya"],
+      rev: 0,
+    });
     expect(Object.keys(draft.channelFields).sort()).toEqual(["push", "sms"]);
-    expect(draft.variables.map((v) => v.key)).toEqual(["first_name", "amount_due", "due_date"]);
+    expect(draft.variables.map((v) => v.key)).toEqual([
+      "first_name",
+      "amount_due",
+      "due_date",
+    ]);
     // An alert's body is one empty paragraph: nothing renders from it.
     expect(draft.body.content).toHaveLength(1);
     expect(draft.body.content?.[0]?.type).toBe("paragraph");
   });
 
   it("from Blank: untitled, no starter key, and nothing written", async () => {
-    const { template, draft } = await createFrom({ family: "message", starterKey: "blank" });
-    expect(template).toMatchObject({ contentTypeId: "ct_alert", starterKey: null });
-    expect(draft).toMatchObject({ name: "Untitled template", channels: ["push", "sms"], channelFields: {}, variables: [] });
+    const { template, draft } = await createFrom({
+      family: "message",
+      starterKey: "blank",
+    });
+    expect(template).toMatchObject({
+      contentTypeId: "ct_alert",
+      starterKey: null,
+    });
+    expect(draft).toMatchObject({
+      name: "Untitled template",
+      channels: ["push", "sms"],
+      channelFields: {},
+      variables: [],
+    });
   });
 
   it("refuses an Alert when no content type makes alerts, and writes nothing", async () => {
-    const before = (await db.select({ id: templates.id }).from(templates)).length;
+    const before = (await db.select({ id: templates.id }).from(templates))
+      .length;
     vi.mocked(redirect).mockClear();
-    await db.update(contentTypes).set({ allowedChannels: ["pdf"] }).where(eq(contentTypes.id, "ct_alert"));
+    await db
+      .update(contentTypes)
+      .set({ allowedChannels: ["pdf"] })
+      .where(eq(contentTypes.id, "ct_alert"));
     try {
-      expect(await createTemplate({ teamSlug: "coral-offers", family: "message", starterKey: "card_activity" })).toEqual({
+      expect(
+        await createTemplate({
+          teamSlug: "coral-offers",
+          family: "message",
+          starterKey: "card_activity",
+        }),
+      ).toEqual({
         ok: false,
         ...REFUSALS.noContentType("message"),
       });
     } finally {
-      await db.update(contentTypes).set({ allowedChannels: ["push", "sms"] }).where(eq(contentTypes.id, "ct_alert"));
+      await db
+        .update(contentTypes)
+        .set({ allowedChannels: ["push", "sms"] })
+        .where(eq(contentTypes.id, "ct_alert"));
     }
-    expect((await db.select({ id: templates.id }).from(templates)).length).toBe(before);
+    expect((await db.select({ id: templates.id }).from(templates)).length).toBe(
+      before,
+    );
     expect(redirect).not.toHaveBeenCalled();
   });
 
   it("refuses a starter of the other kind as input it can't use", async () => {
     vi.mocked(redirect).mockClear();
-    const mixed = { teamSlug: "coral-offers", family: "message", starterKey: "fee_schedule" } as never;
-    expect(await createTemplate(mixed)).toEqual({ ok: false, ...REQUEST_REFUSALS.invalidInput() });
+    const mixed = {
+      teamSlug: "coral-offers",
+      family: "message",
+      starterKey: "fee_schedule",
+    } as never;
+    expect(await createTemplate(mixed)).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.invalidInput(),
+    });
     expect(redirect).not.toHaveBeenCalled();
   });
 });
@@ -161,22 +235,33 @@ describe("startDraft while another write holds the file", () => {
       .select({ templateId: versions.templateId })
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
-      .where(and(eq(templates.teamId, "coral-offers"), eq(versions.state, "active")))
+      .where(
+        and(eq(templates.teamId, "coral-offers"), eq(versions.state, "active")),
+      )
       .limit(1);
     expect(active, "the seed has an Active Coral template").toBeTruthy();
     const { templateId } = active!;
     const draftsOf = () =>
-      db.select({ id: versions.id }).from(versions).where(and(eq(versions.templateId, templateId), eq(versions.state, "draft")));
+      db
+        .select({ id: versions.id })
+        .from(versions)
+        .where(
+          and(eq(versions.templateId, templateId), eq(versions.state, "draft")),
+        );
     expect(await draftsOf()).toHaveLength(0);
 
     // A write on the simulator's client (its own pool on the same file, as `src/simulator/db.ts` opens
     // it), holding the file across an await as a real action's transaction does.
-    const sim = createAppClient({ url: (await import("@/server/db/client")).DATABASE_URL });
+    const sim = createAppClient({
+      url: (await import("@/server/db/client")).DATABASE_URL,
+    });
     let holding!: () => void;
     const held = new Promise<void>((resolve) => (holding = resolve));
     const other = (async () => {
       const tx = await sim.transaction("write");
-      await tx.execute("UPDATE templates SET starter_key = starter_key WHERE id = 'nonexistent'");
+      await tx.execute(
+        "UPDATE templates SET starter_key = starter_key WHERE id = 'nonexistent'",
+      );
       holding();
       await new Promise((resolve) => setTimeout(resolve, 60));
       await tx.commit();
@@ -192,7 +277,10 @@ describe("startDraft while another write holds the file", () => {
     }
 
     expect(await draftsOf()).toHaveLength(1);
-    expect(vi.mocked(redirect)).toHaveBeenCalledWith(`/coral-offers/templates/${templateId}`, "replace");
+    expect(vi.mocked(redirect)).toHaveBeenCalledWith(
+      `/coral-offers/templates/${templateId}`,
+      "replace",
+    );
   });
 });
 
@@ -206,20 +294,43 @@ describe("who wrote a new draft", () => {
 
   it("Edit on an Active template: the person who pressed it, not the Active version's writers", async () => {
     const rows = await db
-      .select({ templateId: versions.templateId, id: versions.id, state: versions.state })
+      .select({
+        templateId: versions.templateId,
+        id: versions.id,
+        state: versions.state,
+      })
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
       .where(eq(templates.teamId, "coral-offers"));
-    const open = new Set(rows.filter((r) => r.state === "draft" || r.state === "in_review").map((r) => r.templateId));
-    const active = rows.find((r) => r.state === "active" && !open.has(r.templateId));
-    expect(active, "the seed has an Active Coral template with nothing newer").toBeTruthy();
-    await db.update(versions).set({ writers: ["priya", "eli"] }).where(eq(versions.id, active!.id));
+    const open = new Set(
+      rows
+        .filter((r) => r.state === "draft" || r.state === "in_review")
+        .map((r) => r.templateId),
+    );
+    const active = rows.find(
+      (r) => r.state === "active" && !open.has(r.templateId),
+    );
+    expect(
+      active,
+      "the seed has an Active Coral template with nothing newer",
+    ).toBeTruthy();
+    await db
+      .update(versions)
+      .set({ writers: ["priya", "eli"] })
+      .where(eq(versions.id, active!.id));
 
     await startDraft({ templateId: active!.templateId });
     const draft = await db.query.versions.findFirst({
-      where: and(eq(versions.templateId, active!.templateId), eq(versions.state, "draft")),
+      where: and(
+        eq(versions.templateId, active!.templateId),
+        eq(versions.state, "draft"),
+      ),
     });
-    expect(draft).toMatchObject({ basedOnVersionId: active!.id, createdBy: "maya", writers: ["maya"] });
+    expect(draft).toMatchObject({
+      basedOnVersionId: active!.id,
+      createdBy: "maya",
+      writers: ["maya"],
+    });
   });
 });
 
@@ -227,12 +338,20 @@ describe("who wrote a new draft", () => {
 // instead of the domain's sentence. They answer them now, write nothing and don't redirect.
 describe("Edit and New template answer a refusal", () => {
   const draftsOf = (templateId: string) =>
-    db.select({ id: versions.id }).from(versions).where(and(eq(versions.templateId, templateId), eq(versions.state, "draft")));
+    db
+      .select({ id: versions.id })
+      .from(versions)
+      .where(
+        and(eq(versions.templateId, templateId), eq(versions.state, "draft")),
+      );
 
   it("Edit while a newer version is in review: the domain's sentence, and no draft", async () => {
     vi.mocked(redirect).mockClear();
     const cashBack = ids["cash-back"]!;
-    expect(await startDraft({ templateId: cashBack })).toEqual({ ok: false, ...REFUSALS.newerInReview });
+    expect(await startDraft({ templateId: cashBack })).toEqual({
+      ok: false,
+      ...REFUSALS.newerInReview,
+    });
     expect(await draftsOf(cashBack)).toEqual([]);
     expect(redirect).not.toHaveBeenCalled();
   });
@@ -241,25 +360,55 @@ describe("Edit and New template answer a refusal", () => {
     vi.mocked(redirect).mockClear();
     vi.mocked(getViewer).mockResolvedValue(await loadPersona(db, "sam"));
     try {
-      expect(await startDraft({ templateId: ids["cash-back"]! })).toEqual({ ok: false, ...REASONS.generic });
-      expect(await startDraft({ templateId: "UC-ZZZZZZ" })).toEqual({ ok: false, ...REASONS.generic });
+      expect(await startDraft({ templateId: ids["cash-back"]! })).toEqual({
+        ok: false,
+        ...REASONS.generic,
+      });
+      expect(await startDraft({ templateId: "UC-ZZZZZZ" })).toEqual({
+        ok: false,
+        ...REASONS.generic,
+      });
     } finally {
       vi.mocked(getViewer).mockResolvedValue(maya);
     }
-    expect(await startDraft({ templateId: "" })).toEqual({ ok: false, ...REQUEST_REFUSALS.invalidInput() });
+    expect(await startDraft({ templateId: "" })).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.invalidInput(),
+    });
     expect(redirect).not.toHaveBeenCalled();
   });
 
   it("New template on a team the author can't create on, an unknown team, or an unknown starter", async () => {
     vi.mocked(redirect).mockClear();
-    const before = (await db.select({ id: templates.id }).from(templates)).length;
-    expect(await createTemplate({ teamSlug: "deposits", family: "document", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await createTemplate({ teamSlug: "nowhere", family: "message", starterKey: "blank" })).toEqual({ ok: false, ...REASONS.generic });
-    expect(await createTemplate({ teamSlug: "coral-offers", family: "document", starterKey: "nope" as never })).toEqual({
+    const before = (await db.select({ id: templates.id }).from(templates))
+      .length;
+    expect(
+      await createTemplate({
+        teamSlug: "deposits",
+        family: "document",
+        starterKey: "blank",
+      }),
+    ).toEqual({ ok: false, ...REASONS.generic });
+    expect(
+      await createTemplate({
+        teamSlug: "nowhere",
+        family: "message",
+        starterKey: "blank",
+      }),
+    ).toEqual({ ok: false, ...REASONS.generic });
+    expect(
+      await createTemplate({
+        teamSlug: "coral-offers",
+        family: "document",
+        starterKey: "nope" as never,
+      }),
+    ).toEqual({
       ok: false,
       ...REQUEST_REFUSALS.invalidInput(),
     });
-    expect((await db.select({ id: templates.id }).from(templates)).length).toBe(before);
+    expect((await db.select({ id: templates.id }).from(templates)).length).toBe(
+      before,
+    );
     expect(redirect).not.toHaveBeenCalled();
   });
 });

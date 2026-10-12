@@ -27,7 +27,11 @@
 //                   and an SMS's fields keep their invisible characters, in text and values alike
 //                   (`characters: "message"`): a phone draws emoji sequences and joiners with them.
 
-import { LINE_BREAKS, cleanCharacters, type CharacterRules } from "@/editor/model/characters";
+import {
+  LINE_BREAKS,
+  cleanCharacters,
+  type CharacterRules,
+} from "@/editor/model/characters";
 import { DOCUMENT_MESSAGES } from "@/editor/model/document-check";
 import { INVISIBLE_CHARACTERS, normalizeLink } from "@/editor/model/links";
 import {
@@ -43,7 +47,12 @@ import {
   type MarkerFormat,
 } from "@/editor/model/list-markers";
 import { CELL_BLOCKS } from "@/editor/model/normalize";
-import { MAX_TABLE_COLUMNS, linesUp, spanValue, tableGrid } from "@/editor/model/table-grid";
+import {
+  MAX_TABLE_COLUMNS,
+  linesUp,
+  spanValue,
+  tableGrid,
+} from "@/editor/model/table-grid";
 import { formatValue } from "@/editor/model/variables";
 import type { JSONContent, Variable } from "../types";
 import type {
@@ -82,7 +91,12 @@ export const HANDLED_NODES: readonly string[] = [
 ];
 
 /** Every mark name the resolver understands: exactly the editor schema's. */
-export const HANDLED_MARKS: readonly string[] = ["bold", "italic", "underline", "link"];
+export const HANDLED_MARKS: readonly string[] = [
+  "bold",
+  "italic",
+  "underline",
+  "link",
+];
 
 /**
  * A stored document the resolver refuses: JSON it can't place (an unknown node or mark, a known node
@@ -135,7 +149,10 @@ interface Scope {
   characters: CharacterRules;
 }
 
-function scopeOf(ctx: ResolveContext, characters: CharacterRules = "document"): Scope {
+function scopeOf(
+  ctx: ResolveContext,
+  characters: CharacterRules = "document",
+): Scope {
   return {
     byKey: new Map(ctx.variables.map((v) => [v.key, v])),
     values: ctx.values,
@@ -149,7 +166,10 @@ function scopeOf(ctx: ResolveContext, characters: CharacterRules = "document"): 
 // ── Public ───────────────────────────────────────────────────────────────────
 
 /** The document's blocks, resolved. `body` must be a `doc`. */
-export function resolveDocument(body: JSONContent, ctx: ResolveContext): RenderBlock[] {
+export function resolveDocument(
+  body: JSONContent,
+  ctx: ResolveContext,
+): RenderBlock[] {
   if (body?.type !== "doc") throw unsupported();
   const out = blocks(body.content, scopeOf(ctx));
   // The editor's trailing line: empty paragraphs at the very end (a paragraph of spaces is content).
@@ -166,7 +186,11 @@ export function resolveDocument(body: JSONContent, ctx: ResolveContext): RenderB
  * is `"message"`, and keeps the invisible characters in its text and values, which a phone draws with;
  * the email's (`"document"`, the default) loses them, as the document does (characters.ts).
  */
-export function resolveInlineField(field: JSONContent | null, ctx: ResolveContext, characters: CharacterRules = "document"): string {
+export function resolveInlineField(
+  field: JSONContent | null,
+  ctx: ResolveContext,
+  characters: CharacterRules = "document",
+): string {
   return fieldText(field, ctx, " ", characters);
 }
 
@@ -176,16 +200,27 @@ export function resolveInlineField(field: JSONContent | null, ctx: ResolveContex
  * lines the author typed. A value is still one line: a line break inside it reads as a space. Line
  * breaks and other whitespace at both ends are trimmed; spaces at a line's ends inside stay as typed.
  */
-export function resolveLinesField(field: JSONContent | null, ctx: ResolveContext, characters: CharacterRules = "document"): string {
+export function resolveLinesField(
+  field: JSONContent | null,
+  ctx: ResolveContext,
+  characters: CharacterRules = "document",
+): string {
   return fieldText(field, ctx, "\n", characters);
 }
 
 /** A field's text, each line break (in text, a hard break, between paragraphs) written as `lineBreak`. */
-function fieldText(field: JSONContent | null, ctx: ResolveContext, lineBreak: " " | "\n", characters: CharacterRules): string {
+function fieldText(
+  field: JSONContent | null,
+  ctx: ResolveContext,
+  lineBreak: " " | "\n",
+  characters: CharacterRules,
+): string {
   if (!field) return "";
   const scope = scopeOf(ctx, characters);
   const lines = field.type === "doc" ? (field.content ?? []) : [field];
-  const text = lines.map((line) => fieldLine(line, scope, lineBreak)).join(lineBreak);
+  const text = lines
+    .map((line) => fieldLine(line, scope, lineBreak))
+    .join(lineBreak);
   return text.normalize("NFC").replace(FIELD_ENDS, "");
 }
 
@@ -204,7 +239,9 @@ function blocks(nodes: JSONContent[] | undefined, scope: Scope): RenderBlock[] {
 /** A block, or null when the removal rule takes it out. */
 function block(node: JSONContent, scope: Scope): RenderBlock | null {
   if (scope.inCell && !CELL_BLOCKS.includes(String(node?.type))) {
-    throw HANDLED_NODES.includes(String(node?.type)) ? new ResolveError(DOCUMENT_MESSAGES.cell) : unsupported();
+    throw HANDLED_NODES.includes(String(node?.type))
+      ? new ResolveError(DOCUMENT_MESSAGES.cell)
+      : unsupported();
   }
   switch (node?.type) {
     case "paragraph":
@@ -227,14 +264,22 @@ function block(node: JSONContent, scope: Scope): RenderBlock | null {
 
 function paragraph(node: JSONContent, scope: Scope): RenderParagraph | null {
   const content = inlines(node, scope);
-  return isRemoved(node, scope) ? null : { type: "paragraph", id: blockId(node), content };
+  return isRemoved(node, scope)
+    ? null
+    : { type: "paragraph", id: blockId(node), content };
 }
 
 function heading(node: JSONContent, scope: Scope): RenderHeading | null {
   const level = headingLevel(node.attrs?.level);
   const content = inlines(node, scope);
   if (isRemoved(node, scope)) return null;
-  return { type: "heading", id: blockId(node), level, section: nonEmptyString(node.attrs?.requiredKey), content };
+  return {
+    type: "heading",
+    id: blockId(node),
+    level,
+    section: nonEmptyString(node.attrs?.requiredKey),
+    content,
+  };
 }
 
 function callout(node: JSONContent, scope: Scope): RenderCallout | null {
@@ -247,7 +292,9 @@ function callout(node: JSONContent, scope: Scope): RenderCallout | null {
     if (resolved) content.push(resolved);
   }
   // A callout whose paragraphs were all removed is removed.
-  return content.length === 0 ? null : { type: "callout", id: blockId(node), content };
+  return content.length === 0
+    ? null
+    : { type: "callout", id: blockId(node), content };
 }
 
 // ── Lists ────────────────────────────────────────────────────────────────────
@@ -257,21 +304,38 @@ function callout(node: JSONContent, scope: Scope): RenderCallout | null {
  * renumbers like deleting a numbered paragraph in Word: item i is `start + i` among the items left.
  */
 function list(node: JSONContent, scope: Scope): RenderList | null {
-  if (scope.orderedDepth + scope.bulletDepth >= MAX_LIST_DEPTH) throw new ResolveError(DOCUMENT_MESSAGES.listDepth);
+  if (scope.orderedDepth + scope.bulletDepth >= MAX_LIST_DEPTH)
+    throw new ResolveError(DOCUMENT_MESSAGES.listDepth);
   const id = blockId(node);
 
   if (node.type === "bulletList") {
     const bullet = bulletStyle(scope.bulletDepth);
     const marker = BULLET_GLYPHS[bullet];
-    const contents = itemContents(node, { ...scope, bulletDepth: scope.bulletDepth + 1 });
+    const contents = itemContents(node, {
+      ...scope,
+      bulletDepth: scope.bulletDepth + 1,
+    });
     if (contents.length === 0) return null;
-    return { type: "list", id, ordered: false, bullet, items: contents.map((content) => ({ marker, content })) };
+    return {
+      type: "list",
+      id,
+      ordered: false,
+      bullet,
+      items: contents.map((content) => ({ marker, content })),
+    };
   }
 
   const attrs = node.attrs ?? {};
   const start = listStart(attrs.start);
-  const { format, delimiter } = resolveNumbering(markerFormat(attrs.markerFormat), markerDelimiter(attrs.markerDelimiter), scope.orderedDepth);
-  const contents = itemContents(node, { ...scope, orderedDepth: scope.orderedDepth + 1 });
+  const { format, delimiter } = resolveNumbering(
+    markerFormat(attrs.markerFormat),
+    markerDelimiter(attrs.markerDelimiter),
+    scope.orderedDepth,
+  );
+  const contents = itemContents(node, {
+    ...scope,
+    orderedDepth: scope.orderedDepth + 1,
+  });
   if (contents.length === 0) return null;
   return {
     type: "list",
@@ -280,7 +344,10 @@ function list(node: JSONContent, scope: Scope): RenderList | null {
     start,
     format,
     delimiter,
-    items: contents.map((content, i) => ({ marker: formatMarker(start + i, format, delimiter), content })),
+    items: contents.map((content, i) => ({
+      marker: formatMarker(start + i, format, delimiter),
+      content,
+    })),
   };
 }
 
@@ -290,7 +357,8 @@ function itemContents(node: JSONContent, scope: Scope): RenderBlock[][] {
   if (children.length === 0) throw unsupported();
   const out: RenderBlock[][] = [];
   for (const child of children) {
-    if (child?.type !== "listItem" || !child.content?.length) throw unsupported();
+    if (child?.type !== "listItem" || !child.content?.length)
+      throw unsupported();
     const content = blocks(child.content, scope);
     if (content.length > 0) out.push(content);
   }
@@ -307,14 +375,16 @@ function listStart(value: unknown): number {
 /** `markerFormat`: absent or null takes the default for the depth; anything else must be known. */
 function markerFormat(value: unknown): MarkerFormat | null {
   if (value === undefined || value === null) return null;
-  if (!isMarkerFormat(value)) throw new ResolveError(DOCUMENT_MESSAGES.numbering);
+  if (!isMarkerFormat(value))
+    throw new ResolveError(DOCUMENT_MESSAGES.numbering);
   return value;
 }
 
 /** `markerDelimiter`: absent or null is "period"; anything else must be known. */
 function markerDelimiter(value: unknown): MarkerDelimiter | null {
   if (value === undefined || value === null) return null;
-  if (!isMarkerDelimiter(value)) throw new ResolveError(DOCUMENT_MESSAGES.numbering);
+  if (!isMarkerDelimiter(value))
+    throw new ResolveError(DOCUMENT_MESSAGES.numbering);
   return value;
 }
 
@@ -328,14 +398,18 @@ function markerDelimiter(value: unknown): MarkerDelimiter | null {
 function table(node: JSONContent, scope: Scope): RenderTable {
   const rows = (node.content ?? []).map((child) => tableRow(child, scope));
   const grid = tableGrid(node);
-  if (grid.width === 0 || !linesUp(grid)) throw new ResolveError(DOCUMENT_MESSAGES.tableShape);
-  if (grid.width > MAX_TABLE_COLUMNS) throw new ResolveError(DOCUMENT_MESSAGES.tableColumns);
+  if (grid.width === 0 || !linesUp(grid))
+    throw new ResolveError(DOCUMENT_MESSAGES.tableShape);
+  if (grid.width > MAX_TABLE_COLUMNS)
+    throw new ResolveError(DOCUMENT_MESSAGES.tableColumns);
   return { type: "table", id: blockId(node), columns: grid.width, rows };
 }
 
 function tableRow(node: JSONContent, scope: Scope): RenderTableRow {
   if (node?.type !== "tableRow") throw unsupported();
-  return { cells: (node.content ?? []).map((child) => tableCell(child, scope)) };
+  return {
+    cells: (node.content ?? []).map((child) => tableCell(child, scope)),
+  };
 }
 
 /**
@@ -343,10 +417,14 @@ function tableRow(node: JSONContent, scope: Scope): RenderTableRow {
  * only paragraphs and lists, at every depth (`inCell`).
  */
 function tableCell(node: JSONContent, scope: Scope): RenderTableCell {
-  if (node?.type !== "tableCell" && node?.type !== "tableHeader") throw unsupported();
+  if (node?.type !== "tableCell" && node?.type !== "tableHeader")
+    throw unsupported();
   const content: RenderCellBlock[] = [];
   for (const child of node.content ?? []) {
-    const resolved = block(child, { ...scope, inCell: true }) as RenderCellBlock | null;
+    const resolved = block(child, {
+      ...scope,
+      inCell: true,
+    }) as RenderCellBlock | null;
     if (resolved) content.push(resolved);
   }
   return {
@@ -401,7 +479,8 @@ function isRemoved(node: JSONContent, scope: Scope): boolean {
         variables += 1;
         break;
       case "text":
-        if (!BLANK_ONLY.test(typeof child.text === "string" ? child.text : "")) return false;
+        if (!BLANK_ONLY.test(typeof child.text === "string" ? child.text : ""))
+          return false;
         break;
       case "hardBreak":
         break;
@@ -441,7 +520,13 @@ function inlines(node: JSONContent, scope: Scope): RenderInline[] {
       case "variable": {
         const marks = marksOf(child.marks);
         const text = variableText(child, scope);
-        if (text !== null) out.push({ type: "text", text, ...marks, variable: String(child.attrs?.key) });
+        if (text !== null)
+          out.push({
+            type: "text",
+            text,
+            ...marks,
+            variable: String(child.attrs?.key),
+          });
         break;
       }
       default:
@@ -458,7 +543,11 @@ function inlines(node: JSONContent, scope: Scope): RenderInline[] {
 function pushText(out: RenderInline[], text: string, marks: MarkSet) {
   if (text === "") return;
   const last = out[out.length - 1];
-  if (last?.type === "text" && last.variable === undefined && sameMarks(last, marks)) {
+  if (
+    last?.type === "text" &&
+    last.variable === undefined &&
+    sameMarks(last, marks)
+  ) {
     last.text += text;
   } else {
     out.push({ type: "text", text, ...marks });
@@ -474,8 +563,12 @@ function variableText(node: JSONContent, scope: Scope): string | null {
   const key = node.attrs?.key;
   if (typeof key !== "string") return null;
   const variable = scope.byKey.get(key);
-  if (!variable || !Object.prototype.hasOwnProperty.call(scope.values, key)) return null;
-  const text = oneLineChars(formatValue(variable.type, scope.values[key]!), scope.characters);
+  if (!variable || !Object.prototype.hasOwnProperty.call(scope.values, key))
+    return null;
+  const text = oneLineChars(
+    formatValue(variable.type, scope.values[key]!),
+    scope.characters,
+  );
   return text === "" ? null : text;
 }
 
@@ -506,21 +599,34 @@ function marksOf(marks: JSONContent["marks"]): MarkSet {
 }
 
 function sameMarks(a: MarkSet, b: MarkSet): boolean {
-  return a.bold === b.bold && a.italic === b.italic && a.underline === b.underline && a.href === b.href;
+  return (
+    a.bold === b.bold &&
+    a.italic === b.italic &&
+    a.underline === b.underline &&
+    a.href === b.href
+  );
 }
 
 // ── One-line fields ──────────────────────────────────────────────────────────
 
 /** One paragraph of a one-line field as plain text (marks are read for validity, not kept). */
-function fieldLine(node: JSONContent, scope: Scope, lineBreak: " " | "\n"): string {
-  if (node?.type !== "paragraph" && node?.type !== "heading") throw unsupported();
+function fieldLine(
+  node: JSONContent,
+  scope: Scope,
+  lineBreak: " " | "\n",
+): string {
+  if (node?.type !== "paragraph" && node?.type !== "heading")
+    throw unsupported();
   let out = "";
   for (const child of node.content ?? []) {
     switch (child?.type) {
       case "text": {
         marksOf(child.marks);
         const text = typeof child.text === "string" ? child.text : "";
-        out += cleanCharacters(text.replace(LINE_BREAKS, lineBreak), scope.characters);
+        out += cleanCharacters(
+          text.replace(LINE_BREAKS, lineBreak),
+          scope.characters,
+        );
         break;
       }
       case "hardBreak":

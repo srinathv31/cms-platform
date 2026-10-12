@@ -11,6 +11,13 @@ const newsreader = Newsreader({
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--ff-figtree" });
 
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--ff-geist-mono" });
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--ff-geist-mono",
+});
 
-export const fontVariables = [newsreader.variable, figtree.variable, geistMono.variable].join(" ");
+export const fontVariables = [
+  newsreader.variable,
+  figtree.variable,
+  geistMono.variable,
+].join(" ");

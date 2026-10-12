@@ -3,7 +3,13 @@ import { and, asc, eq, gt, inArray, type SQL } from "drizzle-orm";
 import { sunsetDay } from "@/domain/business-zone";
 import { apiBadRequest, QUERY_MESSAGES } from "@/domain/golive/api-errors";
 import { contractDiff } from "@/domain/golive/contract-diff";
-import { compareSearchKeys, cutPage, noticeCursor, searchCursor, type SearchKey } from "@/domain/golive/cursor";
+import {
+  compareSearchKeys,
+  cutPage,
+  noticeCursor,
+  searchCursor,
+  type SearchKey,
+} from "@/domain/golive/cursor";
 import { apiVariables, contractJsonSchema } from "@/domain/golive/json-schema";
 import { noticeView } from "@/domain/golive/notices";
 import { contractBaseline } from "@/domain/lifecycle/baselines";
@@ -29,7 +35,15 @@ import { headOf, isReleased } from "@/domain/rounds";
 import { CHANNELS, type Channel } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
-import { consumerNotices, consumers, contentTypes, settings, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  consumerNotices,
+  consumers,
+  contentTypes,
+  settings,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 
 // The consumer API's reads (GET /api/v1/…). No viewer: a consumer is identified by X-Consumer-Id and
 // sees every released version of every template, nothing else (`isReleased` in domain/rounds.ts). Drafts,
@@ -43,7 +57,10 @@ import { consumerNotices, consumers, contentTypes, settings, teams, templates, v
  * version went Active, and the render route refuses it from then on (channel_not_allowed), so the API
  * never advertises it.
  */
-const published = (versionChannels: readonly Channel[], allowed: readonly Channel[]): Channel[] =>
+const published = (
+  versionChannels: readonly Channel[],
+  allowed: readonly Channel[],
+): Channel[] =>
   CHANNELS.filter((c) => versionChannels.includes(c) && allowed.includes(c));
 
 // ── Consumers ────────────────────────────────────────────────────────────────
@@ -54,7 +71,9 @@ export interface Consumer {
 }
 
 /** A registered consumer by id, or null. */
-export async function findConsumer(consumerId: string): Promise<Consumer | null> {
+export async function findConsumer(
+  consumerId: string,
+): Promise<Consumer | null> {
   const [row] = await db
     .select({ id: consumers.id, name: consumers.name })
     .from(consumers)
@@ -70,7 +89,9 @@ export async function requireConsumer(
   const id = header?.trim() ?? "";
   if (id === "") return { ok: false, error: consumerRequired() };
   const consumer = await findConsumer(id);
-  return consumer ? { ok: true, consumer } : { ok: false, error: unknownConsumer(id) };
+  return consumer
+    ? { ok: true, consumer }
+    : { ok: false, error: unknownConsumer(id) };
 }
 
 // ── Search ───────────────────────────────────────────────────────────────────
@@ -96,7 +117,11 @@ export interface SearchPage {
  * Active version's, for matching, ordering, the cursor and the result alike: a draft's rename shows
  * here only once that draft goes live.
  */
-export async function searchActiveTemplates(q: string, limit: number, after: SearchKey | null = null): Promise<SearchPage> {
+export async function searchActiveTemplates(
+  q: string,
+  limit: number,
+  after: SearchKey | null = null,
+): Promise<SearchPage> {
   const rows = await db
     .select({
       id: templates.id,
@@ -178,7 +203,12 @@ function versionSummary(
     sunsetPassed: sunsetPassed(v, now),
     revokedAt,
     renders: checkVersion({
-      version: { number: v.number!, state: v.state, sunsetAt: v.sunsetAt, revokedAt: revokedAt ? new Date(revokedAt) : null },
+      version: {
+        number: v.number!,
+        state: v.state,
+        sunsetAt: v.sunsetAt,
+        revokedAt: revokedAt ? new Date(revokedAt) : null,
+      },
       activeNumber,
       now,
       zone,
@@ -195,8 +225,14 @@ export async function getTemplateDetail(
   templateId: string,
   opts: { version?: number; since?: number },
   now: Date,
-): Promise<{ ok: true; detail: ApiTemplateDetail } | { ok: false; error: ApiError }> {
-  if (opts.version !== undefined && opts.since !== undefined && opts.since >= opts.version) {
+): Promise<
+  { ok: true; detail: ApiTemplateDetail } | { ok: false; error: ApiError }
+> {
+  if (
+    opts.version !== undefined &&
+    opts.since !== undefined &&
+    opts.since >= opts.version
+  ) {
     return { ok: false, error: apiBadRequest(QUERY_MESSAGES.sinceOrder) };
   }
 
@@ -216,12 +252,17 @@ export async function getTemplateDetail(
     .limit(1);
   if (!template) return { ok: false, error: templateNotFound(templateId) };
 
-  const all = (await db.select().from(versions).where(eq(versions.templateId, template.id))).filter((v) => v.number !== null);
+  const all = (
+    await db.select().from(versions).where(eq(versions.templateId, template.id))
+  ).filter((v) => v.number !== null);
   const released = all
-    .filter((v): v is VersionRow & { state: ApiVersionState } => isReleased(v.state))
+    .filter((v): v is VersionRow & { state: ApiVersionState } =>
+      isReleased(v.state),
+    )
     .sort((a, b) => b.number! - a.number!);
   // Unreleased templates are invisible to consumers.
-  if (released.length === 0) return { ok: false, error: templateNotFound(template.id) };
+  if (released.length === 0)
+    return { ok: false, error: templateNotFound(template.id) };
 
   const active = released.find((v) => v.state === "active") ?? null;
   const activeNumber = active?.number ?? null;
@@ -236,12 +277,22 @@ export async function getTemplateDetail(
    */
   const readable = (number: number) => {
     const found = headOf(all, number);
-    if (!found) return { ok: false as const, error: versionNotFound(template.id, number) };
+    if (!found)
+      return {
+        ok: false as const,
+        error: versionNotFound(template.id, number),
+      };
     if (!isReleased(found.state)) {
       const state = found.state as "draft" | "in_review" | "changes_requested";
-      return { ok: false as const, error: versionNotReleased(number, state, activeNumber) };
+      return {
+        ok: false as const,
+        error: versionNotReleased(number, state, activeNumber),
+      };
     }
-    return { ok: true as const, version: found as VersionRow & { state: ApiVersionState } };
+    return {
+      ok: true as const,
+      version: found as VersionRow & { state: ApiVersionState },
+    };
   };
 
   let target: (VersionRow & { state: ApiVersionState }) | null = active;
@@ -253,7 +304,8 @@ export async function getTemplateDetail(
 
   let changes: ApiTemplateDetail["changes"];
   if (opts.since !== undefined && target) {
-    if (opts.since >= target.number!) return { ok: false, error: apiBadRequest(QUERY_MESSAGES.sinceOrder) };
+    if (opts.since >= target.number!)
+      return { ok: false, error: apiBadRequest(QUERY_MESSAGES.sinceOrder) };
     const from = readable(opts.since);
     if (!from.ok) return from;
     changes = contractDiff(
@@ -281,10 +333,15 @@ export async function getTemplateDetail(
     id: template.id,
     name,
     team: { id: template.teamId, name: template.teamName },
-    contentType: { key: template.contentTypeKey, name: template.contentTypeName },
+    contentType: {
+      key: template.contentTypeKey,
+      name: template.contentTypeName,
+    },
     asOf: now.toISOString(),
     activeVersion: activeNumber,
-    versions: released.map((v) => versionSummary(v, activeNumber, template.allowedChannels, now, zone)),
+    versions: released.map((v) =>
+      versionSummary(v, activeNumber, template.allowedChannels, now, zone),
+    ),
     contract,
     ...(changes ? { changes } : {}),
   };
@@ -308,7 +365,11 @@ const SEEDED_AT_KEY = "seeded_at";
  * the notice numbers again. Null for a database that was never seeded.
  */
 export async function noticeEpoch(): Promise<string | null> {
-  const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, SEEDED_AT_KEY)).limit(1);
+  const [row] = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, SEEDED_AT_KEY))
+    .limit(1);
   return typeof row?.value === "string" ? row.value : null;
 }
 
@@ -320,12 +381,21 @@ export async function noticeEpoch(): Promise<string | null> {
  */
 export async function listNotices(
   consumerId: string,
-  opts: { after?: number; templateId?: string; limit: number; epoch?: string | null },
+  opts: {
+    after?: number;
+    templateId?: string;
+    limit: number;
+    epoch?: string | null;
+  },
 ): Promise<NoticePage> {
   const after = opts.after ?? 0;
   const epoch = opts.epoch === undefined ? await noticeEpoch() : opts.epoch;
-  const where: SQL[] = [eq(consumerNotices.consumerId, consumerId), gt(consumerNotices.seq, after)];
-  if (opts.templateId) where.push(eq(consumerNotices.templateId, opts.templateId));
+  const where: SQL[] = [
+    eq(consumerNotices.consumerId, consumerId),
+    gt(consumerNotices.seq, after),
+  ];
+  if (opts.templateId)
+    where.push(eq(consumerNotices.templateId, opts.templateId));
   const rows = await db
     .select()
     .from(consumerNotices)
@@ -336,7 +406,10 @@ export async function listNotices(
   return {
     notices: (await withActiveVersion(items)).map(noticeView),
     hasMore,
-    nextCursor: noticeCursor({ consumerId, templateId: opts.templateId ?? null, epoch }, items.at(-1)?.seq ?? after),
+    nextCursor: noticeCursor(
+      { consumerId, templateId: opts.templateId ?? null, epoch },
+      items.at(-1)?.seq ?? after,
+    ),
   };
 }
 
@@ -347,7 +420,10 @@ type NoticeDbRow = typeof consumerNotices.$inferSelect;
  * Fill it in from the versions' own dates: the other version that was Active at that moment, if any.
  */
 async function withActiveVersion(rows: NoticeDbRow[]): Promise<NoticeDbRow[]> {
-  const gaps = rows.filter((r) => r.kind === "revoked" && !Object.hasOwn(r.payload ?? {}, "activeVersion"));
+  const gaps = rows.filter(
+    (r) =>
+      r.kind === "revoked" && !Object.hasOwn(r.payload ?? {}, "activeVersion"),
+  );
   if (gaps.length === 0) return rows;
   const history = await db
     .select({
@@ -358,7 +434,9 @@ async function withActiveVersion(rows: NoticeDbRow[]): Promise<NoticeDbRow[]> {
       supersededAt: versions.supersededAt,
     })
     .from(versions)
-    .where(inArray(versions.templateId, [...new Set(gaps.map((r) => r.templateId))]));
+    .where(
+      inArray(versions.templateId, [...new Set(gaps.map((r) => r.templateId))]),
+    );
 
   return rows.map((row) => {
     if (!gaps.includes(row)) return row;
@@ -372,6 +450,9 @@ async function withActiveVersion(rows: NoticeDbRow[]): Promise<NoticeDbRow[]> {
         v.activatedAt.getTime() <= at &&
         (v.supersededAt === null || v.supersededAt.getTime() > at),
     );
-    return { ...row, payload: { ...row.payload, activeVersion: active?.number ?? null } };
+    return {
+      ...row,
+      payload: { ...row.payload, activeVersion: active?.number ?? null },
+    };
   });
 }

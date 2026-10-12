@@ -41,11 +41,11 @@ port (the Java API, or anyone else) which rule was meant. The teams and the cons
 
 For a port, the whole rule is in [src/domain/business-zone.ts](../../src/domain/business-zone.ts):
 
-| Here | Java |
-| --- | --- |
-| `sunsetInstant(day, zone)` | `LocalDate.parse(day).atStartOfDay(ZoneId.of(zone)).toInstant()` |
-| `sunsetDay(instant, zone)` | `instant.atZone(ZoneId.of(zone)).toLocalDate()` |
-| `isAfterToday(day, now, zone)` | `day.isAfter(LocalDate.ofInstant(now, ZoneId.of(zone)))` |
+| Here                           | Java                                                             |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `sunsetInstant(day, zone)`     | `LocalDate.parse(day).atStartOfDay(ZoneId.of(zone)).toInstant()` |
+| `sunsetDay(instant, zone)`     | `instant.atZone(ZoneId.of(zone)).toLocalDate()`                  |
+| `isAfterToday(day, now, zone)` | `day.isAfter(LocalDate.ofInstant(now, ZoneId.of(zone)))`         |
 
 Where the zone's clocks skip midnight the day starts at the first instant after the gap; where they repeat it, at
 the earlier one. Java's `atStartOfDay` does both. The US zones change at 02:00, so their midnight always exists once.

@@ -12,7 +12,12 @@ import { RailHeader, railHeaderViews } from "@/components/preview/rail-header";
 import { cn } from "@/lib/utils";
 import type { FocusTargets } from "../session/focus-targets";
 import { useRailView } from "../session/rail-view";
-import { useFocusTarget, usePreviewState, useRailOpen, useWorkspaceSession } from "../session/workspace-session";
+import {
+  useFocusTarget,
+  usePreviewState,
+  useRailOpen,
+  useWorkspaceSession,
+} from "../session/workspace-session";
 import { WS } from "../workspace-grid";
 
 /**
@@ -43,9 +48,15 @@ function inNameField(targets: FocusTargets, target: Element | null): boolean {
  * breakpoint the rail goes away with it, and the Preview toggle, where `closePreview` put focus, keeps it.
  */
 function focusOriginalTab(targets: FocusTargets, replaced: HTMLElement | null) {
-  void targets.waitFor("originalTab", { accept: (tab) => tab !== replaced, timeout: ORIGINAL_TAB_WAIT_MS }).then((tab) => {
-    if (tab?.isConnected && tab.getClientRects().length > 0) tab.focus({ preventScroll: true });
-  });
+  void targets
+    .waitFor("originalTab", {
+      accept: (tab) => tab !== replaced,
+      timeout: ORIGINAL_TAB_WAIT_MS,
+    })
+    .then((tab) => {
+      if (tab?.isConnected && tab.getClientRects().length > 0)
+        tab.focus({ preventScroll: true });
+    });
 }
 
 /**
@@ -55,13 +66,24 @@ function focusOriginalTab(targets: FocusTargets, replaced: HTMLElement | null) {
  * they handle the key and close, because the editor closes its menu inside its own handler and React
  * has unmounted it by the time a bubbling listener runs.
  */
-function escapeIsSpokenFor(event: KeyboardEvent, targets: FocusTargets, nameAtFocus: string | null): boolean {
+function escapeIsSpokenFor(
+  event: KeyboardEvent,
+  targets: FocusTargets,
+  nameAtFocus: string | null,
+): boolean {
   const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest(".ProseMirror")?.hasAttribute("aria-controls")) return true;
-  if (inNameField(targets, target) && targets.get("name")?.value.trim() !== nameAtFocus) return true;
+  if (target?.closest(".ProseMirror")?.hasAttribute("aria-controls"))
+    return true;
+  if (
+    inNameField(targets, target) &&
+    targets.get("name")?.value.trim() !== nameAtFocus
+  )
+    return true;
   // Only one on screen: a route kept mounted but hidden (`<Activity>`) can still hold an open dialog, such as
   // the Library's New template, left open by the import or starter that navigated away from it.
-  return [...document.querySelectorAll(OPEN_POPUP)].some((el) => el.getClientRects().length > 0);
+  return [...document.querySelectorAll(OPEN_POPUP)].some(
+    (el) => el.getClientRects().length > 0,
+  );
 }
 
 /**
@@ -117,7 +139,11 @@ export function Rail({
    * The template's review comments, when it has any (or a new comment is being written): `count` is
    * the number open, `preferred` says the rail should open on them, `panel` is the thread list.
    */
-  comments?: { count: number; preferred: boolean; panel: React.ReactNode } | null;
+  comments?: {
+    count: number;
+    preferred: boolean;
+    panel: React.ReactNode;
+  } | null;
   /** The template was imported: the header gets an Original tab (`preview` draws the view itself). */
   original?: boolean;
   /**
@@ -137,7 +163,10 @@ export function Rail({
   const open = railOpen || previewOpen;
   // One of three views is on screen: the preview's output, the comments, or the normal rail (Channels, Email details, Variables).
   const hasComments = comments != null;
-  const view = useRailView({ has: hasComments, preferred: comments?.preferred ?? false }, original);
+  const view = useRailView(
+    { has: hasComments, preferred: comments?.preferred ?? false },
+    original,
+  );
   const showComments = view === "comments";
   const showRail = view === "variables";
   // With the preview closed, the comments and the original bring their own header row (the preview draws its own, with its tabs).
@@ -161,7 +190,9 @@ export function Rail({
     session.openOriginal();
     // Given back once the widened rail has painted. Not undone in a cleanup: a Strict Mode re-run
     // would put the transition back before the widened render had landed.
-    requestAnimationFrame(() => requestAnimationFrame(() => el.style.removeProperty("transition")));
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => el.style.removeProperty("transition")),
+    );
   }, [takeArrival, session]);
 
   // The control that had focus when the rail opened (the Preview toggle, the rail toggle): Esc gives focus back to it.
@@ -171,7 +202,11 @@ export function Rail({
     if (open && !wasOpen.current) {
       const active = document.activeElement;
       opener.current =
-        active instanceof HTMLElement && active !== document.body && !aside.current?.contains(active) ? active : null;
+        active instanceof HTMLElement &&
+        active !== document.body &&
+        !aside.current?.contains(active)
+          ? active
+          : null;
     }
     wasOpen.current = open;
   }, [open]);
@@ -182,7 +217,8 @@ export function Rail({
       if (name !== null && el === name) nameAtFocus.current = name.value.trim();
     };
     note(document.activeElement);
-    const onFocusIn = (event: FocusEvent) => note(event.target instanceof Element ? event.target : null);
+    const onFocusIn = (event: FocusEvent) =>
+      note(event.target instanceof Element ? event.target : null);
     document.addEventListener("focusin", onFocusIn);
     return () => document.removeEventListener("focusin", onFocusIn);
   }, [session]);
@@ -191,7 +227,12 @@ export function Rail({
     if (!open) return;
     let spokenFor = false;
     const onCapture = (event: KeyboardEvent) => {
-      if (event.key === "Escape") spokenFor = escapeIsSpokenFor(event, session.focusTargets, nameAtFocus.current);
+      if (event.key === "Escape")
+        spokenFor = escapeIsSpokenFor(
+          event,
+          session.focusTargets,
+          nameAtFocus.current,
+        );
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || spokenFor) return;
@@ -204,15 +245,24 @@ export function Rail({
       if (event.defaultPrevented && !inDocument && !inName) return;
       // Focus goes back to the Preview toggle unless it is somewhere the author is working (the document).
       const active = document.activeElement;
-      const lost = active === null || active === document.body || (aside.current?.contains(active) ?? false);
+      const lost =
+        active === null ||
+        active === document.body ||
+        (aside.current?.contains(active) ?? false);
       // Back to what opened the rail when that is still on screen (below the breakpoint, the rail toggle
       // that opened the overlay the Original tab is in); otherwise to the Preview toggle, or to the plain
       // rail's Original tab when that is where the widened Original view came from.
       const from = opener.current;
-      const backToOpener = lost && from !== null && from.isConnected && from.getClientRects().length > 0;
+      const backToOpener =
+        lost &&
+        from !== null &&
+        from.isConnected &&
+        from.getClientRects().length > 0;
       if (backToOpener) from.focus({ preventScroll: true });
       const widenedOriginalTab = session.focusTargets.get("originalTab");
-      closePreview(session, { restoreFocus: !backToOpener && previewOpen && lost });
+      closePreview(session, {
+        restoreFocus: !backToOpener && previewOpen && lost,
+      });
       if (!backToOpener && previewOpen && lost && view === "original") {
         focusOriginalTab(session.focusTargets, widenedOriginalTab);
       }
@@ -246,18 +296,25 @@ export function Rail({
       className={WS.rail}
     >
       {/* The Original view, like the Preview view, is as tall as the rail's content area, so the file scrolls on its own. */}
-      <div className={cn(WS.railInner, "group-data-[view=original]/rail:h-full")}>
+      <div
+        className={cn(WS.railInner, "group-data-[view=original]/rail:h-full")}
+      >
         {preview}
         {plainHeader ? (
           // 8px in from the rail's 12px: the header's text starts on the same 20px edge as the rest of the rail's content.
           <div className="px-2">
             <RailHeader
               value={showComments ? "comments" : "variables"}
-              views={railHeaderViews({ preview: false, comments: comments ? comments.count : null, original })}
+              views={railHeaderViews({
+                preview: false,
+                comments: comments ? comments.count : null,
+                original,
+              })}
               originalTabRef={originalTab}
               onChange={(next) => {
                 if (next !== "original") return session.selectRailView(next);
-                const plainOriginalTab = session.focusTargets.get("originalTab");
+                const plainOriginalTab =
+                  session.focusTargets.get("originalTab");
                 session.openOriginal();
                 // This header goes away as the rail widens (the widened rail has its own): focus follows to its Original tab.
                 focusOriginalTab(session.focusTargets, plainOriginalTab);
@@ -319,7 +376,11 @@ export function Rail({
               render={<Link href={reviewHref as Route} />}
               className="h-8 w-full justify-start gap-2 rounded-lg px-2 text-[13px] font-normal text-text-muted hover:text-text"
             >
-              <ClipboardCheck aria-hidden strokeWidth={1.75} className="size-4" />
+              <ClipboardCheck
+                aria-hidden
+                strokeWidth={1.75}
+                className="size-4"
+              />
               Open review
             </Button>
           </div>

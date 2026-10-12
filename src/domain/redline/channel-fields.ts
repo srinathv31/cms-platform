@@ -2,7 +2,12 @@
 // same engine as the body (`diffDocuments`), one field at a time (`diffChannelFields`): for an alert they
 // are the whole content.
 
-import { channelFieldValue, fieldsOfChannels, type ChannelField, type ChannelFields } from "../channel-fields";
+import {
+  channelFieldValue,
+  fieldsOfChannels,
+  type ChannelField,
+  type ChannelFields,
+} from "../channel-fields";
 import type { FieldRedline, FooterRedline, RedlineDoc } from "../review-types";
 import { CHANNELS, type Channel, type JSONContent } from "../types";
 import { diffDocuments } from "./document";
@@ -44,42 +49,83 @@ export interface FieldsRedline {
  * its `footer` says what it was and is. A footer that changed while SMS stayed on counts as one change, so
  * a version whose only difference is its footer never reads "No changes".
  */
-export function diffChannelFields(base: FieldsSide | null, next: FieldsSide): FieldsRedline {
+export function diffChannelFields(
+  base: FieldsSide | null,
+  next: FieldsSide,
+): FieldsRedline {
   const counts = { added: 0, removed: 0, changed: 0, moved: 0 };
-  const channels = base ? CHANNELS.filter((c) => base.channels.includes(c) || next.channels.includes(c)) : next.channels;
+  const channels = base
+    ? CHANNELS.filter(
+        (c) => base.channels.includes(c) || next.channels.includes(c),
+      )
+    : next.channels;
   const fields = fieldsOfChannels(channels).map((field): FieldRedline => {
     const after = fieldDoc(next, field);
-    if (!base) return { field, status: "unchanged", doc: diffDocuments(null, after) };
+    if (!base)
+      return { field, status: "unchanged", doc: diffDocuments(null, after) };
     const doc = diffDocuments(fieldDoc(base, field), after);
     const status = fieldStatus(doc);
     if (status !== "unchanged") counts[status]++;
     return { field, status, doc };
   });
   const footer = channels.includes("sms") ? footerRedline(base, next) : null;
-  if (footer && footer.status !== "unchanged" && base?.channels.includes("sms") && next.channels.includes("sms")) counts[footer.status]++;
+  if (
+    footer &&
+    footer.status !== "unchanged" &&
+    base?.channels.includes("sms") &&
+    next.channels.includes("sms")
+  )
+    counts[footer.status]++;
   return { fields, counts, footer };
 }
 
 /** The SMS footer each side prints while its SMS is on, and how it changed. */
-function footerRedline(base: FieldsSide | null, next: FieldsSide): FooterRedline {
-  const footerOf = (side: FieldsSide) => (side.channels.includes("sms") ? side.smsFooter || null : null);
+function footerRedline(
+  base: FieldsSide | null,
+  next: FieldsSide,
+): FooterRedline {
+  const footerOf = (side: FieldsSide) =>
+    side.channels.includes("sms") ? side.smsFooter || null : null;
   const to = footerOf(next);
   if (!base) return { from: null, to, status: "unchanged" };
   const from = footerOf(base);
-  const status = from === to ? "unchanged" : from === null ? "added" : to === null ? "removed" : "changed";
+  const status =
+    from === to
+      ? "unchanged"
+      : from === null
+        ? "added"
+        : to === null
+          ? "removed"
+          : "changed";
   return { from, to, status };
 }
 
 /** The two counts together: the body's and the fields', for one "N changes" and its summary. */
-export function addCounts(a: RedlineDoc["counts"], b: RedlineDoc["counts"]): RedlineDoc["counts"] {
-  return { added: a.added + b.added, removed: a.removed + b.removed, changed: a.changed + b.changed, moved: a.moved + b.moved };
+export function addCounts(
+  a: RedlineDoc["counts"],
+  b: RedlineDoc["counts"],
+): RedlineDoc["counts"] {
+  return {
+    added: a.added + b.added,
+    removed: a.removed + b.removed,
+    changed: a.changed + b.changed,
+    moved: a.moved + b.moved,
+  };
 }
 
 /** The field as a document to diff: empty while its channel is off, each block keyed by the field (they pair across versions). */
 function fieldDoc(side: FieldsSide, field: ChannelField): JSONContent {
-  const value = side.channels.includes(field.channel) ? channelFieldValue(side.channelFields, field) : null;
+  const value = side.channels.includes(field.channel)
+    ? channelFieldValue(side.channelFields, field)
+    : null;
   const blocks = (value?.content ?? []).filter(isNode);
-  return { type: "doc", content: blocks.map((block, i) => ({ ...block, attrs: { ...block.attrs, id: `${field.id}:${i}` } })) };
+  return {
+    type: "doc",
+    content: blocks.map((block, i) => ({
+      ...block,
+      attrs: { ...block.attrs, id: `${field.id}:${i}` },
+    })),
+  };
 }
 
 /** The field's status from its blocks': all added is added, all removed removed, none changed unchanged. */

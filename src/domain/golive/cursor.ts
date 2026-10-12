@@ -27,8 +27,12 @@ const VERSION = 1;
 
 function toBase64Url(text: string): string {
   let binary = "";
-  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  for (const byte of new TextEncoder().encode(text))
+    binary += String.fromCharCode(byte);
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 /** The JSON object inside a cursor, or null when the text isn't base64url of a JSON object. */
@@ -36,15 +40,20 @@ function fromBase64Url(raw: string): Record<string, unknown> | null {
   if (!/^[A-Za-z0-9_-]+$/.test(raw)) return null;
   try {
     const binary = atob(raw.replace(/-/g, "+").replace(/_/g, "/"));
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(
+      Uint8Array.from(binary, (c) => c.charCodeAt(0)),
+    );
     const value: unknown = JSON.parse(text);
-    return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
 }
 
-const isCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+const isCount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
 /**
  * `after`: absent or blank is the start of the list. Anything else must decode as this list's cursor:
@@ -52,15 +61,20 @@ const isCount = (value: unknown): value is number => typeof value === "number" &
  */
 function readCursor<T>(
   raw: string | null,
-  read: (body: Record<string, unknown>) => { value: T } | { error: ApiError } | undefined,
+  read: (
+    body: Record<string, unknown>,
+  ) => { value: T } | { error: ApiError } | undefined,
   start: T,
 ): Parsed<T> {
   const text = raw?.trim() ?? "";
   if (text === "") return { ok: true, value: start };
   const body = fromBase64Url(text);
   const outcome = body && body.v === VERSION ? read(body) : undefined;
-  if (outcome === undefined) return { ok: false, error: apiBadRequest(QUERY_MESSAGES.after) };
-  return "error" in outcome ? { ok: false, error: outcome.error } : { ok: true, value: outcome.value };
+  if (outcome === undefined)
+    return { ok: false, error: apiBadRequest(QUERY_MESSAGES.after) };
+  return "error" in outcome
+    ? { ok: false, error: outcome.error }
+    : { ok: true, value: outcome.value };
 }
 
 // ── Notices ──────────────────────────────────────────────────────────────────
@@ -76,7 +90,14 @@ export interface NoticeList {
 /** The cursor that continues `list` after the notice numbered `seq`. */
 export function noticeCursor(list: NoticeList, seq: number): string {
   return toBase64Url(
-    JSON.stringify({ v: VERSION, list: "notices", consumer: list.consumerId, template: list.templateId, epoch: list.epoch, seq }),
+    JSON.stringify({
+      v: VERSION,
+      list: "notices",
+      consumer: list.consumerId,
+      template: list.templateId,
+      epoch: list.epoch,
+      seq,
+    }),
   );
 }
 
@@ -84,14 +105,24 @@ export function noticeCursor(list: NoticeList, seq: number): string {
  * `after` on the notices route: the `seq` to continue after, 0 when absent. A cursor of this list
  * from another epoch (before a demo reset) gets its own sentence: the consumer has to start again.
  */
-export function readNoticeCursor(raw: string | null, list: NoticeList): Parsed<number> {
+export function readNoticeCursor(
+  raw: string | null,
+  list: NoticeList,
+): Parsed<number> {
   return readCursor<number>(
     raw,
     (body) => {
       const { consumer, template, epoch, seq } = body;
-      if (body.list !== "notices" || consumer !== list.consumerId || template !== list.templateId || !isCount(seq)) return undefined;
+      if (
+        body.list !== "notices" ||
+        consumer !== list.consumerId ||
+        template !== list.templateId ||
+        !isCount(seq)
+      )
+        return undefined;
       if (epoch !== null && typeof epoch !== "string") return undefined;
-      if (epoch !== list.epoch) return { error: apiBadRequest(QUERY_MESSAGES.staleAfter) };
+      if (epoch !== list.epoch)
+        return { error: apiBadRequest(QUERY_MESSAGES.staleAfter) };
       return { value: seq };
     },
     0,
@@ -132,7 +163,11 @@ export function compareCodePoints(a: string, b: string): number {
  * exactly this way.
  */
 export function compareSearchKeys(a: SearchKey, b: SearchKey): number {
-  return a.rank - b.rank || compareCodePoints(a.name, b.name) || compareCodePoints(a.id, b.id);
+  return (
+    a.rank - b.rank ||
+    compareCodePoints(a.name, b.name) ||
+    compareCodePoints(a.id, b.id)
+  );
 }
 
 /** A search cursor belongs to its query as the search reads it: trimmed, any case. */
@@ -140,18 +175,28 @@ const searchQuery = (q: string) => q.trim().toLowerCase();
 
 /** The cursor that continues the search for `q` after `last` (null: from the start). */
 export function searchCursor(q: string, last: SearchKey | null): string {
-  return toBase64Url(JSON.stringify({ v: VERSION, list: "search", q: searchQuery(q), last }));
+  return toBase64Url(
+    JSON.stringify({ v: VERSION, list: "search", q: searchQuery(q), last }),
+  );
 }
 
 function readSearchKey(value: unknown): SearchKey | null | undefined {
   if (value === null) return null;
   if (typeof value !== "object" || Array.isArray(value)) return undefined;
   const { rank, name, id } = value as Record<string, unknown>;
-  return isCount(rank) && rank <= 2 && typeof name === "string" && typeof id === "string" ? { rank, name, id } : undefined;
+  return isCount(rank) &&
+    rank <= 2 &&
+    typeof name === "string" &&
+    typeof id === "string"
+    ? { rank, name, id }
+    : undefined;
 }
 
 /** `after` on the search route: the key to continue after, null when absent. */
-export function readSearchCursor(raw: string | null, q: string): Parsed<SearchKey | null> {
+export function readSearchCursor(
+  raw: string | null,
+  q: string,
+): Parsed<SearchKey | null> {
   return readCursor<SearchKey | null>(
     raw,
     (body) => {
@@ -169,6 +214,9 @@ export function readSearchCursor(raw: string | null, q: string): Parsed<SearchKe
  * The first `limit` of `rows` (already in list order, already after the cursor), and whether more
  * follow. Callers read `limit + 1` rows so `hasMore` needs no second query.
  */
-export function cutPage<T>(rows: readonly T[], limit: number): { items: T[]; hasMore: boolean } {
+export function cutPage<T>(
+  rows: readonly T[],
+  limit: number,
+): { items: T[]; hasMore: boolean } {
   return { items: rows.slice(0, limit), hasMore: rows.length > limit };
 }

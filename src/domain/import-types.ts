@@ -8,7 +8,14 @@
 // wrong, make the smallest additive change and say so first in your report.
 
 import { refusal, type Refused } from "./refusals";
-import type { Channel, ChannelFamily, JSONContent, RequiredSection, Variable, VersionState } from "./types";
+import type {
+  Channel,
+  ChannelFamily,
+  JSONContent,
+  RequiredSection,
+  Variable,
+  VersionState,
+} from "./types";
 
 // ── Files ────────────────────────────────────────────────────────────────────
 
@@ -47,9 +54,15 @@ export const IMPORT_MIME: Record<ImportKind, string> = {
  * failure; the wire `code` is the entry's own (decision 0041).
  */
 export const IMPORT_REFUSALS = {
-  type: refusal("import_unsupported_type", "Only .docx, .pdf and .txt files can be imported."),
+  type: refusal(
+    "import_unsupported_type",
+    "Only .docx, .pdf and .txt files can be imported.",
+  ),
   /** A legacy Word file (.doc): the one kind of refusal that has a way forward. */
-  legacyDoc: refusal("import_legacy_doc", "Only .docx, .pdf and .txt files can be imported. Save it as .docx first."),
+  legacyDoc: refusal(
+    "import_legacy_doc",
+    "Only .docx, .pdf and .txt files can be imported. Save it as .docx first.",
+  ),
   /** Named .pdf, but the bytes aren't a PDF. */
   notPdf: refusal("import_not_pdf", "This isn't a valid PDF."),
   /** Named .docx, but the bytes aren't a Word file. */
@@ -65,14 +78,20 @@ export const IMPORT_REFUSALS = {
    * The converted document fails the document check (docs/render-spec.md §3), e.g. a table whose
    * merged cells don't line up. The sentence is this line, then the check's own.
    */
-  content: refusal("import_content", (problem: string) => `This file can't be imported as it is. ${problem}`),
+  content: refusal(
+    "import_content",
+    (problem: string) => `This file can't be imported as it is. ${problem}`,
+  ),
 } as const;
 
 /**
  * What a conversion can fail with: the key of a fixed entry of `IMPORT_REFUSALS`. (`content` comes
  * after conversion, from the document check, with that check's sentence.)
  */
-export type ImportRefusalName = Exclude<keyof typeof IMPORT_REFUSALS, "content">;
+export type ImportRefusalName = Exclude<
+  keyof typeof IMPORT_REFUSALS,
+  "content"
+>;
 
 /** Why Import a file isn't offered for an alert: a file's text becomes a body, and only a document has one. */
 export const IMPORT_DOCUMENTS_ONLY = "Only documents can be imported.";
@@ -149,7 +168,11 @@ export interface SkippedPlaceholder {
 // capitalized, at most 120 characters.
 
 export interface SectionFit {
-  matched: { key: string; title: string; /** The text it matched, as written. */ from: string }[];
+  matched: {
+    key: string;
+    title: string;
+    /** The text it matched, as written. */ from: string;
+  }[];
   added: { key: string; title: string }[];
 }
 
@@ -177,7 +200,12 @@ export interface ImportReport {
   placeholders: DetectedPlaceholder[];
   skippedPlaceholders: SkippedPlaceholder[];
   sections: SectionFit;
-  counts: { headings: number; paragraphs: number; lists: number; tables: number };
+  counts: {
+    headings: number;
+    paragraphs: number;
+    lists: number;
+    tables: number;
+  };
   dropped: ImportDrop[];
 }
 
@@ -207,7 +235,8 @@ export interface ConvertedFile {
 }
 
 /** `code` is the key of the `IMPORT_REFUSALS` entry the failure becomes, not that entry's wire code. */
-export type ConvertResult = { ok: true; file: ConvertedFile } | { ok: false; code: ImportRefusalName };
+export type ConvertResult =
+  { ok: true; file: ConvertedFile } | { ok: false; code: ImportRefusalName };
 
 /** The pure finishing step's output (src/domain/import.ts: `finishImport`). Block ids come after (server: ensureBlockIds). */
 export interface FinishedImport {
@@ -241,7 +270,8 @@ export interface FinishImportInput {
 //   { ok: false, code: "upload_unavailable", reason } when the viewer can't see the template's space.
 // GET /api/imports/{uploadId}/view      ImportOriginalView JSON (same permission, same 404).
 
-export type ImportResponse = { ok: true; templateId: string; href: string } | Refused;
+export type ImportResponse =
+  { ok: true; templateId: string; href: string } | Refused;
 
 /** One-shot, like `ucomp_created` (src/domain/arrival-cookies.ts): holds the template id; max-age 60. */
 export const JUST_IMPORTED_COOKIE = "ucomp_imported";
@@ -312,7 +342,14 @@ export interface CopilotPrompt {
 //   Recent (no query only, ≤ 5) · Actions · This template (on a template's pages) · Templates ·
 //   Pages · Settings · Teams.
 
-export type PaletteGroupKey = "recent" | "actions" | "this_template" | "templates" | "pages" | "settings" | "teams";
+export type PaletteGroupKey =
+  | "recent"
+  | "actions"
+  | "this_template"
+  | "templates"
+  | "pages"
+  | "settings"
+  | "teams";
 
 export type PaletteActionKey = "new_template" | "import";
 
@@ -322,10 +359,23 @@ export type TemplateTabKey = "content" | "versions" | "usage" | "activity";
 export type PalettePageKey = "library" | "review" | "usage" | "audit";
 
 export type PaletteItem =
-  | { kind: "template"; id: string; name: string; teamName: string; status: VersionState; href: string }
+  | {
+      kind: "template";
+      id: string;
+      name: string;
+      teamName: string;
+      status: VersionState;
+      href: string;
+    }
   | { kind: "page"; key: PalettePageKey; label: string; href: string }
   | { kind: "template_tab"; key: TemplateTabKey; label: string; href: string }
-  | { kind: "settings"; key: string; label: string; group: "team" | "platform"; href: string }
+  | {
+      kind: "settings";
+      key: string;
+      label: string;
+      group: "team" | "platform";
+      href: string;
+    }
   | { kind: "team"; slug: string; name: string; href: string }
   /** Goes to the space's Library and opens New template (`import` also focuses its Import row). */
   | { kind: "action"; key: PaletteActionKey; label: string; href: string };

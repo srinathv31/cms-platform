@@ -2,7 +2,13 @@
 //
 //   approve        In review → the next stage, or Active at the last one (the previous Active → Superseded)
 
-import { approvedThisRound, ownStages, stageOf, stageRecipients, type RecordedDecision } from "../approval-chain";
+import {
+  approvedThisRound,
+  ownStages,
+  stageOf,
+  stageRecipients,
+  type RecordedDecision,
+} from "../approval-chain";
 import { describeChanges } from "../contract";
 import { makerCheckerRefusal } from "../permissions";
 import { refuse } from "../refusals";
@@ -84,7 +90,17 @@ export function approve(input: {
    */
   decisions?: readonly RecordedDecision[];
 }): ApproveResult {
-  const { version, chain, actorId, actorName, now, active, sunsetPrevious, zone, templateName } = input;
+  const {
+    version,
+    chain,
+    actorId,
+    actorName,
+    now,
+    active,
+    sunsetPrevious,
+    zone,
+    templateName,
+  } = input;
 
   if (version.state !== "in_review") return refuse(REFUSALS.notInReview);
   const wrote = makerCheckerRefusal(actorId, version);
@@ -100,7 +116,8 @@ export function approve(input: {
   if (!isLast && !next) return refuse(REFUSALS.stageMissing);
   const unseen = outputsRefusal(version.channels, input.outputsViewed);
   if (unseen) return refuse(unseen);
-  if (sunsetPrevious !== null && !isAfterToday(sunsetPrevious, now, zone)) return refuse(REFUSALS.sunsetAfterToday);
+  if (sunsetPrevious !== null && !isAfterToday(sunsetPrevious, now, zone))
+    return refuse(REFUSALS.sunsetAfterToday);
   // What the approver looked at, for the audit row: output keys, never a value.
   const outputsViewed = viewedOutputs(version.channels, input.outputsViewed);
 
@@ -126,11 +143,21 @@ export function approve(input: {
       {
         kind: "audit",
         action: "version.stage_approved",
-        details: { number, round, stage: stage.name, stagePosition: stage.position, next: next.name, outputsViewed },
+        details: {
+          number,
+          round,
+          stage: stage.name,
+          stagePosition: stage.position,
+          next: next.name,
+          outputsViewed,
+        },
       },
     ];
     // Not anyone who has approved a stage of this round, this approver included: they can't take this one.
-    const asked = stageRecipients(next, version.writers, [...approved, actorId]);
+    const asked = stageRecipients(next, version.writers, [
+      ...approved,
+      actorId,
+    ]);
     if (asked) {
       effects.push(
         notify({
@@ -154,7 +181,11 @@ export function approve(input: {
     }
     return {
       ok: true,
-      changes: { state: "in_review", currentStage: index + 1, activatedAt: null },
+      changes: {
+        state: "in_review",
+        currentStage: index + 1,
+        activatedAt: null,
+      },
       approval,
       wentLive: false,
       effects,
@@ -164,7 +195,8 @@ export function approve(input: {
   // ── The last stage: the version goes live ──
   // The sunset goes on the version that is Active now (the action's compare-and-set checks it still is):
   // it is still rendering, so this starts a sunset and can't bring back one that has passed.
-  const sunset = active && sunsetPrevious !== null ? sunsetOn(sunsetPrevious, zone) : null;
+  const sunset =
+    active && sunsetPrevious !== null ? sunsetOn(sunsetPrevious, zone) : null;
   const contractChanges = [...(version.contractChanges ?? [])];
   const contractLines = describeChanges(contractChanges, number);
 
@@ -172,7 +204,13 @@ export function approve(input: {
     {
       kind: "audit",
       action: "version.activated",
-      details: { number, round, supersedes: active?.number ?? null, stage: stage.name, outputsViewed },
+      details: {
+        number,
+        round,
+        supersedes: active?.number ?? null,
+        stage: stage.name,
+        outputsViewed,
+      },
     },
   ];
   if (active) {
@@ -188,7 +226,11 @@ export function approve(input: {
       kind: "audit",
       action: "version.sunset_set",
       versionId: active.id,
-      details: { number: active.number, ...sunset.details, previousSunsetAt: null },
+      details: {
+        number: active.number,
+        ...sunset.details,
+        previousSunsetAt: null,
+      },
     });
   }
   if (version.submittedBy) {
@@ -207,7 +249,12 @@ export function approve(input: {
     kind: "consumer_notice",
     notice: "new_version",
     versionId: version.id,
-    payload: { versionNumber: number, activeVersion: number, contractChanges, contractLines },
+    payload: {
+      versionNumber: number,
+      activeVersion: number,
+      contractChanges,
+      contractLines,
+    },
   });
   if (active && sunset) {
     effects.push({
@@ -237,7 +284,12 @@ export function approve(input: {
     result.previous = {
       id: active.id,
       changes: sunset
-        ? { state: "superseded", supersededAt: now, sunsetAt: sunset.at, sunsetSetBy: actorId }
+        ? {
+            state: "superseded",
+            supersededAt: now,
+            sunsetAt: sunset.at,
+            sunsetSetBy: actorId,
+          }
         : { state: "superseded", supersededAt: now },
     };
   }

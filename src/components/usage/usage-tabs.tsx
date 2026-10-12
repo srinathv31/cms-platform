@@ -34,7 +34,11 @@ export function UsageTabs({
     if (id === "overview") params.delete("tab");
     else params.set("tab", id);
     const query = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
   };
 
   return (

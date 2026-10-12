@@ -39,56 +39,101 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
     await checkOpened(page, "Submit for review dialog as maya");
   });
 
-  test("Approve and Request changes dialogs (review screen, Jordan)", async ({ page }) => {
+  test("Approve and Request changes dialogs (review screen, Jordan)", async ({
+    page,
+  }) => {
     await open(page, `/coral-offers/review/${COLLECT}/3`, "jordan");
-    const decision = page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+    const decision = page
+      .locator('aside[aria-label="Decision"]')
+      .filter({ visible: true });
     await viewEveryOutput(page);
     await click(decision.getByRole("button", { name: "Approve", exact: true }));
-    await expect(page.getByRole("dialog", { name: /^Approve v3/ })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: /^Approve v3/ }),
+    ).toBeVisible();
     await checkOpened(page, "Approve dialog as jordan");
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: /^Approve v3/ })).toBeHidden();
-    await click(decision.getByRole("button", { name: "Request changes", exact: true }));
-    await expect(page.getByRole("dialog", { name: /Request changes/ })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: /^Approve v3/ }),
+    ).toBeHidden();
+    await click(
+      decision.getByRole("button", { name: "Request changes", exact: true }),
+    );
+    await expect(
+      page.getByRole("dialog", { name: /Request changes/ }),
+    ).toBeVisible();
     await checkOpened(page, "Request changes dialog as jordan");
   });
 
   test("Review history, unfolded (Versions, Priya)", async ({ page }) => {
     await open(page, `/deposits/templates/${HIGH_YIELD}/versions`, "priya");
-    const entry = page.locator('[data-slot="version-entry"][data-version="2"]').filter({ visible: true });
-    await expect(entry.locator('[data-slot="approved-on-round"]')).toHaveText("Approved on round 3");
-    const fold = entry.getByRole("button", { name: "v2 review history (3 rounds)", exact: true });
+    const entry = page
+      .locator('[data-slot="version-entry"][data-version="2"]')
+      .filter({ visible: true });
+    await expect(entry.locator('[data-slot="approved-on-round"]')).toHaveText(
+      "Approved on round 3",
+    );
+    const fold = entry.getByRole("button", {
+      name: "v2 review history (3 rounds)",
+      exact: true,
+    });
     await expect(fold).toHaveText("Review history (3 rounds)");
     await expect(fold).toHaveAttribute("aria-expanded", "false");
     await click(fold);
     await expect(fold).toHaveAttribute("aria-expanded", "true");
-    await expect(entry.locator('[data-slot="review-history"] li[data-round]')).toHaveCount(3);
+    await expect(
+      entry.locator('[data-slot="review-history"] li[data-round]'),
+    ).toHaveCount(3);
     await checkOpened(page, "Review history unfolded as priya");
   });
 
   test("Revoke dialog (Versions, Jordan)", async ({ page }) => {
     await open(page, `/coral-offers/templates/${COLLECT}/versions`, "jordan");
-    const revoke = page.getByRole("button", { name: /^Revoke v\d/ }).filter({ visible: true }).first();
-    test.skip((await revoke.count()) === 0, "no version can be revoked in the current data");
+    const revoke = page
+      .getByRole("button", { name: /^Revoke v\d/ })
+      .filter({ visible: true })
+      .first();
+    test.skip(
+      (await revoke.count()) === 0,
+      "no version can be revoked in the current data",
+    );
     await click(revoke);
-    await expect(page.getByRole("dialog", { name: /^Revoke v\d/ })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: /^Revoke v\d/ }),
+    ).toBeVisible();
     await checkOpened(page, "Revoke dialog as jordan");
   });
 
   test("Integration sheet (Jordan and Maya)", async ({ page }) => {
     for (const persona of ["jordan", "maya"]) {
       await open(page, `/coral-offers/templates/${RATE_CHANGE}`, persona);
-      await click(page.getByRole("button", { name: /^Share .* — integration details$/ }).filter({ visible: true }));
-      await expect(page.getByRole("dialog").filter({ hasText: "Integration" })).toBeVisible();
+      await click(
+        page
+          .getByRole("button", { name: /^Share .* — integration details$/ })
+          .filter({ visible: true }),
+      );
+      await expect(
+        page.getByRole("dialog").filter({ hasText: "Integration" }),
+      ).toBeVisible();
       await checkOpened(page, `Integration sheet as ${persona}`);
     }
   });
 
   test("Copilot prompt (Variables, Maya)", async ({ page }) => {
     await open(page, `/coral-offers/templates/${FEE_WAIVER}`, "maya");
-    await click(page.getByRole("tab", { name: "Variables", exact: true }).filter({ visible: true }));
-    await click(page.getByRole("button", { name: "Copilot prompt" }).filter({ visible: true }));
-    await expect(page.getByRole("dialog", { name: "Prompt for Copilot" })).toBeVisible();
+    await click(
+      page
+        .getByRole("tab", { name: "Variables", exact: true })
+        .filter({ visible: true }),
+    );
+    await click(
+      page
+        .getByRole("button", { name: "Copilot prompt" })
+        .filter({ visible: true }),
+    );
+    await expect(
+      page.getByRole("dialog", { name: "Prompt for Copilot" }),
+    ).toBeVisible();
     await checkOpened(page, "Copilot prompt as maya");
   });
 
@@ -97,8 +142,12 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
     await click(page.getByRole("button", { name: "Preview", exact: true }));
     // The render streams into the frame: the output is there once the well has stopped being busy and holds a frame.
     const well = page.locator('[data-slot="preview-well"]');
-    await expect(well.locator("iframe, canvas").first()).toBeAttached({ timeout: 20_000 });
-    await expect(well).not.toHaveAttribute("aria-busy", "true", { timeout: 20_000 });
+    await expect(well.locator("iframe, canvas").first()).toBeAttached({
+      timeout: 20_000,
+    });
+    await expect(well).not.toHaveAttribute("aria-busy", "true", {
+      timeout: 20_000,
+    });
     await checkOpened(page, "Preview mode as maya");
   });
 
@@ -109,17 +158,34 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
     await checkOpened(page, "Command palette as maya");
   });
 
-  test("Settings consequence strips (Alex: remove a member; Riley: a channel rule)", async ({ page }) => {
+  test("Settings consequence strips (Alex: remove a member; Riley: a channel rule)", async ({
+    page,
+  }) => {
     await open(page, "/coral-offers/settings/members", "alex");
-    const dialog = page.getByRole("dialog").filter({ has: page.getByRole("navigation", { name: "Settings sections" }) });
+    const dialog = page.getByRole("dialog").filter({
+      has: page.getByRole("navigation", { name: "Settings sections" }),
+    });
     await expect(dialog).toBeVisible();
-    await click(dialog.getByRole("button", { name: "Remove", exact: true }).filter({ visible: true }).first());
-    await expect(dialog.locator('[data-slot="consequence-strip"]').filter({ visible: true })).toBeVisible();
+    await click(
+      dialog
+        .getByRole("button", { name: "Remove", exact: true })
+        .filter({ visible: true })
+        .first(),
+    );
+    await expect(
+      dialog
+        .locator('[data-slot="consequence-strip"]')
+        .filter({ visible: true }),
+    ).toBeVisible();
     await checkOpened(page, "Remove-member strip as alex");
 
     await open(page, "/coral-offers/settings/channel-rules", "riley");
     await click(dialog.getByRole("switch", { name: "Disclosure on Email" }));
-    await expect(dialog.locator('[data-slot="consequence-strip"]').filter({ visible: true })).toBeVisible();
+    await expect(
+      dialog
+        .locator('[data-slot="consequence-strip"]')
+        .filter({ visible: true }),
+    ).toBeVisible();
     await checkOpened(page, "Channel-rule strip as riley");
   });
 
@@ -133,13 +199,17 @@ test.describe("Dialogs, sheets, strips and popovers", () => {
     await expect(page.getByRole("alertdialog")).toBeVisible();
     await checkOpened(page, "Reset demo confirm as maya");
     // Nothing is reset: the confirm is only looked at, then cancelled.
-    await click(page.getByRole("alertdialog").getByRole("button", { name: "Cancel" }));
+    await click(
+      page.getByRole("alertdialog").getByRole("button", { name: "Cancel" }),
+    );
   });
 
   test("Bell, Help, profile menu and team switcher", async ({ page }) => {
     await open(page, "/coral-offers/library", "jordan");
     await click(page.getByRole("button", { name: /^Notifications/ }));
-    await expect(page.getByRole("dialog", { name: "Notifications" })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Notifications" }),
+    ).toBeVisible();
     await checkOpened(page, "Notifications popover as jordan");
     await page.keyboard.press("Escape");
     await click(page.getByRole("button", { name: "Help" }));

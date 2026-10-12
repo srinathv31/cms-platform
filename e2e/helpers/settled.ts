@@ -37,17 +37,28 @@ export async function settled(page: Page, options: { timeout?: number } = {}) {
       const w = window as unknown as { __settled?: Seen };
       const running = document
         .getAnimations()
-        .some((animation) => animation.playState === "running" && animation.effect?.getComputedTiming().iterations !== Infinity);
-      const parts = [`${document.documentElement.scrollWidth}x${document.documentElement.scrollHeight}`];
+        .some(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getComputedTiming().iterations !== Infinity,
+        );
+      const parts = [
+        `${document.documentElement.scrollWidth}x${document.documentElement.scrollHeight}`,
+      ];
       let count = 0;
       for (const el of document.body.querySelectorAll("*")) {
         if (++count > max) break;
         const r = el.getBoundingClientRect();
-        parts.push(`${Math.round(r.x * 2)},${Math.round(r.y * 2)},${Math.round(r.width * 2)},${Math.round(r.height * 2)}`);
+        parts.push(
+          `${Math.round(r.x * 2)},${Math.round(r.y * 2)},${Math.round(r.width * 2)},${Math.round(r.height * 2)}`,
+        );
       }
       const print = parts.join(";");
       const previous = w.__settled;
-      const frames = previous && previous.print === print && !running ? previous.still + 1 : 0;
+      const frames =
+        previous && previous.print === print && !running
+          ? previous.still + 1
+          : 0;
       w.__settled = { print, still: frames };
       return document.fonts.status === "loaded" && frames >= still;
     },

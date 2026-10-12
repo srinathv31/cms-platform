@@ -1,7 +1,13 @@
 import "server-only";
 
 import type { RenderInline } from "@/domain/render/types";
-import { canDraw, hangsAtLineStart, measure, type FontFace, type GlyphCheck } from "./pdf-fonts";
+import {
+  canDraw,
+  hangsAtLineStart,
+  measure,
+  type FontFace,
+  type GlyphCheck,
+} from "./pdf-fonts";
 import type { TypeSpec } from "./pdf-styles";
 
 // Line breaking for the PDF channel. The adapter breaks every line itself, greedily, the way a
@@ -72,7 +78,10 @@ const LEADING_SPACES = /^[\u0020\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/;
  * of the character it matches ("0" for the figure space, "." for the punctuation space, " " for the
  * Ogham space mark outside Ogham). Typographic convention, as browsers' fallback fonts set them.
  */
-const SPACE_WIDTHS: ReadonlyMap<number, number | string> = new Map<number, number | string>([
+const SPACE_WIDTHS: ReadonlyMap<number, number | string> = new Map<
+  number,
+  number | string
+>([
   [0x1680, " "],
   [0x2000, 1 / 2], // en quad
   [0x2001, 1], // em quad
@@ -96,11 +105,35 @@ const MAX_JOINED_WORDS = 4;
 /** A separator cut is preferred unless it leaves the line less than this full. */
 const MIN_SEPARATOR_FILL = 0.4;
 
-const SEPARATOR = new Set([" ", "-", "/", ".", "_", "?", "&", "=", "#", ":", ",", ";", "+", "~", "|", "\\", "@", NBSP, "–", "—"]);
+const SEPARATOR = new Set([
+  " ",
+  "-",
+  "/",
+  ".",
+  "_",
+  "?",
+  "&",
+  "=",
+  "#",
+  ":",
+  ",",
+  ";",
+  "+",
+  "~",
+  "|",
+  "\\",
+  "@",
+  NBSP,
+  "–",
+  "—",
+]);
 /** A combining mark stays on the line of the character it sits on. */
 const MARK = /\p{M}/u;
 
-export const faceOf = (spec: TypeSpec, piece: Pick<Piece, "bold" | "italic">): FontFace => ({
+export const faceOf = (
+  spec: TypeSpec,
+  piece: Pick<Piece, "bold" | "italic">,
+): FontFace => ({
   family: spec.family,
   weight: piece.bold ? 700 : spec.weight,
   italic: piece.italic,
@@ -110,7 +143,12 @@ export const faceOf = (spec: TypeSpec, piece: Pick<Piece, "bold" | "italic">): F
  * Resolves marks and breaks the text into lines for a box `width` points wide. Every character is
  * checked against the face that will draw it (`glyphs`).
  */
-export function prepareText(inlines: readonly RenderInline[], spec: TypeSpec, width: number, glyphs: GlyphCheck): PreparedText {
+export function prepareText(
+  inlines: readonly RenderInline[],
+  spec: TypeSpec,
+  width: number,
+  glyphs: GlyphCheck,
+): PreparedText {
   // A box narrower than its padding (deep nesting in a narrow cell) still sets its text: a glyph a line.
   const limit = Number.isNaN(width) ? 0 : Math.max(0, width - SAFETY);
   const out: PreparedInline[] = [];
@@ -151,10 +189,21 @@ export function prepareText(inlines: readonly RenderInline[], spec: TypeSpec, wi
       kept.push(piece);
       out.push(piece);
     }
-    if (inline.variable !== undefined && kept.some((piece) => piece.text.includes(" "))) {
-      const words = kept.map((piece) => piece.text).join("").trim().split(/ +/).length;
-      const wide = kept.reduce((sum, piece) => sum + pieceWidth(piece, piece.text, spec), 0);
-      if (words <= MAX_JOINED_WORDS && wide <= limit) for (const piece of kept) joined.add(piece);
+    if (
+      inline.variable !== undefined &&
+      kept.some((piece) => piece.text.includes(" "))
+    ) {
+      const words = kept
+        .map((piece) => piece.text)
+        .join("")
+        .trim()
+        .split(/ +/).length;
+      const wide = kept.reduce(
+        (sum, piece) => sum + pieceWidth(piece, piece.text, spec),
+        0,
+      );
+      if (words <= MAX_JOINED_WORDS && wide <= limit)
+        for (const piece of kept) joined.add(piece);
     }
   }
   const lines = breakLines(out, spec, limit, leads, joined);
@@ -176,14 +225,22 @@ function withDrawableSpaces(run: Piece, face: FontFace, size: number): Piece[] {
     if (missing === null) pieces.push({ ...run, text });
     else {
       const target = SPACE_WIDTHS.get(missing.codePointAt(0)!)!;
-      const wide = typeof target === "number" ? target * size : measure(target, face, size);
-      pieces.push({ ...run, text: NBSP.repeat(text.length), spacing: wide - measure(NBSP, face, size) });
+      const wide =
+        typeof target === "number"
+          ? target * size
+          : measure(target, face, size);
+      pieces.push({
+        ...run,
+        text: NBSP.repeat(text.length),
+        spacing: wide - measure(NBSP, face, size),
+      });
     }
     text = "";
   };
   for (const ch of run.text) {
     const codePoint = ch.codePointAt(0)!;
-    const substitute = SPACE_WIDTHS.has(codePoint) && !canDraw(codePoint, face) ? ch : null;
+    const substitute =
+      SPACE_WIDTHS.has(codePoint) && !canDraw(codePoint, face) ? ch : null;
     if (substitute !== missing) {
       flush();
       missing = substitute;
@@ -210,7 +267,8 @@ interface Char {
 }
 
 type Spaces = { kind: "lead" | "gap"; chars: Char[]; width: number };
-type Unit = Spaces | { kind: "word"; chars: Char[]; width: number } | { kind: "break" };
+type Unit =
+  Spaces | { kind: "word"; chars: Char[]; width: number } | { kind: "break" };
 
 interface Edit {
   start: number;
@@ -233,8 +291,14 @@ function breakLines(
     list.push(e);
     edits.set(piece, list);
   };
-  const remove = (c: Char) => edit(c.piece, { start: c.offset, end: c.offset + c.ch.length, text: "" });
-  const newlineAfter = (c: Char) => edit(c.piece, { start: c.offset + c.ch.length, end: c.offset + c.ch.length, text: "\n" });
+  const remove = (c: Char) =>
+    edit(c.piece, { start: c.offset, end: c.offset + c.ch.length, text: "" });
+  const newlineAfter = (c: Char) =>
+    edit(c.piece, {
+      start: c.offset + c.ch.length,
+      end: c.offset + c.ch.length,
+      text: "\n",
+    });
   /** Keeps the spaces that fit in `room` and absorbs the rest (they would hang past the line's end). */
   const fit = (spaces: Spaces, room: number) => {
     let width = 0;
@@ -296,7 +360,13 @@ function breakLines(
     const gapWidth = gap && !empty ? gap.width : 0;
     if (!empty && used + gapWidth + unit.width > room) {
       // Wrap in the gap before this word: the spaces there become the line break.
-      gap?.chars.forEach((c, i) => edit(c.piece, { start: c.offset, end: c.offset + 1, text: i === 0 ? "\n" : "" }));
+      gap?.chars.forEach((c, i) =>
+        edit(c.piece, {
+          start: c.offset,
+          end: c.offset + 1,
+          text: i === 0 ? "\n" : "",
+        }),
+      );
       lines += 1;
       used = 0;
       room = limit;
@@ -322,7 +392,8 @@ function breakLines(
   for (const [piece, list] of edits) {
     list.sort((a, b) => b.start - a.start);
     let text = piece.text;
-    for (const e of list) text = text.slice(0, e.start) + e.text + text.slice(e.end);
+    for (const e of list)
+      text = text.slice(0, e.start) + e.text + text.slice(e.end);
     piece.text = text;
   }
   return lines;
@@ -333,11 +404,17 @@ function breakLines(
  * possibly across pieces), gaps (runs of U+0020 between words, where a line may wrap) and hard
  * breaks, measured. A joined variable's spaces belong to its word.
  */
-function toUnits(stream: PreparedInline[], spec: TypeSpec, leads: ReadonlySet<Piece>, joined: ReadonlySet<Piece>): Unit[] {
+function toUnits(
+  stream: PreparedInline[],
+  spec: TypeSpec,
+  leads: ReadonlySet<Piece>,
+  joined: ReadonlySet<Piece>,
+): Unit[] {
   const units: Unit[] = [];
   let current = null as { kind: "lead" | "word" | "gap"; chars: Char[] } | null;
   const close = () => {
-    if (current) units.push({ ...current, width: widthOf(current.chars, spec) });
+    if (current)
+      units.push({ ...current, width: widthOf(current.chars, spec) });
     current = null;
   };
   for (const item of stream) {
@@ -369,8 +446,17 @@ function toUnits(stream: PreparedInline[], spec: TypeSpec, leads: ReadonlySet<Pi
  */
 function hangingWidth(lead: Spaces, spec: TypeSpec): number {
   let end = 0;
-  while (end < lead.chars.length && hangsAtLineStart(lead.chars[end]!.ch.codePointAt(0)!, faceOf(spec, lead.chars[end]!.piece))) end += 1;
-  return end === lead.chars.length ? lead.width : widthOf(lead.chars.slice(0, end), spec);
+  while (
+    end < lead.chars.length &&
+    hangsAtLineStart(
+      lead.chars[end]!.ch.codePointAt(0)!,
+      faceOf(spec, lead.chars[end]!.piece),
+    )
+  )
+    end += 1;
+  return end === lead.chars.length
+    ? lead.width
+    : widthOf(lead.chars.slice(0, end), spec);
 }
 
 /** Width of a run of characters, measured per piece (with kerning inside each piece). */
@@ -393,9 +479,14 @@ function widthOf(chars: readonly Char[], spec: TypeSpec): number {
  * Cut points for a word wider than `limit`: each is the number of characters before a cut. `rest`
  * is the width of what follows the last cut. Cuts are bare: nothing is added at either side.
  */
-function cutWord(chars: readonly Char[], spec: TypeSpec, limit: number): { cuts: number[]; rest: number } {
+function cutWord(
+  chars: readonly Char[],
+  spec: TypeSpec,
+  limit: number,
+): { cuts: number[]; rest: number } {
   const prefix = [0];
-  for (const c of chars) prefix.push(prefix[prefix.length - 1] + pieceWidth(c.piece, c.ch, spec));
+  for (const c of chars)
+    prefix.push(prefix[prefix.length - 1] + pieceWidth(c.piece, c.ch, spec));
   const span = (a: number, b: number) => prefix[b] - prefix[a];
   const n = chars.length;
   const cuts: number[] = [];

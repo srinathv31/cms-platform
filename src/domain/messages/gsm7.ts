@@ -67,7 +67,9 @@ const EXTENSION_TABLE: ReadonlyArray<readonly [code: number, char: string]> = [
 
 /** Each character of the GSM 7-bit default alphabet, with its code. 127 characters: 0x1B is the escape. */
 export const GSM7_DEFAULT_ALPHABET: ReadonlyMap<string, number> = new Map(
-  [...DEFAULT_ALPHABET].flatMap((char, code) => (code === ESCAPE ? [] : [[char, code] as const])),
+  [...DEFAULT_ALPHABET].flatMap((char, code) =>
+    code === ESCAPE ? [] : [[char, code] as const],
+  ),
 );
 
 /** Each character of the extension table, with its code after the escape. 10 characters, 2 septets each. */
@@ -286,7 +288,8 @@ const EQUIVALENTS: ReadonlyMap<string, string> = new Map([
 function replacementFor(cluster: string): string | undefined {
   // A decomposed letter (e + U+0301) whose composed form is GSM-7 (é) is the same text: offer the composed form.
   const composed = cluster.normalize("NFC");
-  if (composed !== cluster && smsEncoding(composed) === "GSM-7") return composed;
+  if (composed !== cluster && smsEncoding(composed) === "GSM-7")
+    return composed;
   let out = "";
   for (const char of cluster) {
     if (gsm7Septets(char) !== null) out += char;
@@ -326,18 +329,27 @@ function unsplittable(text: string, encoding: SmsEncoding): Span[] {
   const spans: Span[] = [];
   if (encoding === "GSM-7") {
     // Every GSM-7 character is one code unit; an extension character costs its escape too.
-    for (let i = 0; i < text.length; i++) spans.push({ start: i, end: i + 1, units: gsm7Septets(text[i]) ?? 0 });
+    for (let i = 0; i < text.length; i++)
+      spans.push({ start: i, end: i + 1, units: gsm7Septets(text[i]) ?? 0 });
     return spans;
   }
   for (const { segment, index } of graphemes(text)) {
     if (segment !== "\r\n" && segment.length <= UCS2_PER_PART) {
-      spans.push({ start: index, end: index + segment.length, units: segment.length });
+      spans.push({
+        start: index,
+        end: index + segment.length,
+        units: segment.length,
+      });
       continue;
     }
     // CRLF, and a cluster too long for any part, split between code points. A surrogate pair is one code point.
     let at = index;
     for (const codePoint of segment) {
-      spans.push({ start: at, end: at + codePoint.length, units: codePoint.length });
+      spans.push({
+        start: at,
+        end: at + codePoint.length,
+        units: codePoint.length,
+      });
       at += codePoint.length;
     }
   }
@@ -350,7 +362,8 @@ function split(text: string): { encoding: SmsEncoding; parts: Span[] } {
   const total = pieces.reduce((sum, piece) => sum + piece.units, 0);
   const { single, perPart } = CAPACITY[encoding];
   if (total === 0) return { encoding, parts: [] };
-  if (total <= single) return { encoding, parts: [{ start: 0, end: text.length, units: total }] };
+  if (total <= single)
+    return { encoding, parts: [{ start: 0, end: text.length, units: total }] };
 
   const parts: Span[] = [];
   let current: Span | undefined;
@@ -372,7 +385,12 @@ function countGraphemes(text: string): number {
   if (smsEncoding(text) === "GSM-7") {
     // Every GSM-7 character is its own cluster, except a CRLF, which is one.
     let crlf = 0;
-    for (let i = text.indexOf("\r\n"); i !== -1; i = text.indexOf("\r\n", i + 2)) crlf++;
+    for (
+      let i = text.indexOf("\r\n");
+      i !== -1;
+      i = text.indexOf("\r\n", i + 2)
+    )
+      crlf++;
     return text.length - crlf;
   }
   return graphemeCount(text);

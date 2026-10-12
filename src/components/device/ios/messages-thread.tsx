@@ -60,13 +60,25 @@ export function MessagesThread({
   return (
     <div className="absolute inset-0 flex flex-col bg-(--device-bg)">
       <StatusBar time={clock.time} ink="app" cutout={cutoutWidth("ios")} />
-      <header className="relative flex shrink-0 flex-col items-center" style={{ paddingTop: pt(58), paddingBottom: pt(6) }}>
+      <header
+        className="relative flex shrink-0 flex-col items-center"
+        style={{ paddingTop: pt(58), paddingBottom: pt(6) }}
+      >
         <span
           aria-hidden
           className="absolute grid place-items-center rounded-full"
-          style={{ ...CHROME, left: pt(16), top: pt(62), width: pt(44), height: pt(44) }}
+          style={{
+            ...CHROME,
+            left: pt(16),
+            top: pt(62),
+            width: pt(44),
+            height: pt(44),
+          }}
         >
-          <ChevronLeft strokeWidth={2.4} style={{ width: pt(24), height: pt(24), marginLeft: pt(-2) }} />
+          <ChevronLeft
+            strokeWidth={2.4}
+            style={{ width: pt(24), height: pt(24), marginLeft: pt(-2) }}
+          />
         </span>
         <span
           aria-hidden
@@ -86,7 +98,11 @@ export function MessagesThread({
           }}
         >
           {sender === null ? (
-            <span data-slot="sms-sender" data-placeholder="" className="text-(--device-label-2)">
+            <span
+              data-slot="sms-sender"
+              data-placeholder=""
+              className="text-(--device-label-2)"
+            >
               {NO_SENDER}
             </span>
           ) : (
@@ -94,7 +110,12 @@ export function MessagesThread({
               {sender}
             </span>
           )}
-          <ChevronRight aria-hidden strokeWidth={2.4} className="text-(--device-label-3)" style={{ width: pt(13), height: pt(13) }} />
+          <ChevronRight
+            aria-hidden
+            strokeWidth={2.4}
+            className="text-(--device-label-3)"
+            style={{ width: pt(13), height: pt(13) }}
+          />
         </span>
       </header>
 
@@ -107,23 +128,48 @@ export function MessagesThread({
         style={{ padding: `${pt(10)} ${pt(16)} ${pt(16)}` }}
       >
         {messages.map((message, i) => (
-          <div key={i} ref={i === messages.length - 1 ? newest : undefined} data-slot="sms-message" style={{ marginTop: i === 0 ? 0 : pt(showsStamp(messages, i) ? 14 : 4) }}>
+          <div
+            key={i}
+            ref={i === messages.length - 1 ? newest : undefined}
+            data-slot="sms-message"
+            style={{
+              marginTop: i === 0 ? 0 : pt(showsStamp(messages, i) ? 14 : 4),
+            }}
+          >
             {showsStamp(messages, i) ? (
-              <p className="text-center text-(--device-label-2)" style={{ ...meta, marginBottom: pt(10) }}>
-                {i === 0 ? <span className="block font-semibold">Text Message • SMS</span> : null}
+              <p
+                className="text-center text-(--device-label-2)"
+                style={{ ...meta, marginBottom: pt(10) }}
+              >
+                {i === 0 ? (
+                  <span className="block font-semibold">
+                    Text Message • SMS
+                  </span>
+                ) : null}
                 <span className="block">
-                  <span className="font-semibold">{message.day ?? "Today"}</span> <span className="tabular-nums">{message.time}</span>
+                  <span className="font-semibold">
+                    {message.day ?? "Today"}
+                  </span>{" "}
+                  <span className="tabular-nums">{message.time}</span>
                 </span>
               </p>
             ) : null}
             <div
               data-slot="sms-bubble"
               className="relative isolate w-fit max-w-[75%] bg-(--device-bubble-in) whitespace-pre-wrap text-(--device-label) [overflow-wrap:anywhere]"
-              style={{ ...body, marginLeft: pt(2), borderRadius: pt(19), padding: `${pt(7)} ${pt(13)} ${pt(8)}` }}
+              style={{
+                ...body,
+                marginLeft: pt(2),
+                borderRadius: pt(19),
+                padding: `${pt(7)} ${pt(13)} ${pt(8)}`,
+              }}
             >
               {linkRuns(message.text).map((run, j) =>
                 run.link ? (
-                  <span key={j} className="underline decoration-from-font underline-offset-2">
+                  <span
+                    key={j}
+                    className="underline decoration-from-font underline-offset-2"
+                  >
                     {run.text}
                   </span>
                 ) : (
@@ -136,19 +182,36 @@ export function MessagesThread({
         ))}
       </m.div>
 
-      <div aria-hidden className="flex shrink-0 items-end" style={{ gap: pt(8), padding: `${pt(8)} ${pt(12)} ${pt(38)}` }}>
+      <div
+        aria-hidden
+        className="flex shrink-0 items-end"
+        style={{ gap: pt(8), padding: `${pt(8)} ${pt(12)} ${pt(38)}` }}
+      >
         <span
           className="grid shrink-0 place-items-center rounded-full text-(--device-label-2)"
-          style={{ background: "var(--device-fill)", width: pt(36), height: pt(36) }}
+          style={{
+            background: "var(--device-fill)",
+            width: pt(36),
+            height: pt(36),
+          }}
         >
           <Plus strokeWidth={2.2} style={{ width: pt(20), height: pt(20) }} />
         </span>
         <span
           className="flex min-w-0 flex-1 items-center justify-between rounded-full text-(--device-label-3)"
-          style={{ ...body, height: pt(36), padding: `0 ${pt(6)} 0 ${pt(14)}`, boxShadow: `inset 0 0 0 ${pt(0.75)} var(--device-separator)` }}
+          style={{
+            ...body,
+            height: pt(36),
+            padding: `0 ${pt(6)} 0 ${pt(14)}`,
+            boxShadow: `inset 0 0 0 ${pt(0.75)} var(--device-separator)`,
+          }}
         >
           <span className="truncate">Text Message • SMS</span>
-          <Mic strokeWidth={2} className="shrink-0" style={{ width: pt(20), height: pt(20), marginRight: pt(4) }} />
+          <Mic
+            strokeWidth={2}
+            className="shrink-0"
+            style={{ width: pt(20), height: pt(20), marginRight: pt(4) }}
+          />
         </span>
       </div>
       <HomeIndicator ink="app" />

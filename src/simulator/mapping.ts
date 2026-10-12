@@ -25,7 +25,10 @@ const AUTO: Readonly<Record<string, SimFieldPath>> = {
   country: "card.purchaseCountry",
 };
 
-function fits(path: string | null | undefined, variable: ApiVariable): path is SimFieldPath {
+function fits(
+  path: string | null | undefined,
+  variable: ApiVariable,
+): path is SimFieldPath {
   const field = simField(path);
   return field !== null && field.fits.includes(variable.type);
 }
@@ -43,16 +46,22 @@ export function suggestMapping(
 ): Record<string, SimFieldPath> {
   // New key → the key it was sent under before.
   const renamedFrom = new Map<string, string>();
-  for (const change of changes) if (change.kind === "key_renamed") renamedFrom.set(change.to, change.from);
+  for (const change of changes)
+    if (change.kind === "key_renamed") renamedFrom.set(change.to, change.from);
 
-  const mapped = (key: string | undefined) => (key !== undefined && Object.hasOwn(current, key) ? current[key] : null);
+  const mapped = (key: string | undefined) =>
+    key !== undefined && Object.hasOwn(current, key) ? current[key] : null;
   const out: Record<string, SimFieldPath> = {};
   for (const variable of variables) {
     const kept = mapped(variable.key);
     const carried = mapped(renamedFrom.get(variable.key));
     if (fits(kept, variable)) out[variable.key] = kept;
     else if (fits(carried, variable)) out[variable.key] = carried;
-    else if (Object.hasOwn(AUTO, variable.key) && fits(AUTO[variable.key], variable)) out[variable.key] = AUTO[variable.key];
+    else if (
+      Object.hasOwn(AUTO, variable.key) &&
+      fits(AUTO[variable.key], variable)
+    )
+      out[variable.key] = AUTO[variable.key];
   }
   return out;
 }
@@ -62,11 +71,19 @@ export function missingRequired(
   variables: readonly ApiVariable[],
   mapping: Readonly<Record<string, SimFieldPath | string | null>>,
 ): ApiVariable[] {
-  return variables.filter((v) => v.required && simField(Object.hasOwn(mapping, v.key) ? mapping[v.key] : null) === null);
+  return variables.filter(
+    (v) =>
+      v.required &&
+      simField(Object.hasOwn(mapping, v.key) ? mapping[v.key] : null) === null,
+  );
 }
 
 /** One field's canonical value for a customer and offer, or null when Coral has none. */
-export function fieldValue(path: SimFieldPath, customer: SimCustomerRecord, offer: SimOfferRecord): string | null {
+export function fieldValue(
+  path: SimFieldPath,
+  customer: SimCustomerRecord,
+  offer: SimOfferRecord,
+): string | null {
   switch (path) {
     case "customer.firstName":
       return customer.firstName;
@@ -106,7 +123,9 @@ export function fieldValue(path: SimFieldPath, customer: SimCustomerRecord, offe
     case "offer.months":
       return offer.terms ? String(offer.terms.months) : null;
     case "offer.annualFee":
-      return offer.terms?.annualFee === undefined ? null : String(offer.terms.annualFee);
+      return offer.terms?.annualFee === undefined
+        ? null
+        : String(offer.terms.annualFee);
     case "offer.endsOn":
       return offer.terms?.endsOn ?? null;
   }
@@ -137,6 +156,10 @@ function joinWithAnd(items: readonly string[]): string {
 }
 
 /** "Map First name and Annual fee to send." Empty when nothing is missing. */
-export function blockedSentence(missing: readonly Pick<ApiVariable, "label">[]): string {
-  return missing.length === 0 ? "" : `Map ${joinWithAnd(missing.map((v) => v.label))} to send.`;
+export function blockedSentence(
+  missing: readonly Pick<ApiVariable, "label">[],
+): string {
+  return missing.length === 0
+    ? ""
+    : `Map ${joinWithAnd(missing.map((v) => v.label))} to send.`;
 }

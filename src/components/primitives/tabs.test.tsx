@@ -9,7 +9,9 @@ import { TAB, TAB_LABEL } from "./tab-styles";
 // The app's tabs: Base UI's tablist in the workspace tab bar's look, the underline under the chosen
 // tab only, the arrow keys choosing as they move.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 type View = "overview" | "consumers";
 
@@ -29,11 +31,24 @@ afterEach(async () => {
 
 const show = (node: React.ReactNode) => act(async () => root.render(node));
 const tabs = () => [...container.querySelectorAll<HTMLElement>('[role="tab"]')];
-const tab = (name: string) => tabs().find((t) => t.textContent?.startsWith(name))!;
-const panels = () => [...container.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
-const underlines = () => [...container.querySelectorAll('[role="tab"] > span:last-child:not(:first-child)')];
+const tab = (name: string) =>
+  tabs().find((t) => t.textContent?.startsWith(name))!;
+const panels = () => [
+  ...container.querySelectorAll<HTMLElement>('[role="tabpanel"]'),
+];
+const underlines = () => [
+  ...container.querySelectorAll(
+    '[role="tab"] > span:last-child:not(:first-child)',
+  ),
+];
 
-function Bar({ onChange = () => {}, keepMounted = false }: { onChange?: (v: View) => void; keepMounted?: boolean }) {
+function Bar({
+  onChange = () => {},
+  keepMounted = false,
+}: {
+  onChange?: (v: View) => void;
+  keepMounted?: boolean;
+}) {
   const [value, setValue] = useState<View>("overview");
   return (
     <Tabs
@@ -62,8 +77,16 @@ function Bar({ onChange = () => {}, keepMounted = false }: { onChange?: (v: View
 describe("Tabs", () => {
   it("is a tablist named by its label, with the chosen tab selected and underlined", async () => {
     await show(<Bar />);
-    expect(container.querySelector('[role="tablist"]')?.getAttribute("aria-label")).toBe("Usage");
-    expect(tabs().map((t) => [t.textContent, t.getAttribute("aria-selected"), t.tabIndex])).toEqual([
+    expect(
+      container.querySelector('[role="tablist"]')?.getAttribute("aria-label"),
+    ).toBe("Usage");
+    expect(
+      tabs().map((t) => [
+        t.textContent,
+        t.getAttribute("aria-selected"),
+        t.tabIndex,
+      ]),
+    ).toEqual([
       ["Overview", "true", 0],
       ["Consumers3", "false", -1],
     ]);
@@ -73,7 +96,8 @@ describe("Tabs", () => {
 
   it("wears the tab idiom: the 44px box and the label the focus ring goes round, with the count inside it", async () => {
     await show(<Bar />);
-    for (const c of TAB.split(" ")) expect(tab("Consumers").className).toContain(c);
+    for (const c of TAB.split(" "))
+      expect(tab("Consumers").className).toContain(c);
     expect(tab("Overview").className).toContain("font-medium");
     expect(tab("Consumers").className).toContain("text-text-muted");
     const label = tab("Consumers").firstElementChild!;
@@ -98,7 +122,13 @@ describe("Tabs", () => {
     const arrow = (key: string) =>
       act(async () => {
         const focused = document.activeElement as HTMLElement;
-        focused.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+        focused.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
       });
     await act(async () => tab("Overview").focus());
     await arrow("ArrowRight");
@@ -124,7 +154,11 @@ describe("Tabs", () => {
     const html = renderToStaticMarkup(
       <Tabs value="document" onValueChange={() => {}}>
         <TabList label="View">
-          <Tab value="document" id="review-tab-document" aria-controls="review-panel-document">
+          <Tab
+            value="document"
+            id="review-tab-document"
+            aria-controls="review-panel-document"
+          >
             Document
           </Tab>
           <Tab value="preview" id="review-tab-preview">

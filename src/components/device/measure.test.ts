@@ -42,7 +42,9 @@ describe("visibleLength", () => {
   });
 
   it("returns 0 when nothing shows", () => {
-    expect(visibleLength(all, () => ({ top: 50, bottom: 70, right: 10 }), CLIP, one)).toBe(0);
+    expect(
+      visibleLength(all, () => ({ top: 50, bottom: 70, right: 10 }), CLIP, one),
+    ).toBe(0);
     expect(visibleLength([], layout(), CLIP, one)).toBe(0);
   });
 });

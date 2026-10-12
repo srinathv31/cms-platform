@@ -13,15 +13,20 @@ export function unique<T>(items: readonly T[]): T[] {
 }
 
 /** A version past Draft always has its number; a missing one is a bug, not a refusal. */
-export function numberOf(version: { number: number | null; state: VersionState }): number {
-  if (version.number === null) throw new LifecycleError(`A ${version.state} version has no number.`);
+export function numberOf(version: {
+  number: number | null;
+  state: VersionState;
+}): number {
+  if (version.number === null)
+    throw new LifecycleError(`A ${version.state} version has no number.`);
   return version.number;
 }
 
 /** A version past Draft always has its number and its round; a missing one is a bug, not a refusal. */
 export function roundOf(version: RoundRow): NumberedRound {
   const number = numberOf(version);
-  if (version.round === null) throw new LifecycleError(`A ${version.state} version has no round.`);
+  if (version.round === null)
+    throw new LifecycleError(`A ${version.state} version has no round.`);
   return { number, round: version.round, state: version.state };
 }
 
@@ -41,7 +46,11 @@ export function teamApproversExcept(...userIds: string[]): Recipients {
 }
 
 /** A notification effect; `body` is left out when there is none. */
-export function notify(n: Omit<NotificationEffect, "kind" | "body"> & { body?: string | null }): NotificationEffect {
+export function notify(
+  n: Omit<NotificationEffect, "kind" | "body"> & { body?: string | null },
+): NotificationEffect {
   const { body, ...rest } = n;
-  return body ? { kind: "notification", ...rest, body } : { kind: "notification", ...rest };
+  return body
+    ? { kind: "notification", ...rest, body }
+    : { kind: "notification", ...rest };
 }

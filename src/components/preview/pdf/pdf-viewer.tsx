@@ -6,7 +6,14 @@
 // PdfController; this component renders the boxes and the states around them.
 
 import { Download, FileText } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type JSX,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -28,7 +35,8 @@ export interface PdfViewerProps {
   contentClassName?: string;
 }
 
-type View = { kind: "waiting" } | { kind: "pages"; doc: LoadedPdf } | { kind: "failed" };
+type View =
+  { kind: "waiting" } | { kind: "pages"; doc: LoadedPdf } | { kind: "failed" };
 
 /** US Letter, the shape of the skeleton and the fallback before any page size is known. */
 const LETTER_ASPECT = "612 / 792";
@@ -36,7 +44,14 @@ const LETTER_ASPECT = "612 / 792";
 /** The padding round the pages when the host gives none. */
 const DEFAULT_INSET = "p-6";
 
-export function PdfViewer({ data, fileName, onLoad, onFallbackDownload, className, contentClassName }: PdfViewerProps): JSX.Element {
+export function PdfViewer({
+  data,
+  fileName,
+  onLoad,
+  onFallbackDownload,
+  className,
+  contentClassName,
+}: PdfViewerProps): JSX.Element {
   const [view, setView] = useState<View>({ kind: "waiting" });
   const [busy, setBusy] = useState(false);
   // No bytes: back to the skeleton (state adjusted during render, so there is no stale frame).
@@ -52,7 +67,9 @@ export function PdfViewer({ data, fileName, onLoad, onFallbackDownload, classNam
       }),
   );
   useLayoutEffect(() => {
-    controller.onShown(onLoad ? (doc) => onLoad({ numPages: doc.numPages }) : null);
+    controller.onShown(
+      onLoad ? (doc) => onLoad({ numPages: doc.numPages }) : null,
+    );
   }, [controller, onLoad]);
 
   useLayoutEffect(() => {
@@ -73,22 +90,40 @@ export function PdfViewer({ data, fileName, onLoad, onFallbackDownload, classNam
     if (view.kind === "pages") controller.adopt(view.doc);
   }, [controller, view]);
 
-  const register = useCallback((index: number, el: HTMLElement | null) => controller.register(index, el), [controller]);
+  const register = useCallback(
+    (index: number, el: HTMLElement | null) => controller.register(index, el),
+    [controller],
+  );
 
   return (
     <div
       role="region"
       aria-label="PDF preview"
-      aria-busy={busy || (view.kind === "waiting" && data !== null) || undefined}
+      aria-busy={
+        busy || (view.kind === "waiting" && data !== null) || undefined
+      }
       className={cn("bg-surface-sunken", className)}
     >
-      <div ref={columnRef} className={cn("flex flex-col gap-5", contentClassName ?? DEFAULT_INSET)}>
+      <div
+        ref={columnRef}
+        className={cn("flex flex-col gap-5", contentClassName ?? DEFAULT_INSET)}
+      >
         {view.kind === "pages" ? (
           view.doc.sizes.map((size, index) => (
-            <PdfPage key={index} index={index} count={view.doc.numPages} size={size} register={register} />
+            <PdfPage
+              key={index}
+              index={index}
+              count={view.doc.numPages}
+              size={size}
+              register={register}
+            />
           ))
         ) : view.kind === "failed" && data ? (
-          <Fallback data={data} fileName={fileName} onDownload={onFallbackDownload} />
+          <Fallback
+            data={data}
+            fileName={fileName}
+            onDownload={onFallbackDownload}
+          />
         ) : (
           <PageSkeleton />
         )}
@@ -118,10 +153,25 @@ function PageSkeleton() {
 }
 
 /** When pdf.js can't show the file: the file itself, one click away. */
-function Fallback({ data, fileName, onDownload }: { data: Uint8Array; fileName: string; onDownload?: () => void }) {
+function Fallback({
+  data,
+  fileName,
+  onDownload,
+}: {
+  data: Uint8Array;
+  fileName: string;
+  onDownload?: () => void;
+}) {
   return (
-    <div className="flex w-full flex-col items-center justify-center gap-4 px-6" style={{ aspectRatio: LETTER_ASPECT }}>
-      <FileText className="size-8 text-text-subtle" strokeWidth={1.5} aria-hidden />
+    <div
+      className="flex w-full flex-col items-center justify-center gap-4 px-6"
+      style={{ aspectRatio: LETTER_ASPECT }}
+    >
+      <FileText
+        className="size-8 text-text-subtle"
+        strokeWidth={1.5}
+        aria-hidden
+      />
       <p className="max-w-full truncate text-sm text-text-muted">
         <span className="sr-only">Preview unavailable. </span>
         {fileName}

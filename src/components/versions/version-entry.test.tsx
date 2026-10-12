@@ -4,14 +4,19 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import type { Person } from "@/domain/review-types";
-import type { RoundHistoryItem, VersionTimelineItem } from "@/server/queries/versions";
+import type {
+  RoundHistoryItem,
+  VersionTimelineItem,
+} from "@/server/queries/versions";
 
 // One version's entry on the Versions tab, as the label rule shows it (domain/rounds.ts): no round on a
 // version approved on its first try, "Approved on round 3" on one that took three, the round in the
 // heading while a round after a send-back is in review, and the review history folded until opened,
 // each round linking to its own review screen. The server actions under the entry's islands are replaced.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@/server/actions/review", () => ({
   setSunset: vi.fn(),
@@ -20,7 +25,14 @@ vi.mock("@/server/actions/review", () => ({
   cancelRevoke: vi.fn(),
 }));
 vi.mock("next/link", () => ({
-  default: ({ href, children, ...rest }: { href: string; children: ReactNode }) => (
+  default: ({
+    href,
+    children,
+    ...rest
+  }: {
+    href: string;
+    children: ReactNode;
+  }) => (
     <a href={href} {...rest}>
       {children}
     </a>
@@ -31,9 +43,19 @@ const { VersionEntry } = await import("./version-entry");
 
 const NOW = new Date("2026-10-09T15:00:00.000Z");
 const eli: Person = { id: "eli", name: "Eli Park", initials: "EP", hue: 120 };
-const naomi: Person = { id: "naomi", name: "Naomi Reyes", initials: "NR", hue: 300 };
+const naomi: Person = {
+  id: "naomi",
+  name: "Naomi Reyes",
+  initials: "NR",
+  hue: 300,
+};
 const maya: Person = { id: "maya", name: "Maya Chen", initials: "MC", hue: 40 };
-const jordan: Person = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 200 };
+const jordan: Person = {
+  id: "jordan",
+  name: "Jordan Ellis",
+  initials: "JE",
+  hue: 200,
+};
 
 const CTX = {
   templateId: "UC-ABC123",
@@ -61,15 +83,30 @@ function entry(over: Partial<VersionTimelineItem> = {}): VersionTimelineItem {
     sunsetPassed: false,
     contractLines: [],
     contractItems: [],
-    decisions: [{ kind: "approved", stageName: "Team approver", by: naomi, at: "2026-09-25T12:00:00.000Z" }],
+    decisions: [
+      {
+        kind: "approved",
+        stageName: "Team approver",
+        by: naomi,
+        at: "2026-09-25T12:00:00.000Z",
+      },
+    ],
     lastRenderAt: null,
     renders30d: 0,
-    can: { setSunset: OK, startRevoke: OK, confirmRevoke: NO_REVOKE, cancelRevoke: NO_REVOKE },
+    can: {
+      setSunset: OK,
+      startRevoke: OK,
+      confirmRevoke: NO_REVOKE,
+      cancelRevoke: NO_REVOKE,
+    },
     ...over,
   };
 }
 
-const round = (n: number, over: Partial<RoundHistoryItem> = {}): RoundHistoryItem => ({
+const round = (
+  n: number,
+  over: Partial<RoundHistoryItem> = {},
+): RoundHistoryItem => ({
   id: `ver_2r${n}`,
   round: n,
   state: "changes_requested",
@@ -83,12 +120,33 @@ const APPROVED_ON_3 = entry({
   round: 3,
   approvedOnRound: "Approved on round 3",
   rounds: [
-    round(3, { id: "ver_2", state: "active", decision: { kind: "approved", by: naomi, at: "2026-09-25T12:00:00.000Z", stageName: "Team approver" } }),
+    round(3, {
+      id: "ver_2",
+      state: "active",
+      decision: {
+        kind: "approved",
+        by: naomi,
+        at: "2026-09-25T12:00:00.000Z",
+        stageName: "Team approver",
+      },
+    }),
     round(2, {
-      decision: { kind: "changes_requested", by: naomi, at: "2026-09-23T12:00:00.000Z", stageName: "Team approver", reason: "The email preheader still says 'rate change'." },
+      decision: {
+        kind: "changes_requested",
+        by: naomi,
+        at: "2026-09-23T12:00:00.000Z",
+        stageName: "Team approver",
+        reason: "The email preheader still says 'rate change'.",
+      },
     }),
     round(1, {
-      decision: { kind: "changes_requested", by: naomi, at: "2026-09-22T12:00:00.000Z", stageName: "Team approver", reason: "The withdrawal limit isn't stated." },
+      decision: {
+        kind: "changes_requested",
+        by: naomi,
+        at: "2026-09-22T12:00:00.000Z",
+        stageName: "Team approver",
+        reason: "The withdrawal limit isn't stated.",
+      },
     }),
   ],
 });
@@ -105,14 +163,26 @@ const IN_REVIEW_ROUND_2 = entry({
   activatedAt: undefined,
   decisions: [],
   rounds: [
-    { id: "ver_3", round: 2, state: "in_review", submittedAt: "2026-10-08T12:00:00.000Z", submittedBy: maya },
+    {
+      id: "ver_3",
+      round: 2,
+      state: "in_review",
+      submittedAt: "2026-10-08T12:00:00.000Z",
+      submittedBy: maya,
+    },
     {
       id: "ver_3r1",
       round: 1,
       state: "changes_requested",
       submittedAt: "2026-10-05T12:00:00.000Z",
       submittedBy: maya,
-      decision: { kind: "changes_requested", by: jordan, at: "2026-10-06T12:00:00.000Z", stageName: "Team approver", reason: "Say when the annual fee starts." },
+      decision: {
+        kind: "changes_requested",
+        by: jordan,
+        at: "2026-10-06T12:00:00.000Z",
+        stageName: "Team approver",
+        reason: "Say when the annual fee starts.",
+      },
     },
   ],
 });
@@ -133,19 +203,30 @@ afterEach(async () => {
 });
 
 async function render(item: VersionTimelineItem) {
-  await act(async () => root.render(<VersionEntry item={item} ctx={CTX} space="deposits" now={NOW} last />));
+  await act(async () =>
+    root.render(
+      <VersionEntry item={item} ctx={CTX} space="deposits" now={NOW} last />,
+    ),
+  );
 }
 
 const heading = () => container.querySelector("h2")!.textContent;
-const trigger = () => container.querySelector<HTMLButtonElement>('[data-slot="review-history"] button');
-const rows = () => [...container.querySelectorAll<HTMLElement>('[data-slot="review-history"] li')];
+const trigger = () =>
+  container.querySelector<HTMLButtonElement>(
+    '[data-slot="review-history"] button',
+  );
+const rows = () => [
+  ...container.querySelectorAll<HTMLElement>('[data-slot="review-history"] li'),
+];
 const rowLink = (row: HTMLElement) => row.querySelector("a")!;
 
 describe("VersionEntry: rounds", () => {
   it("shows no round on a version approved on its first try, and no review history", async () => {
     await render(entry());
     expect(heading()).toBe("v2");
-    expect(container.querySelector('[data-slot="approved-on-round"]')).toBeNull();
+    expect(
+      container.querySelector('[data-slot="approved-on-round"]'),
+    ).toBeNull();
     expect(container.querySelector('[data-slot="review-history"]')).toBeNull();
     expect(container.textContent).not.toMatch(/round/i);
   });
@@ -153,14 +234,22 @@ describe("VersionEntry: rounds", () => {
   it("says which round a released version was approved on, beside its badge", async () => {
     await render(APPROVED_ON_3);
     expect(heading()).toBe("v2");
-    expect(container.querySelector('[data-slot="approved-on-round"]')?.textContent).toBe("Approved on round 3");
-    expect(container.querySelector("li[data-slot='version-entry']")?.getAttribute("data-round")).toBe("3");
+    expect(
+      container.querySelector('[data-slot="approved-on-round"]')?.textContent,
+    ).toBe("Approved on round 3");
+    expect(
+      container
+        .querySelector("li[data-slot='version-entry']")
+        ?.getAttribute("data-round"),
+    ).toBe("3");
   });
 
   it("folds the review history until it is opened", async () => {
     await render(APPROVED_ON_3);
     expect(trigger()?.textContent).toBe("Review history (3 rounds)");
-    expect(trigger()?.getAttribute("aria-label"), "whose history it is").toBe("v2 review history (3 rounds)");
+    expect(trigger()?.getAttribute("aria-label"), "whose history it is").toBe(
+      "v2 review history (3 rounds)",
+    );
     expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
     expect(rows()).toEqual([]);
   });
@@ -171,14 +260,20 @@ describe("VersionEntry: rounds", () => {
     expect(trigger()?.getAttribute("aria-expanded")).toBe("true");
 
     const shown = rows();
-    expect(shown.map((row) => rowLink(row).textContent)).toEqual(["Round 3", "Round 2", "Round 1"]);
-    // A screen reader lists the links out of their rows: each names its version.
-    expect(shown.map((row) => rowLink(row).getAttribute("aria-label"))).toEqual(["v2, round 3", "v2, round 2", "v2, round 1"]);
-    expect(shown.map((row) => row.querySelector("[data-status]")?.getAttribute("data-status"))).toEqual([
-      "active",
-      "changes_requested",
-      "changes_requested",
+    expect(shown.map((row) => rowLink(row).textContent)).toEqual([
+      "Round 3",
+      "Round 2",
+      "Round 1",
     ]);
+    // A screen reader lists the links out of their rows: each names its version.
+    expect(shown.map((row) => rowLink(row).getAttribute("aria-label"))).toEqual(
+      ["v2, round 3", "v2, round 2", "v2, round 1"],
+    );
+    expect(
+      shown.map((row) =>
+        row.querySelector("[data-status]")?.getAttribute("data-status"),
+      ),
+    ).toEqual(["active", "changes_requested", "changes_requested"]);
     // The released round is the bare URL (the number's head); a sent-back round names itself.
     expect(shown.map((row) => rowLink(row).getAttribute("href"))).toEqual([
       "/deposits/review/UC-ABC123/2",
@@ -186,32 +281,49 @@ describe("VersionEntry: rounds", () => {
       "/deposits/review/UC-ABC123/2?round=1",
     ]);
     expect(shown[0].textContent).toContain("Approved by Naomi Reyes on Sep 25");
-    expect(shown[1].textContent).toContain("Naomi Reyes requested changes on Sep 23: “The email preheader still says 'rate change'.”");
-    expect(shown[2].textContent).toContain("Naomi Reyes requested changes on Sep 22: “The withdrawal limit isn't stated.”");
+    expect(shown[1].textContent).toContain(
+      "Naomi Reyes requested changes on Sep 23: “The email preheader still says 'rate change'.”",
+    );
+    expect(shown[2].textContent).toContain(
+      "Naomi Reyes requested changes on Sep 22: “The withdrawal limit isn't stated.”",
+    );
   });
 
   it("heads a version in review after a send-back with its round, and keeps the round sent back in its history", async () => {
     await render(IN_REVIEW_ROUND_2);
     expect(heading()).toBe("v3 · Round 2");
-    expect(container.querySelector('[data-slot="approved-on-round"]')).toBeNull();
+    expect(
+      container.querySelector('[data-slot="approved-on-round"]'),
+    ).toBeNull();
     expect(trigger()?.textContent).toBe("Review history (2 rounds)");
-    expect(trigger()?.getAttribute("aria-label")).toBe("v3 review history (2 rounds)");
+    expect(trigger()?.getAttribute("aria-label")).toBe(
+      "v3 review history (2 rounds)",
+    );
 
     await act(async () => trigger()!.click());
     const shown = rows();
-    expect(shown.map((row) => rowLink(row).getAttribute("aria-label"))).toEqual(["v3, round 2", "v3, round 1"]);
+    expect(shown.map((row) => rowLink(row).getAttribute("aria-label"))).toEqual(
+      ["v3, round 2", "v3, round 1"],
+    );
     expect(shown.map((row) => rowLink(row).getAttribute("href"))).toEqual([
       "/deposits/review/UC-ABC123/3?round=2",
       "/deposits/review/UC-ABC123/3?round=1",
     ]);
     expect(shown[0].textContent).toContain("Submitted by Maya Chen on Oct 8");
-    expect(shown[1].textContent).toContain("Jordan Ellis requested changes on Oct 6: “Say when the annual fee starts.”");
+    expect(shown[1].textContent).toContain(
+      "Jordan Ellis requested changes on Oct 6: “Say when the annual fee starts.”",
+    );
   });
 });
 
 describe("VersionEntry: the sunset on the badge", () => {
-  const badge = () => container.querySelector('[data-status="superseded"]')?.textContent;
-  const SUPERSEDED = { state: "superseded", sunsetDay: "2026-10-25", supersededAt: "2026-10-04T12:00:00.000Z" } as const;
+  const badge = () =>
+    container.querySelector('[data-status="superseded"]')?.textContent;
+  const SUPERSEDED = {
+    state: "superseded",
+    sunsetDay: "2026-10-25",
+    supersededAt: "2026-10-04T12:00:00.000Z",
+  } as const;
 
   it("reads a sunset to come as a date to come", async () => {
     await render(entry({ ...SUPERSEDED, sunsetPassed: false }));

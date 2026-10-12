@@ -8,7 +8,10 @@
 //     generated one, as it does at submit, so this half is always there and always agrees with submit.
 // The first half is left out when the selected set's values don't render (the preview says why).
 
-import { channelFieldsFrom, type ChannelFieldValues } from "@/domain/channel-fields";
+import {
+  channelFieldsFrom,
+  type ChannelFieldValues,
+} from "@/domain/channel-fields";
 import { smsLength, type SmsEncoding } from "@/domain/messages/gsm7";
 import type { MessageTypeRules } from "@/domain/platform-config/limits";
 import { plural } from "@/domain/plural";
@@ -46,10 +49,20 @@ export interface SmsMetaInput {
   rules: MessageTypeRules;
 }
 
-export function smsMeta({ fields, variables, values, sampleSets, today, rules }: SmsMetaInput): SmsMeta {
+export function smsMeta({
+  fields,
+  variables,
+  values,
+  sampleSets,
+  today,
+  rules,
+}: SmsMetaInput): SmsMeta {
   const stored = channelFieldsFrom(fields);
   const measure = (canonical: CanonicalValues): SmsMeasure => {
-    const text = resolveMessage({ channel: "sms" }, { fields: stored, variables, values: canonical, rules });
+    const text = resolveMessage(
+      { channel: "sms" },
+      { fields: stored, variables, values: canonical, rules },
+    );
     const { encoding, parts } = smsLength(text);
     return { encoding, parts, over: parts > rules.smsMaxParts };
   };
@@ -62,12 +75,20 @@ export function smsMeta({ fields, variables, values, sampleSets, today, rules }:
 }
 
 /** The line's parts, in order, each in the warning colour when it is over the budget. */
-export function smsMetaSegments(meta: SmsMeta): { text: string; over: boolean }[] {
+export function smsMetaSegments(
+  meta: SmsMeta,
+): { text: string; over: boolean }[] {
   const segments: { text: string; over: boolean }[] = [];
   if (meta.current) {
-    segments.push({ text: `${meta.current.encoding} · ${plural(meta.current.parts, "part")}`, over: meta.current.over });
+    segments.push({
+      text: `${meta.current.encoding} · ${plural(meta.current.parts, "part")}`,
+      over: meta.current.over,
+    });
   }
   const limit = meta.long.over ? `, over the ${meta.maxParts}-part limit` : "";
-  segments.push({ text: `Long values: ${plural(meta.long.parts, "part")}${limit}`, over: meta.long.over });
+  segments.push({
+    text: `Long values: ${plural(meta.long.parts, "part")}${limit}`,
+    over: meta.long.over,
+  });
   return segments;
 }

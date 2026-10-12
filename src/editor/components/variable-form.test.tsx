@@ -8,7 +8,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MAX_VALUE_LENGTH } from "../model/variables";
 import { VariableForm } from "./variable-form";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
@@ -30,14 +32,22 @@ describe("VariableForm", () => {
       root.render(
         <VariableForm
           mode="create"
-          initial={{ label: "Note", key: "note", type: "text", required: true, sample: "" }}
+          initial={{
+            label: "Note",
+            key: "note",
+            type: "text",
+            required: true,
+            sample: "",
+          }}
           takenKeys={new Set()}
           onSubmit={() => ({ ok: true })}
           onCancel={() => {}}
         />,
       ),
     );
-    const sample = [...container.querySelectorAll<HTMLInputElement>("input")].find((input) => input.id.endsWith("-sample"));
+    const sample = [
+      ...container.querySelectorAll<HTMLInputElement>("input"),
+    ].find((input) => input.id.endsWith("-sample"));
     expect(sample?.maxLength).toBe(MAX_VALUE_LENGTH);
   });
 });

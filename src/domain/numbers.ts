@@ -8,7 +8,10 @@
 // (`formatValue` in src/editor/model/variables.ts, docs/render-spec.md).
 
 const COUNT = new Intl.NumberFormat("en-US");
-const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+const COMPACT = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 /** "1,204": a count, grouped by thousands. */
 export function formatCount(n: number): string {

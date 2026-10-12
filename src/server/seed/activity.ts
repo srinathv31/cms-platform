@@ -55,7 +55,13 @@ export function seedActivity(ctx: SeedCtx) {
   });
   const members = recertSubjectIds(coral);
   for (const userId of members) {
-    sink.recertItems.push({ recertId, userId, decision: null, decidedBy: null, decidedAt: null });
+    sink.recertItems.push({
+      recertId,
+      userId,
+      decision: null,
+      decidedBy: null,
+      decidedAt: null,
+    });
   }
   sink.auditEvents.push({
     id: ctx.id("ae"),
@@ -92,11 +98,18 @@ export function seedActivity(ctx: SeedCtx) {
   const abroad = ctx.template("card-used-abroad");
   const reminder = ctx.template("payment-due-reminder");
   const reasonFor = (version: VersionRef) =>
-    sink.approvals.find((a) => a.versionId === version.id && a.decision === "changes_requested")?.reason;
+    sink.approvals.find(
+      (a) => a.versionId === version.id && a.decision === "changes_requested",
+    )?.reason;
   const waiverReason = reasonFor(waiver.versions.v1);
   // A round as the app's notifications name it (rounds.ts): "v3, round 2".
-  const round = (version: VersionRef): NumberedRound => ({ number: version.number!, round: version.round!, state: version.state });
-  const sentence = (version: VersionRef) => versionLabel(round(version), { style: "sentence" });
+  const round = (version: VersionRef): NumberedRound => ({
+    number: version.number!,
+    round: version.round!,
+    state: version.state,
+  });
+  const sentence = (version: VersionRef) =>
+    versionLabel(round(version), { style: "sentence" });
 
   const note = (n: {
     user: string;

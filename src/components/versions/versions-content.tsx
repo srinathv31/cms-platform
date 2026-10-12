@@ -31,16 +31,30 @@ export async function VersionsContent({
   };
 
   return (
-    <section data-slot="versions" aria-label="Versions" className={cn(WS.doc, "flex flex-col")}>
+    <section
+      data-slot="versions"
+      aria-label="Versions"
+      className={cn(WS.doc, "flex flex-col")}
+    >
       <div data-slot="versions-toolbar" className={TOOLBAR}>
-        <CompareVersions templateId={data.template.id} options={data.compareOptions} />
+        <CompareVersions
+          templateId={data.template.id}
+          options={data.compareOptions}
+        />
       </div>
       {data.items.length === 0 ? (
         <p className="text-[14px] text-text-muted">No versions yet.</p>
       ) : (
         <ol className="flex flex-col">
           {data.items.map((item, i) => (
-            <VersionEntry key={item.id} item={item} ctx={ctx} space={team} now={nowDate} last={i === data.items.length - 1} />
+            <VersionEntry
+              key={item.id}
+              item={item}
+              ctx={ctx}
+              space={team}
+              now={nowDate}
+              last={i === data.items.length - 1}
+            />
           ))}
         </ol>
       )}

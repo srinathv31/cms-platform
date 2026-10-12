@@ -7,7 +7,12 @@ import type {
   PaletteTemplateRow,
   TemplateTabKey,
 } from "@/domain/import-types";
-import { normalizePaletteQuery, paletteTokens, rankByQuery, templateSearchText } from "@/domain/palette";
+import {
+  normalizePaletteQuery,
+  paletteTokens,
+  rankByQuery,
+  templateSearchText,
+} from "@/domain/palette";
 import type { SpaceNav } from "@/server/queries/spaces";
 import { visibleGroups } from "@/components/settings/sections";
 
@@ -38,7 +43,11 @@ export const PALETTE_PAGES: { key: PalettePageKey; label: string }[] = [
 ];
 
 /** A template's tabs (`WORKSPACE_TABS`): `segment` is the route under the template. */
-export const PALETTE_TEMPLATE_TABS: { key: TemplateTabKey; label: string; segment: string | null }[] = [
+export const PALETTE_TEMPLATE_TABS: {
+  key: TemplateTabKey;
+  label: string;
+  segment: string | null;
+}[] = [
   { key: "content", label: "Content", segment: null },
   { key: "versions", label: "Versions", segment: "versions" },
   { key: "usage", label: "Usage", segment: "usage" },
@@ -67,12 +76,19 @@ export function templateIdFromPath(pathname: string): string | null {
   return match ? decodeURIComponent(match[1]!) : null;
 }
 
-export function paletteGroups({ space, spaces, results, pathname, query = "" }: PaletteInput): PaletteGroup[] {
+export function paletteGroups({
+  space,
+  spaces,
+  results,
+  pathname,
+  query = "",
+}: PaletteInput): PaletteGroup[] {
   const tokens = paletteTokens(query);
   const base = `/${space.slug}`;
   // An answer for another space is not trusted.
   const answer = results?.space === space.slug ? results : null;
-  const exact = answer !== null && answer.query === normalizePaletteQuery(query);
+  const exact =
+    answer !== null && answer.query === normalizePaletteQuery(query);
 
   const toItem = (t: PaletteTemplateRow): PaletteItem => ({
     kind: "template",
@@ -90,8 +106,18 @@ export function paletteGroups({ space, spaces, results, pathname, query = "" }: 
 
   const actions: PaletteItem[] = answer?.canCreate
     ? [
-        { kind: "action", key: "new_template", label: "New template", href: `${base}/library` },
-        { kind: "action", key: "import", label: "Import a file", href: `${base}/library` },
+        {
+          kind: "action",
+          key: "new_template",
+          label: "New template",
+          href: `${base}/library`,
+        },
+        {
+          kind: "action",
+          key: "import",
+          label: "Import a file",
+          href: `${base}/library`,
+        },
       ]
     : [];
 
@@ -102,7 +128,9 @@ export function paletteGroups({ space, spaces, results, pathname, query = "" }: 
           kind: "template_tab" as const,
           key: tab.key,
           label: tab.label,
-          href: tab.segment ? `${base}/templates/${currentId}/${tab.segment}` : `${base}/templates/${currentId}`,
+          href: tab.segment
+            ? `${base}/templates/${currentId}/${tab.segment}`
+            : `${base}/templates/${currentId}`,
         }))
       : [];
 
@@ -112,28 +140,40 @@ export function paletteGroups({ space, spaces, results, pathname, query = "" }: 
     ? []
     : exact
       ? answer.templates
-      : rankByQuery([...answer.recent, ...answer.templates], tokens, templateSearchText);
+      : rankByQuery(
+          [...answer.recent, ...answer.templates],
+          tokens,
+          templateSearchText,
+        );
 
-  const pages: PaletteItem[] = PALETTE_PAGES.filter((p) => p.key !== "audit" || space.showAudit).map((p) => ({
+  const pages: PaletteItem[] = PALETTE_PAGES.filter(
+    (p) => p.key !== "audit" || space.showAudit,
+  ).map((p) => ({
     kind: "page" as const,
     key: p.key,
     label: p.label,
     href: `${base}/${p.key}`,
   }));
 
-  const settings: PaletteItem[] = visibleGroups(space.settings).flatMap((group) =>
-    group.sections.map((section) => ({
-      kind: "settings" as const,
-      key: section.key,
-      label: section.label,
-      group: group.key,
-      href: `${base}/settings/${section.key}`,
-    })),
+  const settings: PaletteItem[] = visibleGroups(space.settings).flatMap(
+    (group) =>
+      group.sections.map((section) => ({
+        kind: "settings" as const,
+        key: section.key,
+        label: section.label,
+        group: group.key,
+        href: `${base}/settings/${section.key}`,
+      })),
   );
 
   const teams: PaletteItem[] = spaces
     .filter((s) => s.slug !== space.slug)
-    .map((s) => ({ kind: "team" as const, slug: s.slug, name: s.name, href: `/${s.slug}/library` }));
+    .map((s) => ({
+      kind: "team" as const,
+      slug: s.slug,
+      name: s.name,
+      href: `/${s.slug}/library`,
+    }));
 
   const labelText = (item: PaletteItem): [string, string?] => {
     switch (item.kind) {
@@ -152,11 +192,16 @@ export function paletteGroups({ space, spaces, results, pathname, query = "" }: 
   const groups: { key: PaletteGroupKey; items: PaletteItem[] }[] = [
     { key: "recent", items: recent },
     { key: "actions", items: rankByQuery(actions, tokens, labelText) },
-    { key: "this_template", items: rankByQuery(thisTemplate, tokens, labelText) },
+    {
+      key: "this_template",
+      items: rankByQuery(thisTemplate, tokens, labelText),
+    },
     { key: "templates", items: templateRows.map(toItem) },
     { key: "pages", items: rankByQuery(pages, tokens, labelText) },
     { key: "settings", items: rankByQuery(settings, tokens, labelText) },
     { key: "teams", items: rankByQuery(teams, tokens, labelText) },
   ];
-  return groups.filter((g) => g.items.length > 0).map((g) => ({ ...g, heading: GROUP_HEADINGS[g.key] }));
+  return groups
+    .filter((g) => g.items.length > 0)
+    .map((g) => ({ ...g, heading: GROUP_HEADINGS[g.key] }));
 }

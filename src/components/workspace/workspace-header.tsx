@@ -27,7 +27,8 @@ import { WorkspaceShare } from "./workspace-share";
 // On a narrow canvas (under 26rem, a window under about 470px) it is two columns and four rows instead: the name
 // and the ring, the status row across the full width, the Template ID under it, then why saving stopped. The
 // three-column layout would leave the status row about 30px at 320px wide (reflow, decision 0045).
-const HEADER = "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5 @max-[26rem]/canvas:grid-cols-[minmax(0,1fr)_auto]";
+const HEADER =
+  "grid grid-cols-[minmax(0,1fr)_auto_auto] gap-y-1.5 @max-[26rem]/canvas:grid-cols-[minmax(0,1fr)_auto]";
 
 /** One item of the status row: 16px of left padding, the room a separator takes (and the row pulls back). */
 const META_ITEM = "flex shrink-0 items-center pl-4 whitespace-nowrap";
@@ -67,13 +68,27 @@ export async function WorkspaceHeader({
       >
         <div className="-ml-4 flex min-h-7 flex-wrap items-center gap-y-1.5">
           <span className={META_ITEM}>
-            <StatusBadge state={t.status} sunsetDay={t.sunsetDay} sunsetPassed={t.sunsetPassed} now={nowDate} />
+            <StatusBadge
+              state={t.status}
+              sunsetDay={t.sunsetDay}
+              sunsetPassed={t.sunsetPassed}
+              now={nowDate}
+            />
           </span>
-          {t.versionLabel ? <span className={cn(META_ITEM, "text-[14px] leading-6 text-text-muted")}>{t.versionLabel}</span> : null}
+          {t.versionLabel ? (
+            <span
+              className={cn(META_ITEM, "text-[14px] leading-6 text-text-muted")}
+            >
+              {t.versionLabel}
+            </span>
+          ) : null}
           {t.editable ? (
             <span className={cn(META_ITEM, "relative")}>
               {t.versionLabel ? (
-                <span aria-hidden className="absolute left-[5px] text-[14px] leading-6 text-text-subtle">
+                <span
+                  aria-hidden
+                  className="absolute left-[5px] text-[14px] leading-6 text-text-subtle"
+                >
                   ·
                 </span>
               ) : null}
@@ -82,7 +97,10 @@ export async function WorkspaceHeader({
           ) : null}
           {!t.canEdit ? (
             <span className={META_ITEM}>
-              <Badge variant="outline" className="h-[22px] gap-1.5 border-hairline px-2 text-[12px] font-medium text-text-muted">
+              <Badge
+                variant="outline"
+                className="h-[22px] gap-1.5 border-hairline px-2 text-[12px] font-medium text-text-muted"
+              >
                 <Eye aria-hidden strokeWidth={1.75} />
                 View only
               </Badge>
@@ -96,11 +114,20 @@ export async function WorkspaceHeader({
         className="col-start-2 row-start-2 ml-8 -mb-0.5 self-end @max-[26rem]/canvas:col-span-2 @max-[26rem]/canvas:col-start-1 @max-[26rem]/canvas:row-start-3 @max-[26rem]/canvas:mb-0 @max-[26rem]/canvas:ml-0 @max-[26rem]/canvas:mt-1.5"
       />
       {/* Saving stopped for good: a line of its own, the header's full width. */}
-      {t.editable ? <SaveStopped className="col-span-3 col-start-1 row-start-3 @max-[26rem]/canvas:col-span-2 @max-[26rem]/canvas:row-start-4" /> : null}
+      {t.editable ? (
+        <SaveStopped className="col-span-3 col-start-1 row-start-3 @max-[26rem]/canvas:col-span-2 @max-[26rem]/canvas:row-start-4" />
+      ) : null}
       {t.activeNumber !== null ? (
         // The SHARE signature: Active versions only. It shows what consumers get, so the Active version's name.
-        <div data-slot="share" className="col-start-3 row-span-2 row-start-1 ml-6 flex size-19 shrink-0 items-center justify-center self-start @max-[26rem]/canvas:col-start-2 @max-[26rem]/canvas:row-span-1 @max-[26rem]/canvas:ml-3">
-          <WorkspaceShare templateId={t.id} templateName={t.activeName ?? t.name} activeVersion={t.activeNumber} />
+        <div
+          data-slot="share"
+          className="col-start-3 row-span-2 row-start-1 ml-6 flex size-19 shrink-0 items-center justify-center self-start @max-[26rem]/canvas:col-start-2 @max-[26rem]/canvas:row-span-1 @max-[26rem]/canvas:ml-3"
+        >
+          <WorkspaceShare
+            templateId={t.id}
+            templateName={t.activeName ?? t.name}
+            activeVersion={t.activeNumber}
+          />
         </div>
       ) : null}
     </header>

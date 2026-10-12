@@ -3,7 +3,11 @@ import { resolveRailView } from "./rail-view";
 import { INITIAL_PREVIEW, type PreviewState } from "./session-store";
 
 const closed: PreviewState = INITIAL_PREVIEW;
-const open = (view: PreviewState["view"]): PreviewState => ({ ...INITIAL_PREVIEW, open: true, view });
+const open = (view: PreviewState["view"]): PreviewState => ({
+  ...INITIAL_PREVIEW,
+  open: true,
+  view,
+});
 const waiting = { has: true, preferred: true };
 const resolvedOnly = { has: true, preferred: false };
 const none = { has: false, preferred: false };
@@ -25,16 +29,26 @@ describe("resolveRailView", () => {
   });
 
   it("shows the widened rail's own view while the preview is open", () => {
-    expect(resolveRailView(open("preview"), "comments", waiting)).toBe("preview");
-    expect(resolveRailView(open("comments"), "variables", waiting)).toBe("comments");
-    expect(resolveRailView(open("variables"), "comments", waiting)).toBe("variables");
+    expect(resolveRailView(open("preview"), "comments", waiting)).toBe(
+      "preview",
+    );
+    expect(resolveRailView(open("comments"), "variables", waiting)).toBe(
+      "comments",
+    );
+    expect(resolveRailView(open("variables"), "comments", waiting)).toBe(
+      "variables",
+    );
   });
 });
 
 describe("resolveRailView: the imported original", () => {
   it("shows the Original view while the widened rail is on it", () => {
-    expect(resolveRailView(open("original"), null, none, true)).toBe("original");
-    expect(resolveRailView(open("original"), "comments", waiting, true)).toBe("original");
+    expect(resolveRailView(open("original"), null, none, true)).toBe(
+      "original",
+    );
+    expect(resolveRailView(open("original"), "comments", waiting, true)).toBe(
+      "original",
+    );
   });
 
   it("is the normal rail when the template has no original", () => {
@@ -42,7 +56,16 @@ describe("resolveRailView: the imported original", () => {
   });
 
   it("is never the plain rail's view: putting the rail away goes back to Comments or Variables", () => {
-    expect(resolveRailView({ ...open("original"), open: false }, null, waiting, true)).toBe("comments");
-    expect(resolveRailView({ ...open("original"), open: false }, null, none, true)).toBe("variables");
+    expect(
+      resolveRailView(
+        { ...open("original"), open: false },
+        null,
+        waiting,
+        true,
+      ),
+    ).toBe("comments");
+    expect(
+      resolveRailView({ ...open("original"), open: false }, null, none, true),
+    ).toBe("variables");
   });
 });

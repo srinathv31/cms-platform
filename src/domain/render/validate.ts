@@ -11,15 +11,24 @@
 // numbers over as their exact source text (`parseJsonWithNumberText`), so they arrive here as strings;
 // a JS number from an internal caller is read as its JSON text (`String(n)`, see `validateValue`).
 
-import { MAX_VALUE_LENGTH, longerThan, validateValue } from "@/editor/model/variables";
+import {
+  MAX_VALUE_LENGTH,
+  longerThan,
+  validateValue,
+} from "@/editor/model/variables";
 import type { Variable } from "../types";
 import { valuesError } from "./errors";
 import type { CanonicalValues, InvalidValue, RenderError } from "./types";
 
-export type ValidateResult = { ok: true; values: CanonicalValues } | { ok: false; error: RenderError };
+export type ValidateResult =
+  { ok: true; values: CanonicalValues } | { ok: false; error: RenderError };
 
 function isAbsent(value: unknown): boolean {
-  return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && value.trim() === "")
+  );
 }
 
 export function validateValues(
@@ -32,7 +41,9 @@ export function validateValues(
 
   for (const variable of variables) {
     // Own keys only: a variable named `constructor` mustn't read Object.prototype.
-    const value = Object.prototype.hasOwnProperty.call(values, variable.key) ? values[variable.key] : undefined;
+    const value = Object.prototype.hasOwnProperty.call(values, variable.key)
+      ? values[variable.key]
+      : undefined;
 
     if (isAbsent(value)) {
       if (variable.required) missing.push(variable.key);
@@ -40,11 +51,17 @@ export function validateValues(
     }
 
     if (typeof value === "string" && longerThan(value, MAX_VALUE_LENGTH)) {
-      invalid.push({ key: variable.key, expected: variable.type, maxLength: MAX_VALUE_LENGTH });
+      invalid.push({
+        key: variable.key,
+        expected: variable.type,
+        maxLength: MAX_VALUE_LENGTH,
+      });
       continue;
     }
 
-    const usable = typeof value === "string" || (typeof value === "number" && Number.isFinite(value));
+    const usable =
+      typeof value === "string" ||
+      (typeof value === "number" && Number.isFinite(value));
     const checked = usable ? validateValue(variable.type, value) : null;
     if (checked?.ok) canonical[variable.key] = checked.value;
     else invalid.push({ key: variable.key, expected: variable.type });

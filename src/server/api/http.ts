@@ -1,5 +1,9 @@
 import "server-only";
-import { API_ERROR_STATUS, type ApiError, type ApiErrorBody } from "@/domain/golive-types";
+import {
+  API_ERROR_STATUS,
+  type ApiError,
+  type ApiErrorBody,
+} from "@/domain/golive-types";
 import { now } from "@/server/clock";
 import { newId } from "@/server/ids";
 
@@ -26,9 +30,15 @@ export function baseHeaders(correlationId: string): Headers {
 }
 
 /** An error as JSON, with the status the contract gives its code. */
-export function errorResponse(error: ApiError, correlationId: string): Response {
+export function errorResponse(
+  error: ApiError,
+  correlationId: string,
+): Response {
   const body: ApiErrorBody = { error };
-  return Response.json(body, { status: API_ERROR_STATUS[error.code], headers: baseHeaders(correlationId) });
+  return Response.json(body, {
+    status: API_ERROR_STATUS[error.code],
+    headers: baseHeaders(correlationId),
+  });
 }
 
 /** A 200 JSON body with the base headers. */
@@ -41,7 +51,9 @@ export function jsonResponse(body: unknown, correlationId: string): Response {
  * in the demo. A consumer (Coral) stamps what it receives with that header, so after the clock advances
  * its deliveries read on the same day as UCOMP's sunsets and notices.
  */
-export function withDemoDate<A extends unknown[]>(handler: (...args: A) => Promise<Response>) {
+export function withDemoDate<A extends unknown[]>(
+  handler: (...args: A) => Promise<Response>,
+) {
   return async (...args: A): Promise<Response> => {
     const response = await handler(...args);
     response.headers.set("Date", (await now()).toUTCString());

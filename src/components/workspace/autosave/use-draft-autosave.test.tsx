@@ -1,14 +1,24 @@
 // @vitest-environment happy-dom
 import { Activity, StrictMode, act, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from "vitest";
 import type { DraftPatch } from "@/domain/types";
 import { useDraftAutosave, type DraftAutosave } from "./use-draft-autosave";
 
 // The hook is a thin wrapper, so these cover only the wiring: the mount-time session key, the
 // flush on each way of leaving, and read-only mode. The scheduling is tested in autosave-scheduler.test.ts.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let api: DraftAutosave;
 let root: Root;
@@ -16,23 +26,38 @@ let container: HTMLElement;
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 
 function Probe({ disabled = false }: { disabled?: boolean }) {
-  const result = useDraftAutosave({ versionId: "v_abc", initialRev: 7, disabled });
+  const result = useDraftAutosave({
+    versionId: "v_abc",
+    initialRev: 7,
+    disabled,
+  });
   // Hand the latest result to the test; an effect, because render must not write to outer variables.
   useEffect(() => {
     api = result;
   });
-  return <span data-status={result.status}>{result.error ?? result.status}</span>;
+  return (
+    <span data-status={result.status}>{result.error ?? result.status}</span>
+  );
 }
 
 const answer = (rev: number) =>
-  new Response(JSON.stringify({ ok: true, rev, savedAt: "2026-10-04T10:00:00.000Z" }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  new Response(
+    JSON.stringify({ ok: true, rev, savedAt: "2026-10-04T10:00:00.000Z" }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 
-const sent = (index: number): { url: string; init: RequestInit; patch: DraftPatch } => {
+const sent = (
+  index: number,
+): { url: string; init: RequestInit; patch: DraftPatch } => {
   const [url, init] = fetchMock.mock.calls[index]!;
-  return { url: String(url), init: init!, patch: JSON.parse(init!.body as string) as DraftPatch };
+  return {
+    url: String(url),
+    init: init!,
+    patch: JSON.parse(init!.body as string) as DraftPatch,
+  };
 };
 
 async function render(node: ReactNode) {
@@ -40,7 +65,10 @@ async function render(node: ReactNode) {
 }
 
 function setVisibility(state: "hidden" | "visible") {
-  Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+  Object.defineProperty(document, "visibilityState", {
+    value: state,
+    configurable: true,
+  });
   document.dispatchEvent(new Event("visibilitychange"));
 }
 
@@ -90,11 +118,15 @@ describe("useDraftAutosave", () => {
     await act(async () => api.save({ name: "Morning" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
 
-    await act(async () => void (await vi.advanceTimersByTimeAsync(10 * 60_000)));
+    await act(
+      async () => void (await vi.advanceTimersByTimeAsync(10 * 60_000)),
+    );
     await act(async () => api.save({ name: "Ten minutes later" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
 
-    await act(async () => void (await vi.advanceTimersByTimeAsync(31 * 60_000)));
+    await act(
+      async () => void (await vi.advanceTimersByTimeAsync(31 * 60_000)),
+    );
     await act(async () => api.save({ name: "After lunch" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
 
@@ -220,8 +252,10 @@ describe("useDraftAutosave", () => {
       return event.defaultPrevented;
     };
     const guards = () => ({
-      added: addSpy.mock.calls.filter(([type]) => type === "beforeunload").length,
-      removed: removeSpy.mock.calls.filter(([type]) => type === "beforeunload").length,
+      added: addSpy.mock.calls.filter(([type]) => type === "beforeunload")
+        .length,
+      removed: removeSpy.mock.calls.filter(([type]) => type === "beforeunload")
+        .length,
     });
     let addSpy: MockInstance<typeof window.addEventListener>;
     let removeSpy: MockInstance<typeof window.removeEventListener>;
@@ -242,17 +276,25 @@ describe("useDraftAutosave", () => {
 
     it("asks while a change waits to save, sends it as it asks, and lets go once it has landed", async () => {
       let land: (response: Response) => void = () => {};
-      fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (land = resolve)));
+      fetchMock.mockImplementationOnce(
+        () => new Promise<Response>((resolve) => (land = resolve)),
+      );
       await render(<Probe />);
 
       await act(async () => api.save({ name: "Typed just now" }));
       expect(api.status).toBe("unsaved");
       expect(await leave(), "waiting to save").toBe(true);
-      expect(fetchMock, "it sends what is waiting as it asks").toHaveBeenCalledTimes(1);
+      expect(
+        fetchMock,
+        "it sends what is waiting as it asks",
+      ).toHaveBeenCalledTimes(1);
       expect(sent(0).init.keepalive).toBe(true);
       expect(api.status).toBe("saving");
       expect(await leave(), "saving").toBe(true);
-      expect(guards(), "one guard for the whole stretch").toEqual({ added: 1, removed: 0 });
+      expect(guards(), "one guard for the whole stretch").toEqual({
+        added: 1,
+        removed: 0,
+      });
 
       await act(async () => land(answer(8)));
       expect(api.status).toBe("saved");
@@ -271,10 +313,18 @@ describe("useDraftAutosave", () => {
 
     it("asks after saving has stopped for good: what wasn't saved is still on the page to copy", async () => {
       fetchMock.mockResolvedValue(
-        new Response(JSON.stringify({ ok: false, code: "draft_changed", rev: 9, reason: "This draft changed. Try again." }), {
-          status: 409,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({
+            ok: false,
+            code: "draft_changed",
+            rev: 9,
+            reason: "This draft changed. Try again.",
+          }),
+          {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       );
       await render(<Probe />);
       await act(async () => api.save({ name: "Mine" }));
@@ -297,14 +347,26 @@ describe("useDraftAutosave", () => {
     await render(<Probe />);
     expect(api.stopped).toBe(false);
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ok: false, code: "version_not_draft", reason: "This version is no longer a draft." }), {
-        status: 409,
-        headers: { "Content-Type": "application/json" },
-      }),
+      new Response(
+        JSON.stringify({
+          ok: false,
+          code: "version_not_draft",
+          reason: "This version is no longer a draft.",
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
     );
     await act(async () => api.save({ name: "Too late" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(800)));
-    expect(api).toMatchObject({ status: "error", stopped: true, error: "Your latest changes can't be saved — this version is no longer a draft." });
+    expect(api).toMatchObject({
+      status: "error",
+      stopped: true,
+      error:
+        "Your latest changes can't be saved — this version is no longer a draft.",
+    });
   });
 
   it("returns stable save and flush functions", async () => {

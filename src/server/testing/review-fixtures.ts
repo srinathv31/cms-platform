@@ -3,7 +3,10 @@ import { createDraft } from "@/domain/lifecycle/drafts";
 import type { TeamRole, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { tempDatabase as tempDatabaseOn, freshDatabasePerTest as freshDatabasePerTestOn } from "@/lib/fresh-database";
+import {
+  tempDatabase as tempDatabaseOn,
+  freshDatabasePerTest as freshDatabasePerTestOn,
+} from "@/lib/fresh-database";
 import { newId, newTemplateId } from "@/server/ids";
 import { seedDatabase } from "@/server/seed";
 import { buildStarter } from "@/server/starters";
@@ -27,8 +30,15 @@ export function tempDatabase(prefix: string) {
  * tests read through the `db` the mocked client exports). Pass `{ migrate: false }` when `build` migrates
  * by itself.
  */
-export function freshDatabasePerTest(build?: (db: Db) => Promise<void>, opts: { migrate?: boolean } = {}): void {
-  freshDatabasePerTestOn<Db>({ client: () => import("@/server/db/client"), build, migrate: opts.migrate });
+export function freshDatabasePerTest(
+  build?: (db: Db) => Promise<void>,
+  opts: { migrate?: boolean } = {},
+): void {
+  freshDatabasePerTestOn<Db>({
+    client: () => import("@/server/db/client"),
+    build,
+    migrate: opts.migrate,
+  });
 }
 
 /**
@@ -42,7 +52,10 @@ export function standaloneDatabasePerTest(opts: { base: Date }) {
   freshDatabasePerTestOn<Db>({
     client: async () => temp,
     build: async (db) => {
-      Object.assign(ids, (await seedDatabase(db, { base: opts.base })).templates);
+      Object.assign(
+        ids,
+        (await seedDatabase(db, { base: opts.base })).templates,
+      );
     },
   });
   return { db: temp.db as Db, libsql: temp.libsql, ids };
@@ -52,10 +65,15 @@ export function standaloneDatabasePerTest(opts: { base: Date }) {
  * `freshDatabasePerTest()` with the real seed built on `base`. Returns the seed's template ids by key
  * (`ids["balance-transfer"]`); the object is filled in before the first test runs.
  */
-export function seededDatabasePerTest(opts: { base: Date }): Record<string, string> {
+export function seededDatabasePerTest(opts: {
+  base: Date;
+}): Record<string, string> {
   const templates: Record<string, string> = {};
   freshDatabasePerTest(async (db) => {
-    Object.assign(templates, (await seedDatabase(db, { base: opts.base })).templates);
+    Object.assign(
+      templates,
+      (await seedDatabase(db, { base: opts.base })).templates,
+    );
   });
   return templates;
 }
@@ -80,7 +98,12 @@ export async function loadPersona(db: Db, userId: string): Promise<Viewer> {
     ? await db
         .select()
         .from(membershipRoles)
-        .where(inArray(membershipRoles.membershipId, rows.map((r) => r.membershipId)))
+        .where(
+          inArray(
+            membershipRoles.membershipId,
+            rows.map((r) => r.membershipId),
+          ),
+        )
     : [];
   return {
     userId: user.id,
@@ -93,7 +116,9 @@ export async function loadPersona(db: Db, userId: string): Promise<Viewer> {
       teamSlug: r.teamSlug,
       teamName: r.teamName,
       status: r.status,
-      roles: roles.filter((x) => x.membershipId === r.membershipId).map((x) => x.role as TeamRole),
+      roles: roles
+        .filter((x) => x.membershipId === r.membershipId)
+        .map((x) => x.role as TeamRole),
     })),
   };
 }
@@ -104,8 +129,15 @@ export async function createTemplateWithDraft(
   opts: { teamId: string; createdBy: string; at: Date; name?: string },
 ): Promise<{ templateId: string; draftId: string }> {
   const templateId = newTemplateId();
-  const starter = buildStarter({ family: "document", starterKey: "card_offer_terms" }, { scope: templateId, now: opts.at });
-  const { changes } = createDraft({ starter, createdBy: opts.createdBy, now: opts.at });
+  const starter = buildStarter(
+    { family: "document", starterKey: "card_offer_terms" },
+    { scope: templateId, now: opts.at },
+  );
+  const { changes } = createDraft({
+    starter,
+    createdBy: opts.createdBy,
+    now: opts.at,
+  });
   const draftId = newId("v");
   await db.insert(schema.templates).values({
     id: templateId,
@@ -131,7 +163,10 @@ export async function createTemplateWithDraft(
 export async function draftRev(db: Db, templateId: string): Promise<number> {
   const draft = await db.query.versions.findFirst({
     columns: { rev: true },
-    where: and(eq(schema.versions.templateId, templateId), eq(schema.versions.state, "draft")),
+    where: and(
+      eq(schema.versions.templateId, templateId),
+      eq(schema.versions.state, "draft"),
+    ),
   });
   return draft?.rev ?? 0;
 }

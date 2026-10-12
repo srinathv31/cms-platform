@@ -17,12 +17,20 @@ const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v3 in review, so it has
 
 async function open(page: Page) {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:3100";
-  await page.context().addCookies([{ name: "ucomp_persona", value: "jordan", url: baseURL }]);
+  await page
+    .context()
+    .addCookies([{ name: "ucomp_persona", value: "jordan", url: baseURL }]);
   await page.goto(`/coral-offers/review/${COLLECT}/3`, { waitUntil: "load" });
   // Hydrated (the profile button has React's props), and every skeleton has gone.
   await page.waitForFunction(() => {
-    const el = document.querySelector("button[aria-label$='profile and persona']");
-    return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps")) && !document.querySelector('[data-slot="skeleton"]');
+    const el = document.querySelector(
+      "button[aria-label$='profile and persona']",
+    );
+    return (
+      !!el &&
+      Object.keys(el).some((k) => k.startsWith("__reactProps")) &&
+      !document.querySelector('[data-slot="skeleton"]')
+    );
   });
   await settled(page);
 }
@@ -31,11 +39,19 @@ async function open(page: Page) {
 function scrollToDocumentEnd(page: Page) {
   return page.evaluate(() => {
     const main = document.querySelector('main[data-slot="sidebar-inset"]');
-    const canvas = main && ([...main.children].find((child) => getComputedStyle(child).overflowY === "auto") as HTMLElement | undefined);
+    const canvas =
+      main &&
+      ([...main.children].find(
+        (child) => getComputedStyle(child).overflowY === "auto",
+      ) as HTMLElement | undefined);
     const doc = document.querySelector("#review-panel-document") as HTMLElement;
-    const last = doc.querySelector(".ProseMirror")?.lastElementChild as HTMLElement | null | undefined;
-    if (!canvas || !last) throw new Error("the review screen's canvas or document is missing");
-    canvas.scrollTop += doc.getBoundingClientRect().bottom - canvas.getBoundingClientRect().bottom;
+    const last = doc.querySelector(".ProseMirror")?.lastElementChild as
+      HTMLElement | null | undefined;
+    if (!canvas || !last)
+      throw new Error("the review screen's canvas or document is missing");
+    canvas.scrollTop +=
+      doc.getBoundingClientRect().bottom -
+      canvas.getBoundingClientRect().bottom;
     const rect = (el: Element) => {
       const { top, bottom } = el.getBoundingClientRect();
       return { top, bottom };
@@ -55,13 +71,18 @@ for (const { height, fits } of [
   test.describe(`320x${height}`, () => {
     test.use({ viewport: { width: 320, height } });
 
-    test("scrolled to the end of the document, its last block is not under the decision bar", async ({ page }) => {
+    test("scrolled to the end of the document, its last block is not under the decision bar", async ({
+      page,
+    }) => {
       await open(page);
       const bar = page.locator('[data-slot="decision-bar"]');
       await expect(bar.getByRole("button", { name: "Approve" })).toBeVisible();
 
       const m = await scrollToDocumentEnd(page);
-      expect(m.last.bottom, "the last block ends above the bar").toBeLessThanOrEqual(m.bar.top);
+      expect(
+        m.last.bottom,
+        "the last block ends above the bar",
+      ).toBeLessThanOrEqual(m.bar.top);
 
       for (const name of ["Approve", "Request changes"]) {
         const box = await bar.getByRole("button", { name }).boundingBox();
@@ -69,7 +90,11 @@ for (const { height, fits } of [
         expect(box!.y).toBeGreaterThanOrEqual(m.canvas.top);
         expect(box!.y + box!.height).toBeLessThanOrEqual(m.canvas.bottom);
       }
-      if (fits) expect(m.last.top, "the last block is fully in view").toBeGreaterThanOrEqual(m.canvas.top);
+      if (fits)
+        expect(
+          m.last.top,
+          "the last block is fully in view",
+        ).toBeGreaterThanOrEqual(m.canvas.top);
     });
   });
 }

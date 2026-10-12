@@ -6,14 +6,20 @@ import { NavList, SimNav } from "@/simulator/ui/nav";
 import { NoticeBadge } from "@/simulator/ui/notice-badge";
 import "@/simulator/theme.css";
 
-export const metadata: Metadata = { title: { absolute: "Coral Offers (simulated)" } };
+export const metadata: Metadata = {
+  title: { absolute: "Coral Offers (simulated)" },
+};
 
 /*
  * The frame is UCOMP's (warm stone, dashed): the "← Back to Stencil" pill (to where the simulator was
  * opened) and the "Coral — simulated" label mark the boundary. Everything under it is Coral's own system in its own look (src/simulator/theme.css).
  * The Demo pill is mounted here too, so the presenter can move the clock without leaving Coral.
  */
-export default function SimulatorLayout({ children }: { children: React.ReactNode }) {
+export default function SimulatorLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-app">
       <header className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-dashed border-hairline-strong bg-app px-3">
@@ -25,13 +31,21 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
       </header>
       {/* Below 800px (a laptop zoomed past about 160%) Coral's sidebar becomes a band across the top and the page
           scrolls as one, so its content keeps the width (reflow, decision 0045). */}
-      <div data-sim className="flex min-h-0 flex-1 narrow:flex-col narrow:overflow-y-auto">
+      <div
+        data-sim
+        className="flex min-h-0 flex-1 narrow:flex-col narrow:overflow-y-auto"
+      >
         <aside className="flex w-56 shrink-0 flex-col bg-(--sim-nav) text-(--sim-nav-text) narrow:w-full narrow:flex-row narrow:flex-wrap narrow:items-center">
           <div className="flex h-14 items-center gap-2.5 px-5">
-            <span aria-hidden className="grid size-7 place-items-center rounded-md bg-(--sim-accent) text-[15px] font-bold text-(--sim-accent-text)">
+            <span
+              aria-hidden
+              className="grid size-7 place-items-center rounded-md bg-(--sim-accent) text-[15px] font-bold text-(--sim-accent-text)"
+            >
               c
             </span>
-            <span className="text-[16px] font-semibold tracking-tight text-(--sim-nav-on)">coral</span>
+            <span className="text-[16px] font-semibold tracking-tight text-(--sim-nav-on)">
+              coral
+            </span>
             <span className="rounded-(--sim-rs) bg-(--sim-nav-active) px-1.5 py-0.5 text-[10px] font-medium tracking-wider text-(--sim-nav-muted) uppercase">
               Ops
             </span>
@@ -50,7 +64,9 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
             <p className="m-0">Offers operations</p>
           </div>
         </aside>
-        <main className="flex min-h-0 min-w-0 flex-1 narrow:flex-none">{children}</main>
+        <main className="flex min-h-0 min-w-0 flex-1 narrow:flex-none">
+          {children}
+        </main>
       </div>
       <DemoPillHole />
     </div>

@@ -23,12 +23,19 @@ export interface ReadRefusal {
 
 export type ReadResult<T> = ({ ok: true } & T) | ReadRefusal;
 
-export const refusal = (status: ReadRefusal["status"], { code, reason }: Refusal): ReadRefusal => ({ ok: false, status, code, reason });
+export const refusal = (
+  status: ReadRefusal["status"],
+  { code, reason }: Refusal,
+): ReadRefusal => ({ ok: false, status, code, reason });
 
 /** A read route's answer: the result as JSON, never cached (it depends on the viewer and on the draft). */
 export function readResponse<T>(result: ReadResult<T>): Response {
   const headers = { "Cache-Control": "private, no-store" };
   if (result.ok) return Response.json(result, { headers });
-  const body: ActionResult = { ok: false, code: result.code, reason: result.reason };
+  const body: ActionResult = {
+    ok: false,
+    code: result.code,
+    reason: result.reason,
+  };
   return Response.json(body, { status: result.status, headers });
 }

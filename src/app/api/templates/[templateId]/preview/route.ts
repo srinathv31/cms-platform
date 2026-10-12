@@ -2,7 +2,11 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { badRequest, renderFailed, renderTarget } from "@/domain/render";
 import { correlationIdOf, errorResponse } from "@/server/api/http";
-import { ROUND_MESSAGE, readRenderRequest, renderSuccessResponse } from "@/server/api/render-http";
+import {
+  ROUND_MESSAGE,
+  readRenderRequest,
+  renderSuccessResponse,
+} from "@/server/api/render-http";
 import { renderTemplate } from "@/server/render/render-template";
 import { getViewer } from "@/server/viewer";
 
@@ -24,18 +28,29 @@ import { getViewer } from "@/server/viewer";
 /** A preview's round: a whole number from 1. */
 const Round = z.int().min(1);
 
-export async function POST(request: NextRequest, ctx: RouteContext<"/api/templates/[templateId]/preview">) {
+export async function POST(
+  request: NextRequest,
+  ctx: RouteContext<"/api/templates/[templateId]/preview">,
+) {
   const { templateId } = await ctx.params;
   const correlationId = correlationIdOf(request);
 
   const read = await readRenderRequest(request);
   if (!read.ok) return errorResponse(read.error, correlationId);
-  const { version, round: askedRound, channel, platform, values, encoding } = read.body;
+  const {
+    version,
+    round: askedRound,
+    channel,
+    platform,
+    values,
+    encoding,
+  } = read.body;
 
   let round: number | undefined;
   if (askedRound !== undefined) {
     const checked = Round.safeParse(askedRound);
-    if (!checked.success) return errorResponse(badRequest(ROUND_MESSAGE), correlationId);
+    if (!checked.success)
+      return errorResponse(badRequest(ROUND_MESSAGE), correlationId);
     round = checked.data;
   }
   // A push asks for its platform; nothing else takes one, and push and SMS take no encoding.
@@ -57,10 +72,18 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/templat
       viewer: await getViewer(),
     });
     if (!result.ok) return errorResponse(result.error, correlationId);
-    return renderSuccessResponse(result, { templateId, preview: true, encoding, correlationId });
+    return renderSuccessResponse(result, {
+      templateId,
+      preview: true,
+      encoding,
+      correlationId,
+    });
   } catch (error) {
     // The database or the log write failed: still a JSON error with the render engine's shape.
-    console.error(`[preview] ${templateId} ${channel} failed outside the pipeline, correlation ${correlationId}`, error);
+    console.error(
+      `[preview] ${templateId} ${channel} failed outside the pipeline, correlation ${correlationId}`,
+      error,
+    );
     return errorResponse(renderFailed(channel), correlationId);
   }
 }

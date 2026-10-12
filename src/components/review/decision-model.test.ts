@@ -17,13 +17,29 @@ import {
 
 const NOW = "2026-10-05T02:29:00.000Z";
 
-const step = (position: number, name: string, status: StepView["status"]): StepView => ({ position, name, status });
+const step = (
+  position: number,
+  name: string,
+  status: StepView["status"],
+): StepView => ({ position, name, status });
 const ONE = [step(0, "Team approver", "current")];
-const TWO_FIRST = [step(0, "Team approver", "current"), step(1, "Legal reviewer", "waiting")];
-const TWO_SECOND = [step(0, "Team approver", "done"), step(1, "Legal reviewer", "current")];
+const TWO_FIRST = [
+  step(0, "Team approver", "current"),
+  step(1, "Legal reviewer", "waiting"),
+];
+const TWO_SECOND = [
+  step(0, "Team approver", "done"),
+  step(1, "Legal reviewer", "current"),
+];
 
 const USAGE: ConsumerUsage[] = [
-  { consumerId: "coral", consumerName: "Coral", versionNumber: 2, lastRenderAt: "2026-10-05T01:00:00.000Z", renders30d: 332 },
+  {
+    consumerId: "coral",
+    consumerName: "Coral",
+    versionNumber: 2,
+    lastRenderAt: "2026-10-05T01:00:00.000Z",
+    renders30d: 332,
+  },
 ];
 
 function lines(over: Partial<ApproveLinesInput> = {}) {
@@ -55,7 +71,9 @@ describe("a change request's reason", () => {
     expect(reasonReady(`  ${"a".repeat(REASON_MAX)}  `)).toBe(true);
     expect(reasonProblem(`  ${"a".repeat(REASON_MAX)}  `)).toBeNull();
     expect(reasonReady("a".repeat(REASON_MAX + 1))).toBe(false);
-    expect(reasonProblem("a".repeat(REASON_MAX + 1))).toBe("Keep the reason under 2,000 characters.");
+    expect(reasonProblem("a".repeat(REASON_MAX + 1))).toBe(
+      "Keep the reason under 2,000 characters.",
+    );
   });
 });
 
@@ -68,9 +86,15 @@ describe("decisionAccess", () => {
 
   it("is blocked, with the reason, for an approver who can't decide this one (maker-checker, another stage)", () => {
     const own = refuse(REASONS.ownVersion);
-    expect(decisionAccess(own, own)).toEqual({ kind: "blocked", reason: "You submitted this version." });
+    expect(decisionAccess(own, own)).toEqual({
+      kind: "blocked",
+      reason: "You submitted this version.",
+    });
     const stage = refuse(STAGE_REFUSALS.waitingOn("Legal reviewer"));
-    expect(decisionAccess(stage, stage)).toEqual({ kind: "blocked", reason: "Waiting on Legal reviewer." });
+    expect(decisionAccess(stage, stage)).toEqual({
+      kind: "blocked",
+      reason: "Waiting on Legal reviewer.",
+    });
   });
 
   it("is hidden for someone who isn't an approver on the team: no dead buttons", () => {
@@ -80,47 +104,83 @@ describe("decisionAccess", () => {
 
   it("reads the refusal's code, never its sentence (handoff review I11)", () => {
     // Reworded copy changes nothing: `generic` still hides, with any wording.
-    const reworded = { ok: false, code: "generic", reason: "Ask a Team Admin for the Approver role." } as const;
+    const reworded = {
+      ok: false,
+      code: "generic",
+      reason: "Ask a Team Admin for the Approver role.",
+    } as const;
     expect(decisionAccess(reworded, reworded)).toEqual({ kind: "hidden" });
     // And a sentence that happens to read like `generic` doesn't hide a refusal coded otherwise.
-    const lookalike = { ok: false, code: "submitted_version", reason: REASONS.generic.reason } as const;
-    expect(decisionAccess(lookalike, lookalike)).toEqual({ kind: "blocked", reason: REASONS.generic.reason });
+    const lookalike = {
+      ok: false,
+      code: "submitted_version",
+      reason: REASONS.generic.reason,
+    } as const;
+    expect(decisionAccess(lookalike, lookalike)).toEqual({
+      kind: "blocked",
+      reason: REASONS.generic.reason,
+    });
   });
 
   it("takes Approve's refusal first, then Request changes'", () => {
     const own = refuse(REASONS.ownVersion);
-    expect(decisionAccess(ok, own)).toEqual({ kind: "blocked", reason: REASONS.ownVersion.reason });
-    expect(decisionAccess(refuse(REASONS.generic), own)).toEqual({ kind: "hidden" });
+    expect(decisionAccess(ok, own)).toEqual({
+      kind: "blocked",
+      reason: REASONS.ownVersion.reason,
+    });
+    expect(decisionAccess(refuse(REASONS.generic), own)).toEqual({
+      kind: "hidden",
+    });
   });
 });
 
 describe("approvalStage", () => {
   it("is final when the current stage is the only one, or the last", () => {
-    expect(approvalStage(ONE)).toMatchObject({ final: true, next: null, current: { name: "Team approver" } });
-    expect(approvalStage(TWO_SECOND)).toMatchObject({ final: true, current: { name: "Legal reviewer" } });
+    expect(approvalStage(ONE)).toMatchObject({
+      final: true,
+      next: null,
+      current: { name: "Team approver" },
+    });
+    expect(approvalStage(TWO_SECOND)).toMatchObject({
+      final: true,
+      current: { name: "Legal reviewer" },
+    });
   });
 
   it("names the next stage when it is not the last", () => {
-    expect(approvalStage(TWO_FIRST)).toMatchObject({ final: false, next: { name: "Legal reviewer" } });
+    expect(approvalStage(TWO_FIRST)).toMatchObject({
+      final: false,
+      next: { name: "Legal reviewer" },
+    });
   });
 
   it("has no stage to decide when nothing is current", () => {
-    expect(approvalStage([step(0, "Team approver", "returned")])).toEqual({ current: null, next: null, final: false });
+    expect(approvalStage([step(0, "Team approver", "returned")])).toEqual({
+      current: null,
+      next: null,
+      final: false,
+    });
   });
 });
 
 describe("approveLines", () => {
   it("says what goes live and that the previous version keeps rendering until it relinks", () => {
-    expect(lines()).toEqual(["v3 becomes Active. v2 becomes Superseded; Coral keeps rendering v2 until it relinks."]);
+    expect(lines()).toEqual([
+      "v3 becomes Active. v2 becomes Superseded; Coral keeps rendering v2 until it relinks.",
+    ]);
   });
 
   it("follows the sunset date as it changes", () => {
     const first = lines({ sunset: "2027-03-01" });
     expect(first[0]).toBe("v3 becomes Active. v2 becomes Superseded.");
-    expect(first[1]).toBe("Coral still renders v2 (last render today). It will keep working until March 1, 2027.");
+    expect(first[1]).toBe(
+      "Coral still renders v2 (last render today). It will keep working until March 1, 2027.",
+    );
 
     const moved = lines({ sunset: "2027-04-15" });
-    expect(moved[1]).toBe("Coral still renders v2 (last render today). It will keep working until April 15, 2027.");
+    expect(moved[1]).toBe(
+      "Coral still renders v2 (last render today). It will keep working until April 15, 2027.",
+    );
 
     // Switched off again: back to the first answer.
     expect(lines({ sunset: null })).toEqual(lines());
@@ -128,8 +188,20 @@ describe("approveLines", () => {
 
   it("adds what each consumer has to map when the version breaks the contract", () => {
     const changes = [
-      { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
-      { kind: "added", key: "bonus_points", breaking: false, type: "number", required: false },
+      {
+        kind: "added",
+        key: "annual_fee",
+        breaking: true,
+        type: "currency",
+        required: true,
+      },
+      {
+        kind: "added",
+        key: "bonus_points",
+        breaking: false,
+        type: "number",
+        required: false,
+      },
     ] as const;
     expect(lines({ contractChanges: changes })).toEqual([
       "v3 becomes Active. v2 becomes Superseded; Coral keeps rendering v2 until it relinks.",
@@ -137,97 +209,211 @@ describe("approveLines", () => {
     ]);
     // Nothing breaks: nothing to map. Removing a variable asks nothing of a consumer either.
     expect(lines({ contractChanges: [changes[1]] })).toEqual(lines());
-    expect(lines({ contractChanges: [{ kind: "removed", key: "old", breaking: true, type: "text", required: false }] })).toEqual(lines());
+    expect(
+      lines({
+        contractChanges: [
+          {
+            kind: "removed",
+            key: "old",
+            breaking: true,
+            type: "text",
+            required: false,
+          },
+        ],
+      }),
+    ).toEqual(lines());
   });
 
   // N3, revoked during review: v3 was submitted while v2 was Active, so its stored changes are against v2.
   // v2 was revoked since, v1 still renders, and what v1's consumers have to map is v3 against v1.
   it("with nothing Active, names what the consumers of the version that still renders have to map, not what submit stored", () => {
-    const storedAgainstV2 = [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }] as const;
+    const storedAgainstV2 = [
+      {
+        kind: "added",
+        key: "annual_fee",
+        breaking: true,
+        type: "currency",
+        required: true,
+      },
+    ] as const;
     const againstV1 = [
-      { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
-      { kind: "key_renamed", key: "apr", breaking: true, from: "rate", to: "apr" },
-      { kind: "label_changed", key: "first_name", breaking: false, from: "Name", to: "First name" },
+      {
+        kind: "added",
+        key: "annual_fee",
+        breaking: true,
+        type: "currency",
+        required: true,
+      },
+      {
+        kind: "key_renamed",
+        key: "apr",
+        breaking: true,
+        from: "rate",
+        to: "apr",
+      },
+      {
+        kind: "label_changed",
+        key: "first_name",
+        breaking: false,
+        from: "Name",
+        to: "First name",
+      },
     ] as const;
     const v1 = { number: 1, sunsetDay: null, contractChanges: againstV1 };
     const usage: ConsumerUsage[] = [{ ...USAGE[0]!, versionNumber: 1 }];
-    expect(lines({ previousNumber: null, stillRenders: v1, contractChanges: storedAgainstV2, usage })).toEqual([
+    expect(
+      lines({
+        previousNumber: null,
+        stillRenders: v1,
+        contractChanges: storedAgainstV2,
+        usage,
+      }),
+    ).toEqual([
       "v3 becomes Active.",
       "Coral keeps rendering v1 until it relinks.",
       "Coral has to map `annual_fee` and `apr` before it moves to v3.",
     ]);
     // v1 already has what v2 lacked: nothing to map, whatever submit stored.
-    expect(lines({ previousNumber: null, stillRenders: { ...v1, contractChanges: [] }, contractChanges: storedAgainstV2, usage })).toEqual([
+    expect(
+      lines({
+        previousNumber: null,
+        stillRenders: { ...v1, contractChanges: [] },
+        contractChanges: storedAgainstV2,
+        usage,
+      }),
+    ).toEqual([
       "v3 becomes Active.",
       "Coral keeps rendering v1 until it relinks.",
     ]);
     // Something Active: the stored changes, against the Active version it replaces.
-    expect(lines({ stillRenders: v1, contractChanges: storedAgainstV2 })).toEqual(lines({ contractChanges: storedAgainstV2 }));
+    expect(
+      lines({ stillRenders: v1, contractChanges: storedAgainstV2 }),
+    ).toEqual(lines({ contractChanges: storedAgainstV2 }));
   });
 
   it("is one line when nothing is Active yet, and a sunset date has nothing to apply to", () => {
-    expect(lines({ previousNumber: null })).toEqual(["v3 becomes Active.", "Consumers can start using it right away."]);
-    expect(lines({ previousNumber: null, sunset: "2027-03-01" })).toEqual(["v3 becomes Active.", "Consumers can start using it right away."]);
+    expect(lines({ previousNumber: null })).toEqual([
+      "v3 becomes Active.",
+      "Consumers can start using it right away.",
+    ]);
+    expect(lines({ previousNumber: null, sunset: "2027-03-01" })).toEqual([
+      "v3 becomes Active.",
+      "Consumers can start using it right away.",
+    ]);
   });
 
   it("says nobody renders the previous version when the log has no one", () => {
-    expect(lines({ usage: [] })).toEqual(["v3 becomes Active. v2 becomes Superseded.", "No consumer renders v2."]);
+    expect(lines({ usage: [] })).toEqual([
+      "v3 becomes Active. v2 becomes Superseded.",
+      "No consumer renders v2.",
+    ]);
   });
 
   it("only moves the version along at an earlier stage: no go-live, no sunset", () => {
-    const out = lines({ stage: approvalStage(TWO_FIRST), sunset: "2027-03-01" });
-    expect(out).toEqual(["v3 moves to Legal reviewer for approval. It isn't Active until the last stage approves."]);
+    const out = lines({
+      stage: approvalStage(TWO_FIRST),
+      sunset: "2027-03-01",
+    });
+    expect(out).toEqual([
+      "v3 moves to Legal reviewer for approval. It isn't Active until the last stage approves.",
+    ]);
   });
 
   it("names the round at an earlier stage once the version was sent back, and only released numbers at the last", () => {
     const round2 = { number: 3, round: 2, state: "in_review" } as const;
-    expect(lines({ version: round2, stage: approvalStage(TWO_FIRST) })).toEqual([
-      "v3, round 2 moves to Legal reviewer for approval. It isn't Active until the last stage approves.",
-    ]);
+    expect(lines({ version: round2, stage: approvalStage(TWO_FIRST) })).toEqual(
+      [
+        "v3, round 2 moves to Legal reviewer for approval. It isn't Active until the last stage approves.",
+      ],
+    );
     // Consumers never see a round: what goes live is v3.
     expect(lines({ version: round2 })).toEqual(lines());
   });
 });
 
 describe("decisionRow", () => {
-  const base = { authorName: "Maya Chen", local: null, canDecideAgain: false } as const;
-  const at = (state: VersionState, round = 1) => ({ version: { number: 3, round, state } });
+  const base = {
+    authorName: "Maya Chen",
+    local: null,
+    canDecideAgain: false,
+  } as const;
+  const at = (state: VersionState, round = 1) => ({
+    version: { number: 3, round, state },
+  });
   const line = (text: string) => ({ kind: "line", text });
 
   it("leaves the buttons in place while the version is in review", () => {
-    expect(decisionRow({ ...base, ...at("in_review") })).toEqual({ kind: "buttons" });
+    expect(decisionRow({ ...base, ...at("in_review") })).toEqual({
+      kind: "buttons",
+    });
   });
 
   it("tells the approver of an earlier stage who is next, unless they can decide it too", () => {
-    const local = { kind: "approved", wentLive: false, nextStage: "Legal reviewer" } as const;
-    expect(decisionRow({ ...base, ...at("in_review"), local })).toEqual(line("You approved this stage. Legal reviewer is next."));
-    expect(decisionRow({ ...base, ...at("in_review"), local, canDecideAgain: true })).toEqual({ kind: "buttons" });
+    const local = {
+      kind: "approved",
+      wentLive: false,
+      nextStage: "Legal reviewer",
+    } as const;
+    expect(decisionRow({ ...base, ...at("in_review"), local })).toEqual(
+      line("You approved this stage. Legal reviewer is next."),
+    );
+    expect(
+      decisionRow({ ...base, ...at("in_review"), local, canDecideAgain: true }),
+    ).toEqual({ kind: "buttons" });
   });
 
   it("words the decision as the viewer's own right after they make it, and as a plain record otherwise", () => {
-    expect(decisionRow({ ...base, ...at("active"), local: { kind: "approved", wentLive: true, nextStage: null } })).toEqual(
-      line("You approved v3."),
+    expect(
+      decisionRow({
+        ...base,
+        ...at("active"),
+        local: { kind: "approved", wentLive: true, nextStage: null },
+      }),
+    ).toEqual(line("You approved v3."));
+    expect(decisionRow({ ...base, ...at("active") })).toEqual(
+      line("v3 is Active."),
     );
-    expect(decisionRow({ ...base, ...at("active") })).toEqual(line("v3 is Active."));
-    expect(decisionRow({ ...base, ...at("changes_requested"), local: { kind: "returned" } })).toEqual(
-      line("You returned v3, round 1 to Maya Chen."),
+    expect(
+      decisionRow({
+        ...base,
+        ...at("changes_requested"),
+        local: { kind: "returned" },
+      }),
+    ).toEqual(line("You returned v3, round 1 to Maya Chen."));
+    expect(decisionRow({ ...base, ...at("superseded") })).toEqual(
+      line("v3 is Superseded."),
     );
-    expect(decisionRow({ ...base, ...at("superseded") })).toEqual(line("v3 is Superseded."));
-    expect(decisionRow({ ...base, ...at("revoked") })).toEqual(line("v3 is Revoked."));
+    expect(decisionRow({ ...base, ...at("revoked") })).toEqual(
+      line("v3 is Revoked."),
+    );
   });
 
   it("adds no sentence to a round sent back before: its returned stage says who and when", () => {
-    expect(decisionRow({ ...base, ...at("changes_requested") })).toEqual({ kind: "sentBack" });
-    expect(decisionRow({ ...base, ...at("changes_requested", 2) })).toEqual({ kind: "sentBack" });
+    expect(decisionRow({ ...base, ...at("changes_requested") })).toEqual({
+      kind: "sentBack",
+    });
+    expect(decisionRow({ ...base, ...at("changes_requested", 2) })).toEqual({
+      kind: "sentBack",
+    });
   });
 
   it("names the round it returned (a sent-back round always shows it), and a released version by its number", () => {
-    expect(decisionRow({ ...base, ...at("changes_requested", 2), local: { kind: "returned" } })).toEqual(
-      line("You returned v3, round 2 to Maya Chen."),
+    expect(
+      decisionRow({
+        ...base,
+        ...at("changes_requested", 2),
+        local: { kind: "returned" },
+      }),
+    ).toEqual(line("You returned v3, round 2 to Maya Chen."));
+    expect(
+      decisionRow({
+        ...base,
+        ...at("active", 3),
+        local: { kind: "approved", wentLive: true, nextStage: null },
+      }),
+    ).toEqual(line("You approved v3."));
+    expect(decisionRow({ ...base, ...at("superseded", 3) })).toEqual(
+      line("v3 is Superseded."),
     );
-    expect(decisionRow({ ...base, ...at("active", 3), local: { kind: "approved", wentLive: true, nextStage: null } })).toEqual(
-      line("You approved v3."),
-    );
-    expect(decisionRow({ ...base, ...at("superseded", 3) })).toEqual(line("v3 is Superseded."));
   });
 });

@@ -2,7 +2,11 @@
 // applies, so a file we know will be refused never makes a request, and the console stays clean),
 // and the upload itself to `POST /api/imports`. The server still decides: it sniffs the bytes.
 
-import { IMPORT_LIMITS, IMPORT_REFUSALS, type ImportResponse } from "@/domain/import-types";
+import {
+  IMPORT_LIMITS,
+  IMPORT_REFUSALS,
+  type ImportResponse,
+} from "@/domain/import-types";
 
 /** The names the server accepts (a .txt must also be named so; .docx and .pdf are then sniffed). */
 const ACCEPTED_NAME = /\.(docx|pdf|txt)$/i;
@@ -11,7 +15,9 @@ const ACCEPTED_NAME = /\.(docx|pdf|txt)$/i;
 export const IMPORT_FAILED = "Couldn't import the file. Try again.";
 
 /** Why this file would be refused, from what the browser knows (name and size); null when it may go. */
-export function precheckImport(file: Pick<File, "name" | "size">): string | null {
+export function precheckImport(
+  file: Pick<File, "name" | "size">,
+): string | null {
   // A legacy Word file is the one refusal with a way forward.
   if (/\.doc$/i.test(file.name.trim())) return IMPORT_REFUSALS.legacyDoc.reason;
   if (!ACCEPTED_NAME.test(file.name)) return IMPORT_REFUSALS.type.reason;
@@ -28,7 +34,9 @@ const ZIP_MAGIC = [0x50, 0x4b]; // PK: a .docx is a zip
  * A file that isn't is refused here, so a renamed picture never makes a request the server will
  * refuse (and the console stays clean). The server still sniffs the whole file. A .txt has no magic.
  */
-export async function precheckImportBytes(file: Pick<Blob, "slice"> & { name: string }): Promise<string | null> {
+export async function precheckImportBytes(
+  file: Pick<Blob, "slice"> & { name: string },
+): Promise<string | null> {
   const pdf = /\.pdf$/i.test(file.name.trim());
   const docx = /\.docx$/i.test(file.name.trim());
   if (!pdf && !docx) return null;
@@ -48,11 +56,17 @@ export async function precheckImportBytes(file: Pick<Blob, "slice"> & { name: st
  * `{ ok: false, code, reason }` like every refusal (an `IMPORT_REFUSALS` code, or the permission
  * refusal's); an answer that isn't one is `failed`, with `IMPORT_FAILED`.
  */
-export async function uploadImport(file: File, teamSlug: string): Promise<ImportResponse> {
+export async function uploadImport(
+  file: File,
+  teamSlug: string,
+): Promise<ImportResponse> {
   const form = new FormData();
   form.set("file", file);
   // The team goes in the query: the server checks the permission before it reads the body.
-  const response = await fetch(`/api/imports?team=${encodeURIComponent(teamSlug)}`, { method: "POST", body: form });
+  const response = await fetch(
+    `/api/imports?team=${encodeURIComponent(teamSlug)}`,
+    { method: "POST", body: form },
+  );
   try {
     const answer: unknown = await response.json();
     if (isImportResponse(answer)) return answer;
@@ -66,6 +80,9 @@ export async function uploadImport(file: File, teamSlug: string): Promise<Import
 function isImportResponse(value: unknown): value is ImportResponse {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v.ok === true) return typeof v.templateId === "string" && typeof v.href === "string";
-  return v.ok === false && typeof v.code === "string" && typeof v.reason === "string";
+  if (v.ok === true)
+    return typeof v.templateId === "string" && typeof v.href === "string";
+  return (
+    v.ok === false && typeof v.code === "string" && typeof v.reason === "string"
+  );
 }

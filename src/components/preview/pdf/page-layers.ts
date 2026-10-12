@@ -32,7 +32,10 @@ export async function drawCanvas(
   signal: AbortSignal,
 ): Promise<HTMLCanvasElement> {
   signal.throwIfAborted();
-  const scale = Math.min(pixelWidth / size.width, Math.sqrt(MAX_CANVAS_PIXELS / (size.width * size.height)));
+  const scale = Math.min(
+    pixelWidth / size.width,
+    Math.sqrt(MAX_CANVAS_PIXELS / (size.width * size.height)),
+  );
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement("canvas");
   canvas.className = styles.canvas;

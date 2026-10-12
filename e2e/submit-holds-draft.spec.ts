@@ -1,7 +1,18 @@
 import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
-import { SPRING_NAME, TEAM, click, createSpringTravel, json, reactReady, removeTemplate, rows, run, type SpringFixture } from "./helpers/golive";
+import {
+  SPRING_NAME,
+  TEAM,
+  click,
+  createSpringTravel,
+  json,
+  reactReady,
+  removeTemplate,
+  rows,
+  run,
+  type SpringFixture,
+} from "./helpers/golive";
 import {
   asPersona,
   caret,
@@ -56,17 +67,38 @@ test.afterAll(async () => {
   }
 });
 
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
-const submitButton = (page: Page) => page.getByRole("button", { name: "Submit for review" });
-const newVariable = (page: Page) => page.getByRole("button", { name: "New variable" });
-const undoButton = (page: Page) => page.locator("header").filter({ visible: true }).getByRole("button", { name: "Undo", exact: true });
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
+const submitButton = (page: Page) =>
+  page.getByRole("button", { name: "Submit for review" });
+const newVariable = (page: Page) =>
+  page.getByRole("button", { name: "New variable" });
+const undoButton = (page: Page) =>
+  page
+    .locator("header")
+    .filter({ visible: true })
+    .getByRole("button", { name: "Undo", exact: true });
 // By selector rather than by role: an open dialog hides the page behind it from the accessibility tree.
 const held = {
-  document: (page: Page) => page.locator('.ProseMirror[aria-label="Document"]').filter({ visible: true }),
-  name: (page: Page) => page.locator('textarea[aria-label="Template name"]').filter({ visible: true }),
-  channels: (page: Page) => page.locator('[aria-label="Channels"] button').filter({ visible: true }),
-  newVariable: (page: Page) => page.locator("button").filter({ hasText: /^New variable$/, visible: true }),
-  formLabel: (page: Page) => page.locator('form[aria-label="New variable"] input').filter({ visible: true }).first(),
+  document: (page: Page) =>
+    page
+      .locator('.ProseMirror[aria-label="Document"]')
+      .filter({ visible: true }),
+  name: (page: Page) =>
+    page
+      .locator('textarea[aria-label="Template name"]')
+      .filter({ visible: true }),
+  channels: (page: Page) =>
+    page.locator('[aria-label="Channels"] button').filter({ visible: true }),
+  newVariable: (page: Page) =>
+    page.locator("button").filter({ hasText: /^New variable$/, visible: true }),
+  formLabel: (page: Page) =>
+    page
+      .locator('form[aria-label="New variable"] input')
+      .filter({ visible: true })
+      .first(),
 };
 
 /** Clicks at the end of the document's first paragraph and types `text` after a space. */
@@ -77,7 +109,11 @@ async function typeAtEndOfFirstParagraph(page: Page, text: string) {
   await untilUncovered(paragraph, end);
   await paragraph.click({ position: end, delay: 90 });
   await page.keyboard.press("End");
-  await expect.poll(async () => (await caret(page)).focused, { message: "the document takes focus" }).toBe(true);
+  await expect
+    .poll(async () => (await caret(page)).focused, {
+      message: "the document takes focus",
+    })
+    .toBe(true);
   await typeSlowly(page, ` ${text}`);
   await expect(documentEditor(page)).toContainText(text);
 }
@@ -87,7 +123,10 @@ async function typeAtEndOfFirstParagraph(page: Page, text: string) {
  * (`formOpen`) the New variable button is the form instead, in both states.
  */
 async function expectEditable(page: Page, editable: boolean, formOpen = false) {
-  await expect(held.document(page)).toHaveAttribute("contenteditable", String(editable));
+  await expect(held.document(page)).toHaveAttribute(
+    "contenteditable",
+    String(editable),
+  );
   await expect(held.name(page)).toHaveJSProperty("readOnly", !editable);
   await expect(held.channels(page)).toHaveCount(3);
   for (const toggle of await held.channels(page).all()) {
@@ -107,11 +146,15 @@ async function expectEditable(page: Page, editable: boolean, formOpen = false) {
   }
 }
 
-test("Submit holds the draft still while it reads the summary, Cancel lets go, and a stale summary is refreshed", async ({ page }) => {
+test("Submit holds the draft still while it reads the summary, Cancel lets go, and a stale summary is refreshed", async ({
+  page,
+}) => {
   const { templateId } = fixture!;
   await asPersona(page, "maya");
   await page.goto(`/${TEAM}/templates/${templateId}`);
-  await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: SPRING_NAME }),
+  ).toBeVisible();
   await hydrated(page);
 
   await test.step("Maya opens a draft of v2", async () => {
@@ -125,7 +168,8 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
 
   // Every autosave now takes a while to reach the server, so the saves are still out when she presses Submit.
   await page.route("**/api/drafts/**", async (route) => {
-    if (route.request().method() === "PUT") await new Promise((resolve) => setTimeout(resolve, SLOW_SAVE_MS));
+    if (route.request().method() === "PUT")
+      await new Promise((resolve) => setTimeout(resolve, SLOW_SAVE_MS));
     await route.continue();
   });
 
@@ -149,7 +193,10 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
     await tap(submitButton(page));
     await expect(submitButton(page)).toBeDisabled();
     await expectEditable(page, false, true);
-    await expect(held.formLabel(page), "the open form keeps what she typed").toHaveValue("Half typed");
+    await expect(
+      held.formLabel(page),
+      "the open form keeps what she typed",
+    ).toHaveValue("Half typed");
     // Typing into the document changes nothing now.
     const before = await documentEditor(page).textContent();
     await documentEditor(page).locator("p").first().click({ delay: 90 });
@@ -165,9 +212,15 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
     await expect(held.formLabel(page)).toHaveValue("Half typed");
     await expect(dialog).toContainText("v3 adds required gift_card (Text).");
     await expect(saveIndicator(page)).toHaveText("Saved");
-    const [draft] = await rows(db, "SELECT body, variables FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
+    const [draft] = await rows(
+      db,
+      "SELECT body, variables FROM versions WHERE template_id = ? AND state = 'draft'",
+      [templateId],
+    );
     expect(JSON.stringify(json(draft.body))).toContain(FIRST);
-    expect((json(draft.variables) as { key: string }[]).map((v) => v.key)).toContain("gift_card");
+    expect(
+      (json(draft.variables) as { key: string }[]).map((v) => v.key),
+    ).toContain("gift_card");
   });
 
   await page.unroute("**/api/drafts/**");
@@ -176,8 +229,15 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
     await tap(dialog.getByRole("button", { name: "Cancel" }));
     await expect(dialog).toBeHidden();
     await expectEditable(page, true, true);
-    await expect(held.formLabel(page), "what she typed is still there").toHaveValue("Half typed");
-    await tap(page.getByRole("form", { name: "New variable" }).getByRole("button", { name: "Cancel" }));
+    await expect(
+      held.formLabel(page),
+      "what she typed is still there",
+    ).toHaveValue("Half typed");
+    await tap(
+      page
+        .getByRole("form", { name: "New variable" })
+        .getByRole("button", { name: "Cancel" }),
+    );
     await expectEditable(page, true);
     await expect(undoButton(page)).not.toHaveAttribute("data-disabled");
     await typeAtEndOfFirstParagraph(page, SECOND);
@@ -190,28 +250,51 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
     await expectEditable(page, false);
 
     // What a save from another tab leaves behind: the draft's rev moves on.
-    await run(db, "UPDATE versions SET rev = rev + 1 WHERE template_id = ? AND state = 'draft'", [templateId]);
+    await run(
+      db,
+      "UPDATE versions SET rev = rev + 1 WHERE template_id = ? AND state = 'draft'",
+      [templateId],
+    );
     await tap(dialog.getByRole("button", { name: "Submit v3", exact: true }));
-    await expect(dialog.getByRole("alert")).toHaveText("This draft changed after this summary was made.");
-    const [still] = await rows(db, "SELECT state FROM versions WHERE template_id = ? AND number IS NULL", [templateId]);
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "This draft changed after this summary was made.",
+    );
+    const [still] = await rows(
+      db,
+      "SELECT state FROM versions WHERE template_id = ? AND number IS NULL",
+      [templateId],
+    );
     expect(still.state, "nothing was frozen").toBe("draft");
 
     await tap(dialog.getByRole("button", { name: "Refresh summary" }));
     await expect(dialog.getByRole("alert")).toHaveText("");
     await tap(dialog.getByRole("button", { name: "Submit v3", exact: true }));
-    await expect(dialog, "the submit goes through").toBeHidden({ timeout: 20_000 });
-    await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
-    await expect(held.document(page)).toHaveAttribute("contenteditable", "false");
+    await expect(dialog, "the submit goes through").toBeHidden({
+      timeout: 20_000,
+    });
+    await expect(statusBadge(page)).toHaveText("In review", {
+      timeout: 20_000,
+    });
+    await expect(held.document(page)).toHaveAttribute(
+      "contenteditable",
+      "false",
+    );
   });
 
   await test.step("v3 holds everything she typed, and nothing failed to save after the submit", async () => {
-    const [v3] = await rows(db, "SELECT state, body, variables FROM versions WHERE template_id = ? AND number = 3", [templateId]);
+    const [v3] = await rows(
+      db,
+      "SELECT state, body, variables FROM versions WHERE template_id = ? AND number = 3",
+      [templateId],
+    );
     expect(v3.state).toBe("in_review");
     const body = JSON.stringify(json(v3.body));
     expect(body).toContain(FIRST);
     expect(body).toContain(SECOND);
     expect(body).not.toContain("Nope");
-    expect((json(v3.variables) as { key: string }[]).map((v) => v.key)).toContain("gift_card");
+    expect(
+      (json(v3.variables) as { key: string }[]).map((v) => v.key),
+    ).toContain("gift_card");
     await expect(page.getByText(/Not saved/)).toHaveCount(0);
   });
 });

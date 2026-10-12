@@ -15,13 +15,31 @@
 // whatever still breaks a limit at save.
 
 import { Extension, type KeyboardShortcutCommand } from "@tiptap/core";
-import { Fragment, Slice, type Node as PMNode, type ResolvedPos, type Schema } from "@tiptap/pm/model";
-import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
+import {
+  Fragment,
+  Slice,
+  type Node as PMNode,
+  type ResolvedPos,
+  type Schema,
+} from "@tiptap/pm/model";
+import {
+  Plugin,
+  PluginKey,
+  type EditorState,
+  type Transaction,
+} from "@tiptap/pm/state";
 import { TableMap } from "@tiptap/pm/tables";
 import type { CharacterRules } from "../model/characters";
 import { DOCUMENT_MESSAGES } from "../model/document-check";
 import { MAX_LIST_DEPTH } from "../model/list-markers";
-import { CELL_BLOCKS, HEADING_LEVELS, MAX_HEADING_LEVEL, cellBlocks, normalizeFragment, type FieldLines } from "../model/normalize";
+import {
+  CELL_BLOCKS,
+  HEADING_LEVELS,
+  MAX_HEADING_LEVEL,
+  cellBlocks,
+  normalizeFragment,
+  type FieldLines,
+} from "../model/normalize";
 import { MAX_TABLE_COLUMNS } from "../model/table-grid";
 import type { JSONContent } from "../model/types";
 
@@ -45,13 +63,18 @@ const LISTS = new Set(["bulletList", "orderedList"]);
 /** How deep the open edge of a fragment goes on one side (how far a slice can be open there). */
 function edgeDepth(fragment: Fragment, side: "first" | "last"): number {
   let depth = 0;
-  for (let node = fragment[side === "first" ? "firstChild" : "lastChild"]; node && !node.isLeaf; depth++) {
+  for (
+    let node = fragment[side === "first" ? "firstChild" : "lastChild"];
+    node && !node.isLeaf;
+    depth++
+  ) {
     node = side === "first" ? node.firstChild : node.lastChild;
   }
   return depth;
 }
 
-const isCell = (node: PMNode) => String(node.type.spec.tableRole ?? "").includes("cell");
+const isCell = (node: PMNode) =>
+  String(node.type.spec.tableRole ?? "").includes("cell");
 
 /** Whether `$pos` is inside a table cell, at any depth. */
 export function inTableCell($pos: ResolvedPos): boolean {
@@ -64,27 +87,37 @@ export function inTableCell($pos: ResolvedPos): boolean {
  * hold (a heading, rule, callout or table in a list item there; the schema keeps them out of the
  * cell's own children). Outermost first, in document order; what's inside one is converted with it.
  */
-function blocksCellsCantHold(before: PMNode, doc: PMNode): { node: PMNode; pos: number }[] {
+function blocksCellsCantHold(
+  before: PMNode,
+  doc: PMNode,
+): { node: PMNode; pos: number }[] {
   const start = before.content.findDiffStart(doc.content);
   if (start === null) return [];
   const end = before.content.findDiffEnd(doc.content);
   const from = Math.min(start, end?.b ?? start);
   const to = Math.max(start, end?.b ?? start);
   const found: { node: PMNode; pos: number }[] = [];
-  doc.nodesBetween(from, Math.min(Math.max(to, from + 1), doc.content.size), (node, pos) => {
-    if (node.isTextblock || node.isLeaf) return false;
-    if (!isCell(node)) return true;
-    node.descendants((child, offset) => {
-      if (child.isTextblock || child.isLeaf) {
-        if (CELL_BLOCKS.includes(child.type.name)) return false;
-      } else if (CELL_BLOCKS.includes(child.type.name) || child.type.name === "listItem") {
-        return true;
-      }
-      found.push({ node: child, pos: pos + 1 + offset });
+  doc.nodesBetween(
+    from,
+    Math.min(Math.max(to, from + 1), doc.content.size),
+    (node, pos) => {
+      if (node.isTextblock || node.isLeaf) return false;
+      if (!isCell(node)) return true;
+      node.descendants((child, offset) => {
+        if (child.isTextblock || child.isLeaf) {
+          if (CELL_BLOCKS.includes(child.type.name)) return false;
+        } else if (
+          CELL_BLOCKS.includes(child.type.name) ||
+          child.type.name === "listItem"
+        ) {
+          return true;
+        }
+        found.push({ node: child, pos: pos + 1 + offset });
+        return false;
+      });
       return false;
-    });
-    return false;
-  });
+    },
+  );
   return found;
 }
 
@@ -98,7 +131,14 @@ function cellGuard(before: PMNode, state: EditorState): Transaction | null {
   const tr = state.tr;
   try {
     for (const { node, pos } of found.reverse()) {
-      tr.replaceWith(pos, pos + node.nodeSize, Fragment.fromJSON(state.schema, cellBlocks(node.toJSON() as JSONContent)));
+      tr.replaceWith(
+        pos,
+        pos + node.nodeSize,
+        Fragment.fromJSON(
+          state.schema,
+          cellBlocks(node.toJSON() as JSONContent),
+        ),
+      );
     }
     tr.doc.check();
   } catch {
@@ -120,11 +160,21 @@ export function normalizeSlice(
 ): Slice {
   if (slice.content.size === 0) return slice;
   const json = slice.content.toJSON() as JSONContent[];
-  const nodes = normalizeFragment(json, { openStart: slice.openStart, openEnd: slice.openEnd }, field, inCell, characters);
+  const nodes = normalizeFragment(
+    json,
+    { openStart: slice.openStart, openEnd: slice.openEnd },
+    field,
+    inCell,
+    characters,
+  );
   try {
     const content = Fragment.fromJSON(schema, nodes);
     if (content.size === 0) return Slice.empty;
-    if (edgeDepth(content, "first") < slice.openStart || edgeDepth(content, "last") < slice.openEnd) return slice;
+    if (
+      edgeDepth(content, "first") < slice.openStart ||
+      edgeDepth(content, "last") < slice.openEnd
+    )
+      return slice;
     return new Slice(content, slice.openStart, slice.openEnd);
   } catch {
     return slice;
@@ -132,11 +182,14 @@ export function normalizeSlice(
 }
 
 /** The table around the selection: its node and width. Null outside a table. */
-export function tableAround(state: EditorState): { node: PMNode; pos: number; columns: number } | null {
+export function tableAround(
+  state: EditorState,
+): { node: PMNode; pos: number; columns: number } | null {
   const { $from } = state.selection;
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d);
-    if (node.type.spec.tableRole === "table") return { node, pos: $from.before(d), columns: TableMap.get(node).width };
+    if (node.type.spec.tableRole === "table")
+      return { node, pos: $from.before(d), columns: TableMap.get(node).width };
   }
   return null;
 }
@@ -156,7 +209,8 @@ export function canAddColumn(state: EditorState): boolean {
 function listLevels(node: PMNode): number {
   let deepest = 0;
   node.forEach((child) => {
-    if (!child.isTextblock && !child.isLeaf) deepest = Math.max(deepest, listLevels(child));
+    if (!child.isTextblock && !child.isLeaf)
+      deepest = Math.max(deepest, listLevels(child));
   });
   return deepest + (LISTS.has(node.type.name) ? 1 : 0);
 }
@@ -166,12 +220,17 @@ export function sinkPassesLimit(state: EditorState): boolean {
   const { $from, $to } = state.selection;
   const item = state.schema.nodes.listItem;
   if (!item) return false;
-  const range = $from.blockRange($to, (node) => node.childCount > 0 && node.firstChild?.type === item);
+  const range = $from.blockRange(
+    $to,
+    (node) => node.childCount > 0 && node.firstChild?.type === item,
+  );
   if (!range) return false;
   let level = 0; // the list the items are in, and its list ancestors
-  for (let d = range.depth; d >= 0; d--) if (LISTS.has(range.$from.node(d).type.name)) level++;
+  for (let d = range.depth; d >= 0; d--)
+    if (LISTS.has(range.$from.node(d).type.name)) level++;
   let inner = 0;
-  for (let i = range.startIndex; i < range.endIndex; i++) inner = Math.max(inner, listLevels(range.parent.child(i)));
+  for (let i = range.startIndex; i < range.endIndex; i++)
+    inner = Math.max(inner, listLevels(range.parent.child(i)));
   return level + 1 + inner > MAX_LIST_DEPTH;
 }
 
@@ -179,17 +238,25 @@ export function sinkPassesLimit(state: EditorState): boolean {
  * The Markdown shortcuts (TipTap's input rules) for blocks a cell can't hold, when they are the
  * whole line: a horizontal rule, and a heading of the levels the editor offers.
  */
-const CELL_BLOCKED_SHORTCUT = new RegExp(`^(?:---|—-|___\\s|\\*\\*\\*\\s|#{1,${MAX_HEADING_LEVEL}}\\s)$`);
+const CELL_BLOCKED_SHORTCUT = new RegExp(
+  `^(?:---|—-|___\\s|\\*\\*\\*\\s|#{1,${MAX_HEADING_LEVEL}}\\s)$`,
+);
 
 /**
  * Whether typing `text` at `from` would turn a line inside a table cell (in the cell itself, or in a
  * list in it) into a rule or a heading. A cell holds paragraphs and lists only, at every depth; the
  * characters are typed as text instead.
  */
-function completesBlockedShortcutInCell(state: EditorState, from: number, text: string): boolean {
+function completesBlockedShortcutInCell(
+  state: EditorState,
+  from: number,
+  text: string,
+): boolean {
   const $from = state.doc.resolve(from);
   if (!inTableCell($from)) return false;
-  return CELL_BLOCKED_SHORTCUT.test($from.parent.textBetween(0, $from.parentOffset, undefined, "\ufffc") + text);
+  return CELL_BLOCKED_SHORTCUT.test(
+    $from.parent.textBetween(0, $from.parentOffset, undefined, "\ufffc") + text,
+  );
 }
 
 export const ContentLimits = Extension.create<ContentLimitsOptions>({
@@ -206,13 +273,18 @@ export const ContentLimits = Extension.create<ContentLimitsOptions>({
     // In a cell, the heading shortcuts do nothing (as they do in a cell's own paragraphs, where the
     // schema refuses a heading); elsewhere they fall through to the heading's own.
     const headings = Object.fromEntries(
-      HEADING_LEVELS.map((level) => [`Mod-Alt-${level}`, () => inTableCell(this.editor.state.selection.$from)]),
+      HEADING_LEVELS.map((level) => [
+        `Mod-Alt-${level}`,
+        () => inTableCell(this.editor.state.selection.$from),
+      ]),
     );
     // At the limit, Tab does nothing in a list (as Word does at its ninth level); elsewhere it falls through.
     return {
       ...headings,
       Tab: () =>
-        this.editor.isActive("listItem") && sinkPassesLimit(this.editor.state) && this.editor.can().sinkListItem("listItem"),
+        this.editor.isActive("listItem") &&
+        sinkPassesLimit(this.editor.state) &&
+        this.editor.can().sinkListItem("listItem"),
     };
   },
 
@@ -224,13 +296,25 @@ export const ContentLimits = Extension.create<ContentLimitsOptions>({
         // A drop, or any other change, that leaves a heading, rule, callout or table in a list inside a
         // cell: converted in the same undo step, as the save would.
         appendTransaction: (transactions, oldState, state) =>
-          field || !transactions.some((tr) => tr.docChanged) ? null : cellGuard(oldState.doc, state),
+          field || !transactions.some((tr) => tr.docChanged)
+            ? null
+            : cellGuard(oldState.doc, state),
         props: {
           transformPasted: (slice, view) =>
-            normalizeSlice(slice, view.state.schema, field, !field && inTableCell(view.state.selection.$from), characters),
+            normalizeSlice(
+              slice,
+              view.state.schema,
+              field,
+              !field && inTableCell(view.state.selection.$from),
+              characters,
+            ),
           // Ahead of the rule's and the heading's own input rules (this extension's plugins come first).
           handleTextInput: (view, from, to, text) => {
-            if (field || !completesBlockedShortcutInCell(view.state, from, text)) return false;
+            if (
+              field ||
+              !completesBlockedShortcutInCell(view.state, from, text)
+            )
+              return false;
             view.dispatch(view.state.tr.insertText(text, from, to));
             return true;
           },

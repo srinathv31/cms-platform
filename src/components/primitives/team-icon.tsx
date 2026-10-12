@@ -25,7 +25,9 @@ import type { TEAM_ICONS } from "@/domain/platform-config/limits";
 // each have an icon and the name the picker reads out; a typed record, so a key added there needs an
 // icon here. A few keys older rows may hold still draw. Anything else draws a building.
 
-const PICKABLE: Readonly<Record<(typeof TEAM_ICONS)[number], { Icon: LucideIcon; label: string }>> = {
+const PICKABLE: Readonly<
+  Record<(typeof TEAM_ICONS)[number], { Icon: LucideIcon; label: string }>
+> = {
   "credit-card": { Icon: CreditCard, label: "Credit card" },
   "piggy-bank": { Icon: PiggyBank, label: "Piggy bank" },
   "receipt-text": { Icon: ReceiptText, label: "Receipt" },
@@ -53,12 +55,22 @@ const OLDER: Readonly<Record<string, LucideIcon>> = {
 };
 
 function pickable(name: string) {
-  return Object.hasOwn(PICKABLE, name) ? PICKABLE[name as keyof typeof PICKABLE] : undefined;
+  return Object.hasOwn(PICKABLE, name)
+    ? PICKABLE[name as keyof typeof PICKABLE]
+    : undefined;
 }
 
 /** A team's icon. Decorative: the team's name is always beside it. */
-export function TeamIcon({ name, className }: { name: string; className?: string }) {
-  const Icon = pickable(name)?.Icon ?? (Object.hasOwn(OLDER, name) ? OLDER[name] : Building2);
+export function TeamIcon({
+  name,
+  className,
+}: {
+  name: string;
+  className?: string;
+}) {
+  const Icon =
+    pickable(name)?.Icon ??
+    (Object.hasOwn(OLDER, name) ? OLDER[name] : Building2);
   return <Icon aria-hidden strokeWidth={1.75} className={className} />;
 }
 

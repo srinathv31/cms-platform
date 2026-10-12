@@ -41,10 +41,19 @@
 // SMS's: `characters: "message"`) keeps its invisible characters, which a phone draws with (the joiner in
 // an emoji sequence, the non-joiner in a Persian name); only its control characters go (characters.ts).
 
-import { LINE_BREAKS, cleanCharacters, type CharacterRules } from "./characters";
+import {
+  LINE_BREAKS,
+  cleanCharacters,
+  type CharacterRules,
+} from "./characters";
 import { normalizeLink } from "./links";
 import { LIST_START_MAX, LIST_START_MIN } from "./list-markers";
-import { MAX_TABLE_COLUMNS, linesUp, tableGrid, type GridCell } from "./table-grid";
+import {
+  MAX_TABLE_COLUMNS,
+  linesUp,
+  tableGrid,
+  type GridCell,
+} from "./table-grid";
 import { isNode, type JSONContent } from "./types";
 
 /** Heading levels the editor offers; 4–6 are saved as the last of these. */
@@ -55,7 +64,11 @@ export const MAX_HEADING_LEVEL = 3;
  * What a table cell may hold (rule 24): paragraphs and lists, at every depth (a list item inside a
  * cell holds only these too).
  */
-export const CELL_BLOCKS: readonly string[] = ["paragraph", "bulletList", "orderedList"];
+export const CELL_BLOCKS: readonly string[] = [
+  "paragraph",
+  "bulletList",
+  "orderedList",
+];
 
 const CELLS = new Set(["tableCell", "tableHeader"]);
 
@@ -96,7 +109,11 @@ export function normalizeDocument(doc: JSONContent): JSONContent {
  * A channel field, normalized: on one line (the email subject, a push title), or keeping its line breaks (an SMS
  * message). `characters`: `"message"` for a push's or an SMS's field, which keeps its invisible characters.
  */
-export function normalizeField(doc: JSONContent, lines: FieldLines = "line", characters: CharacterRules = "document"): JSONContent {
+export function normalizeField(
+  doc: JSONContent,
+  lines: FieldLines = "line",
+  characters: CharacterRules = "document",
+): JSONContent {
   return normalizeNode(doc, CLOSED, { field: lines, characters })[0] ?? doc;
 }
 
@@ -114,8 +131,16 @@ export function normalizeFragment(
   inCell = false,
   characters: CharacterRules = "document",
 ): JSONContent[] {
-  const out = normalizeChildren(nodes, edges, { field, paste: true, characters }, null, inCell);
-  return inCell ? cellContent(out, edges, { keepTables: true, fill: false }) : out;
+  const out = normalizeChildren(
+    nodes,
+    edges,
+    { field, paste: true, characters },
+    null,
+    inCell,
+  );
+  return inCell
+    ? cellContent(out, edges, { keepTables: true, fill: false })
+    : out;
 }
 
 /**
@@ -125,7 +150,11 @@ export function normalizeFragment(
  * (or any other change) leaves in a cell, so the screen shows what will be stored and rendered.
  */
 export function cellBlocks(block: JSONContent): JSONContent[] {
-  return cellContent(normalizeNode(block, CLOSED, { field: false }, null, true), CLOSED, { keepTables: false, fill: false });
+  return cellContent(
+    normalizeNode(block, CLOSED, { field: false }, null, true),
+    CLOSED,
+    { keepTables: false, fill: false },
+  );
 }
 
 // ── Nodes ────────────────────────────────────────────────────────────────────
@@ -157,17 +186,39 @@ function normalizeChildren(
  * One node in, zero or more out (text splits at line breaks or empties; a split table is several).
  * `inCell`: the node sits inside a table cell, at any depth.
  */
-function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent: string | null = null, inCell = false): JSONContent[] {
+function normalizeNode(
+  node: JSONContent,
+  edges: Edges,
+  options: Options,
+  parent: string | null = null,
+  inCell = false,
+): JSONContent[] {
   if (!isNode(node)) return [node];
   if (node.type === "text") return normalizeText(node, options);
-  if (node.type === "hardBreak" && options.field === "line") return [{ type: "text", text: " " }];
-  if (node.type === "variable") return [withMarks(node, normalizeMarks(node.marks, options))];
+  if (node.type === "hardBreak" && options.field === "line")
+    return [{ type: "text", text: " " }];
+  if (node.type === "variable")
+    return [withMarks(node, normalizeMarks(node.marks, options))];
 
   const open = edges.openStart > 0 || edges.openEnd > 0;
-  const inner: Edges = { openStart: Math.max(edges.openStart - 1, 0), openEnd: Math.max(edges.openEnd - 1, 0) };
+  const inner: Edges = {
+    openStart: Math.max(edges.openStart - 1, 0),
+    openEnd: Math.max(edges.openEnd - 1, 0),
+  };
   const childrenInCell = inCell || CELLS.has(node.type ?? "");
-  const children = Array.isArray(node.content) ? normalizeChildren(node.content, inner, options, node.type ?? null, childrenInCell) : undefined;
-  let next: JSONContent = { ...node, ...(children ? { content: children } : {}) };
+  const children = Array.isArray(node.content)
+    ? normalizeChildren(
+        node.content,
+        inner,
+        options,
+        node.type ?? null,
+        childrenInCell,
+      )
+    : undefined;
+  let next: JSONContent = {
+    ...node,
+    ...(children ? { content: children } : {}),
+  };
   if (node.marks) next = withMarks(next, normalizeMarks(node.marks, options));
 
   switch (node.type) {
@@ -184,7 +235,8 @@ function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent
       next = { ...next, content: cellContent(next.content ?? [], inner) };
       break;
     case "listItem":
-      if (inCell) next = { ...next, content: cellContent(next.content ?? [], inner) };
+      if (inCell)
+        next = { ...next, content: cellContent(next.content ?? [], inner) };
       break;
     case "table":
       if (!open) return normalizeTable(next);
@@ -192,10 +244,12 @@ function normalizeNode(node: JSONContent, edges: Edges, options: Options, parent
   }
 
   // A text block whose text was all removed (control or invisible characters) has no `content`.
-  if (TEXTBLOCKS.has(node.type ?? "") && children && children.length === 0) next = withoutKey(next, "content");
+  if (TEXTBLOCKS.has(node.type ?? "") && children && children.length === 0)
+    next = withoutKey(next, "content");
 
   // A field's paragraphs join into one.
-  if (options.field && node.type === "doc" && parent === null) next = joinFieldParagraphs(next, options.field);
+  if (options.field && node.type === "doc" && parent === null)
+    next = joinFieldParagraphs(next, options.field);
   return [next];
 }
 
@@ -242,7 +296,11 @@ function withMarks<T extends JSONContent>(node: T, marks: Marks): T {
  */
 function joinFieldParagraphs(doc: JSONContent, lines: FieldLines): JSONContent {
   const blocks = doc.content ?? [];
-  if (blocks.length < 2 || !blocks.every((b) => isNode(b) && b.type === "paragraph")) return doc;
+  if (
+    blocks.length < 2 ||
+    !blocks.every((b) => isNode(b) && b.type === "paragraph")
+  )
+    return doc;
   const inline: JSONContent[] = [];
   blocks.forEach((block, i) => {
     if (lines === "lines") {
@@ -255,7 +313,14 @@ function joinFieldParagraphs(doc: JSONContent, lines: FieldLines): JSONContent {
     inline.push(...block.content);
   });
   const first = blocks[0];
-  return { ...doc, content: [inline.length ? { ...first, content: inline } : withoutKey(first, "content")] };
+  return {
+    ...doc,
+    content: [
+      inline.length
+        ? { ...first, content: inline }
+        : withoutKey(first, "content"),
+    ],
+  };
 }
 
 // ── Attributes ───────────────────────────────────────────────────────────────
@@ -264,7 +329,9 @@ type Attrs = Record<string, unknown> | undefined;
 
 function headingAttrs(attrs: Attrs): Attrs {
   const level = attrs?.level;
-  return typeof level === "number" && level > MAX_HEADING_LEVEL && level <= 6 ? { ...attrs, level: MAX_HEADING_LEVEL } : attrs;
+  return typeof level === "number" && level > MAX_HEADING_LEVEL && level <= 6
+    ? { ...attrs, level: MAX_HEADING_LEVEL }
+    : attrs;
 }
 
 /**
@@ -275,7 +342,9 @@ function headingAttrs(attrs: Attrs): Attrs {
 function pastedStart(attrs: Attrs): Attrs {
   const start = attrs?.start;
   if (typeof start !== "number") return attrs;
-  const fixed = Number.isNaN(start) ? 1 : Math.min(Math.max(Math.trunc(start), LIST_START_MIN), LIST_START_MAX);
+  const fixed = Number.isNaN(start)
+    ? 1
+    : Math.min(Math.max(Math.trunc(start), LIST_START_MIN), LIST_START_MAX);
   return Object.is(fixed, start) ? attrs : { ...attrs, start: fixed };
 }
 
@@ -288,7 +357,9 @@ function without(attrs: Attrs, keys: readonly string[]): Attrs {
 
 function withAttrs(node: JSONContent, attrs: Attrs): JSONContent {
   if (attrs === node.attrs) return node;
-  return attrs && Object.keys(attrs).length ? { ...node, attrs } : withoutKey(node, "attrs");
+  return attrs && Object.keys(attrs).length
+    ? { ...node, attrs }
+    : withoutKey(node, "attrs");
 }
 
 function withoutKey<T extends JSONContent>(node: T, key: keyof JSONContent): T {
@@ -301,7 +372,9 @@ function withoutKey<T extends JSONContent>(node: T, key: keyof JSONContent): T {
 // ── Table cells: paragraphs and lists only ───────────────────────────────────
 
 const emptyParagraph = (id?: unknown): JSONContent =>
-  typeof id === "string" && id ? { type: "paragraph", attrs: { id } } : { type: "paragraph" };
+  typeof id === "string" && id
+    ? { type: "paragraph", attrs: { id } }
+    : { type: "paragraph" };
 
 interface CellContentOptions {
   /** Keep a table as it is (a paste into a cell: the table plugin pastes its cells into the grid). */
@@ -324,7 +397,11 @@ function cellContent(
   const out: JSONContent[] = [];
   const last = blocks.length - 1;
   for (const [i, block] of blocks.entries()) {
-    if (!isNode(block) || (i === 0 && edges.openStart > 0) || (i === last && edges.openEnd > 0)) {
+    if (
+      !isNode(block) ||
+      (i === 0 && edges.openStart > 0) ||
+      (i === last && edges.openEnd > 0)
+    ) {
       out.push(block);
       continue;
     }
@@ -350,14 +427,17 @@ function cellContent(
           break;
         }
         for (const row of block.content ?? []) {
-          for (const cell of row?.content ?? []) out.push(...cellContent(cell?.content ?? []));
+          for (const cell of row?.content ?? [])
+            out.push(...cellContent(cell?.content ?? []));
         }
         break;
       default:
         out.push(block); // paragraphs and lists; anything unknown is the check's to refuse
     }
   }
-  return out.length || !options.fill || edges.openStart > 0 || edges.openEnd > 0 ? out : [emptyParagraph()];
+  return out.length || !options.fill || edges.openStart > 0 || edges.openEnd > 0
+    ? out
+    : [emptyParagraph()];
 }
 
 // ── Tables: ragged rows, more than 12 columns ────────────────────────────────
@@ -372,7 +452,14 @@ export const MAX_SPLIT_COLUMNS = 1000;
 function normalizeTable(table: JSONContent): JSONContent[] {
   const grid = tableGrid(table);
   // Spans that aren't integers, overlaps and overruns can't be fixed without guessing: the check refuses them.
-  if (grid.badSpan || grid.collision || grid.overlongRowspan || grid.width === 0 || grid.width > MAX_SPLIT_COLUMNS) return [table];
+  if (
+    grid.badSpan ||
+    grid.collision ||
+    grid.overlongRowspan ||
+    grid.width === 0 ||
+    grid.width > MAX_SPLIT_COLUMNS
+  )
+    return [table];
 
   const rows = table.content ?? [];
   const padded = grid.missing.some((n) => n > 0)
@@ -381,8 +468,14 @@ function normalizeTable(table: JSONContent): JSONContent[] {
         content: rows.map((row, r) => {
           const add = grid.missing[r];
           if (!add) return row;
-          const kind = row.content?.[0]?.type === "tableHeader" ? "tableHeader" : "tableCell";
-          const fill = Array.from({ length: add }, (): JSONContent => ({ type: kind, content: [emptyParagraph()] }));
+          const kind =
+            row.content?.[0]?.type === "tableHeader"
+              ? "tableHeader"
+              : "tableCell";
+          const fill = Array.from({ length: add }, (): JSONContent => ({
+            type: kind,
+            content: [emptyParagraph()],
+          }));
           return { ...row, content: [...(row.content ?? []), ...fill] };
         }),
       }
@@ -399,7 +492,11 @@ function normalizeTable(table: JSONContent): JSONContent[] {
  * every row in each. A cell spanning a boundary keeps its content in the first table it starts in
  * and leaves an empty cell of the remaining span in the next, so the rows still line up.
  */
-function splitColumns(table: JSONContent, rows: readonly GridCell[][], width: number): JSONContent[] {
+function splitColumns(
+  table: JSONContent,
+  rows: readonly GridCell[][],
+  width: number,
+): JSONContent[] {
   const rowNodes = table.content ?? [];
   const tables: JSONContent[] = [];
   for (let from = 0; from < width; from += MAX_TABLE_COLUMNS) {
@@ -409,10 +506,17 @@ function splitColumns(table: JSONContent, rows: readonly GridCell[][], width: nu
       content: cells
         .filter((cell) => cell.column < to && cell.column + cell.colspan > from)
         .map((cell): JSONContent => {
-          const span = Math.min(cell.column + cell.colspan, to) - Math.max(cell.column, from);
+          const span =
+            Math.min(cell.column + cell.colspan, to) -
+            Math.max(cell.column, from);
           const starts = cell.column >= from;
-          const node: JSONContent = { ...cell.node, content: starts ? cell.node.content : [emptyParagraph()] };
-          return span === cell.colspan ? node : withAttrs(node, { ...cell.node.attrs, colspan: span });
+          const node: JSONContent = {
+            ...cell.node,
+            content: starts ? cell.node.content : [emptyParagraph()],
+          };
+          return span === cell.colspan
+            ? node
+            : withAttrs(node, { ...cell.node.attrs, colspan: span });
         }),
     }));
     const attrs = from === 0 ? table.attrs : without(table.attrs, ["id"]);

@@ -22,8 +22,10 @@ export const FieldLines = Extension.create({
         props: {
           // Plain text: one paragraph, each line break a hard break (ProseMirror's own parser would
           // make a paragraph per line and drop the blank ones).
-          clipboardTextParser: (text, _context, _plain, view) => linesOfText(text, view.state.schema),
-          transformPasted: (slice, view) => flattenToLines(slice, view.state.schema),
+          clipboardTextParser: (text, _context, _plain, view) =>
+            linesOfText(text, view.state.schema),
+          transformPasted: (slice, view) =>
+            flattenToLines(slice, view.state.schema),
         },
       }),
     ];

@@ -1,13 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type Ref,
+} from "react";
 import { m } from "motion/react";
 import { fadeRise } from "@/components/motion/presets";
-import { Segmented, type SegmentedOption } from "@/components/primitives/segmented";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "@/components/primitives/segmented";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { Spinner } from "@/components/ui/spinner";
 import { importUnavailable } from "@/domain/import-types";
-import { CHANNEL_FAMILIES, TEMPLATE_KIND_LABELS, type ChannelFamily } from "@/domain/types";
+import {
+  CHANNEL_FAMILIES,
+  TEMPLATE_KIND_LABELS,
+  type ChannelFamily,
+} from "@/domain/types";
 import { createTemplate } from "@/server/actions/create-template";
 import { STARTERS, type StarterChoice } from "@/server/starters/catalog";
 import { cn } from "@/lib/utils";
@@ -15,12 +29,15 @@ import { ImportRow } from "./import-row";
 import { StarterPreview } from "./starter-preview";
 
 /** Document · Alert: which kind of template, and so its content type for life (decision 0034). */
-const KINDS: readonly SegmentedOption<ChannelFamily>[] = CHANNEL_FAMILIES.map((family) => ({
-  value: family,
-  label: TEMPLATE_KIND_LABELS[family],
-}));
+const KINDS: readonly SegmentedOption<ChannelFamily>[] = CHANNEL_FAMILIES.map(
+  (family) => ({
+    value: family,
+    label: TEMPLATE_KIND_LABELS[family],
+  }),
+);
 
-const sameChoice = (a: StarterChoice | null, b: StarterChoice) => a?.family === b.family && a.starterKey === b.starterKey;
+const sameChoice = (a: StarterChoice | null, b: StarterChoice) =>
+  a?.family === b.family && a.starterKey === b.starterKey;
 
 /**
  * The starting points. Over them, Document · Alert chooses the kind of template: a document renders one
@@ -57,7 +74,9 @@ export function StarterGallery({
   /** A template was made (from a card or a file) and has opened: the dialog closes along with that navigation. */
   onImported?: () => void;
 }) {
-  const { pending, error, setError, run } = useActionRun("Couldn't create the template. Try again.");
+  const { pending, error, setError, run } = useActionRun(
+    "Couldn't create the template. Try again.",
+  );
   const [family, setFamily] = useState<ChannelFamily>("document");
   const [picked, setPicked] = useState<StarterChoice | null>(null);
   const [importing, setImporting] = useState(false);
@@ -92,7 +111,12 @@ export function StarterGallery({
   function pick(choice: StarterChoice) {
     if (busy) return;
     // On success the action redirects, and Next follows it (`runAction` hands the redirect back).
-    if (run(() => createTemplate({ teamSlug, ...choice }), { onRefused: () => setPicked(null) })) setPicked(choice);
+    if (
+      run(() => createTemplate({ teamSlug, ...choice }), {
+        onRefused: () => setPicked(null),
+      })
+    )
+      setPicked(choice);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -112,14 +136,24 @@ export function StarterGallery({
 
   return (
     <div>
-      <Segmented label="Kind of template" value={family} options={KINDS} onChange={choose} disabled={busy} className="mb-5" />
+      <Segmented
+        label="Kind of template"
+        value={family}
+        options={KINDS}
+        onChange={choose}
+        disabled={busy}
+        className="mb-5"
+      />
       {/* Keyed by the kind: the cards fade in when it changes, and a card's ref and focus belong to its kind. */}
       <m.div
         key={family}
         {...fadeRise}
         role="group"
         aria-label="Starting points"
-        className={cn("grid gap-4", columns === 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}
+        className={cn(
+          "grid gap-4",
+          columns === 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4",
+        )}
       >
         {starters.map((starter, index) => {
           const choice = { family, starterKey: starter.key } as StarterChoice;
@@ -133,7 +167,10 @@ export function StarterGallery({
                 cards.current[index] = el;
                 if (index === 0 && firstCardRef) {
                   if (typeof firstCardRef === "function") firstCardRef(el);
-                  else (firstCardRef as { current: HTMLButtonElement | null }).current = el;
+                  else
+                    (
+                      firstCardRef as { current: HTMLButtonElement | null }
+                    ).current = el;
                 }
               }}
               aria-describedby={id}
@@ -152,17 +189,29 @@ export function StarterGallery({
               <span className="relative block">
                 <StarterPreview
                   starter={choice}
-                  className={cn(columns === 2 ? "h-36" : "h-44", "transition-opacity", isPicked && pending && "opacity-60")}
+                  className={cn(
+                    columns === 2 ? "h-36" : "h-44",
+                    "transition-opacity",
+                    isPicked && pending && "opacity-60",
+                  )}
                 />
                 {isPicked && pending ? (
                   <span className="absolute inset-0 grid place-items-center">
-                    <Spinner aria-label={`Creating ${starter.name}`} className="size-5 text-text-muted" />
+                    <Spinner
+                      aria-label={`Creating ${starter.name}`}
+                      className="size-5 text-text-muted"
+                    />
                   </span>
                 ) : null}
               </span>
               <span className="block px-1.5 pb-1">
-                <span className="block text-[15px] leading-5 font-medium text-text">{starter.name}</span>
-                <span id={id} className="mt-0.5 block text-[13px] leading-[18px] text-text-muted">
+                <span className="block text-[15px] leading-5 font-medium text-text">
+                  {starter.name}
+                </span>
+                <span
+                  id={id}
+                  className="mt-0.5 block text-[13px] leading-[18px] text-text-muted"
+                >
                   {starter.description}
                 </span>
               </span>

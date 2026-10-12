@@ -88,11 +88,15 @@ const WEB: HtmlFlavor = {
   bareParagraph: false,
   list: (ordered, items) => {
     const tag = ordered ? "ol" : "ul";
-    const rows = items.map((item) => `<li><span class="marker">${item.marker}</span><div>${item.content}</div></li>`);
+    const rows = items.map(
+      (item) =>
+        `<li><span class="marker">${item.marker}</span><div>${item.content}</div></li>`,
+    );
     return `<${tag}>\n${rows.join("\n")}\n</${tag}>`;
   },
   wrapTable: (table) => `<div class="table-wrap">\n${table}\n</div>`,
-  callout: (content) => `<div class="callout" role="note">\n${GLYPH}\n${content}\n</div>`,
+  callout: (content) =>
+    `<div class="callout" role="note">\n${GLYPH}\n${content}\n</div>`,
 };
 
 export function renderWeb(doc: RenderDoc): string {

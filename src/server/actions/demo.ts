@@ -33,7 +33,10 @@ export async function resetDemoAction(): Promise<void> {
  */
 export async function advanceClockAction(days: number): Promise<ActionResult> {
   if (!Number.isInteger(days) || days < 1 || days > 3650) {
-    return { ok: false, ...REQUEST_REFUSALS.invalidInput("Enter 1 to 3,650 days.") };
+    return {
+      ok: false,
+      ...REQUEST_REFUSALS.invalidInput("Enter 1 to 3,650 days."),
+    };
   }
   await advanceClock(days);
   await runAccessSweep();

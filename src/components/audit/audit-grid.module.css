@@ -51,14 +51,20 @@
 
 @container (min-width: 56rem) {
   .withTeam {
-    grid-template-columns: 9.75rem 8rem 6.5rem minmax(8rem, 1.3fr) 10rem minmax(10rem, 1.5fr);
+    grid-template-columns: 9.75rem 8rem 6.5rem minmax(8rem, 1.3fr) 10rem minmax(
+        10rem,
+        1.5fr
+      );
     grid-template-areas: "when who team tpl act det";
   }
 }
 
 @container (min-width: 49rem) {
   .noTeam {
-    grid-template-columns: 9.75rem 8rem minmax(8rem, 1.3fr) 10rem minmax(10rem, 1.5fr);
+    grid-template-columns: 9.75rem 8rem minmax(8rem, 1.3fr) 10rem minmax(
+        10rem,
+        1.5fr
+      );
     grid-template-areas: "when who tpl act det";
   }
 }

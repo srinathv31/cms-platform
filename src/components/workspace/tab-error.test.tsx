@@ -6,12 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The template workspace's error boundary (src/app/(product)/[team]/templates/[templateId]/error.tsx): a tab
 // that threw, in the document's cell under the header and the tab bar the layout keeps.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ team: "coral-offers", templateId: "UC-ABC123" }) }));
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ team: "coral-offers", templateId: "UC-ABC123" }),
+}));
 
 const { TAB_FAILED, TabError } = await import("./tab-error");
-const { WorkspaceSessionProvider, useTabFailed } = await import("./session/workspace-session");
+const { WorkspaceSessionProvider, useTabFailed } =
+  await import("./session/workspace-session");
 const { WS } = await import("./workspace-grid");
 
 let root: Root;
@@ -28,9 +33,12 @@ afterEach(async () => {
   container.remove();
 });
 
-const error = () => Object.assign(new Error("SQLITE_BUSY"), { digest: "4101045379" });
+const error = () =>
+  Object.assign(new Error("SQLITE_BUSY"), { digest: "4101045379" });
 const control = (name: string) =>
-  [...container.querySelectorAll<HTMLElement>("button, a")].find((el) => el.textContent?.trim() === name) ?? null;
+  [...container.querySelectorAll<HTMLElement>("button, a")].find(
+    (el) => el.textContent?.trim() === name,
+  ) ?? null;
 
 /** The layout's session around the error view, as the workspace layout provides it. */
 const show = (retry: () => void = () => {}) =>
@@ -51,7 +59,9 @@ describe("TabError", () => {
 
   it("says the tab didn't load, as an alert", async () => {
     await show();
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe(TAB_FAILED);
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      TAB_FAILED,
+    );
   });
 
   it("offers Try again in outline (the tab bar keeps the black button) and retries with it", async () => {

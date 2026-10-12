@@ -17,7 +17,14 @@ import type { RenderError } from "./render/types";
 import { CHANNELS, type Channel } from "./types";
 
 /** Every output there is, in the order the outputs are named: a channel, or Push on one platform. */
-export const OUTPUT_KEYS = ["pdf", "web", "email", "push.ios", "push.android", "sms"] as const;
+export const OUTPUT_KEYS = [
+  "pdf",
+  "web",
+  "email",
+  "push.ios",
+  "push.android",
+  "sms",
+] as const;
 export type OutputKey = (typeof OUTPUT_KEYS)[number];
 
 export function isOutputKey(value: string): value is OutputKey {
@@ -41,21 +48,31 @@ export function outputKey(channel: Channel, platform: PushPlatform): OutputKey {
 
 /** A channel's outputs: one, or Push's two. */
 export function channelOutputs(channel: Channel): OutputKey[] {
-  return channel === "push" ? ["push.ios", "push.android"] : [outputKey(channel, "ios")];
+  return channel === "push"
+    ? ["push.ios", "push.android"]
+    : [outputKey(channel, "ios")];
 }
 
 /** The outputs a version's approver has to view: each of its channels' outputs, in the order outputs are named. */
 export function requiredOutputs(channels: readonly Channel[]): OutputKey[] {
-  return CHANNELS.filter((channel) => channels.includes(channel)).flatMap(channelOutputs);
+  return CHANNELS.filter((channel) => channels.includes(channel)).flatMap(
+    channelOutputs,
+  );
 }
 
 /** The required outputs not among `viewed`, in order. Keys that aren't outputs, or aren't required, are ignored. */
-export function missingOutputs(channels: readonly Channel[], viewed: readonly string[]): OutputKey[] {
+export function missingOutputs(
+  channels: readonly Channel[],
+  viewed: readonly string[],
+): OutputKey[] {
   return requiredOutputs(channels).filter((key) => !viewed.includes(key));
 }
 
 /** The required outputs among `viewed`, in order and each once: what an approval records. */
-export function viewedOutputs(channels: readonly Channel[], viewed: readonly string[]): OutputKey[] {
+export function viewedOutputs(
+  channels: readonly Channel[],
+  viewed: readonly string[],
+): OutputKey[] {
   return requiredOutputs(channels).filter((key) => viewed.includes(key));
 }
 
@@ -84,7 +101,9 @@ export function outputsLabels(outputs: readonly OutputKey[]): string[] {
     const keys = channelOutputs(channel).filter((key) => outputs.includes(key));
     if (keys.length === 0) return [];
     if (channel !== "push") return [CHANNEL_LABELS[channel]];
-    const phones = keys.map((key) => PLATFORM_LABELS[platformOf(key as "push.ios" | "push.android")]);
+    const phones = keys.map(
+      (key) => PLATFORM_LABELS[platformOf(key as "push.ios" | "push.android")],
+    );
     return [`${CHANNEL_LABELS.push} (${phones.join(", ")})`];
   });
 }
@@ -93,12 +112,14 @@ export const OUTPUT_REFUSALS = {
   /** "Preview Push (Android) and SMS first." */
   notViewed: refusal(
     "output_not_viewed",
-    (missing: readonly OutputKey[]) => `Preview ${joinWithAnd(outputsLabels(missing))} first.`,
+    (missing: readonly OutputKey[]) =>
+      `Preview ${joinWithAnd(outputsLabels(missing))} first.`,
   ),
   /** "The PDF can't be shown. Request changes." The render refused it: the version has to change before it can be approved. */
   cannotShow: refusal(
     "output_cannot_show",
-    (outputs: readonly OutputKey[]) => `The ${joinWithAnd(outputsLabels(outputs))} can't be shown. Request changes.`,
+    (outputs: readonly OutputKey[]) =>
+      `The ${joinWithAnd(outputsLabels(outputs))} can't be shown. Request changes.`,
   ),
 } as const;
 
@@ -135,5 +156,7 @@ export function outputsRefusal(
   const missing = missingOutputs(channels, viewed);
   if (missing.length === 0) return null;
   const stuck = missing.filter((key) => cannotShow.includes(key));
-  return stuck.length > 0 ? OUTPUT_REFUSALS.cannotShow(stuck) : OUTPUT_REFUSALS.notViewed(missing);
+  return stuck.length > 0
+    ? OUTPUT_REFUSALS.cannotShow(stuck)
+    : OUTPUT_REFUSALS.notViewed(missing);
 }

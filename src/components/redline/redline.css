@@ -122,10 +122,16 @@
   margin-top: 1rem;
 }
 
-.ucomp-fields[data-fields-document="details"] .ucomp-doc > .rl-item[data-kind="label"] + .rl-item {
+.ucomp-fields[data-fields-document="details"]
+  .ucomp-doc
+  > .rl-item[data-kind="label"]
+  + .rl-item {
   margin-top: 0.75rem;
 }
 
-.ucomp-fields[data-fields-document="details"] .ucomp-doc > .rl-item + .rl-item[data-kind="label"] {
+.ucomp-fields[data-fields-document="details"]
+  .ucomp-doc
+  > .rl-item
+  + .rl-item[data-kind="label"] {
   margin-top: 2rem;
 }

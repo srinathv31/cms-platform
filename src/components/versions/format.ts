@@ -24,7 +24,11 @@ export function fromYmd(ymd: string): Date | null {
   if (!match) return null;
   const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
   const date = new Date(y, m - 1, d);
-  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null;
+  return date.getFullYear() === y &&
+    date.getMonth() === m - 1 &&
+    date.getDate() === d
+    ? date
+    : null;
 }
 
 /** "March 1, 2027" for a picked day; "" until one is. */
@@ -39,5 +43,9 @@ export function codeSegments(line: string): { text: string; code: boolean }[] {
   return line
     .split(/(`[^`]+`)/g)
     .filter((part) => part.length > 0)
-    .map((part) => (part.startsWith("`") && part.endsWith("`") && part.length > 1 ? { text: part.slice(1, -1), code: true } : { text: part, code: false }));
+    .map((part) =>
+      part.startsWith("`") && part.endsWith("`") && part.length > 1
+        ? { text: part.slice(1, -1), code: true }
+        : { text: part, code: false },
+    );
 }

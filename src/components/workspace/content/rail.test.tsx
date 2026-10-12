@@ -3,30 +3,58 @@ import { act, useCallback, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RailHeader, railHeaderViews } from "@/components/preview/rail-header";
-import type { FocusTargetElements, FocusTargetName } from "../session/focus-targets";
-import { createWorkspaceSession, INITIAL_PREVIEW } from "../session/session-store";
+import type {
+  FocusTargetElements,
+  FocusTargetName,
+} from "../session/focus-targets";
+import {
+  createWorkspaceSession,
+  INITIAL_PREVIEW,
+} from "../session/session-store";
 import { Rail } from "./rail";
 
 // The rail reads the session through these hooks; here they sit on a plain store (no autosave host).
-const session = vi.hoisted(() => ({ current: null as null | ReturnType<typeof createWorkspaceSession> }));
+const session = vi.hoisted(() => ({
+  current: null as null | ReturnType<typeof createWorkspaceSession>,
+}));
 vi.mock("../session/workspace-session", () => ({
   useWorkspaceSession: () => session.current!,
-  useRailOpen: () => useSyncExternalStore(session.current!.subscribe, session.current!.getRailOpen, () => false),
-  useRailTab: () => useSyncExternalStore(session.current!.subscribe, session.current!.getRailTab, () => null),
+  useRailOpen: () =>
+    useSyncExternalStore(
+      session.current!.subscribe,
+      session.current!.getRailOpen,
+      () => false,
+    ),
+  useRailTab: () =>
+    useSyncExternalStore(
+      session.current!.subscribe,
+      session.current!.getRailTab,
+      () => null,
+    ),
   usePreviewState: () =>
-    useSyncExternalStore(session.current!.subscribe, session.current!.getPreview, () => INITIAL_PREVIEW),
-  useFocusTarget: (name: FocusTargetName, state?: string) => useFocusTarget(name, state),
+    useSyncExternalStore(
+      session.current!.subscribe,
+      session.current!.getPreview,
+      () => INITIAL_PREVIEW,
+    ),
+  useFocusTarget: (name: FocusTargetName, state?: string) =>
+    useFocusTarget(name, state),
 }));
 
 /** What `useFocusTarget` does, on the test's session. */
 function useFocusTarget<N extends FocusTargetName>(name: N, state?: string) {
   return useCallback(
-    (element: FocusTargetElements[N] | null) => (element ? session.current!.focusTargets.register(name, element, state) : undefined),
+    (element: FocusTargetElements[N] | null) =>
+      element
+        ? session.current!.focusTargets.register(name, element, state)
+        : undefined,
     [name, state],
   );
 }
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
@@ -48,19 +76,34 @@ function Page({ nameLabel = "Template name" }: { nameLabel?: string }) {
   return (
     <>
       <PreviewToggle />
-      <textarea ref={useFocusTarget("name")} aria-label={nameLabel} id="name" defaultValue="Card offer terms" />
+      <textarea
+        ref={useFocusTarget("name")}
+        aria-label={nameLabel}
+        id="name"
+        defaultValue="Card offer terms"
+      />
       <div className="ProseMirror" id="doc" tabIndex={0} />
-      <Rail channels={<div />} preview={<button id="in-rail">Download PDF</button>}>
+      <Rail
+        channels={<div />}
+        preview={<button id="in-rail">Download PDF</button>}
+      >
         <div />
       </Rail>
     </>
   );
 }
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const $ = <T extends HTMLElement>(id: string) =>
+  document.getElementById(id) as T;
 const pressEscape = (target: HTMLElement) =>
   act(() => {
-    target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    target.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   });
 
 beforeEach(() => {
@@ -158,7 +201,13 @@ describe("Escape in the template name", () => {
 });
 
 describe("The rail with review comments", () => {
-  function CommentsPage({ preferred = true, count = 5 }: { preferred?: boolean; count?: number }) {
+  function CommentsPage({
+    preferred = true,
+    count = 5,
+  }: {
+    preferred?: boolean;
+    count?: number;
+  }) {
     return (
       <Rail
         channels={<div id="channels" />}
@@ -171,7 +220,9 @@ describe("The rail with review comments", () => {
   }
   const shown = (id: string) => !$(id).closest("[hidden]");
   const tab = (name: string) =>
-    Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).find((t) => t.textContent?.startsWith(name))!;
+    Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).find(
+      (t) => t.textContent?.startsWith(name),
+    )!;
 
   beforeEach(() => {
     // (The file's own beforeEach opened the preview.)
@@ -231,13 +282,20 @@ describe("The rail with review comments", () => {
 describe("The rail of an imported template", () => {
   /** The widened rail's header row, as the preview surface draws it while the preview is open, with its own Original tab. */
   function WidenedHeader() {
-    const preview = useSyncExternalStore(session.current!.subscribe, session.current!.getPreview);
+    const preview = useSyncExternalStore(
+      session.current!.subscribe,
+      session.current!.getPreview,
+    );
     const originalTab = useFocusTarget("originalTab");
     if (!preview.open) return null;
     return (
       <RailHeader
         value={preview.view}
-        views={railHeaderViews({ preview: true, comments: null, original: true })}
+        views={railHeaderViews({
+          preview: true,
+          comments: null,
+          original: true,
+        })}
         originalTabRef={originalTab}
         onChange={(view) => session.current!.selectRailView(view)}
         onClose={() => {}}
@@ -268,7 +326,9 @@ describe("The rail of an imported template", () => {
   }
   const shown = (id: string) => !$(id).closest("[hidden]");
   const tab = (name: string) =>
-    Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).find((t) => t.textContent?.startsWith(name));
+    Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).find(
+      (t) => t.textContent?.startsWith(name),
+    );
   const rail = () => document.querySelector<HTMLElement>('[data-slot="rail"]')!;
 
   beforeEach(() => {
@@ -288,7 +348,10 @@ describe("The rail of an imported template", () => {
 
   it("widens on the Original view when Original is picked, and hides the normal rail", () => {
     act(() => tab("Original")!.click());
-    expect(session.current!.getPreview()).toMatchObject({ open: true, view: "original" });
+    expect(session.current!.getPreview()).toMatchObject({
+      open: true,
+      view: "original",
+    });
     expect(rail().getAttribute("aria-label")).toBe("Original");
     expect(rail().dataset.view).toBe("original");
     expect(shown("variables-panel")).toBe(false);
@@ -298,8 +361,13 @@ describe("The rail of an imported template", () => {
     const plain = tab("Original")!;
     act(() => plain.click());
     await act(async () => {});
-    expect(plain.isConnected, "the plain rail's header went as the rail widened").toBe(false);
-    expect(tab("Original")!.closest('[data-slot="rail-header"]')).not.toBeNull();
+    expect(
+      plain.isConnected,
+      "the plain rail's header went as the rail widened",
+    ).toBe(false);
+    expect(
+      tab("Original")!.closest('[data-slot="rail-header"]'),
+    ).not.toBeNull();
     expect(document.activeElement).toBe(tab("Original"));
   });
 
@@ -308,7 +376,12 @@ describe("The rail of an imported template", () => {
     $("in-rail").focus();
     pressEscape($("in-rail"));
     expect(session.current!.getPreview().open).toBe(false);
-    await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    await act(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => resolve(undefined)),
+        ),
+    );
     expect(document.activeElement).toBe(tab("Original"));
   });
 
@@ -327,7 +400,10 @@ describe("The rail of an imported template", () => {
   it("opens widened on the Original view when the page arrives from an import, without the width transition", () => {
     act(() => root.render(<></>));
     act(() => root.render(<ImportedPage arrival />));
-    expect(session.current!.getPreview()).toMatchObject({ open: true, view: "original" });
+    expect(session.current!.getPreview()).toMatchObject({
+      open: true,
+      view: "original",
+    });
     expect(rail().style.transition).toBe("none");
   });
 });

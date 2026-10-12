@@ -48,19 +48,33 @@ export interface FcmPayload {
 
 /** The notification JSON for one platform, as Stencil sends it, before any keys the consumer adds. */
 export function pushPayload(platform: "ios", content: PushContent): ApnsPayload;
-export function pushPayload(platform: "android", content: PushContent): FcmPayload;
-export function pushPayload(platform: PushPlatform, content: PushContent): ApnsPayload | FcmPayload;
-export function pushPayload(platform: PushPlatform, { title, subtitle, body }: PushContent): ApnsPayload | FcmPayload {
+export function pushPayload(
+  platform: "android",
+  content: PushContent,
+): FcmPayload;
+export function pushPayload(
+  platform: PushPlatform,
+  content: PushContent,
+): ApnsPayload | FcmPayload;
+export function pushPayload(
+  platform: PushPlatform,
+  { title, subtitle, body }: PushContent,
+): ApnsPayload | FcmPayload {
   switch (platform) {
     case "ios":
-      return { aps: { alert: subtitle ? { title, subtitle, body } : { title, body } } };
+      return {
+        aps: { alert: subtitle ? { title, subtitle, body } : { title, body } },
+      };
     case "android":
       return { message: { notification: { title, body } } };
   }
 }
 
 /** The UTF-8 size of `pushPayload(platform, content)` as compact JSON. Compare it with PUSH_MAX_BYTES. */
-export function pushPayloadBytes(platform: PushPlatform, content: PushContent): number {
+export function pushPayloadBytes(
+  platform: PushPlatform,
+  content: PushContent,
+): number {
   return utf8ByteLength(JSON.stringify(pushPayload(platform, content)));
 }
 
@@ -74,7 +88,11 @@ export function utf8ByteLength(text: string): number {
     const unit = text.charCodeAt(i);
     if (unit < 0x80) bytes += 1;
     else if (unit < 0x800) bytes += 2;
-    else if (isHighSurrogate(unit) && i + 1 < text.length && isLowSurrogate(text.charCodeAt(i + 1))) {
+    else if (
+      isHighSurrogate(unit) &&
+      i + 1 < text.length &&
+      isLowSurrogate(text.charCodeAt(i + 1))
+    ) {
       bytes += 4;
       i++;
     } else bytes += 3;

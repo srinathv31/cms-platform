@@ -1,7 +1,11 @@
 import "server-only";
 import { and, eq, gte, inArray, max } from "drizzle-orm";
 import { DAY_MS } from "@/domain/dates";
-import type { LifecycleEffect, NotificationLink, Recipients } from "@/domain/review-types";
+import type {
+  LifecycleEffect,
+  NotificationLink,
+  Recipients,
+} from "@/domain/review-types";
 import type { Db } from "@/server/db/client";
 import {
   auditEvents,
@@ -74,7 +78,11 @@ export async function writeEffects(
   effects: readonly LifecycleEffect[],
   ctx: EffectContext,
 ): Promise<EffectsWritten> {
-  const written: EffectsWritten = { audit: 0, notifications: 0, consumerNotices: 0 };
+  const written: EffectsWritten = {
+    audit: 0,
+    notifications: 0,
+    consumerNotices: 0,
+  };
   const createdAt = ctx.writtenAt ?? ctx.at;
   // Read once, and only when a notification or a notice needs it.
   let team: Promise<string> | undefined;
@@ -98,7 +106,10 @@ export async function writeEffects(
           teamId: ctx.teamId,
           templateId: ctx.templateId,
           // The creation event is about the template; the rest belong to a version.
-          versionId: effect.action === "template.created" ? null : (effect.versionId ?? ctx.versionId),
+          versionId:
+            effect.action === "template.created"
+              ? null
+              : (effect.versionId ?? ctx.versionId),
           action: effect.action,
           details: effect.details,
           sessionKey: null,
@@ -108,7 +119,9 @@ export async function writeEffects(
       }
 
       case "notification": {
-        const userIds = (await resolveRecipients(tx, effect.to, ctx.teamId)).filter((id) => id !== ctx.actorId);
+        const userIds = (
+          await resolveRecipients(tx, effect.to, ctx.teamId)
+        ).filter((id) => id !== ctx.actorId);
         if (userIds.length === 0) break;
         const teamSlug = await teamSlugOf();
         // A stage reviewer outside the template's team opens the version from their own space: a review
@@ -123,10 +136,15 @@ export async function writeEffects(
                 round: link.reviewVersion.round,
               }
             : null;
-        const spaces = link.to === "review" || outsideReview ? await recipientSpaces(tx, userIds, teamSlug) : null;
+        const spaces =
+          link.to === "review" || outsideReview
+            ? await recipientSpaces(tx, userIds, teamSlug)
+            : null;
         const hrefFor = (userId: string): string => {
           const own = spaces?.get(userId);
-          return own ? notificationHref(own, outsideReview ?? link) : notificationHref(teamSlug, link);
+          return own
+            ? notificationHref(own, outsideReview ?? link)
+            : notificationHref(teamSlug, link);
         };
         await tx.insert(notifications).values(
           userIds.map((userId) => ({
@@ -185,8 +203,16 @@ async function teamSlug(tx: Tx, ctx: EffectContext): Promise<string> {
  * The name a notice carries: the one the version it is about has, as written now. A new version's
  * notice names it as approved; a sunset or a revoke names the old version as its consumers know it.
  */
-async function versionName(tx: Tx, versionId: string, ctx: EffectContext): Promise<string> {
-  const rows = await tx.select({ name: versions.name }).from(versions).where(eq(versions.id, versionId)).limit(1);
+async function versionName(
+  tx: Tx,
+  versionId: string,
+  ctx: EffectContext,
+): Promise<string> {
+  const rows = await tx
+    .select({ name: versions.name })
+    .from(versions)
+    .where(eq(versions.id, versionId))
+    .limit(1);
   return rows[0]?.name ?? ctx.templateId;
 }
 
@@ -195,45 +221,83 @@ async function versionName(tx: Tx, versionId: string, ctx: EffectContext): Promi
  * active membership there, or a platform role); otherwise their own first space by name, as the
  * team switcher lists it (a stage that names someone outside the team: `requireReviewVersion`).
  */
-async function recipientSpaces(tx: Tx, userIds: readonly string[], teamSlug: string): Promise<Map<string, string>> {
+async function recipientSpaces(
+  tx: Tx,
+  userIds: readonly string[],
+  teamSlug: string,
+): Promise<Map<string, string>> {
   const [people, rows] = await Promise.all([
-    tx.select({ id: users.id, platformRole: users.platformRole }).from(users).where(inArray(users.id, [...userIds])),
     tx
-      .selectDistinct({ userId: memberships.userId, slug: teams.slug, name: teams.name })
+      .select({ id: users.id, platformRole: users.platformRole })
+      .from(users)
+      .where(inArray(users.id, [...userIds])),
+    tx
+      .selectDistinct({
+        userId: memberships.userId,
+        slug: teams.slug,
+        name: teams.name,
+      })
       .from(memberships)
       .innerJoin(teams, eq(teams.id, memberships.teamId))
-      .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
-      .where(and(inArray(memberships.userId, [...userIds]), eq(memberships.status, "active"))),
+      .innerJoin(
+        membershipRoles,
+        eq(membershipRoles.membershipId, memberships.id),
+      )
+      .where(
+        and(
+          inArray(memberships.userId, [...userIds]),
+          eq(memberships.status, "active"),
+        ),
+      ),
   ]);
   const spaces = new Map<string, string>();
   for (const userId of userIds) {
     if (people.find((p) => p.id === userId)?.platformRole) continue;
     const mine = rows.filter((r) => r.userId === userId);
     if (mine.length === 0 || mine.some((r) => r.slug === teamSlug)) continue;
-    spaces.set(userId, [...mine].sort((a, b) => a.name.localeCompare(b.name))[0]!.slug);
+    spaces.set(
+      userId,
+      [...mine].sort((a, b) => a.name.localeCompare(b.name))[0]!.slug,
+    );
   }
   return spaces;
 }
 
 /** The users a notification goes to, before the actor is taken out. Sorted, without repeats. */
-export async function resolveRecipients(tx: Tx, to: Recipients, teamId: string): Promise<string[]> {
+export async function resolveRecipients(
+  tx: Tx,
+  to: Recipients,
+  teamId: string,
+): Promise<string[]> {
   if (to.kind === "user") return [to.userId];
   const rows = await tx
     .select({ userId: memberships.userId })
     .from(memberships)
-    .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
+    .innerJoin(
+      membershipRoles,
+      eq(membershipRoles.membershipId, memberships.id),
+    )
     .where(
-      and(eq(memberships.teamId, teamId), eq(memberships.status, "active"), eq(membershipRoles.role, to.role)),
+      and(
+        eq(memberships.teamId, teamId),
+        eq(memberships.status, "active"),
+        eq(membershipRoles.role, to.role),
+      ),
     );
   const except = new Set(to.exceptUserIds ?? []);
-  return [...new Set(rows.map((r) => r.userId))].filter((id) => !except.has(id)).sort();
+  return [...new Set(rows.map((r) => r.userId))]
+    .filter((id) => !except.has(id))
+    .sort();
 }
 
 /**
  * `/{team}/review/{templateId}/{n}` (plus `?round=N` when the link names its round), `/{team}/templates/{id}`
  * or `/{team}/templates/{id}/versions`.
  */
-export function notificationHref(teamSlug: string, link: NotificationLink): string {
+export function notificationHref(
+  teamSlug: string,
+  link: NotificationLink,
+): string {
   switch (link.to) {
     case "review": {
       // A link names its round only when the round's label shows it (`reviewLink`); bare, it is the number's head.
@@ -263,23 +327,40 @@ export const NOTICE_SEQ_KEY = "consumer_notice_seq";
  * - The unique index on `seq` refuses a duplicate rather than store one.
  */
 export async function takeNoticeSeqs(tx: Tx, count: number): Promise<number> {
-  const [counter] = await tx.select({ value: settings.value }).from(settings).where(eq(settings.key, NOTICE_SEQ_KEY));
-  const [stored] = await tx.select({ last: max(consumerNotices.seq) }).from(consumerNotices);
-  const last = Math.max(typeof counter?.value === "number" ? counter.value : 0, stored?.last ?? 0);
+  const [counter] = await tx
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, NOTICE_SEQ_KEY));
+  const [stored] = await tx
+    .select({ last: max(consumerNotices.seq) })
+    .from(consumerNotices);
+  const last = Math.max(
+    typeof counter?.value === "number" ? counter.value : 0,
+    stored?.last ?? 0,
+  );
   const value = last + count;
-  await tx.insert(settings).values({ key: NOTICE_SEQ_KEY, value }).onConflictDoUpdate({ target: settings.key, set: { value } });
+  await tx
+    .insert(settings)
+    .values({ key: NOTICE_SEQ_KEY, value })
+    .onConflictDoUpdate({ target: settings.key, set: { value } });
   return last + 1;
 }
 
 /** Registered consumers with a non-preview render of the template from the notice window before `ctx.at` on. */
 async function recentConsumers(tx: Tx, ctx: EffectContext): Promise<string[]> {
-  const since = new Date(ctx.at.getTime() - CONSUMER_NOTICE_WINDOW_DAYS * DAY_MS);
+  const since = new Date(
+    ctx.at.getTime() - CONSUMER_NOTICE_WINDOW_DAYS * DAY_MS,
+  );
   const rows = await tx
     .selectDistinct({ consumerId: consumers.id })
     .from(renderLog)
     .innerJoin(consumers, eq(consumers.id, renderLog.consumerId))
     .where(
-      and(eq(renderLog.templateId, ctx.templateId), eq(renderLog.isPreview, false), gte(renderLog.at, since)),
+      and(
+        eq(renderLog.templateId, ctx.templateId),
+        eq(renderLog.isPreview, false),
+        gte(renderLog.at, since),
+      ),
     );
   return rows.map((r) => r.consumerId).sort();
 }
@@ -298,7 +379,10 @@ function isBusy(error: unknown): boolean {
  * timeout; the failed attempt rolled back whole, so running it again is safe. The retry re-reads
  * everything, so its compare-and-set sees the first write. Against Turso this never triggers.
  */
-export async function inTransaction<T>(db: Db, run: (tx: Tx) => Promise<T>): Promise<T> {
+export async function inTransaction<T>(
+  db: Db,
+  run: (tx: Tx) => Promise<T>,
+): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
       return await db.transaction(run);
@@ -308,4 +392,3 @@ export async function inTransaction<T>(db: Db, run: (tx: Tx) => Promise<T>): Pro
     }
   }
 }
-

@@ -7,7 +7,14 @@ import { CHANNEL_FIELD_IDS } from "@/domain/channel-fields";
  * Every field an autosave can change, in the order they are listed in the audit details. Each channel
  * field is listed by its id ("email.subject"), from the registry.
  */
-export const DRAFT_FIELDS = ["body", "variables", "name", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
+export const DRAFT_FIELDS = [
+  "body",
+  "variables",
+  "name",
+  "channels",
+  ...CHANNEL_FIELD_IDS,
+  "sampleSets",
+] as const;
 export type DraftField = (typeof DRAFT_FIELDS)[number];
 
 export const DRAFT_EDITED = "draft.edited";
@@ -29,7 +36,9 @@ export interface DraftEditedDetails {
 }
 
 /** The fields a patch actually carries. `null` counts (it clears a channel field). */
-export function changedFields(patch: Partial<Record<DraftField, unknown>>): DraftField[] {
+export function changedFields(
+  patch: Partial<Record<DraftField, unknown>>,
+): DraftField[] {
   return DRAFT_FIELDS.filter((field) => patch[field] !== undefined);
 }
 
@@ -79,15 +88,26 @@ export function mergeDraftEdit(
   rev: number,
 ): { at: Date; details: DraftEditedDetails } {
   const old = previous && isRecord(previous.details) ? previous.details : {};
-  const oldSaves = typeof old.saves === "number" && Number.isInteger(old.saves) && old.saves > 0 ? old.saves : 1;
-  const oldFields = Array.isArray(old.fields) ? old.fields.filter(isDraftField) : [];
+  const oldSaves =
+    typeof old.saves === "number" &&
+    Number.isInteger(old.saves) &&
+    old.saves > 0
+      ? old.saves
+      : 1;
+  const oldFields = Array.isArray(old.fields)
+    ? old.fields.filter(isDraftField)
+    : [];
 
   const wanted = new Set<DraftField>([...oldFields, ...changed]);
   const details: DraftEditedDetails = {
     ...old,
     saves: previous ? oldSaves + 1 : 1,
     fields: DRAFT_FIELDS.filter((field) => wanted.has(field)),
-    since: previous ? (validIso(old.since) ? old.since : previous.at.toISOString()) : now.toISOString(),
+    since: previous
+      ? validIso(old.since)
+        ? old.since
+        : previous.at.toISOString()
+      : now.toISOString(),
     rev,
   };
   return { at: now, details };

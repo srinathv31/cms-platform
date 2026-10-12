@@ -32,9 +32,15 @@ function firstSegment(path: string): string | null {
  * tool, so it checks no permission and doesn't run on the server action kit; a persona that isn't one
  * is refused.
  */
-export async function switchPersona(personaId: string, currentPath: string): Promise<ActionResult> {
+export async function switchPersona(
+  personaId: string,
+  currentPath: string,
+): Promise<ActionResult> {
   const personas = await getPersonas();
-  if (typeof currentPath !== "string" || !personas.some((p) => p.id === personaId)) {
+  if (
+    typeof currentPath !== "string" ||
+    !personas.some((p) => p.id === personaId)
+  ) {
     return { ok: false, ...REQUEST_REFUSALS.invalidInput() };
   }
 
@@ -46,7 +52,10 @@ export async function switchPersona(personaId: string, currentPath: string): Pro
 
   await runAccessSweep();
   await runSunsetSweep();
-  await db.update(users).set({ lastActiveAt: await now() }).where(eq(users.id, personaId));
+  await db
+    .update(users)
+    .set({ lastActiveAt: await now() })
+    .where(eq(users.id, personaId));
   revalidatePath("/", "layout");
 
   const viewer = await getViewer(); // first read in this request: reflects the new cookie

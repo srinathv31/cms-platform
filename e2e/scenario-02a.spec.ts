@@ -46,14 +46,20 @@ const SECTIONS = ["Offer details", "Rates and fees", "Legal notices"];
 const CHIPS = ["first_name", "purchase_apr", "offer_end_date"] as const;
 const MOD = "ControlOrMeta";
 /** Caret to the end of the document: ⌘↓ on a Mac, Ctrl+End elsewhere. */
-const DOC_END = process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End";
+const DOC_END =
+  process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End";
 
 // ── Reading and asserting ────────────────────────────────────────────────────
 
-const docText = (page: Page) => editor(page).evaluate((el) => el.textContent ?? "");
+const docText = (page: Page) =>
+  editor(page).evaluate((el) => el.textContent ?? "");
 
 async function expectEditorCaret(page: Page, section: string) {
-  await expect.poll(async () => (await caret(page)).focused, { message: "the document has focus" }).toBe(true);
+  await expect
+    .poll(async () => (await caret(page)).focused, {
+      message: "the document has focus",
+    })
+    .toBe(true);
   expect((await caret(page)).section).toBe(section);
 }
 
@@ -78,7 +84,11 @@ async function expectNameSelected(page: Page, text: string) {
 }
 
 /** The panel row for `key`: its usage text ("Unused", "1 use"). */
-async function expectUses(page: Page, key: string, uses: "Unused" | "1 use" | "2 uses") {
+async function expectUses(
+  page: Page,
+  key: string,
+  uses: "Unused" | "1 use" | "2 uses",
+) {
   await expect(panelRow(page, key)).toContainText(uses);
 }
 
@@ -104,21 +114,28 @@ async function moveCaret(page: Page, key: string) {
   };
   const before = await where();
   await page.keyboard.press(key);
-  await expect.poll(where, { message: `${key} moves the selection` }).not.toBe(before);
+  await expect
+    .poll(where, { message: `${key} moves the selection` })
+    .not.toBe(before);
 }
 
 /** Types the way a person does: a little slower than the machine can. */
-const type = (page: Page, text: string) => page.keyboard.type(text, { delay: 18 });
+const type = (page: Page, text: string) =>
+  page.keyboard.type(text, { delay: 18 });
 
 /** The offer paragraph, found by text no chip splits. */
-const greetingBlock = (page: Page) => editor(page).locator("p", { hasText: GREETING_LOCATOR });
+const greetingBlock = (page: Page) =>
+  editor(page).locator("p", { hasText: GREETING_LOCATOR });
 
 /** The note at "Legal notices" shows, in the document and to a screen reader, and the heading is intact. */
 async function expectBlocked(page: Page, what: string) {
   const heading = requiredHeading(page, "legal_notices");
   await expect(heading, `${what}: the heading is still there`).toHaveCount(1);
   await expect(heading, `${what}: with its text`).toHaveText("Legal notices");
-  await expect(heading, `${what}: the note is on the heading`).toHaveAttribute("data-required-note", REQUIRED_NOTE);
+  await expect(heading, `${what}: the note is on the heading`).toHaveAttribute(
+    "data-required-note",
+    REQUIRED_NOTE,
+  );
   await expect
     .poll(
       () =>
@@ -134,7 +151,10 @@ async function expectBlocked(page: Page, what: string) {
       { message: `${what}: the note "${REQUIRED_NOTE}" is painted` },
     )
     .toBe(true);
-  await expect(page.getByRole("status").filter({ hasText: REQUIRED_NOTE }), `${what}: announced politely`).toHaveCount(1);
+  await expect(
+    page.getByRole("status").filter({ hasText: REQUIRED_NOTE }),
+    `${what}: announced politely`,
+  ).toHaveCount(1);
   await expectRequiredSectionsIntact(page);
 }
 
@@ -144,7 +164,11 @@ async function expectRequiredSectionsIntact(page: Page) {
 
 /** The note lasts about two seconds. Wait it out so the next attempt's note is a new one. */
 async function waitForNoteToClear(page: Page) {
-  await expect(requiredHeading(page, "legal_notices")).not.toHaveAttribute("data-required-note", /./, { timeout: 5_000 });
+  await expect(requiredHeading(page, "legal_notices")).not.toHaveAttribute(
+    "data-required-note",
+    /./,
+    { timeout: 5_000 },
+  );
 }
 
 /** Undo until `keys` are all gone, noting the order they disappeared in. */
@@ -153,7 +177,11 @@ async function undoUntilGone(page: Page, keys: readonly string[], cap = 40) {
   let present = await chipsPresent(page, keys);
   for (let i = 0; i < cap && present.length; i++) {
     await page.keyboard.press(`${MOD}+z`);
-    await expect.poll(async () => (await chipsPresent(page, keys)).length, { timeout: 1_000 }).toBeLessThanOrEqual(present.length);
+    await expect
+      .poll(async () => (await chipsPresent(page, keys)).length, {
+        timeout: 1_000,
+      })
+      .toBeLessThanOrEqual(present.length);
     const now = await chipsPresent(page, keys);
     for (const key of present) if (!now.includes(key)) order.push(key);
     present = now;
@@ -168,7 +196,11 @@ async function redoUntilBack(page: Page, keys: readonly string[], cap = 40) {
   let present = await chipsPresent(page, keys);
   for (let i = 0; i < cap && present.length < keys.length; i++) {
     await page.keyboard.press(`${MOD}+Shift+z`);
-    await expect.poll(async () => (await chipsPresent(page, keys)).length, { timeout: 1_000 }).toBeGreaterThanOrEqual(present.length);
+    await expect
+      .poll(async () => (await chipsPresent(page, keys)).length, {
+        timeout: 1_000,
+      })
+      .toBeGreaterThanOrEqual(present.length);
     const now = await chipsPresent(page, keys);
     for (const key of now) if (!present.includes(key)) order.push(key);
     present = now;
@@ -182,11 +214,17 @@ async function redoUntilBack(page: Page, keys: readonly string[], cap = 40) {
  * undone earlier is still on the redo stack, and redoing it would clear the document again.)
  */
 async function redoUntilDocument(page: Page, expected: string, cap = 40) {
-  for (let i = 0; i < cap && (await docText(page)) !== expected && (await history(page)).redo; i++) {
+  for (
+    let i = 0;
+    i < cap && (await docText(page)) !== expected && (await history(page)).redo;
+    i++
+  ) {
     // The editor applies a redo inside the key handler, so its state is current when the press returns.
     await page.keyboard.press(`${MOD}+Shift+z`);
   }
-  expect(await docText(page), "redo restores the document exactly").toBe(expected);
+  expect(await docText(page), "redo restores the document exactly").toBe(
+    expected,
+  );
 }
 
 /**
@@ -199,12 +237,16 @@ async function selectHeadingBlock(page: Page, requiredKey: string) {
       attrs: Record<string, unknown>;
     }
     interface Handle {
-      state: { doc: { forEach(fn: (node: Node, offset: number) => void): void } };
-      chain(): { focus(): { setNodeSelection(pos: number): { run(): boolean } } };
+      state: {
+        doc: { forEach(fn: (node: Node, offset: number) => void): void };
+      };
+      chain(): {
+        focus(): { setNodeSelection(pos: number): { run(): boolean } };
+      };
     }
-    const dom = [...document.querySelectorAll(".ProseMirror")].find((el) => (el as HTMLElement).offsetParent !== null) as
-      | (HTMLElement & { editor: Handle })
-      | undefined;
+    const dom = [...document.querySelectorAll(".ProseMirror")].find(
+      (el) => (el as HTMLElement).offsetParent !== null,
+    ) as (HTMLElement & { editor: Handle }) | undefined;
     if (!dom) throw new Error("no live editor on screen");
     let at = -1;
     dom.editor.state.doc.forEach((node, offset) => {
@@ -241,15 +283,23 @@ test.afterAll(() => {
 });
 
 test.describe("scenario 2, steps 1–3: Create", () => {
-  test("mouse run: two clicks to a selected name, rename, write, drag, {{ and inline Create, the guard, undo and redo", async ({ page }) => {
+  test("mouse run: two clicks to a selected name, rename, write, drag, {{ and inline Create, the guard, undo and redo", async ({
+    page,
+  }) => {
     test.setTimeout(150_000);
     await asPersona(page, "maya");
     await openLibrary(page);
-    expect(await mousePresses(page), "no mouse press before the first click").toBe(0);
+    expect(
+      await mousePresses(page),
+      "no mouse press before the first click",
+    ).toBe(0);
 
     await test.step("1. Exactly two clicks from the Library to a focused, editable name with all of its text selected", async () => {
       const clicks = await createCardOfferTerms(page);
-      expect(clicks.count, "clicks made from the Library until the name is ready").toBe(2);
+      expect(
+        clicks.count,
+        "clicks made from the Library until the name is ready",
+      ).toBe(2);
       expect(await mousePresses(page), "mouse presses the page saw").toBe(2);
       await expectNameSelected(page, "Card offer terms");
       // The address is the template's own (no query), and the name keeps its selection.
@@ -283,7 +333,10 @@ test.describe("scenario 2, steps 1–3: Create", () => {
       await dragRowTo(page, panelRow(page, "first_name"), target);
 
       await expect(chip(page, "first_name")).toHaveCount(1);
-      await expect(greetingBlock(page).locator('[data-variable="first_name"]'), "it landed in the paragraph it was dropped on").toHaveCount(1);
+      await expect(
+        greetingBlock(page).locator('[data-variable="first_name"]'),
+        "it landed in the paragraph it was dropped on",
+      ).toHaveCount(1);
       await expect(chip(page, "first_name")).toHaveText("First name");
       await expectUses(page, "first_name", "1 use");
       await expectEditorCaret(page, "Offer details");
@@ -295,7 +348,10 @@ test.describe("scenario 2, steps 1–3: Create", () => {
       await type(page, " Your purchase APR is {{pur");
       const picker = page.getByRole("option");
       await expect(picker.filter({ hasText: "Purchase APR" })).toBeVisible();
-      await expect(picker.filter({ hasText: "purchase_apr" })).toHaveAttribute("data-selected", "true");
+      await expect(picker.filter({ hasText: "purchase_apr" })).toHaveAttribute(
+        "data-selected",
+        "true",
+      );
       await page.keyboard.press("Enter");
       await expect(picker).toHaveCount(0);
       await expect(chip(page, "purchase_apr")).toHaveCount(1);
@@ -316,7 +372,9 @@ test.describe("scenario 2, steps 1–3: Create", () => {
       const form = page.getByRole("form", { name: "New variable" });
       await expect(form).toBeVisible();
       await expect(form.getByLabel("Label"), "focus is in Label").toBeFocused();
-      await expect(form.getByLabel("Label"), "prefilled").toHaveValue("Offer end date");
+      await expect(form.getByLabel("Label"), "prefilled").toHaveValue(
+        "Offer end date",
+      );
       await expect(form.getByLabel("Key")).toHaveValue("offer_end_date");
 
       const clicks = clickCounter();
@@ -331,18 +389,34 @@ test.describe("scenario 2, steps 1–3: Create", () => {
       await expect(form).toBeHidden();
       await expect(chip(page, "offer_end_date")).toHaveCount(1);
       await expect(chip(page, "offer_end_date")).toHaveText("Offer end date");
-      await expect(chip(page, "offer_end_date")).toHaveAttribute("data-variable-type", "date");
-      await expect(panelRow(page, "offer_end_date"), "a new row in the panel").toBeVisible();
-      await expect(panelRow(page, "offer_end_date")).toContainText("offer_end_date");
+      await expect(chip(page, "offer_end_date")).toHaveAttribute(
+        "data-variable-type",
+        "date",
+      );
+      await expect(
+        panelRow(page, "offer_end_date"),
+        "a new row in the panel",
+      ).toBeVisible();
+      await expect(panelRow(page, "offer_end_date")).toContainText(
+        "offer_end_date",
+      );
       await expectUses(page, "offer_end_date", "1 use");
       await expectEditorCaret(page, "Offer details");
       await type(page, ".");
 
       // The panel row is a Date: its edit form says so.
-      await page.getByRole("button", { name: "Edit Offer end date" }).click({ delay: 90 });
-      await expect(page.getByRole("form", { name: "Edit Offer end date" }).getByRole("combobox")).toHaveText(/Date/);
+      await page
+        .getByRole("button", { name: "Edit Offer end date" })
+        .click({ delay: 90 });
+      await expect(
+        page
+          .getByRole("form", { name: "Edit Offer end date" })
+          .getByRole("combobox"),
+      ).toHaveText(/Date/);
       await page.keyboard.press("Escape");
-      await expect(page.getByRole("form", { name: "Edit Offer end date" })).toBeHidden();
+      await expect(
+        page.getByRole("form", { name: "Edit Offer end date" }),
+      ).toBeHidden();
       expect(await docText(page)).not.toContain("{{");
     });
 
@@ -381,21 +455,36 @@ test.describe("scenario 2, steps 1–3: Create", () => {
       expect(await docText(page)).not.toBe(filled);
 
       await page.keyboard.press(`${MOD}+z`);
-      await expect.poll(() => docText(page), { message: "one Undo brings everything back" }).toBe(filled);
+      await expect
+        .poll(() => docText(page), {
+          message: "one Undo brings everything back",
+        })
+        .toBe(filled);
       await expectRequiredSectionsIntact(page);
       for (const key of CHIPS) await expect(chip(page, key)).toHaveCount(1);
     });
 
     await test.step("Undo removes the chips and Redo restores them, newest first and oldest first", async () => {
-      expect(await undoUntilGone(page, CHIPS)).toEqual(["offer_end_date", "purchase_apr", "first_name"]);
+      expect(await undoUntilGone(page, CHIPS)).toEqual([
+        "offer_end_date",
+        "purchase_apr",
+        "first_name",
+      ]);
       await expectUses(page, "first_name", "Unused");
       await expectUses(page, "purchase_apr", "Unused");
       await expectRequiredSectionsIntact(page);
 
-      expect(await redoUntilBack(page, CHIPS)).toEqual(["first_name", "purchase_apr", "offer_end_date"]);
+      expect(await redoUntilBack(page, CHIPS)).toEqual([
+        "first_name",
+        "purchase_apr",
+        "offer_end_date",
+      ]);
       await redoUntilDocument(page, filled);
       for (const key of CHIPS) await expectUses(page, key, "1 use");
-      await expect(chip(page, "offer_end_date")).toHaveAttribute("data-variable-type", "date");
+      await expect(chip(page, "offer_end_date")).toHaveAttribute(
+        "data-variable-type",
+        "date",
+      );
     });
 
     await test.step("Autosave: Saved, and after a reload the name, the text and the three chips are still there", async () => {
@@ -406,10 +495,15 @@ test.describe("scenario 2, steps 1–3: Create", () => {
       await expect(editor(page)).toContainText(OFFER_TEXT.trim());
       await expect(greetingBlock(page)).toContainText("Your purchase APR is");
       for (const key of CHIPS) await expect(chip(page, key)).toHaveCount(1);
-      await expect(chip(page, "offer_end_date"), "the variable's type was saved too").toHaveAttribute("data-variable-type", "date");
+      await expect(
+        chip(page, "offer_end_date"),
+        "the variable's type was saved too",
+      ).toHaveAttribute("data-variable-type", "date");
       expect(await docText(page)).toBe(filled);
       for (const key of CHIPS) await expectUses(page, key, "1 use");
-      await expect(panelRow(page, "offer_end_date")).toContainText("offer_end_date");
+      await expect(panelRow(page, "offer_end_date")).toContainText(
+        "offer_end_date",
+      );
     });
   });
 });
@@ -419,25 +513,45 @@ test.describe("scenario 2, steps 1–3: Create", () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 /** Tab (or Shift+Tab) until `target` has focus. Returns how many presses it took. */
-async function tabTo(page: Page, target: Locator, what: string, cap = 40, key = "Tab") {
+async function tabTo(
+  page: Page,
+  target: Locator,
+  what: string,
+  cap = 40,
+  key = "Tab",
+) {
   for (let presses = 1; presses <= cap; presses++) {
     await page.keyboard.press(key);
-    if (await target.evaluate((el) => el === document.activeElement).catch(() => false)) return presses;
+    if (
+      await target
+        .evaluate((el) => el === document.activeElement)
+        .catch(() => false)
+    )
+      return presses;
   }
   throw new Error(`${what}: not reached with ${cap} presses of ${key}`);
 }
 
 /** Arrow keys in the document until the caret is in the block with this text. */
-async function arrowTo(page: Page, key: "ArrowUp" | "ArrowDown", block: string, cap = 40) {
+async function arrowTo(
+  page: Page,
+  key: "ArrowUp" | "ArrowDown",
+  block: string,
+  cap = 40,
+) {
   for (let presses = 0; presses < cap; presses++) {
     if ((await caret(page)).block === block) return;
     await moveCaret(page, key);
   }
-  throw new Error(`the caret never reached "${block}" with ${cap} ${key} presses`);
+  throw new Error(
+    `the caret never reached "${block}" with ${cap} ${key} presses`,
+  );
 }
 
 test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
-  test("keyboard-only run: the same flow with no mouse at all after the page loads", async ({ page }) => {
+  test("keyboard-only run: the same flow with no mouse at all after the page loads", async ({
+    page,
+  }) => {
     test.setTimeout(150_000);
     await asPersona(page, "maya");
     await openLibrary(page);
@@ -453,7 +567,10 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
       await page.keyboard.press("Enter");
       const gallery = page.getByRole("dialog");
       await expect(gallery).toBeVisible();
-      await expectVisibleFocus(gallery.getByRole("button", { name: /^Blank/ }), "the first card (Blank)");
+      await expectVisibleFocus(
+        gallery.getByRole("button", { name: /^Blank/ }),
+        "the first card (Blank)",
+      );
 
       await page.keyboard.press("Escape");
       await expect(gallery).toBeHidden();
@@ -466,13 +583,23 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
       await expect(gallery).toBeVisible();
       // The dialog opens with Blank focused (Base UI applies initial focus a frame after the popup
       // shows, so wait for it rather than racing it with Tab).
-      await expect(gallery.getByRole("button", { name: /^Blank/ }), "Blank is focused on open").toBeFocused();
+      await expect(
+        gallery.getByRole("button", { name: /^Blank/ }),
+        "Blank is focused on open",
+      ).toBeFocused();
 
       // Focus stays inside the dialog both ways round.
       await page.keyboard.press("Tab");
-      expect(await page.evaluate(() => !!document.activeElement?.closest("[role='dialog']"))).toBe(true);
+      expect(
+        await page.evaluate(
+          () => !!document.activeElement?.closest("[role='dialog']"),
+        ),
+      ).toBe(true);
       await page.keyboard.press("Shift+Tab");
-      await expectVisibleFocus(gallery.getByRole("button", { name: /^Blank/ }), "the first card (Blank)");
+      await expectVisibleFocus(
+        gallery.getByRole("button", { name: /^Blank/ }),
+        "the first card (Blank)",
+      );
 
       await page.keyboard.press("ArrowRight");
       const card = gallery.getByRole("button", { name: /^Card offer terms/ });
@@ -503,8 +630,11 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
     await test.step("2. A panel row inserts first_name at the caret: Tab to the row, Enter", async () => {
       await expectUses(page, "first_name", "Unused");
       await page.keyboard.press("Home");
-      for (let i = 0; i < "Hello".length; i++) await page.keyboard.press("ArrowRight");
-      await expect.poll(async () => (await caret(page)).offset).toBe("Hello".length);
+      for (let i = 0; i < "Hello".length; i++)
+        await page.keyboard.press("ArrowRight");
+      await expect
+        .poll(async () => (await caret(page)).offset)
+        .toBe("Hello".length);
 
       const row = page.getByRole("button", { name: "Insert First name" });
       await tabTo(page, row, "the First name row");
@@ -512,7 +642,9 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
       await page.keyboard.press("Enter");
 
       await expect(chip(page, "first_name")).toHaveCount(1);
-      await expect(greetingBlock(page).locator('[data-variable="first_name"]')).toHaveCount(1);
+      await expect(
+        greetingBlock(page).locator('[data-variable="first_name"]'),
+      ).toHaveCount(1);
       await expectUses(page, "first_name", "1 use");
       await expectEditorCaret(page, "Offer details");
     });
@@ -520,7 +652,9 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
     await test.step("2. {{pur, Enter: Purchase APR", async () => {
       await page.keyboard.press("End");
       await type(page, " Your purchase APR is {{pur");
-      await expect(page.getByRole("option").filter({ hasText: "purchase_apr" })).toHaveAttribute("data-selected", "true");
+      await expect(
+        page.getByRole("option").filter({ hasText: "purchase_apr" }),
+      ).toHaveAttribute("data-selected", "true");
       await page.keyboard.press("Enter");
       await expect(page.getByRole("option")).toHaveCount(0);
       await expect(chip(page, "purchase_apr")).toHaveCount(1);
@@ -529,7 +663,9 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
 
     await test.step("2. {{Offer end date, Create, Tab to Type, open it, arrows to Date, Enter, Enter", async () => {
       await type(page, " until {{Offer end date");
-      await expect(page.getByRole("option", { name: /Create/ })).toHaveAttribute("data-selected", "true");
+      await expect(
+        page.getByRole("option", { name: /Create/ }),
+      ).toHaveAttribute("data-selected", "true");
       await page.keyboard.press("Enter");
 
       const form = page.getByRole("form", { name: "New variable" });
@@ -545,11 +681,22 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
       await expectVisibleFocus(typeSelect, "Type");
       await page.keyboard.press("Space");
       const options = page.getByRole("option");
-      await expect(options).toHaveText(["Text", "Currency", "Percent", "Date", "Number", "US state"]);
+      await expect(options).toHaveText([
+        "Text",
+        "Currency",
+        "Percent",
+        "Date",
+        "Number",
+        "US state",
+      ]);
       // Base UI applies initial focus a frame after the popup shows: wait for it, or an arrow press races it.
       await expect(page.locator('[role="option"]:focus')).toHaveCount(1);
       for (let presses = 0; presses < 8; presses++) {
-        if ((await page.evaluate(() => document.activeElement?.textContent)) === "Date") break;
+        if (
+          (await page.evaluate(() => document.activeElement?.textContent)) ===
+          "Date"
+        )
+          break;
         await page.keyboard.press("ArrowDown");
       }
       await expect(page.getByRole("option", { name: "Date" })).toBeFocused();
@@ -560,8 +707,13 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
 
       await expect(form).toBeHidden();
       await expect(chip(page, "offer_end_date")).toHaveCount(1);
-      await expect(chip(page, "offer_end_date")).toHaveAttribute("data-variable-type", "date");
-      await expect(panelRow(page, "offer_end_date")).toContainText("offer_end_date");
+      await expect(chip(page, "offer_end_date")).toHaveAttribute(
+        "data-variable-type",
+        "date",
+      );
+      await expect(panelRow(page, "offer_end_date")).toContainText(
+        "offer_end_date",
+      );
       await expectUses(page, "offer_end_date", "1 use");
       await expectEditorCaret(page, "Offer details");
       await type(page, ".");
@@ -574,7 +726,9 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
       await moveCaret(page, "ArrowLeft"); // onto the chip: selected
       expect((await caret(page)).kind).toBe("NodeSelection");
       await page.keyboard.press("Enter");
-      const popover = page.getByRole("dialog").filter({ hasText: "offer_end_date" });
+      const popover = page
+        .getByRole("dialog")
+        .filter({ hasText: "offer_end_date" });
       await expect(popover).toBeVisible();
       await expect(popover).toContainText("Offer end date");
       await expect(popover).toContainText("Date");
@@ -609,7 +763,10 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
       // Delete at the end of the line above does the same from the other side.
       await page.keyboard.press("ArrowLeft");
       await page.keyboard.press("Delete");
-      await expectBlocked(page, "Delete at the end of the line above the title");
+      await expectBlocked(
+        page,
+        "Delete at the end of the line above the title",
+      );
       expect(await docText(page)).toBe(filled);
     });
 
@@ -624,14 +781,27 @@ test.describe("scenario 2, steps 1–3: Create, keyboard only", () => {
     });
 
     await test.step("Undo and Redo by key cover every chip", async () => {
-      expect(await undoUntilGone(page, CHIPS)).toEqual(["offer_end_date", "purchase_apr", "first_name"]);
-      expect(await redoUntilBack(page, CHIPS)).toEqual(["first_name", "purchase_apr", "offer_end_date"]);
+      expect(await undoUntilGone(page, CHIPS)).toEqual([
+        "offer_end_date",
+        "purchase_apr",
+        "first_name",
+      ]);
+      expect(await redoUntilBack(page, CHIPS)).toEqual([
+        "first_name",
+        "purchase_apr",
+        "offer_end_date",
+      ]);
       await redoUntilDocument(page, filled);
     });
 
     await test.step("Autosave, reload: it is all still there; and not one mouse press happened", async () => {
-      expect(await mousePresses(page), "mouse presses since the page loaded").toBe(0);
-      expect(await mouseMoves(page), "mouse moves since the page loaded").toBe(0);
+      expect(
+        await mousePresses(page),
+        "mouse presses since the page loaded",
+      ).toBe(0);
+      expect(await mouseMoves(page), "mouse moves since the page loaded").toBe(
+        0,
+      );
       await expectAutosaved(page);
       await page.reload();
       await liveEditor(page);
@@ -664,7 +834,10 @@ test.describe("scenario 2, step 1: the name is ready the moment the page lands",
     });
 
     const typed = `${NAME} — a second pass over the offer terms, kept short, with the dates written out in full`;
-    expect(typed.length, "stays under the 120-character name limit").toBeLessThan(120);
+    expect(
+      typed.length,
+      "stays under the 120-character name limit",
+    ).toBeLessThan(120);
 
     const lost: string[] = [];
     for (let attempt = 1; attempt <= 4; attempt++) {
@@ -678,10 +851,15 @@ test.describe("scenario 2, step 1: the name is ready the moment the page lands",
       await hydrated(page);
       await settled(page);
       const value = await nameField(page).inputValue();
-      if (value !== typed) lost.push(`attempt ${attempt}: typed ${JSON.stringify(typed)}, the field holds ${JSON.stringify(value)}`);
+      if (value !== typed)
+        lost.push(
+          `attempt ${attempt}: typed ${JSON.stringify(typed)}, the field holds ${JSON.stringify(value)}`,
+        );
     }
     await page.unrouteAll({ behavior: "wait" });
-    expect(lost, "characters lost while typing as the page settled").toEqual([]);
+    expect(lost, "characters lost while typing as the page settled").toEqual(
+      [],
+    );
   });
 });
 
@@ -696,7 +874,10 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
  * actual text content") and reports it as "incomplete", which would hide a failing count or badge.
  * Work those out directly: text colour against the colours painted behind it, AA for normal text.
  */
-async function shortTextContrast(page: Page, selectors: string[]): Promise<string[]> {
+async function shortTextContrast(
+  page: Page,
+  selectors: string[],
+): Promise<string[]> {
   return page.evaluate((list) => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 1;
@@ -709,13 +890,18 @@ async function shortTextContrast(page: Page, selectors: string[]): Promise<strin
       const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
       return [r, g, b, a / 255];
     };
-    const over = (top: number[], bottom: number[]): [number, number, number, number] => {
+    const over = (
+      top: number[],
+      bottom: number[],
+    ): [number, number, number, number] => {
       const a = top[3] + bottom[3] * (1 - top[3]);
-      const mix = (i: number) => (top[i] * top[3] + bottom[i] * bottom[3] * (1 - top[3])) / (a || 1);
+      const mix = (i: number) =>
+        (top[i] * top[3] + bottom[i] * bottom[3] * (1 - top[3])) / (a || 1);
       return [mix(0), mix(1), mix(2), a];
     };
     const luminance = ([r, g, b]: number[]) => {
-      const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      const lin = (v: number) =>
+        (v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
       return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
     };
     const failures: string[] = [];
@@ -733,9 +919,12 @@ async function shortTextContrast(page: Page, selectors: string[]): Promise<strin
       const [hi, lo] = [luminance(text), luminance(back)].sort((x, y) => y - x);
       const ratio = (hi + 0.05) / (lo + 0.05);
       const size = parseFloat(style.fontSize);
-      const large = size >= 24 || (size >= 18.66 && parseInt(style.fontWeight, 10) >= 700);
+      const large =
+        size >= 24 || (size >= 18.66 && parseInt(style.fontWeight, 10) >= 700);
       if (ratio < (large ? 3 : 4.5)) {
-        failures.push(`${selector}: "${el.textContent}" contrast ${ratio.toFixed(2)}:1 (${style.color} on rgb(${back.slice(0, 3).map(Math.round)}), ${size}px)`);
+        failures.push(
+          `${selector}: "${el.textContent}" contrast ${ratio.toFixed(2)}:1 (${style.color} on rgb(${back.slice(0, 3).map(Math.round)}), ${size}px)`,
+        );
       }
     }
     return failures;
@@ -744,13 +933,18 @@ async function shortTextContrast(page: Page, selectors: string[]): Promise<strin
 
 async function scan(page: Page, screen: string) {
   await settled(page);
-  const { violations, incomplete } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  const { violations, incomplete } = await new AxeBuilder({ page })
+    .withTags(WCAG)
+    .analyze();
   const report = violations.map(
     (v) =>
       `${v.id} (${v.impact}): ${v.help}\n` +
       v.nodes
         .slice(0, 4)
-        .map((n) => `    ${n.target.join(" ")}\n      ${n.html.slice(0, 160)}\n      ${(n.failureSummary ?? "").split("\n").slice(1, 3).join(" / ")}`)
+        .map(
+          (n) =>
+            `    ${n.target.join(" ")}\n      ${n.html.slice(0, 160)}\n      ${(n.failureSummary ?? "").split("\n").slice(1, 3).join(" / ")}`,
+        )
         .join("\n"),
   );
 
@@ -758,12 +952,20 @@ async function scan(page: Page, screen: string) {
   const shortText = incomplete
     .filter((item) => item.id === "color-contrast")
     .flatMap((item) => item.nodes)
-    .filter((node) => node.any.some((check) => /too short/.test(check.message ?? "")))
+    .filter((node) =>
+      node.any.some((check) => /too short/.test(check.message ?? "")),
+    )
     .map((node) => node.target.join(" "));
   const shortFailures = await shortTextContrast(page, shortText);
-  if (shortFailures.length) report.push(`color-contrast (short text, measured directly):\n    ${shortFailures.join("\n    ")}`);
+  if (shortFailures.length)
+    report.push(
+      `color-contrast (short text, measured directly):\n    ${shortFailures.join("\n    ")}`,
+    );
   for (const item of incomplete) {
-    test.info().annotations.push({ type: "axe needs review", description: `${screen}: ${item.id} (${item.nodes.length} nodes)` });
+    test.info().annotations.push({
+      type: "axe needs review",
+      description: `${screen}: ${item.id} (${item.nodes.length} nodes)`,
+    });
   }
 
   expect.soft(report, `axe violations on ${screen}`).toEqual([]);
@@ -779,12 +981,20 @@ test.describe("axe, WCAG 2.1 A and AA", () => {
   test("the starter gallery, open", async ({ page }) => {
     await asPersona(page, "maya");
     await openLibrary(page);
-    await page.getByRole("button", { name: "New template" }).click({ delay: 90 });
-    await expect(page.getByRole("dialog").getByRole("button", { name: /Card offer terms/ })).toBeVisible();
+    await page
+      .getByRole("button", { name: "New template" })
+      .click({ delay: 90 });
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByRole("button", { name: /Card offer terms/ }),
+    ).toBeVisible();
     await scan(page, "the starter gallery");
   });
 
-  test("the editable workspace, with the {{ picker and a chip popover open", async ({ page }) => {
+  test("the editable workspace, with the {{ picker and a chip popover open", async ({
+    page,
+  }) => {
     await asPersona(page, "maya");
     await openLibrary(page);
     await createCardOfferTerms(page);
@@ -812,11 +1022,20 @@ test.describe("axe, WCAG 2.1 A and AA", () => {
     await scan(page, "the workspace with a chip popover open");
   });
 
-  test("the read-only workspace (Priya on a Deposits template)", async ({ page }) => {
+  test("the read-only workspace (Priya on a Deposits template)", async ({
+    page,
+  }) => {
     await asPersona(page, "priya");
     await openLibrary(page, "deposits");
-    await page.getByRole("link", { name: /^Everyday Checking — Fee Schedule/ }).click({ delay: 90 });
-    await expect(page.getByRole("heading", { level: 1, name: "Everyday Checking — Fee Schedule" })).toBeVisible();
+    await page
+      .getByRole("link", { name: /^Everyday Checking — Fee Schedule/ })
+      .click({ delay: 90 });
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Everyday Checking — Fee Schedule",
+      }),
+    ).toBeVisible();
     await expect(page.getByText("View only", { exact: true })).toBeVisible();
     const ed = await liveEditor(page);
     await expect(ed).toHaveAttribute("contenteditable", "false");

@@ -55,7 +55,9 @@ export function Strip({
     if (!focusOnMount) return;
     const el = root.current;
     if (!el) return;
-    const target = el.querySelector<HTMLElement>("[data-autofocus]") ?? el.querySelector<HTMLElement>("[data-cancel]");
+    const target =
+      el.querySelector<HTMLElement>("[data-autofocus]") ??
+      el.querySelector<HTMLElement>("[data-cancel]");
     target?.focus({ preventScroll: true });
     el.scrollIntoView({ block: "nearest" });
   }, [focusOnMount]);
@@ -71,9 +73,14 @@ export function Strip({
         e.stopPropagation();
         if (!pending) onCancel();
       }}
-      className={cn("flex flex-col gap-3 rounded-lg bg-surface-sunken p-4", className)}
+      className={cn(
+        "flex flex-col gap-3 rounded-lg bg-surface-sunken p-4",
+        className,
+      )}
     >
-      {consequence !== undefined ? <p className="text-[14px] leading-relaxed text-text">{consequence}</p> : null}
+      {consequence !== undefined ? (
+        <p className="text-[14px] leading-relaxed text-text">{consequence}</p>
+      ) : null}
       {children}
       {lines.length ? (
         <ul className="flex flex-col gap-1.5 text-[14px] leading-relaxed text-text">
@@ -84,11 +91,22 @@ export function Strip({
       ) : null}
       <div className="flex items-center justify-end gap-2">
         {shown ? (
-          <p role={error ? "alert" : undefined} className={cn("mr-auto text-[13px]", error ? "text-danger-text" : "text-text-muted")}>
+          <p
+            role={error ? "alert" : undefined}
+            className={cn(
+              "mr-auto text-[13px]",
+              error ? "text-danger-text" : "text-text-muted",
+            )}
+          >
             {shown}
           </p>
         ) : null}
-        <Button data-cancel variant="ghost" aria-disabled={pending} onClick={() => (pending ? undefined : onCancel())}>
+        <Button
+          data-cancel
+          variant="ghost"
+          aria-disabled={pending}
+          onClick={() => (pending ? undefined : onCancel())}
+        >
           {cancelLabel}
         </Button>
         <Button

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewQueueRow } from "@/server/queries/review-models";
-import { defaultTab, formatQueueRow, parseTab, queueTabs, TAB_META } from "./format-row";
+import {
+  defaultTab,
+  formatQueueRow,
+  parseTab,
+  queueTabs,
+  TAB_META,
+} from "./format-row";
 
 const NOW = new Date("2026-10-04T15:00:00.000Z");
 const DAY = 86_400_000;
@@ -36,18 +42,30 @@ describe("formatQueueRow", () => {
   });
 
   it("shows no round on a version that was never sent back, and links to the bare review screen", () => {
-    const first = formatQueueRow(row({ round: 1, state: "in_review" }), "coral-offers", NOW);
+    const first = formatQueueRow(
+      row({ round: 1, state: "in_review" }),
+      "coral-offers",
+      NOW,
+    );
     expect(first.versionLabel).toBe("v3");
     expect(first.href).toBe("/coral-offers/review/UC-4F7K2Q/3");
   });
 
   it("names the round once the version was sent back, and links to exactly that round", () => {
-    const waiting = formatQueueRow(row({ round: 2, state: "in_review" }), "coral-offers", NOW);
+    const waiting = formatQueueRow(
+      row({ round: 2, state: "in_review" }),
+      "coral-offers",
+      NOW,
+    );
     expect(waiting.versionLabel).toBe("v3 · Round 2");
     expect(waiting.href).toBe("/coral-offers/review/UC-4F7K2Q/3?round=2");
     // The decided round 1 opens round 1, not the round in review now.
     const returned = formatQueueRow(
-      row({ round: 1, state: "changes_requested", decision: { kind: "changes_requested", by: jordan, at: ago(2 * DAY) } }),
+      row({
+        round: 1,
+        state: "changes_requested",
+        decision: { kind: "changes_requested", by: jordan, at: ago(2 * DAY) },
+      }),
       "coral-offers",
       NOW,
     );
@@ -57,7 +75,11 @@ describe("formatQueueRow", () => {
 
   it("says which round a decided version was approved on, and links to the released version", () => {
     const approved = formatQueueRow(
-      row({ round: 3, state: "active", decision: { kind: "approved", by: jordan, at: ago(DAY) } }),
+      row({
+        round: 3,
+        state: "active",
+        decision: { kind: "approved", by: jordan, at: ago(DAY) },
+      }),
       "coral-offers",
       NOW,
     );
@@ -65,23 +87,43 @@ describe("formatQueueRow", () => {
     expect(approved.href).toBe("/coral-offers/review/UC-4F7K2Q/3");
     // Approved on its first try: no round anywhere.
     const firstTry = formatQueueRow(
-      row({ round: 1, state: "active", decision: { kind: "approved", by: jordan, at: ago(DAY) } }),
+      row({
+        round: 1,
+        state: "active",
+        decision: { kind: "approved", by: jordan, at: ago(DAY) },
+      }),
       "coral-offers",
       NOW,
     );
-    expect([firstTry.versionLabel, firstTry.href]).toEqual(["v3", "/coral-offers/review/UC-4F7K2Q/3"]);
+    expect([firstTry.versionLabel, firstTry.href]).toEqual([
+      "v3",
+      "/coral-offers/review/UC-4F7K2Q/3",
+    ]);
   });
 
   it("words the submit time against the demo clock", () => {
-    expect(formatQueueRow(row({ submittedAt: ago(3 * DAY) }), "coral-offers", NOW).submitted).toBe("3 days ago");
-    expect(formatQueueRow(row({ submittedAt: ago(10_000) }), "coral-offers", NOW).submitted).toBe("just now");
-    expect(formatQueueRow(row({ submittedAt: ago(2 * 3_600_000) }), "coral-offers", NOW).submitted).toBe("2 hours ago");
+    expect(
+      formatQueueRow(row({ submittedAt: ago(3 * DAY) }), "coral-offers", NOW)
+        .submitted,
+    ).toBe("3 days ago");
+    expect(
+      formatQueueRow(row({ submittedAt: ago(10_000) }), "coral-offers", NOW)
+        .submitted,
+    ).toBe("just now");
+    expect(
+      formatQueueRow(
+        row({ submittedAt: ago(2 * 3_600_000) }),
+        "coral-offers",
+        NOW,
+      ).submitted,
+    ).toBe("2 hours ago");
   });
 
   it("says on one line what the folded columns would: who and when, and for a decision what, who and when", () => {
-    expect(formatQueueRow(row({ submittedAt: ago(3 * DAY) }), "coral-offers", NOW).folded).toBe(
-      "Maya Chen · 3 days ago · Team approver",
-    );
+    expect(
+      formatQueueRow(row({ submittedAt: ago(3 * DAY) }), "coral-offers", NOW)
+        .folded,
+    ).toBe("Maya Chen · 3 days ago · Team approver");
     const decided = formatQueueRow(
       row({ decision: { kind: "approved", by: jordan, at: ago(2 * DAY) } }),
       "coral-offers",
@@ -91,15 +133,26 @@ describe("formatQueueRow", () => {
   });
 
   it("carries the breaking flag", () => {
-    expect(formatQueueRow(row({ breaking: true }), "coral-offers", NOW).breaking).toBe(true);
-    expect(formatQueueRow(row({ breaking: false }), "coral-offers", NOW).breaking).toBe(false);
+    expect(
+      formatQueueRow(row({ breaking: true }), "coral-offers", NOW).breaking,
+    ).toBe(true);
+    expect(
+      formatQueueRow(row({ breaking: false }), "coral-offers", NOW).breaking,
+    ).toBe(false);
   });
 
   it("names the stage, and its place only when the chain has more than one", () => {
     const single = formatQueueRow(row(), "coral-offers", NOW);
     expect([single.stage, single.stageStep]).toEqual(["Team approver", null]);
-    const multi = formatQueueRow(row({ stage: { position: 1, name: "Legal reviewer", count: 2 } }), "coral-offers", NOW);
-    expect([multi.stage, multi.stageStep]).toEqual(["Legal reviewer", "Stage 2 of 2"]);
+    const multi = formatQueueRow(
+      row({ stage: { position: 1, name: "Legal reviewer", count: 2 } }),
+      "coral-offers",
+      NOW,
+    );
+    expect([multi.stage, multi.stageStep]).toEqual([
+      "Legal reviewer",
+      "Stage 2 of 2",
+    ]);
   });
 
   it("has no decision on a row waiting for one", () => {
@@ -112,9 +165,16 @@ describe("formatQueueRow", () => {
       "coral-offers",
       NOW,
     );
-    expect(approved.decision).toEqual({ kind: "approved", label: "Approved", by: "Jordan Ellis", when: "2 days ago" });
+    expect(approved.decision).toEqual({
+      kind: "approved",
+      label: "Approved",
+      by: "Jordan Ellis",
+      when: "2 days ago",
+    });
     const returned = formatQueueRow(
-      row({ decision: { kind: "changes_requested", by: jordan, at: ago(5 * DAY) } }),
+      row({
+        decision: { kind: "changes_requested", by: jordan, at: ago(5 * DAY) },
+      }),
       "coral-offers",
       NOW,
     );
@@ -125,7 +185,11 @@ describe("formatQueueRow", () => {
 
 describe("queueTabs", () => {
   it("makes the three tabs in order, each with its rows and its quiet empty line", () => {
-    const tabs = queueTabs({ waiting: [row()], submitted: [], decided: [] }, "coral-offers", NOW);
+    const tabs = queueTabs(
+      { waiting: [row()], submitted: [], decided: [] },
+      "coral-offers",
+      NOW,
+    );
     expect(tabs.map((t) => [t.key, t.label, t.rows.length])).toEqual([
       ["waiting", "Waiting on me", 1],
       ["submitted", "Submitted by me", 0],
@@ -156,9 +220,15 @@ describe("defaultTab", () => {
   const tabs = (waiting: number, submitted: number, decided: number) =>
     queueTabs(
       {
-        waiting: Array.from({ length: waiting }, (_, i) => row({ versionId: `w${i}` })),
-        submitted: Array.from({ length: submitted }, (_, i) => row({ versionId: `s${i}` })),
-        decided: Array.from({ length: decided }, (_, i) => row({ versionId: `d${i}` })),
+        waiting: Array.from({ length: waiting }, (_, i) =>
+          row({ versionId: `w${i}` }),
+        ),
+        submitted: Array.from({ length: submitted }, (_, i) =>
+          row({ versionId: `s${i}` }),
+        ),
+        decided: Array.from({ length: decided }, (_, i) =>
+          row({ versionId: `d${i}` }),
+        ),
       },
       "coral-offers",
       NOW,

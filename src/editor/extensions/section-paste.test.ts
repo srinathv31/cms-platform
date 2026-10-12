@@ -10,9 +10,27 @@ import type { Variable } from "../model/types";
 import { editorExtensions } from "../schema";
 import { createChipPopoverStore } from "../state/chip-popover";
 import { createEditorRootRuntime } from "../state/editor-root";
-import { SECTIONS_DOC, blockPos, blocks, caret, doc, flush, h2, p, type } from "../testing/editor";
+import {
+  SECTIONS_DOC,
+  blockPos,
+  blocks,
+  caret,
+  doc,
+  flush,
+  h2,
+  p,
+  type,
+} from "../testing/editor";
 
-const KNOWN: Variable[] = [{ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }];
+const KNOWN: Variable[] = [
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+];
 
 const editors: Editor[] = [];
 afterEach(() => {
@@ -28,7 +46,12 @@ function mount(content: JSONContent = SECTIONS_DOC) {
     element,
     extensions: editorExtensions({
       store: root.variables,
-      binding: { fieldId: "body", kind: "body", root, chip: createChipPopoverStore() },
+      binding: {
+        fieldId: "body",
+        kind: "body",
+        root,
+        chip: createChipPopoverStore(),
+      },
     }),
     content,
   });
@@ -40,17 +63,34 @@ function paste(editor: Editor, data: { text?: string; html?: string }) {
   const clipboard = new DataTransfer();
   if (data.text !== undefined) clipboard.setData("text/plain", data.text);
   if (data.html !== undefined) clipboard.setData("text/html", data.html);
-  editor.view.dom.dispatchEvent(new ClipboardEvent("paste", { clipboardData: clipboard, bubbles: true, cancelable: true }));
+  editor.view.dom.dispatchEvent(
+    new ClipboardEvent("paste", {
+      clipboardData: clipboard,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
 }
 
-const selectAll = (editor: Editor) => editor.view.dispatch(editor.state.tr.setSelection(new AllSelection(editor.state.doc)));
+const selectAll = (editor: Editor) =>
+  editor.view.dispatch(
+    editor.state.tr.setSelection(new AllSelection(editor.state.doc)),
+  );
 
 /** Strips block ids, so documents compare by content. */
 function content(editor: Editor): JSONContent {
   const strip = (node: JSONContent): JSONContent => {
     const { attrs, content: children, ...rest } = node;
-    const kept = attrs ? Object.fromEntries(Object.entries(attrs).filter(([name]) => name !== "id")) : undefined;
-    return { ...rest, ...(kept && Object.keys(kept).length ? { attrs: kept } : {}), ...(children ? { content: children.map(strip) } : {}) };
+    const kept = attrs
+      ? Object.fromEntries(
+          Object.entries(attrs).filter(([name]) => name !== "id"),
+        )
+      : undefined;
+    return {
+      ...rest,
+      ...(kept && Object.keys(kept).length ? { attrs: kept } : {}),
+      ...(children ? { content: children.map(strip) } : {}),
+    };
   };
   return strip(editor.getJSON());
 }
@@ -108,7 +148,10 @@ describe("pasted headings that match required sections", () => {
       if (node.type.name === "variable") chips.push(node.attrs.key as string);
     });
     expect(chips).toEqual(["first_name", "late_fee"]);
-    expect(root.variables.getState().byKey.get("late_fee")).toMatchObject({ type: "text", required: false });
+    expect(root.variables.getState().byKey.get("late_fee")).toMatchObject({
+      type: "text",
+      required: false,
+    });
     editor.commands.undo();
     await flush();
     expect(root.variables.getState().byKey.has("late_fee")).toBe(true);
@@ -134,9 +177,21 @@ describe("pasted headings that match required sections", () => {
   });
 
   it("a section holding only empty lines is replaced; trailing empty lines stay after the content", () => {
-    const { editor } = mount(doc(h2("Offer details", "offer_details"), p(), p(), h2("Rates and fees", "rates_and_fees"), p("Rates"), p(), h2("Legal notices", "legal_notices")));
+    const { editor } = mount(
+      doc(
+        h2("Offer details", "offer_details"),
+        p(),
+        p(),
+        h2("Rates and fees", "rates_and_fees"),
+        p("Rates"),
+        p(),
+        h2("Legal notices", "legal_notices"),
+      ),
+    );
     caret(editor, 1);
-    paste(editor, { text: "## Offer details\n\nOffer.\n\n## Rates and fees\n\nMore rates." });
+    paste(editor, {
+      text: "## Offer details\n\nOffer.\n\n## Rates and fees\n\nMore rates.",
+    });
     expect(blocks(editor)).toEqual([
       "h2*:Offer details",
       "p:Offer.",
@@ -151,7 +206,9 @@ describe("pasted headings that match required sections", () => {
   it("headings that match nothing stay ordinary headings, in the section they came with", () => {
     const { editor } = mount();
     caret(editor, 0, "Intro".length);
-    paste(editor, { text: "## Rates and fees\n\n### How interest works\n\nDaily.\n\n## Something else\n\nOther." });
+    paste(editor, {
+      text: "## Rates and fees\n\n### How interest works\n\nDaily.\n\n## Something else\n\nOther.",
+    });
     expect(blocks(editor).slice(3)).toEqual([
       "h2*:Rates and fees",
       "p:Rates body",
@@ -168,12 +225,25 @@ describe("pasted headings that match required sections", () => {
     const { editor } = mount();
     caret(editor, 0, "Intro".length);
     paste(editor, { text: "# 2.  RATES and fees:\n\nCase-insensitive." });
-    expect(blocks(editor).filter((block) => block.startsWith("h"))).toEqual(["h2*:Offer details", "h2*:Rates and fees", "h2*:Legal notices"]);
+    expect(blocks(editor).filter((block) => block.startsWith("h"))).toEqual([
+      "h2*:Offer details",
+      "h2*:Rates and fees",
+      "h2*:Legal notices",
+    ]);
     expect(blocks(editor)[5]).toBe("p:Case-insensitive.");
   });
 
   it("select-all + paste replaces the draft section by section", () => {
-    const { editor } = mount(doc(h2("Offer details", "offer_details"), p("Old offer"), h2("Rates and fees", "rates_and_fees"), p("Old rates"), h2("Legal notices", "legal_notices"), p("Old legal")));
+    const { editor } = mount(
+      doc(
+        h2("Offer details", "offer_details"),
+        p("Old offer"),
+        h2("Rates and fees", "rates_and_fees"),
+        p("Old rates"),
+        h2("Legal notices", "legal_notices"),
+        p("Old legal"),
+      ),
+    );
     selectAll(editor);
     paste(editor, { text: ANSWER });
     expect(blocks(editor)).toEqual([
@@ -185,14 +255,37 @@ describe("pasted headings that match required sections", () => {
       "p:New legal.",
     ]);
     editor.commands.undo();
-    expect(blocks(editor)).toEqual(["h2*:Offer details", "p:Old offer", "h2*:Rates and fees", "p:Old rates", "h2*:Legal notices", "p:Old legal"]);
+    expect(blocks(editor)).toEqual([
+      "h2*:Offer details",
+      "p:Old offer",
+      "h2*:Rates and fees",
+      "p:Old rates",
+      "h2*:Legal notices",
+      "p:Old legal",
+    ]);
   });
 
   it("select-all + paste: blocks before the first section go to the top", () => {
-    const { editor } = mount(doc(h2("Offer details", "offer_details"), p("Old offer"), h2("Rates and fees", "rates_and_fees"), p("Old rates"), h2("Legal notices", "legal_notices"), p("Old legal")));
+    const { editor } = mount(
+      doc(
+        h2("Offer details", "offer_details"),
+        p("Old offer"),
+        h2("Rates and fees", "rates_and_fees"),
+        p("Old rates"),
+        h2("Legal notices", "legal_notices"),
+        p("Old legal"),
+      ),
+    );
     selectAll(editor);
     paste(editor, { text: "Lead.\n\n## Legal notices\n\nNew legal." });
-    expect(blocks(editor)).toEqual(["p:Lead.", "h2*:Offer details", "p:", "h2*:Rates and fees", "h2*:Legal notices", "p:New legal."]);
+    expect(blocks(editor)).toEqual([
+      "p:Lead.",
+      "h2*:Offer details",
+      "p:",
+      "h2*:Rates and fees",
+      "h2*:Legal notices",
+      "p:New legal.",
+    ]);
   });
 
   it("right after typing, the paste is still its own undo step", () => {
@@ -209,35 +302,71 @@ describe("pasted headings that match required sections", () => {
     const { editor } = mount();
     caret(editor, 1, 3);
     paste(editor, { text: "Lead\n\n## Legal notices\n\nAppended." });
-    expect(blocks(editor).slice(0, 4)).toEqual(["p:Intro", "h2*:Offer details", "p:Lead", "p:Offer body"]);
+    expect(blocks(editor).slice(0, 4)).toEqual([
+      "p:Intro",
+      "h2*:Offer details",
+      "p:Lead",
+      "p:Offer body",
+    ]);
     expect(blocks(editor).at(-1)).toBe("p:Appended.");
   });
 
   it("works for pasted HTML too (a rendered answer copied from the browser)", () => {
     const { editor } = mount();
     caret(editor, 0, "Intro".length);
-    paste(editor, { html: "<h2>Offer details</h2><p>From <b>HTML</b> {{first_name}}</p>", text: "Offer details\nFrom HTML" });
-    expect(blocks(editor).slice(1, 4)).toEqual(["h2*:Offer details", "p:Offer body", "p:From HTML "]);
+    paste(editor, {
+      html: "<h2>Offer details</h2><p>From <b>HTML</b> {{first_name}}</p>",
+      text: "Offer details\nFrom HTML",
+    });
+    expect(blocks(editor).slice(1, 4)).toEqual([
+      "h2*:Offer details",
+      "p:Offer body",
+      "p:From HTML ",
+    ]);
   });
 
   it("a copy of a required heading (copied in the editor, it carries its key) pastes as a plain heading, as before", () => {
     const { editor } = mount();
     caret(editor, 6, "Legal body".length);
     // What copying from a ProseMirror editor puts on the clipboard (data-pm-slice: open start and end, no context).
-    paste(editor, { html: '<p data-pm-slice="1 1 []">Copied</p><h2 data-required="legal_notices">Legal notices</h2><p>More</p>' });
-    expect(blocks(editor).slice(5)).toEqual(["h2*:Legal notices", "p:Legal bodyCopied", "h2:Legal notices", "p:More"]);
+    paste(editor, {
+      html: '<p data-pm-slice="1 1 []">Copied</p><h2 data-required="legal_notices">Legal notices</h2><p>More</p>',
+    });
+    expect(blocks(editor).slice(5)).toEqual([
+      "h2*:Legal notices",
+      "p:Legal bodyCopied",
+      "h2:Legal notices",
+      "p:More",
+    ]);
   });
 
   it("a paste without a matching heading is the ordinary paste", () => {
-    const { editor } = mount(doc(p("Intro"), p(), h2("Offer details", "offer_details"), p("Offer body")));
+    const { editor } = mount(
+      doc(
+        p("Intro"),
+        p(),
+        h2("Offer details", "offer_details"),
+        p("Offer body"),
+      ),
+    );
     caret(editor, 1);
     paste(editor, { text: "## Not a section\n\nText" });
-    expect(blocks(editor)).toEqual(["p:Intro", "h2:Not a section", "p:Text", "h2*:Offer details", "p:Offer body"]);
+    expect(blocks(editor)).toEqual([
+      "p:Intro",
+      "h2:Not a section",
+      "p:Text",
+      "h2*:Offer details",
+      "p:Offer body",
+    ]);
   });
 
   it("a document without required sections pastes headings as headings", () => {
     const { editor } = mount(doc(p("Hello"), p()));
-    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, blockPos(editor, 1) + 1)));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, blockPos(editor, 1) + 1),
+      ),
+    );
     paste(editor, { text: "## Offer details\n\nText" });
     expect(blocks(editor)).toEqual(["p:Hello", "h2:Offer details", "p:Text"]);
   });

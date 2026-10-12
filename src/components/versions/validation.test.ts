@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { addDays, formatShortDate } from "@/domain/dates";
 import { plural } from "@/domain/plural";
 import { codeSegments, formatLong, fromYmd, toYmd } from "./format";
-import { REVOKE_REASON_MAX, defaultSunsetDate, validateRevokeReason, validateSunsetDate } from "./validation";
+import {
+  REVOKE_REASON_MAX,
+  defaultSunsetDate,
+  validateRevokeReason,
+  validateSunsetDate,
+} from "./validation";
 
 describe("validateSunsetDate", () => {
   const today = "2026-10-05";
@@ -13,8 +18,12 @@ describe("validateSunsetDate", () => {
   });
 
   it("refuses today and the past, in words that name the date", () => {
-    expect(validateSunsetDate("2026-10-05", today)).toBe("Pick a date after October 5, 2026.");
-    expect(validateSunsetDate("2026-09-30", today)).toBe("Pick a date after October 5, 2026.");
+    expect(validateSunsetDate("2026-10-05", today)).toBe(
+      "Pick a date after October 5, 2026.",
+    );
+    expect(validateSunsetDate("2026-09-30", today)).toBe(
+      "Pick a date after October 5, 2026.",
+    );
   });
 
   it("refuses nothing-picked, malformed and impossible dates", () => {
@@ -40,14 +49,20 @@ describe("defaultSunsetDate", () => {
 
 describe("validateRevokeReason", () => {
   it("needs a reason: empty and blank are refused", () => {
-    expect(validateRevokeReason("")).toBe("Say why this version is being revoked.");
-    expect(validateRevokeReason("  \n ")).toBe("Say why this version is being revoked.");
+    expect(validateRevokeReason("")).toBe(
+      "Say why this version is being revoked.",
+    );
+    expect(validateRevokeReason("  \n ")).toBe(
+      "Say why this version is being revoked.",
+    );
   });
 
   it("accepts a reason, and refuses one the server would", () => {
     expect(validateRevokeReason("Wrong APR in the legal notices.")).toBeNull();
     expect(validateRevokeReason("x".repeat(REVOKE_REASON_MAX))).toBeNull();
-    expect(validateRevokeReason("x".repeat(REVOKE_REASON_MAX + 1))).toBe("Keep the reason under 2,000 characters.");
+    expect(validateRevokeReason("x".repeat(REVOKE_REASON_MAX + 1))).toBe(
+      "Keep the reason under 2,000 characters.",
+    );
   });
 });
 
@@ -64,16 +79,24 @@ describe("calendar dates", () => {
 
   it("reads a sunset's day as given (the business time zone's), whatever the viewer's time zone", () => {
     // The read model sends the day itself; read as a local date it would be the 16th in the Americas.
-    expect(formatShortDate("2026-10-17", new Date("2026-10-04T12:00:00.000Z"))).toBe("Oct 17");
-    expect(formatShortDate("2027-03-01", new Date("2026-10-04T12:00:00.000Z"))).toBe("Mar 1, 2027");
+    expect(
+      formatShortDate("2026-10-17", new Date("2026-10-04T12:00:00.000Z")),
+    ).toBe("Oct 17");
+    expect(
+      formatShortDate("2027-03-01", new Date("2026-10-04T12:00:00.000Z")),
+    ).toBe("Mar 1, 2027");
     // The year check is on the demo clock's UTC year: the last evening of the year, in the Americas, is already next year.
-    expect(formatShortDate("2027-01-01", new Date("2026-12-31T23:30:00.000Z"))).toBe("Jan 1, 2027");
+    expect(
+      formatShortDate("2027-01-01", new Date("2026-12-31T23:30:00.000Z")),
+    ).toBe("Jan 1, 2027");
   });
 
   it("checks a date against the business time zone's today, as the read model gives it", () => {
     // 23:30 Eastern on October 4 is October 5 in UTC; the picker's today is still the 4th, so the 5th is fine.
     expect(validateSunsetDate("2026-10-05", "2026-10-04")).toBeNull();
-    expect(validateSunsetDate("2026-10-04", "2026-10-04")).toBe("Pick a date after October 4, 2026.");
+    expect(validateSunsetDate("2026-10-04", "2026-10-04")).toBe(
+      "Pick a date after October 4, 2026.",
+    );
   });
 });
 
@@ -84,7 +107,9 @@ describe("sentences", () => {
       { text: "annual_fee", code: true },
       { text: " (Currency).", code: false },
     ]);
-    expect(codeSegments("Nothing special.")).toEqual([{ text: "Nothing special.", code: false }]);
+    expect(codeSegments("Nothing special.")).toEqual([
+      { text: "Nothing special.", code: false },
+    ]);
   });
 
   it("counts renders with the right number", () => {

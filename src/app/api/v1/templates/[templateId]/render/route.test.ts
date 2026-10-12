@@ -1,7 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_BODY_BYTES, MAX_VALUE_LENGTH, type Base64ResponseBody, type EmailResponseBody, type RenderErrorBody } from "@/domain/render/types";
+import {
+  MAX_BODY_BYTES,
+  MAX_VALUE_LENGTH,
+  type Base64ResponseBody,
+  type EmailResponseBody,
+  type RenderErrorBody,
+} from "@/domain/render/types";
 import type { JSONContent, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { contentTypes, renderLog, versions } from "@/server/db/schema/ucomp";
@@ -34,7 +40,13 @@ const persona = (userId: string, teamIds: string[]): Viewer => ({
   initials: userId.slice(0, 2).toUpperCase(),
   title: "Tester",
   platformRole: null,
-  memberships: teamIds.map((teamId) => ({ teamId, teamSlug: teamId, teamName: teamId, roles: ["author"], status: "active" })),
+  memberships: teamIds.map((teamId) => ({
+    teamId,
+    teamSlug: teamId,
+    teamName: teamId,
+    roles: ["author"],
+    status: "active",
+  })),
 });
 const maya = persona("maya", ["coral-offers"]);
 
@@ -42,10 +54,19 @@ beforeEach(() => {
   vi.mocked(getViewer).mockReset().mockResolvedValue(maya);
 });
 
-const CUSTOMER = { first_name: "Maya", last_name: "Chen", purchase_apr: "21.99", home_state: "NJ" };
+const CUSTOMER = {
+  first_name: "Maya",
+  last_name: "Chen",
+  purchase_apr: "21.99",
+  home_state: "NJ",
+};
 const CORAL = { "X-Consumer-Id": "coral" };
 
-function requestOf(templateId: string, body: BodyInit, headers: Record<string, string> = CORAL) {
+function requestOf(
+  templateId: string,
+  body: BodyInit,
+  headers: Record<string, string> = CORAL,
+) {
   return new Request(`http://localhost/api/v1/templates/${templateId}/render`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
@@ -54,9 +75,17 @@ function requestOf(templateId: string, body: BodyInit, headers: Record<string, s
   } as RequestInit) as NextRequest;
 }
 
-function post(template: string, body: unknown, headers: Record<string, string> = CORAL) {
+function post(
+  template: string,
+  body: unknown,
+  headers: Record<string, string> = CORAL,
+) {
   const templateId = ids[template] ?? template;
-  const request = requestOf(templateId, typeof body === "string" ? body : JSON.stringify(body), headers);
+  const request = requestOf(
+    templateId,
+    typeof body === "string" ? body : JSON.stringify(body),
+    headers,
+  );
   return POST(request, { params: Promise.resolve({ templateId }) });
 }
 
@@ -73,7 +102,12 @@ function chunkedBody(megabytes: number) {
   return { stream, pulled };
 }
 
-async function expectError(res: Response, status: number, code: string, message?: string) {
+async function expectError(
+  res: Response,
+  status: number,
+  code: string,
+  message?: string,
+) {
   expect(res.status).toBe(status);
   expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
   expect(res.headers.get("Cache-Control")).toBe("no-store");
@@ -91,26 +125,40 @@ const logRows = (correlationId: string) =>
 
 describe("POST /api/v1/templates/[templateId]/render: channels", () => {
   it("web: a text/html document with the X-Stencil headers", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER }, { ...CORAL, "X-Correlation-Id": "abc-123" });
+    const res = await post(
+      "balance-transfer",
+      { version: 2, channel: "web", values: CUSTOMER },
+      { ...CORAL, "X-Correlation-Id": "abc-123" },
+    );
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("X-Correlation-Id")).toBe("abc-123");
-    expect(res.headers.get("X-Stencil-Template-Id")).toBe(ids["balance-transfer"]);
+    expect(res.headers.get("X-Stencil-Template-Id")).toBe(
+      ids["balance-transfer"],
+    );
     expect(res.headers.get("X-Stencil-Version")).toBe("2");
     expect(res.headers.get("X-Stencil-Newer-Version")).toBeNull();
     expect(res.headers.get("X-Stencil-Preview")).toBeNull();
-    expect(res.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
+    expect(res.headers.get("Content-Security-Policy")).toContain(
+      "default-src 'none'",
+    );
     const html = await res.text();
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain("21.99%");
   });
 
   it("pdf: application/pdf bytes, inline, with the version's filename", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "pdf", values: CUSTOMER });
+    const res = await post("balance-transfer", {
+      version: 2,
+      channel: "pdf",
+      values: CUSTOMER,
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("application/pdf");
-    expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="${ids["balance-transfer"]}-v2.pdf"`);
+    expect(res.headers.get("Content-Disposition")).toBe(
+      `inline; filename="${ids["balance-transfer"]}-v2.pdf"`,
+    );
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect(Buffer.from(bytes.slice(0, 5)).toString("latin1")).toBe("%PDF-");
   }, 30_000);
@@ -124,7 +172,13 @@ describe("POST /api/v1/templates/[templateId]/render: channels", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
     const body = (await res.json()) as EmailResponseBody;
-    expect(Object.keys(body).sort()).toEqual(["html", "newerVersion", "preheader", "subject", "text"]);
+    expect(Object.keys(body).sort()).toEqual([
+      "html",
+      "newerVersion",
+      "preheader",
+      "subject",
+      "text",
+    ]);
     expect(body.subject).toBe("Your purchase APR is changing on March 4, 2027");
     expect(body.newerVersion).toBeNull();
     expect(body.html).toContain("<!doctype html>");
@@ -134,19 +188,40 @@ describe("POST /api/v1/templates/[templateId]/render: channels", () => {
 
 describe("POST …/render: base64 opt-in", () => {
   it("pdf comes back as a JSON envelope", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "pdf", values: CUSTOMER, encoding: "base64" });
+    const res = await post("balance-transfer", {
+      version: 2,
+      channel: "pdf",
+      values: CUSTOMER,
+      encoding: "base64",
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
     expect(res.headers.get("Content-Disposition")).toBeNull();
     const body = (await res.json()) as Base64ResponseBody;
-    expect(body).toMatchObject({ channel: "pdf", contentType: "application/pdf", encoding: "base64", newerVersion: null });
-    expect(Buffer.from(body.data, "base64").subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(body).toMatchObject({
+      channel: "pdf",
+      contentType: "application/pdf",
+      encoding: "base64",
+      newerVersion: null,
+    });
+    expect(
+      Buffer.from(body.data, "base64").subarray(0, 5).toString("latin1"),
+    ).toBe("%PDF-");
   }, 30_000);
 
   it("web comes back as a JSON envelope of the UTF-8 document", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER, encoding: "base64" });
+    const res = await post("balance-transfer", {
+      version: 2,
+      channel: "web",
+      values: CUSTOMER,
+      encoding: "base64",
+    });
     const body = (await res.json()) as Base64ResponseBody;
-    expect(body).toMatchObject({ channel: "web", contentType: "text/html; charset=utf-8", encoding: "base64" });
+    expect(body).toMatchObject({
+      channel: "web",
+      contentType: "text/html; charset=utf-8",
+      encoding: "base64",
+    });
     const html = Buffer.from(body.data, "base64").toString("utf8");
     expect(html).toContain("<!doctype html>");
     expect(html).toContain("—"); // non-ASCII survives the round trip (the title has an em dash)
@@ -162,14 +237,22 @@ describe("POST …/render: base64 opt-in", () => {
     const body = (await res.json()) as EmailResponseBody;
     expect(body.encoding).toBe("base64");
     expect(body.subject).toBe("Your purchase APR is changing on March 4, 2027");
-    expect(Buffer.from(body.html, "base64").toString("utf8")).toContain("<!doctype html>");
-    expect(Buffer.from(body.text, "base64").toString("utf8")).toContain("Hi Maya");
+    expect(Buffer.from(body.html, "base64").toString("utf8")).toContain(
+      "<!doctype html>",
+    );
+    expect(Buffer.from(body.text, "base64").toString("utf8")).toContain(
+      "Hi Maya",
+    );
   });
 });
 
 describe("POST …/render: superseded versions", () => {
   it("a Superseded version renders with X-Stencil-Newer-Version", async () => {
-    const res = await post("balance-transfer", { version: 1, channel: "web", values: CUSTOMER });
+    const res = await post("balance-transfer", {
+      version: 1,
+      channel: "web",
+      values: CUSTOMER,
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("X-Stencil-Version")).toBe("1");
     expect(res.headers.get("X-Stencil-Newer-Version")).toBe("2");
@@ -180,17 +263,44 @@ describe("POST …/render: superseded versions", () => {
     const id = ids["high-yield-savings"]!;
     const where = and(eq(versions.templateId, id), eq(versions.number, 1));
     const [v1] = await db.select().from(versions).where(where);
-    const subject = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Your savings rate" }] }] };
-    await db.update(versions).set({ channels: ["pdf", "web", "email"], channelFields: { email: { subject } } }).where(where);
+    const subject = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Your savings rate" }],
+        },
+      ],
+    };
+    await db
+      .update(versions)
+      .set({
+        channels: ["pdf", "web", "email"],
+        channelFields: { email: { subject } },
+      })
+      .where(where);
     try {
-      const values = Object.fromEntries(v1!.variables.map((v) => [v.key, v.sample]));
-      const res = await post("high-yield-savings", { version: 1, channel: "email", values }, { "X-Consumer-Id": "deposits-online" });
+      const values = Object.fromEntries(
+        v1!.variables.map((v) => [v.key, v.sample]),
+      );
+      const res = await post(
+        "high-yield-savings",
+        { version: 1, channel: "email", values },
+        { "X-Consumer-Id": "deposits-online" },
+      );
       expect(res.status).toBe(200);
       expect(res.headers.get("X-Stencil-Newer-Version")).toBe("2");
       const body = (await res.json()) as EmailResponseBody;
-      expect(body).toMatchObject({ subject: "Your savings rate", preheader: "", newerVersion: 2 });
+      expect(body).toMatchObject({
+        subject: "Your savings rate",
+        preheader: "",
+        newerVersion: 2,
+      });
     } finally {
-      await db.update(versions).set({ channels: v1!.channels, channelFields: v1!.channelFields }).where(where);
+      await db
+        .update(versions)
+        .set({ channels: v1!.channels, channelFields: v1!.channelFields })
+        .where(where);
     }
   });
 
@@ -198,10 +308,19 @@ describe("POST …/render: superseded versions", () => {
     const saved = env.now;
     env.now = new Date(saved.getTime() + 22 * 86_400_000);
     try {
-      const res = await post("balance-transfer", { version: 1, channel: "web", values: CUSTOMER });
+      const res = await post("balance-transfer", {
+        version: 1,
+        channel: "web",
+        values: CUSTOMER,
+      });
       const error = await expectError(res, 410, "version_sunset");
-      expect(error.message).toMatch(/^Version 1 was sunset on \w+ \d+, \d{4}\. Version 2 is active\.$/);
-      expect(error.details, "the day and zone beside the instant").toMatchObject({
+      expect(error.message).toMatch(
+        /^Version 1 was sunset on \w+ \d+, \d{4}\. Version 2 is active\.$/,
+      );
+      expect(
+        error.details,
+        "the day and zone beside the instant",
+      ).toMatchObject({
         version: 1,
         activeVersion: 2,
         sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
@@ -222,50 +341,112 @@ describe("POST …/render: consumers only", () => {
 
   it("refuses the open draft, with or without `preview` and a consumer, and never asks who is signed in", async () => {
     for (const [body, headers] of [
-      [{ version: "draft", channel: "pdf", values: CUSTOMER, preview: true }, {}],
-      [{ version: "draft", channel: "pdf", values: CUSTOMER, preview: true }, CORAL],
+      [
+        { version: "draft", channel: "pdf", values: CUSTOMER, preview: true },
+        {},
+      ],
+      [
+        { version: "draft", channel: "pdf", values: CUSTOMER, preview: true },
+        CORAL,
+      ],
       [{ version: "draft", channel: "pdf", values: CUSTOMER }, CORAL],
     ] as const) {
-      const res = await post("annual-fee-waiver", body, { ...headers, "X-Correlation-Id": "no-draft" });
-      await expectError(res, 400, "bad_request", "version must be a version number.");
+      const res = await post("annual-fee-waiver", body, {
+        ...headers,
+        "X-Correlation-Id": "no-draft",
+      });
+      await expectError(
+        res,
+        400,
+        "bad_request",
+        "version must be a version number.",
+      );
     }
     expect(getViewer).not.toHaveBeenCalled();
     expect(await logRows("no-draft")).toEqual([]);
   });
 
   it("refuses a preview of a released version that names no consumer: the cookie's person is not a consumer", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER, preview: true }, { "X-Correlation-Id": "no-consumer" });
-    await expectError(res, 400, "consumer_required", "X-Consumer-Id is required.");
+    const res = await post(
+      "balance-transfer",
+      { version: 2, channel: "web", values: CUSTOMER, preview: true },
+      { "X-Correlation-Id": "no-consumer" },
+    );
+    await expectError(
+      res,
+      400,
+      "consumer_required",
+      "X-Consumer-Id is required.",
+    );
     expect(getViewer).not.toHaveBeenCalled();
     expect(await logRows("no-consumer")).toEqual([]);
   });
 
   it("serves a version in review to nobody, `preview` or not: a consumer is refused it, and it is logged as a consumer's", async () => {
     for (const preview of [true, false, "yes"]) {
-      const res = await post("cash-back", { version: 3, channel: "web", values: FEE, preview }, { ...CORAL, "X-Correlation-Id": `in-review-${preview}` });
-      await expectError(res, 409, "version_not_released", "Version 3 is in review. Version 2 is active.");
+      const res = await post(
+        "cash-back",
+        { version: 3, channel: "web", values: FEE, preview },
+        { ...CORAL, "X-Correlation-Id": `in-review-${preview}` },
+      );
+      await expectError(
+        res,
+        409,
+        "version_not_released",
+        "Version 3 is in review. Version 2 is active.",
+      );
       expect(await logRows(`in-review-${preview}`)).toEqual([
-        expect.objectContaining({ isPreview: false, consumerId: "coral", outcome: "error", errorCode: "version_not_released" }),
+        expect.objectContaining({
+          isPreview: false,
+          consumerId: "coral",
+          outcome: "error",
+          errorCode: "version_not_released",
+        }),
       ]);
     }
     expect(getViewer).not.toHaveBeenCalled();
   });
 
   it("renders a released version as a consumer whatever `preview` says, with no preview header and no session read", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER, preview: true }, { ...CORAL, "X-Correlation-Id": "released" });
+    const res = await post(
+      "balance-transfer",
+      { version: 2, channel: "web", values: CUSTOMER, preview: true },
+      { ...CORAL, "X-Correlation-Id": "released" },
+    );
     expect(res.status).toBe(200);
     expect(res.headers.get("X-Stencil-Preview")).toBeNull();
     expect(getViewer).not.toHaveBeenCalled();
-    expect(await logRows("released")).toEqual([expect.objectContaining({ isPreview: false, consumerId: "coral", outcome: "ok" })]);
+    expect(await logRows("released")).toEqual([
+      expect.objectContaining({
+        isPreview: false,
+        consumerId: "coral",
+        outcome: "ok",
+      }),
+    ]);
   });
 
   // A consumer never sees rounds: the field is dropped unread and the number is its head.
   it("a consumer's round is ignored, whatever it holds: the number's head answers", async () => {
     for (const round of [1, "x", 0]) {
-      const res = await post("cash-back", { version: 3, round, channel: "web", values: FEE });
-      await expectError(res, 409, "version_not_released", "Version 3 is in review. Version 2 is active.");
+      const res = await post("cash-back", {
+        version: 3,
+        round,
+        channel: "web",
+        values: FEE,
+      });
+      await expectError(
+        res,
+        409,
+        "version_not_released",
+        "Version 3 is in review. Version 2 is active.",
+      );
     }
-    const released = await post("balance-transfer", { version: 2, round: 7, channel: "web", values: CUSTOMER });
+    const released = await post("balance-transfer", {
+      version: 2,
+      round: 7,
+      channel: "web",
+      values: CUSTOMER,
+    });
     expect(released.status).toBe(200);
   });
 });
@@ -281,26 +462,63 @@ describe("POST …/render: 400 bad requests", () => {
     ["a JSON array", "[]", BODY],
     ["no values", { version: 2, channel: "web" }, BODY],
     ["no version", { channel: "web", values: {} }, BODY],
-    ["an unknown channel", { ...good, channel: "fax" }, "channel must be one of pdf, web, email, push, sms."],
-    ["a version as a string", { ...good, version: "2" }, "version must be a version number."],
+    [
+      "an unknown channel",
+      { ...good, channel: "fax" },
+      "channel must be one of pdf, web, email, push, sms.",
+    ],
+    [
+      "a version as a string",
+      { ...good, version: "2" },
+      "version must be a version number.",
+    ],
     ["version 0", { ...good, version: 0 }, "version must be a version number."],
-    ["a fractional version", { ...good, version: 1.5 }, "version must be a version number."],
-    ["values as an array", { ...good, values: [] }, "values must be an object."],
+    [
+      "a fractional version",
+      { ...good, version: 1.5 },
+      "version must be a version number.",
+    ],
+    [
+      "values as an array",
+      { ...good, values: [] },
+      "values must be an object.",
+    ],
     ["values as null", { ...good, values: null }, "values must be an object."],
-    ["another encoding", { ...good, encoding: "hex" }, "encoding must be base64."],
-    ["the draft", { ...good, version: "draft" }, "version must be a version number."],
+    [
+      "another encoding",
+      { ...good, encoding: "hex" },
+      "encoding must be base64.",
+    ],
+    [
+      "the draft",
+      { ...good, version: "draft" },
+      "version must be a version number.",
+    ],
   ])("%s", async (_, body, message) => {
-    await expectError(await post("balance-transfer", body), 400, "bad_request", message);
+    await expectError(
+      await post("balance-transfer", body),
+      400,
+      "bad_request",
+      message,
+    );
   });
 
   it("a missing X-Consumer-Id is consumer_required", async () => {
-    await expectError(await post("balance-transfer", good, {}), 400, "consumer_required", "X-Consumer-Id is required.");
+    await expectError(
+      await post("balance-transfer", good, {}),
+      400,
+      "consumer_required",
+      "X-Consumer-Id is required.",
+    );
   });
 
   it("generates a correlation id when none is sent, and replaces an unusable one", async () => {
     const res = await post("balance-transfer", { ...good, channel: "fax" });
     expect(res.headers.get("X-Correlation-Id")).toMatch(/^req_[0-9a-z]{12}$/);
-    const odd = await post("balance-transfer", good, { ...CORAL, "X-Correlation-Id": "x".repeat(200) });
+    const odd = await post("balance-transfer", good, {
+      ...CORAL,
+      "X-Correlation-Id": "x".repeat(200),
+    });
     expect(odd.headers.get("X-Correlation-Id")).toMatch(/^req_/);
   });
 });
@@ -310,28 +528,72 @@ describe("POST …/render: 413 body_too_large", () => {
 
   it("when Content-Length says the body is too large, before reading it", async () => {
     const templateId = ids["balance-transfer"]!;
-    const body = JSON.stringify({ version: 2, channel: "web", values: CUSTOMER });
-    const request = requestOf(templateId, body, { ...CORAL, "Content-Length": String(MAX_BODY_BYTES + 1) });
-    await expectError(await POST(request, { params: Promise.resolve({ templateId }) }), 413, "body_too_large", TOO_LARGE);
+    const body = JSON.stringify({
+      version: 2,
+      channel: "web",
+      values: CUSTOMER,
+    });
+    const request = requestOf(templateId, body, {
+      ...CORAL,
+      "Content-Length": String(MAX_BODY_BYTES + 1),
+    });
+    await expectError(
+      await POST(request, { params: Promise.resolve({ templateId }) }),
+      413,
+      "body_too_large",
+      TOO_LARGE,
+    );
     expect(request.bodyUsed).toBe(false);
   });
 
   it("for a chunked body with no Content-Length, as soon as it passes the limit: the rest is never read", async () => {
     const templateId = ids["balance-transfer"]!;
     const { stream, pulled } = chunkedBody(64);
-    const res = await POST(requestOf(templateId, stream, { ...CORAL, "X-Correlation-Id": "chunked" }), { params: Promise.resolve({ templateId }) });
+    const res = await POST(
+      requestOf(templateId, stream, {
+        ...CORAL,
+        "X-Correlation-Id": "chunked",
+      }),
+      { params: Promise.resolve({ templateId }) },
+    );
     await expectError(res, 413, "body_too_large", TOO_LARGE);
     expect(pulled.mb).toBeLessThan(4); // the limit is 1,000,000 bytes: one 1 MB chunk and a bit
     expect(await logRows("chunked")).toEqual([]);
   });
 
   it("counts bytes, not characters: a body one byte over is refused, a body at the limit is read", async () => {
-    const json = JSON.stringify({ version: 2, channel: "web", values: CUSTOMER });
-    await expectError(await post("balance-transfer", json + " ".repeat(MAX_BODY_BYTES - json.length + 1)), 413, "body_too_large");
-    expect((await post("balance-transfer", json + " ".repeat(MAX_BODY_BYTES - json.length))).status).toBe(200);
+    const json = JSON.stringify({
+      version: 2,
+      channel: "web",
+      values: CUSTOMER,
+    });
+    await expectError(
+      await post(
+        "balance-transfer",
+        json + " ".repeat(MAX_BODY_BYTES - json.length + 1),
+      ),
+      413,
+      "body_too_large",
+    );
+    expect(
+      (
+        await post(
+          "balance-transfer",
+          json + " ".repeat(MAX_BODY_BYTES - json.length),
+        )
+      ).status,
+    ).toBe(200);
     // 500,000 two-byte characters: half the limit counted in characters, over it in bytes.
-    const wide = { version: 2, channel: "web", values: { ...CUSTOMER, unused: "é".repeat(500_000) } };
-    await expectError(await post("balance-transfer", wide), 413, "body_too_large");
+    const wide = {
+      version: 2,
+      channel: "web",
+      values: { ...CUSTOMER, unused: "é".repeat(500_000) },
+    };
+    await expectError(
+      await post("balance-transfer", wide),
+      413,
+      "body_too_large",
+    );
   });
 });
 
@@ -339,30 +601,62 @@ describe("POST …/render: the value length limit", () => {
   it("a value at the limit renders, exactly as sent, in every channel the version has", async () => {
     const name = `${"Maya".repeat(MAX_VALUE_LENGTH / 4 - 1)}Chen`;
     expect([...name]).toHaveLength(MAX_VALUE_LENGTH);
-    const web = await post("balance-transfer", { version: 2, channel: "web", values: { ...CUSTOMER, first_name: name } });
+    const web = await post("balance-transfer", {
+      version: 2,
+      channel: "web",
+      values: { ...CUSTOMER, first_name: name },
+    });
     expect(web.status).toBe(200);
     expect(await web.text()).toContain(name);
-    const pdf = await post("balance-transfer", { version: 2, channel: "pdf", values: { ...CUSTOMER, first_name: name } });
+    const pdf = await post("balance-transfer", {
+      version: 2,
+      channel: "pdf",
+      values: { ...CUSTOMER, first_name: name },
+    });
     expect(pdf.status).toBe(200);
   }, 30_000);
 
   it("a value one character over is 422 invalid_values that names the limit, never the value, and isn't cut", async () => {
     const res = await post(
       "balance-transfer",
-      { version: 2, channel: "web", values: { ...CUSTOMER, first_name: `Zq9${"x".repeat(MAX_VALUE_LENGTH - 2)}` } },
+      {
+        version: 2,
+        channel: "web",
+        values: {
+          ...CUSTOMER,
+          first_name: `Zq9${"x".repeat(MAX_VALUE_LENGTH - 2)}`,
+        },
+      },
       { ...CORAL, "X-Correlation-Id": "too-long" },
     );
-    const error = await expectError(res, 422, "invalid_values", "first_name must be at most 1,000 characters.");
-    expect(error.details).toEqual({ missing: [], invalid: [{ key: "first_name", expected: "text", maxLength: 1000 }] });
+    const error = await expectError(
+      res,
+      422,
+      "invalid_values",
+      "first_name must be at most 1,000 characters.",
+    );
+    expect(error.details).toEqual({
+      missing: [],
+      invalid: [{ key: "first_name", expected: "text", maxLength: 1000 }],
+    });
     expect(JSON.stringify(error)).not.toContain("Zq9");
-    expect(await logRows("too-long")).toEqual([expect.objectContaining({ outcome: "error", errorCode: "invalid_values" })]);
+    expect(await logRows("too-long")).toEqual([
+      expect.objectContaining({
+        outcome: "error",
+        errorCode: "invalid_values",
+      }),
+    ]);
   });
 });
 
 describe("POST …/render: 403, 404 and 422", () => {
   it("an unregistered consumer is 403", async () => {
     await expectError(
-      await post("balance-transfer", { version: 2, channel: "web", values: CUSTOMER }, { "X-Consumer-Id": "acme" }),
+      await post(
+        "balance-transfer",
+        { version: 2, channel: "web", values: CUSTOMER },
+        { "X-Consumer-Id": "acme" },
+      ),
       403,
       "unknown_consumer",
       'Consumer "acme" isn\'t registered.',
@@ -370,14 +664,27 @@ describe("POST …/render: 403, 404 and 422", () => {
   });
 
   it("an unknown template is 404, and isn't logged", async () => {
-    const res = await post("UC-ZZZZZZ", { version: 1, channel: "web", values: {} }, { ...CORAL, "X-Correlation-Id": "no-template" });
-    await expectError(res, 404, "template_not_found", "Template UC-ZZZZZZ doesn't exist.");
+    const res = await post(
+      "UC-ZZZZZZ",
+      { version: 1, channel: "web", values: {} },
+      { ...CORAL, "X-Correlation-Id": "no-template" },
+    );
+    await expectError(
+      res,
+      404,
+      "template_not_found",
+      "Template UC-ZZZZZZ doesn't exist.",
+    );
     expect(await logRows("no-template")).toEqual([]);
   });
 
   it("an unknown version is 404", async () => {
     await expectError(
-      await post("balance-transfer", { version: 9, channel: "web", values: CUSTOMER }),
+      await post("balance-transfer", {
+        version: 9,
+        channel: "web",
+        values: CUSTOMER,
+      }),
       404,
       "version_not_found",
       `Template ${ids["balance-transfer"]} has no version 9.`,
@@ -386,17 +693,33 @@ describe("POST …/render: 403, 404 and 422", () => {
 
   it("missing required variables are 422, listed by key", async () => {
     const error = await expectError(
-      await post("balance-transfer", { version: 2, channel: "web", values: { first_name: "Maya" } }),
+      await post("balance-transfer", {
+        version: 2,
+        channel: "web",
+        values: { first_name: "Maya" },
+      }),
       422,
       "missing_variables",
       "Missing required variables: last_name, purchase_apr, home_state.",
     );
-    expect(error.details).toEqual({ missing: ["last_name", "purchase_apr", "home_state"], invalid: [] });
+    expect(error.details).toEqual({
+      missing: ["last_name", "purchase_apr", "home_state"],
+      invalid: [],
+    });
   });
 
   it("a wrong type is 422, naming the variable and the type, never the value", async () => {
-    const res = await post("balance-transfer", { version: 2, channel: "web", values: { ...CUSTOMER, home_state: "Atlantis" } });
-    const error = await expectError(res, 422, "invalid_values", "home_state must be a US state, like NJ.");
+    const res = await post("balance-transfer", {
+      version: 2,
+      channel: "web",
+      values: { ...CUSTOMER, home_state: "Atlantis" },
+    });
+    const error = await expectError(
+      res,
+      422,
+      "invalid_values",
+      "home_state must be a US state, like NJ.",
+    );
     expect(JSON.stringify(error)).not.toContain("Atlantis");
   });
 
@@ -406,12 +729,21 @@ describe("POST …/render: 403, 404 and 422", () => {
     const res = await post("balance-transfer", body("21.90"));
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("21.90%");
-    await expectError(await post("balance-transfer", body("1e1")), 422, "invalid_values", "purchase_apr must be a percentage, like 21.99.");
+    await expectError(
+      await post("balance-transfer", body("1e1")),
+      422,
+      "invalid_values",
+      "purchase_apr must be a percentage, like 21.99.",
+    );
   });
 
   it("a channel the version hasn't turned on is 422", async () => {
     await expectError(
-      await post("balance-transfer", { version: 2, channel: "email", values: CUSTOMER }),
+      await post("balance-transfer", {
+        version: 2,
+        channel: "email",
+        values: CUSTOMER,
+      }),
       422,
       "channel_not_enabled",
       "Version 2 doesn't render to Email. Its channels are PDF and Web.",
@@ -419,22 +751,36 @@ describe("POST …/render: 403, 404 and 422", () => {
   });
 
   it("a channel the content type doesn't allow is 422", async () => {
-    await db.update(contentTypes).set({ allowedChannels: ["pdf", "web"] }).where(eq(contentTypes.key, "disclosure"));
+    await db
+      .update(contentTypes)
+      .set({ allowedChannels: ["pdf", "web"] })
+      .where(eq(contentTypes.key, "disclosure"));
     try {
       await expectError(
-        await post("rate-change-notice", { version: 1, channel: "email", values: { ...CUSTOMER, effective_date: "2027-03-04" } }),
+        await post("rate-change-notice", {
+          version: 1,
+          channel: "email",
+          values: { ...CUSTOMER, effective_date: "2027-03-04" },
+        }),
         422,
         "channel_not_allowed",
         "Disclosures don't render to Email.",
       );
     } finally {
-      await db.update(contentTypes).set({ allowedChannels: ["pdf", "web", "email"] }).where(eq(contentTypes.key, "disclosure"));
+      await db
+        .update(contentTypes)
+        .set({ allowedChannels: ["pdf", "web", "email"] })
+        .where(eq(contentTypes.key, "disclosure"));
     }
   });
 
   it("a disclosure doesn't render to push or SMS: its content type is documents", async () => {
     await expectError(
-      await post("balance-transfer", { version: 2, channel: "sms", values: CUSTOMER }),
+      await post("balance-transfer", {
+        version: 2,
+        channel: "sms",
+        values: CUSTOMER,
+      }),
       422,
       "channel_not_allowed",
       "Disclosures don't render to SMS.",
@@ -447,14 +793,29 @@ describe("POST …/render: 403, 404 and 422", () => {
 describe("POST …/render: push and SMS", () => {
   const ALERT_ID = "UC-ALERT1";
   const t = (text: string): JSONContent => ({ type: "text", text });
-  const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
-  const field = (...inline: JSONContent[]): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: inline }] });
+  const chip = (key: string): JSONContent => ({
+    type: "variable",
+    attrs: { key },
+  });
+  const field = (...inline: JSONContent[]): JSONContent => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: inline }],
+  });
   const VALUES = { first_name: "Maya", amount_due: "35.00" };
 
   beforeEach(async () => {
     // An Active Alert version, made from a seeded version's row: the seed has no alert yet.
-    const [base] = await db.select().from(versions).where(and(eq(versions.templateId, ids["balance-transfer"]!), eq(versions.number, 2)));
-    const { templates: templatesTable } = await import("@/server/db/schema/ucomp");
+    const [base] = await db
+      .select()
+      .from(versions)
+      .where(
+        and(
+          eq(versions.templateId, ids["balance-transfer"]!),
+          eq(versions.number, 2),
+        ),
+      );
+    const { templates: templatesTable } =
+      await import("@/server/db/schema/ucomp");
     await db.insert(templatesTable).values({
       id: ALERT_ID,
       teamId: "coral-offers",
@@ -472,17 +833,43 @@ describe("POST …/render: push and SMS", () => {
       name: "Payment due",
       body: { type: "doc", content: [{ type: "paragraph" }] },
       variables: [
-        { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-        { key: "amount_due", label: "Amount due", type: "currency", required: true, sample: "35" },
+        {
+          key: "first_name",
+          label: "First name",
+          type: "text",
+          required: true,
+          sample: "Maya",
+        },
+        {
+          key: "amount_due",
+          label: "Amount due",
+          type: "currency",
+          required: true,
+          sample: "35",
+        },
       ],
       channels: ["push", "sms"],
       channelFields: {
         push: {
           title: field(t("Payment due")),
           subtitle: field(t("Coral Card")),
-          body: field(t("Hi "), chip("first_name"), t(", your payment of "), chip("amount_due"), t(" is due.")),
+          body: field(
+            t("Hi "),
+            chip("first_name"),
+            t(", your payment of "),
+            chip("amount_due"),
+            t(" is due."),
+          ),
         },
-        sms: { text: field(t("Coral Offers: "), chip("amount_due"), t(" is due."), { type: "hardBreak" }, t("coral.example/pay")) },
+        sms: {
+          text: field(
+            t("Coral Offers: "),
+            chip("amount_due"),
+            t(" is due."),
+            { type: "hardBreak" },
+            t("coral.example/pay"),
+          ),
+        },
       },
       // Frozen at submit, as the Alert content type's footer stood then.
       smsFooter: "Coral: Reply STOP to opt out, HELP for help.",
@@ -492,7 +879,11 @@ describe("POST …/render: push and SMS", () => {
   });
 
   it("push for iPhone: JSON with the title, the subtitle and the body in full, and the payload's size", async () => {
-    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "ios", values: VALUES }, { ...CORAL, "X-Correlation-Id": "push-ios" });
+    const res = await post(
+      ALERT_ID,
+      { version: 1, channel: "push", platform: "ios", values: VALUES },
+      { ...CORAL, "X-Correlation-Id": "push-ios" },
+    );
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
     expect(res.headers.get("X-Stencil-Version")).toBe("1");
@@ -505,37 +896,95 @@ describe("POST …/render: push and SMS", () => {
     });
     // The log holds the channel, the platform and the outcome, never a value.
     const [row] = await logRows("push-ios");
-    expect(row).toMatchObject({ channel: "push", platform: "ios", outcome: "ok", errorCode: null, consumerId: "coral" });
+    expect(row).toMatchObject({
+      channel: "push",
+      platform: "ios",
+      outcome: "ok",
+      errorCode: null,
+      consumerId: "coral",
+    });
     expect(JSON.stringify(row)).not.toContain("Maya");
   });
 
   it("push for Android: never a subtitle", async () => {
-    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "android", values: VALUES }, { ...CORAL, "X-Correlation-Id": "push-android" });
+    const res = await post(
+      ALERT_ID,
+      { version: 1, channel: "push", platform: "android", values: VALUES },
+      { ...CORAL, "X-Correlation-Id": "push-android" },
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ title: "Payment due", body: "Hi Maya, your payment of $35.00 is due.", payloadBytes: 101, newerVersion: null });
-    expect(await logRows("push-android")).toEqual([expect.objectContaining({ channel: "push", platform: "android", outcome: "ok" })]);
+    expect(body).toEqual({
+      title: "Payment due",
+      body: "Hi Maya, your payment of $35.00 is due.",
+      payloadBytes: 101,
+      newerVersion: null,
+    });
+    expect(await logRows("push-android")).toEqual([
+      expect.objectContaining({
+        channel: "push",
+        platform: "android",
+        outcome: "ok",
+      }),
+    ]);
   });
 
   it("logs the platform of a push and of a failed push, and none for any other channel", async () => {
     const asked = [
-      { id: "plat-sms", body: { version: 1, channel: "sms", values: VALUES }, headers: CORAL, platform: null },
-      { id: "plat-ios", body: { version: 1, channel: "push", platform: "ios", values: VALUES }, headers: CORAL, platform: "ios" },
-      { id: "plat-failed", body: { version: 1, channel: "push", platform: "android", values: {} }, headers: CORAL, platform: "android" },
+      {
+        id: "plat-sms",
+        body: { version: 1, channel: "sms", values: VALUES },
+        headers: CORAL,
+        platform: null,
+      },
+      {
+        id: "plat-ios",
+        body: { version: 1, channel: "push", platform: "ios", values: VALUES },
+        headers: CORAL,
+        platform: "ios",
+      },
+      {
+        id: "plat-failed",
+        body: { version: 1, channel: "push", platform: "android", values: {} },
+        headers: CORAL,
+        platform: "android",
+      },
     ] as const;
-    for (const { id, body, headers } of asked) await post(ALERT_ID, body, { ...headers, "X-Correlation-Id": id });
-    for (const { id, platform } of asked) expect(await logRows(id), id).toEqual([expect.objectContaining({ platform })]);
+    for (const { id, body, headers } of asked)
+      await post(ALERT_ID, body, { ...headers, "X-Correlation-Id": id });
+    for (const { id, platform } of asked)
+      expect(await logRows(id), id).toEqual([
+        expect.objectContaining({ platform }),
+      ]);
     // A failed push is logged by its code and its phone, no value.
-    expect((await logRows("plat-failed"))[0]).toMatchObject({ channel: "push", platform: "android", outcome: "error", errorCode: "missing_variables" });
+    expect((await logRows("plat-failed"))[0]).toMatchObject({
+      channel: "push",
+      platform: "android",
+      outcome: "error",
+      errorCode: "missing_variables",
+    });
   });
 
   it("a request refused before it is logged leaves no row, so a push without a platform never writes a null one", async () => {
-    await expectError(await post(ALERT_ID, { version: 1, channel: "push", values: VALUES }, { ...CORAL, "X-Correlation-Id": "plat-none" }), 400, "bad_request", "platform must be ios or android.");
+    await expectError(
+      await post(
+        ALERT_ID,
+        { version: 1, channel: "push", values: VALUES },
+        { ...CORAL, "X-Correlation-Id": "plat-none" },
+      ),
+      400,
+      "bad_request",
+      "platform must be ios or android.",
+    );
     expect(await logRows("plat-none")).toEqual([]);
   });
 
   it("SMS: JSON with the text as sent, the footer on its last line, and its encoding and parts", async () => {
-    const res = await post(ALERT_ID, { version: 1, channel: "sms", values: VALUES });
+    const res = await post(ALERT_ID, {
+      version: 1,
+      channel: "sms",
+      values: VALUES,
+    });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       text: "Coral Offers: $35.00 is due.\ncoral.example/pay\nCoral: Reply STOP to opt out, HELP for help.",
@@ -548,12 +997,24 @@ describe("POST …/render: push and SMS", () => {
 
   it("ends with the footer the version was submitted with: a later change to the content type's reaches only a draft", async () => {
     const { contentTypes } = await import("@/server/db/schema/ucomp");
-    await db.update(contentTypes).set({ smsFooter: "Coral: Reply STOP to end, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
+    await db
+      .update(contentTypes)
+      .set({ smsFooter: "Coral: Reply STOP to end, HELP for help." })
+      .where(eq(contentTypes.id, "ct_alert"));
     try {
-      const active = await post(ALERT_ID, { version: 1, channel: "sms", values: VALUES });
-      expect(((await active.json()) as { text: string }).text).toMatch(/\nCoral: Reply STOP to opt out, HELP for help\.$/);
+      const active = await post(ALERT_ID, {
+        version: 1,
+        channel: "sms",
+        values: VALUES,
+      });
+      expect(((await active.json()) as { text: string }).text).toMatch(
+        /\nCoral: Reply STOP to opt out, HELP for help\.$/,
+      );
     } finally {
-      await db.update(contentTypes).set({ smsFooter: "Coral: Reply STOP to opt out, HELP for help." }).where(eq(contentTypes.id, "ct_alert"));
+      await db
+        .update(contentTypes)
+        .set({ smsFooter: "Coral: Reply STOP to opt out, HELP for help." })
+        .where(eq(contentTypes.id, "ct_alert"));
     }
   });
 
@@ -567,7 +1028,11 @@ describe("POST …/render: push and SMS", () => {
         },
       })
       .where(eq(versions.id, "v_alert_1"));
-    const res = await post(ALERT_ID, { version: 1, channel: "sms", values: { ...VALUES, first_name: "Gómez" } });
+    const res = await post(ALERT_ID, {
+      version: 1,
+      channel: "sms",
+      values: { ...VALUES, first_name: "Gómez" },
+    });
     expect(await res.json()).toEqual({
       text: "Hi Gómez\nCoral: Reply STOP to opt out, HELP for help.",
       encoding: "UCS-2",
@@ -578,9 +1043,19 @@ describe("POST …/render: push and SMS", () => {
   });
 
   it("a push without a platform, or with a platform that isn't one, is 400", async () => {
-    await expectError(await post(ALERT_ID, { version: 1, channel: "push", values: VALUES }), 400, "bad_request", "platform must be ios or android.");
     await expectError(
-      await post(ALERT_ID, { version: 1, channel: "push", platform: "windows", values: VALUES }),
+      await post(ALERT_ID, { version: 1, channel: "push", values: VALUES }),
+      400,
+      "bad_request",
+      "platform must be ios or android.",
+    );
+    await expectError(
+      await post(ALERT_ID, {
+        version: 1,
+        channel: "push",
+        platform: "windows",
+        values: VALUES,
+      }),
       400,
       "bad_request",
       "platform must be ios or android.",
@@ -589,19 +1064,34 @@ describe("POST …/render: push and SMS", () => {
 
   it("any other channel with a platform is 400, and push and SMS refuse an encoding", async () => {
     await expectError(
-      await post(ALERT_ID, { version: 1, channel: "sms", platform: "ios", values: VALUES }),
+      await post(ALERT_ID, {
+        version: 1,
+        channel: "sms",
+        platform: "ios",
+        values: VALUES,
+      }),
       400,
       "bad_request",
       "platform is only for channel push.",
     );
     await expectError(
-      await post("balance-transfer", { version: 2, channel: "pdf", platform: "android", values: CUSTOMER }),
+      await post("balance-transfer", {
+        version: 2,
+        channel: "pdf",
+        platform: "android",
+        values: CUSTOMER,
+      }),
       400,
       "bad_request",
       "platform is only for channel push.",
     );
     await expectError(
-      await post(ALERT_ID, { version: 1, channel: "sms", encoding: "base64", values: VALUES }),
+      await post(ALERT_ID, {
+        version: 1,
+        channel: "sms",
+        encoding: "base64",
+        values: VALUES,
+      }),
       400,
       "bad_request",
       "encoding is only for channels pdf, web and email.",
@@ -609,7 +1099,12 @@ describe("POST …/render: push and SMS", () => {
   });
 
   it("an alert doesn't render to PDF: its content type is messages", async () => {
-    await expectError(await post(ALERT_ID, { version: 1, channel: "pdf", values: VALUES }), 422, "channel_not_allowed", "Alerts don't render to PDF.");
+    await expectError(
+      await post(ALERT_ID, { version: 1, channel: "pdf", values: VALUES }),
+      422,
+      "channel_not_allowed",
+      "Alerts don't render to PDF.",
+    );
   });
 
   it("a push over 4,096 bytes is 422 and logged by its code, never cut and never echoing the value", async () => {
@@ -618,16 +1113,47 @@ describe("POST …/render: push and SMS", () => {
       .update(versions)
       .set({
         channelFields: {
-          push: { title: field(chip("first_name")), body: field(chip("first_name"), chip("first_name"), chip("first_name"), chip("first_name")) },
+          push: {
+            title: field(chip("first_name")),
+            body: field(
+              chip("first_name"),
+              chip("first_name"),
+              chip("first_name"),
+              chip("first_name"),
+            ),
+          },
           sms: { text: field(chip("first_name")) },
         },
       })
       .where(eq(versions.id, "v_alert_1"));
-    const res = await post(ALERT_ID, { version: 1, channel: "push", platform: "ios", values: { ...VALUES, first_name: long } }, { ...CORAL, "X-Correlation-Id": "push-big" });
-    const error = await expectError(res, 422, "push_payload_too_large", "The push is 5,040 bytes on iPhone. It can be at most 4,096 bytes.");
-    expect(error.details).toEqual({ platform: "ios", payloadBytes: 5040, maxBytes: 4096 });
+    const res = await post(
+      ALERT_ID,
+      {
+        version: 1,
+        channel: "push",
+        platform: "ios",
+        values: { ...VALUES, first_name: long },
+      },
+      { ...CORAL, "X-Correlation-Id": "push-big" },
+    );
+    const error = await expectError(
+      res,
+      422,
+      "push_payload_too_large",
+      "The push is 5,040 bytes on iPhone. It can be at most 4,096 bytes.",
+    );
+    expect(error.details).toEqual({
+      platform: "ios",
+      payloadBytes: 5040,
+      maxBytes: 4096,
+    });
     const [row] = await logRows("push-big");
-    expect(row).toMatchObject({ channel: "push", platform: "ios", outcome: "error", errorCode: "push_payload_too_large" });
+    expect(row).toMatchObject({
+      channel: "push",
+      platform: "ios",
+      outcome: "error",
+      errorCode: "push_payload_too_large",
+    });
     expect(JSON.stringify(row)).not.toContain("xxxx");
   });
 
@@ -637,12 +1163,29 @@ describe("POST …/render: push and SMS", () => {
       .update(versions)
       .set({
         channelFields: {
-          push: { title: field(chip("first_name")), body: field(chip("first_name"), chip("first_name"), chip("first_name"), chip("first_name")) },
+          push: {
+            title: field(chip("first_name")),
+            body: field(
+              chip("first_name"),
+              chip("first_name"),
+              chip("first_name"),
+              chip("first_name"),
+            ),
+          },
           sms: { text: field(chip("first_name")) },
         },
       })
       .where(eq(versions.id, "v_alert_1"));
-    const res = await post(ALERT_ID, { version: 1, channel: "sms", values: { ...VALUES, first_name: "é".repeat(699) + "😀" } });
-    await expectError(res, 422, "sms_too_long", "The SMS is 12 parts in UCS-2. It can be at most 10 parts.");
+    const res = await post(ALERT_ID, {
+      version: 1,
+      channel: "sms",
+      values: { ...VALUES, first_name: "é".repeat(699) + "😀" },
+    });
+    await expectError(
+      res,
+      422,
+      "sms_too_long",
+      "The SMS is 12 parts in UCS-2. It can be at most 10 parts.",
+    );
   });
 });

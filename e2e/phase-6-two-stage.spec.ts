@@ -1,8 +1,28 @@
 import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
-import { click, closeSettings, escapeRe, openBell, openSettings, resetDemoData, settingsDialog, strip, switchPersona } from "./helpers/access";
-import { asPersona, beat, demoTimeout, expect, hydrated, liveEditor, openLibrary, shoot, test } from "./helpers/scenario";
+import {
+  click,
+  closeSettings,
+  escapeRe,
+  openBell,
+  openSettings,
+  resetDemoData,
+  settingsDialog,
+  strip,
+  switchPersona,
+} from "./helpers/access";
+import {
+  asPersona,
+  beat,
+  demoTimeout,
+  expect,
+  hydrated,
+  liveEditor,
+  openLibrary,
+  shoot,
+  test,
+} from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
 
 // Approving views every output first, and the preview frames are sandboxed: Playwright's trace injects
@@ -38,7 +58,8 @@ test.use({ trace: "off" });
 const TEAM = "coral-offers";
 const NAME = "Cash Back Welcome Bonus — Terms";
 const STAGE = "Legal reviewer";
-const EVERY_TEAM = "Dana Park will review Disclosure submissions from every team, including teams they aren't a member of.";
+const EVERY_TEAM =
+  "Dana Park will review Disclosure submissions from every team, including teams they aren't a member of.";
 
 type Row = Record<string, InValue>;
 
@@ -66,10 +87,17 @@ async function rows(sql: string, args: InValue[] = []): Promise<Row[]> {
   for (let attempt = 0; ; attempt++) {
     try {
       const result = await db.execute({ sql, args });
-      return result.rows.map((row) => Object.fromEntries(result.columns.map((column) => [column, row[column] as InValue])));
+      return result.rows.map((row) =>
+        Object.fromEntries(
+          result.columns.map((column) => [column, row[column] as InValue]),
+        ),
+      );
     } catch (error) {
-      const text = String((error as { code?: unknown }).code ?? "") + String((error as Error).message ?? "");
-      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text)) throw error;
+      const text =
+        String((error as { code?: unknown }).code ?? "") +
+        String((error as Error).message ?? "");
+      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text))
+        throw error;
       await new Promise((resolve) => setTimeout(resolve, 40 * 2 ** attempt));
     }
   }
@@ -77,12 +105,22 @@ async function rows(sql: string, args: InValue[] = []): Promise<Row[]> {
 
 // ── The screens ──────────────────────────────────────────────────────────────
 
-const decision = (page: Page): Locator => page.locator('aside[aria-label="Decision"]').filter({ visible: true });
-const approveButton = (page: Page) => decision(page).getByRole("button", { name: "Approve", exact: true });
-const step = (page: Page, status: "done" | "current" | "waiting") => decision(page).locator(`[data-step="${status}"]`);
-const reviewNav = (page: Page) => page.locator('[data-slot="sidebar-menu-button"][href$="/review"]').filter({ visible: true });
-const reviewBadge = (page: Page) => reviewNav(page).locator('[aria-label$=" waiting"]');
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
+const decision = (page: Page): Locator =>
+  page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+const approveButton = (page: Page) =>
+  decision(page).getByRole("button", { name: "Approve", exact: true });
+const step = (page: Page, status: "done" | "current" | "waiting") =>
+  decision(page).locator(`[data-step="${status}"]`);
+const reviewNav = (page: Page) =>
+  page
+    .locator('[data-slot="sidebar-menu-button"][href$="/review"]')
+    .filter({ visible: true });
+const reviewBadge = (page: Page) =>
+  reviewNav(page).locator('[aria-label$=" waiting"]');
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
 
 /** The queue row of this template's in-review version (whatever its number). */
 const queueRow = (page: Page) =>
@@ -94,23 +132,32 @@ const queueRow = (page: Page) =>
 async function openQueue(page: Page, tab = "Waiting on me") {
   await click(reviewNav(page));
   await expect(page).toHaveURL(new RegExp(`/${TEAM}/review$`));
-  await expect(page.getByRole("heading", { level: 1, name: "Review" })).toBeVisible();
-  const queueTab = page.getByRole("tab", { name: new RegExp(`^${escapeRe(tab)}`) });
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Review" }),
+  ).toBeVisible();
+  const queueTab = page.getByRole("tab", {
+    name: new RegExp(`^${escapeRe(tab)}`),
+  });
   await click(queueTab);
   await expect(queueTab).toHaveAttribute("aria-selected", "true");
 }
 
 /** The review screen, once the document is live. A queue row links a round past the first with `?round=`. */
 async function expectReviewScreen(page: Page, number: number) {
-  await expect(page).toHaveURL(new RegExp(`/${TEAM}/review/[^/]+/${number}(\\?round=\\d+)?$`));
-  await expect(page.getByRole("heading", { level: 1, name: NAME })).toBeVisible();
+  await expect(page).toHaveURL(
+    new RegExp(`/${TEAM}/review/[^/]+/${number}(\\?round=\\d+)?$`),
+  );
+  await expect(
+    page.getByRole("heading", { level: 1, name: NAME }),
+  ).toBeVisible();
   await expect(decision(page)).toBeVisible();
   await liveEditor(page);
   await hydrated(page);
 }
 
 /** How a round in review is named in a sentence: "v4", or "v3, round 2" once v3 was sent back (decision 0033). */
-const inReviewLabel = (number: number, round: number) => (round > 1 ? `v${number}, round ${round}` : `v${number}`);
+const inReviewLabel = (number: number, round: number) =>
+  round > 1 ? `v${number}, round ${round}` : `v${number}`;
 
 /** The seed's in-review version of Cash Back: v3, round 2 (round 1 was sent back). */
 async function seededInReview() {
@@ -119,26 +166,50 @@ async function seededInReview() {
      WHERE v.name = ? AND v.state = 'in_review'`,
     [NAME],
   );
-  if (!seeded) throw new Error(`This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`);
+  if (!seeded)
+    throw new Error(
+      `This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`,
+    );
   const number = Number(seeded.number);
   const round = Number(seeded.round);
-  expect([number, round], "the seed has Cash Back v3 in review on round 2").toEqual([3, 2]);
-  return { versionId: String(seeded.id), templateId: String(seeded.template_id), number, round, label: inReviewLabel(number, round), row: seeded };
+  expect(
+    [number, round],
+    "the seed has Cash Back v3 in review on round 2",
+  ).toEqual([3, 2]);
+  return {
+    versionId: String(seeded.id),
+    templateId: String(seeded.template_id),
+    number,
+    round,
+    label: inReviewLabel(number, round),
+    row: seeded,
+  };
 }
 
 /**
  * Approve on the open review screen, through the dialog named for the round ("Approve v3, round 2",
  * "Approve v4"); at the last stage, wait out the go-live moment.
  */
-async function approveOnScreen(page: Page, label: string, outcome: "live" | "next") {
+async function approveOnScreen(
+  page: Page,
+  label: string,
+  outcome: "live" | "next",
+) {
   await viewEveryOutput(page);
   await click(approveButton(page));
-  const dialog = page.getByRole("dialog", { name: `Approve ${label}`, exact: true });
+  const dialog = page.getByRole("dialog", {
+    name: `Approve ${label}`,
+    exact: true,
+  });
   await expect(dialog).toBeVisible();
-  await click(dialog.getByRole("button", { name: `Approve ${label}`, exact: true }));
+  await click(
+    dialog.getByRole("button", { name: `Approve ${label}`, exact: true }),
+  );
   await expect(dialog).toBeHidden({ timeout: 20_000 });
   if (outcome === "live") {
-    await expect(page.locator("[data-go-live]")).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.locator("[data-go-live]")).toHaveCount(0, {
+      timeout: 20_000,
+    });
     await expect(statusBadge(page)).toHaveText("Active");
   } else {
     await expect(statusBadge(page)).toHaveText("In review");
@@ -150,38 +221,64 @@ async function approveOnScreen(page: Page, label: string, outcome: "live" | "nex
  * Jordan's approval makes it Active. Maya then presses Edit and submits v4, which records the chain as it
  * is now. Returns v4.
  */
-async function goLiveThenResubmit(page: Page, seeded: { templateId: string; number: number; round: number; label: string }) {
+async function goLiveThenResubmit(
+  page: Page,
+  seeded: { templateId: string; number: number; round: number; label: string },
+) {
   await asPersona(page, "jordan");
   await page.goto(`/${TEAM}/review/${seeded.templateId}/${seeded.number}`);
   await expectReviewScreen(page, seeded.number);
   // The bare link opens the number's latest round, and the header names it.
-  await expect(page.getByRole("heading", { level: 1, name: NAME }).locator("xpath=../..")).toContainText(`v${seeded.number} · Round ${seeded.round} by Maya Chen`);
-  await expect(decision(page).locator("[data-step]"), "v3 has the one stage it was submitted with").toHaveCount(1);
+  await expect(
+    page.getByRole("heading", { level: 1, name: NAME }).locator("xpath=../.."),
+  ).toContainText(`v${seeded.number} · Round ${seeded.round} by Maya Chen`);
+  await expect(
+    decision(page).locator("[data-step]"),
+    "v3 has the one stage it was submitted with",
+  ).toHaveCount(1);
   await approveOnScreen(page, seeded.label, "live");
 
   await asPersona(page, "maya");
   await page.goto(`/${TEAM}/templates/${seeded.templateId}`);
   await hydrated(page);
   await click(page.getByRole("button", { name: "Edit", exact: true }));
-  await expect(page.locator("header").filter({ visible: true }).getByText(`Based on v${seeded.number}`, { exact: true })).toBeVisible({
+  await expect(
+    page
+      .locator("header")
+      .filter({ visible: true })
+      .getByText(`Based on v${seeded.number}`, { exact: true }),
+  ).toBeVisible({
     timeout: 20_000,
   });
   await liveEditor(page);
   await hydrated(page);
   const number = seeded.number + 1;
   await click(page.getByRole("button", { name: "Submit for review" }));
-  const dialog = page.getByRole("dialog", { name: `Submit v${number} for review` });
+  const dialog = page.getByRole("dialog", {
+    name: `Submit v${number} for review`,
+  });
   await expect(dialog).toBeVisible({ timeout: 20_000 });
-  await click(dialog.getByRole("button", { name: `Submit v${number}`, exact: true }));
+  await click(
+    dialog.getByRole("button", { name: `Submit v${number}`, exact: true }),
+  );
   await expect(dialog).toBeHidden({ timeout: 20_000 });
   await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
-  const [row] = await rows("SELECT id, state, stages FROM versions WHERE template_id = ? AND number = ?", [seeded.templateId, number]);
+  const [row] = await rows(
+    "SELECT id, state, stages FROM versions WHERE template_id = ? AND number = ?",
+    [seeded.templateId, number],
+  );
   expect(row?.state).toBe("in_review");
-  return { versionId: String(row!.id), number, stages: JSON.parse(String(row!.stages)) as { id: string; name: string }[] };
+  return {
+    versionId: String(row!.id),
+    number,
+    stages: JSON.parse(String(row!.stages)) as { id: string; name: string }[],
+  };
 }
 
 test.describe("phase 6: two-stage approval", () => {
-  test("Riley adds Dana's Legal reviewer stage; Jordan approves stage 1, Dana approves stage 2, the version goes Active", async ({ page }) => {
+  test("Riley adds Dana's Legal reviewer stage; Jordan approves stage 1, Dana approves stage 2, the version goes Active", async ({
+    page,
+  }) => {
     test.setTimeout(demoTimeout(300_000));
 
     const seeded = await seededInReview();
@@ -199,9 +296,13 @@ test.describe("phase 6: two-stage approval", () => {
     await test.step("1.1 Riley opens Approval chains: one stage, Team approver", async () => {
       const dialog = await openSettings(page, "Approval chains");
       await expect(page).toHaveURL(/\/all\/settings\/approval-chains$/);
-      const chain = dialog.getByRole("region", { name: "Disclosure approval chain" });
+      const chain = dialog.getByRole("region", {
+        name: "Disclosure approval chain",
+      });
       await expect(chain).toBeVisible();
-      const stages = chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem");
+      const stages = chain
+        .getByRole("list", { name: "Disclosure stages" })
+        .getByRole("listitem");
       await expect(stages).toHaveCount(1);
       await expect(stages.first()).toContainText("Team approver");
       await beat(page, 900);
@@ -210,15 +311,23 @@ test.describe("phase 6: two-stage approval", () => {
 
     await test.step("1.2 Add stage: the name, Dana Park as the reviewer; the strip shows Now and After", async () => {
       const dialog = settingsDialog(page);
-      const chain = dialog.getByRole("region", { name: "Disclosure approval chain" });
-      await click(chain.getByRole("button", { name: "Add stage", exact: true }));
+      const chain = dialog.getByRole("region", {
+        name: "Disclosure approval chain",
+      });
+      await click(
+        chain.getByRole("button", { name: "Add stage", exact: true }),
+      );
       const name = chain.getByRole("textbox", { name: "Stage name" });
       await expect(name).toBeFocused();
       await page.keyboard.type(STAGE, { delay: 40 });
       await expect(name).toHaveValue(STAGE);
       const reviewer = chain.getByRole("combobox", { name: "Reviewer" });
-      await expect(reviewer.locator('option[value="role:approver"]')).toHaveCount(1);
-      await expect(reviewer.locator('option[value="user:dana"]')).toHaveText("Dana Park · Coral Offers");
+      await expect(
+        reviewer.locator('option[value="role:approver"]'),
+      ).toHaveCount(1);
+      await expect(reviewer.locator('option[value="user:dana"]')).toHaveText(
+        "Dana Park · Coral Offers",
+      );
       await reviewer.selectOption("user:dana");
       await expect(reviewer).toHaveValue("user:dana");
 
@@ -236,29 +345,57 @@ test.describe("phase 6: two-stage approval", () => {
       await beat(page, 900);
       await shoot(page, "riley-chain-add-stage");
 
-      await click(consequence.getByRole("button", { name: `Add ${STAGE} stage`, exact: true }));
+      await click(
+        consequence.getByRole("button", {
+          name: `Add ${STAGE} stage`,
+          exact: true,
+        }),
+      );
       await expect(consequence).toBeHidden({ timeout: 20_000 });
-      await expect(chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem")).toHaveCount(2);
-      await expect(chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem").nth(1)).toContainText(STAGE);
+      await expect(
+        chain
+          .getByRole("list", { name: "Disclosure stages" })
+          .getByRole("listitem"),
+      ).toHaveCount(2);
+      await expect(
+        chain
+          .getByRole("list", { name: "Disclosure stages" })
+          .getByRole("listitem")
+          .nth(1),
+      ).toContainText(STAGE);
       await beat(page, 900);
       await shoot(page, "riley-chain-after");
       await closeSettings(page);
     });
 
     await test.step("1.3 The chain has both stages; v3, submitted before, keeps the one stage it was submitted with", async () => {
-      const stages = await rows("SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position");
+      const stages = await rows(
+        "SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position",
+      );
       expect(stages.map((s) => [s.position, s.name])).toEqual([
         [0, "Team approver"],
         [1, STAGE],
       ]);
-      expect(stages[0].id, "the first stage kept its id").toBe("stage_disclosure_0");
-      expect(JSON.parse(String(stages[1].approver_rule))).toEqual({ kind: "user", userId: "dana" });
-      const [version] = await rows("SELECT state, current_stage, stages FROM versions WHERE id = ?", [seeded.versionId]);
+      expect(stages[0].id, "the first stage kept its id").toBe(
+        "stage_disclosure_0",
+      );
+      expect(JSON.parse(String(stages[1].approver_rule))).toEqual({
+        kind: "user",
+        userId: "dana",
+      });
+      const [version] = await rows(
+        "SELECT state, current_stage, stages FROM versions WHERE id = ?",
+        [seeded.versionId],
+      );
       expect(version.state).toBe("in_review");
-      expect(Number(version.current_stage), "still waiting on the first stage").toBe(0);
-      expect(JSON.parse(String(version.stages)), "a chain edit doesn't change a version in review").toEqual([
-        { id: "stage_disclosure_0", name: "Team approver" },
-      ]);
+      expect(
+        Number(version.current_stage),
+        "still waiting on the first stage",
+      ).toBe(0);
+      expect(
+        JSON.parse(String(version.stages)),
+        "a chain edit doesn't change a version in review",
+      ).toEqual([{ id: "stage_disclosure_0", name: "Team approver" }]);
     });
 
     await test.step("1.4 Jordan's approval makes v3 Active; Maya edits Cash Back and submits v4, which records both stages", async () => {
@@ -299,18 +436,27 @@ test.describe("phase 6: two-stage approval", () => {
       await click(approveButton(page));
       const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
       await expect(dialog).toBeVisible();
-      await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText(
+      await expect(
+        dialog.locator('[data-slot="dialog-description"]'),
+      ).toHaveText(
         `v${number} moves to ${STAGE} for approval. It isn't Active until the last stage approves.`,
       );
-      await expect(dialog.getByRole("checkbox"), "an earlier stage sets no sunset").toHaveCount(0);
+      await expect(
+        dialog.getByRole("checkbox"),
+        "an earlier stage sets no sunset",
+      ).toHaveCount(0);
       await beat(page, 900);
       await shoot(page, "jordan-approve-dialog");
 
-      await click(dialog.getByRole("button", { name: `Approve v${number}`, exact: true }));
+      await click(
+        dialog.getByRole("button", { name: `Approve v${number}`, exact: true }),
+      );
       await expect(dialog).toBeHidden({ timeout: 20_000 });
 
       // Not Active: no go-live moment, no ring. His approval is on the stepper and the next stage is current.
-      await expect(decision(page).locator("[data-decided]")).toHaveText(`You approved this stage. ${STAGE} is next.`);
+      await expect(decision(page).locator("[data-decided]")).toHaveText(
+        `You approved this stage. ${STAGE} is next.`,
+      );
       await expect(step(page, "done")).toContainText("Team approver");
       await expect(step(page, "done")).toContainText("Jordan Ellis");
       await expect(step(page, "current")).toContainText(STAGE);
@@ -323,9 +469,18 @@ test.describe("phase 6: two-stage approval", () => {
 
     await test.step("2.3 It has left Jordan's Waiting on me, and the version is still in review", async () => {
       await openQueue(page);
-      await expect(reviewBadge(page), "only the seeded Card Used Abroad alert waits on him now").toHaveText("1");
-      await expect(queueRow(page), "it moved on, so it isn't in his Waiting on me").toHaveCount(0);
-      const [version] = await rows("SELECT state, current_stage FROM versions WHERE id = ?", [versionId]);
+      await expect(
+        reviewBadge(page),
+        "only the seeded Card Used Abroad alert waits on him now",
+      ).toHaveText("1");
+      await expect(
+        queueRow(page),
+        "it moved on, so it isn't in his Waiting on me",
+      ).toHaveCount(0);
+      const [version] = await rows(
+        "SELECT state, current_stage FROM versions WHERE id = ?",
+        [versionId],
+      );
       expect(version.state).toBe("in_review");
       expect(Number(version.current_stage)).toBe(1);
     });
@@ -350,7 +505,10 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(step(page, "done")).toContainText("Jordan Ellis");
       await expect(step(page, "current")).toContainText(STAGE);
       await expect(statusBadge(page)).toHaveText("In review");
-      await expect(approveButton(page), "a named stage is the named person's alone").toBeDisabled();
+      await expect(
+        approveButton(page),
+        "a named stage is the named person's alone",
+      ).toBeDisabled();
       await expect(step(page, "current")).toContainText(`Waiting on ${STAGE}.`);
       await beat(page, 900);
       await shoot(page, "alex-waiting-on-dana");
@@ -364,7 +522,9 @@ test.describe("phase 6: two-stage approval", () => {
       await hydrated(page);
       await expect(reviewBadge(page)).toHaveText("1");
       const popover = await openBell(page);
-      const item = popover.getByRole("link", { name: new RegExp(escapeRe(NAME)) }).first();
+      const item = popover
+        .getByRole("link", { name: new RegExp(escapeRe(NAME)) })
+        .first();
       await expect(item).toBeVisible();
       await expect(item).toHaveAttribute("data-unread", "true");
       await beat(page, 900);
@@ -393,22 +553,34 @@ test.describe("phase 6: two-stage approval", () => {
       await click(approveButton(page));
       const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
       await expect(dialog).toBeVisible();
-      await expect(dialog.locator('[data-slot="dialog-description"]')).toContainText(`v${number} becomes Active.`);
+      await expect(
+        dialog.locator('[data-slot="dialog-description"]'),
+      ).toContainText(`v${number} becomes Active.`);
       await beat(page, 900);
       await shoot(page, "dana-approve-dialog");
 
-      await click(dialog.getByRole("button", { name: `Approve v${number}`, exact: true }));
+      await click(
+        dialog.getByRole("button", { name: `Approve v${number}`, exact: true }),
+      );
       await expect(dialog).toBeHidden({ timeout: 20_000 });
 
       const moment = page.locator("[data-go-live]");
-      await expect(moment, "the go-live moment plays").toBeVisible({ timeout: 10_000 });
-      await expect(moment.getByRole("status")).toHaveText(`v${number} is Active`);
+      await expect(moment, "the go-live moment plays").toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(moment.getByRole("status")).toHaveText(
+        `v${number} is Active`,
+      );
       await expect(moment).toHaveCount(0, { timeout: 15_000 });
       await expect(statusBadge(page)).toHaveText("Active");
-      await expect(decision(page).locator("[data-decided]")).toHaveText(`You approved v${number}.`);
+      await expect(decision(page).locator("[data-decided]")).toHaveText(
+        `You approved v${number}.`,
+      );
       await expect(step(page, "done")).toHaveCount(2);
       await expect(approveButton(page)).toHaveCount(0);
-      await expect(reviewBadge(page), "her queue is empty again").toHaveCount(0);
+      await expect(reviewBadge(page), "her queue is empty again").toHaveCount(
+        0,
+      );
       await beat(page, 1200);
       await shoot(page, "dana-approved");
     });
@@ -416,23 +588,51 @@ test.describe("phase 6: two-stage approval", () => {
     // ── 5. The trail ─────────────────────────────────────────────────────────
 
     await test.step("5. The database: both approvals in order, v4 Active, v3 Superseded", async () => {
-      const [legal] = await rows("SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' AND name = ?", [STAGE]);
-      const approvals = await rows("SELECT * FROM approvals WHERE version_id = ? ORDER BY decided_at, stage_position", [versionId]);
-      expect(approvals.map((a) => [a.actor_id, a.decision, a.stage_id, Number(a.stage_position), a.stage_name])).toEqual([
+      const [legal] = await rows(
+        "SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' AND name = ?",
+        [STAGE],
+      );
+      const approvals = await rows(
+        "SELECT * FROM approvals WHERE version_id = ? ORDER BY decided_at, stage_position",
+        [versionId],
+      );
+      expect(
+        approvals.map((a) => [
+          a.actor_id,
+          a.decision,
+          a.stage_id,
+          Number(a.stage_position),
+          a.stage_name,
+        ]),
+      ).toEqual([
         ["jordan", "approved", "stage_disclosure_0", 0, "Team approver"],
         ["dana", "approved", legal!.id, 1, STAGE],
       ]);
-      const [version] = await rows("SELECT state, activated_at FROM versions WHERE id = ?", [versionId]);
+      const [version] = await rows(
+        "SELECT state, activated_at FROM versions WHERE id = ?",
+        [versionId],
+      );
       expect(version.state).toBe("active");
       expect(version.activated_at).not.toBeNull();
-      const [before] = await rows("SELECT state FROM versions WHERE id = ?", [seeded.versionId]);
+      const [before] = await rows("SELECT state FROM versions WHERE id = ?", [
+        seeded.versionId,
+      ]);
       expect(before.state, "the version it replaced").toBe("superseded");
-      const audit = await rows("SELECT actor_id, action FROM audit_events WHERE version_id = ? ORDER BY at, id", [versionId]);
-      expect(audit.filter((a) => /approved|activated/.test(String(a.action))).map((a) => a.actor_id)).toContain("dana");
+      const audit = await rows(
+        "SELECT actor_id, action FROM audit_events WHERE version_id = ? ORDER BY at, id",
+        [versionId],
+      );
+      expect(
+        audit
+          .filter((a) => /approved|activated/.test(String(a.action)))
+          .map((a) => a.actor_id),
+      ).toContain("dana");
     });
   });
 
-  test("nobody approves two stages: with a second Approver stage, Jordan can't approve it too; Alex does and it goes Active", async ({ page }) => {
+  test("nobody approves two stages: with a second Approver stage, Jordan can't approve it too; Alex does and it goes Active", async ({
+    page,
+  }) => {
     test.setTimeout(demoTimeout(240_000));
     const SECOND = "Second approver";
 
@@ -445,16 +645,35 @@ test.describe("phase 6: two-stage approval", () => {
       await asPersona(page, "riley");
       await openLibrary(page, "all");
       const dialog = await openSettings(page, "Approval chains");
-      const chain = dialog.getByRole("region", { name: "Disclosure approval chain" });
-      await click(chain.getByRole("button", { name: "Add stage", exact: true }));
-      await expect(chain.getByRole("textbox", { name: "Stage name" })).toBeFocused();
+      const chain = dialog.getByRole("region", {
+        name: "Disclosure approval chain",
+      });
+      await click(
+        chain.getByRole("button", { name: "Add stage", exact: true }),
+      );
+      await expect(
+        chain.getByRole("textbox", { name: "Stage name" }),
+      ).toBeFocused();
       await page.keyboard.type(SECOND, { delay: 40 });
       const consequence = strip(chain);
-      await expect(consequence.getByRole("region", { name: "After" }).getByRole("listitem")).toHaveCount(2);
+      await expect(
+        consequence
+          .getByRole("region", { name: "After" })
+          .getByRole("listitem"),
+      ).toHaveCount(2);
       await beat(page, 900);
-      await click(consequence.getByRole("button", { name: `Add ${SECOND} stage`, exact: true }));
+      await click(
+        consequence.getByRole("button", {
+          name: `Add ${SECOND} stage`,
+          exact: true,
+        }),
+      );
       await expect(consequence).toBeHidden({ timeout: 20_000 });
-      await expect(chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem")).toHaveCount(2);
+      await expect(
+        chain
+          .getByRole("list", { name: "Disclosure stages" })
+          .getByRole("listitem"),
+      ).toHaveCount(2);
       await closeSettings(page);
     });
 
@@ -470,10 +689,14 @@ test.describe("phase 6: two-stage approval", () => {
       await viewEveryOutput(page);
       await click(approveButton(page));
       const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
-      await expect(dialog.locator('[data-slot="dialog-description"]')).toHaveText(
+      await expect(
+        dialog.locator('[data-slot="dialog-description"]'),
+      ).toHaveText(
         `v${number} moves to ${SECOND} for approval. It isn't Active until the last stage approves.`,
       );
-      await click(dialog.getByRole("button", { name: `Approve v${number}`, exact: true }));
+      await click(
+        dialog.getByRole("button", { name: `Approve v${number}`, exact: true }),
+      );
       await expect(dialog).toBeHidden({ timeout: 20_000 });
       await expect(step(page, "done")).toContainText("Jordan Ellis");
       await expect(step(page, "current")).toContainText(SECOND);
@@ -483,7 +706,9 @@ test.describe("phase 6: two-stage approval", () => {
       await expectReviewScreen(page, number);
       await expect(step(page, "current")).toContainText(SECOND);
       await expect(approveButton(page)).toBeDisabled();
-      await expect(decision(page)).toContainText("You approved an earlier stage.");
+      await expect(decision(page)).toContainText(
+        "You approved an earlier stage.",
+      );
       await beat(page, 900);
       await shoot(page, "jordan-approved-an-earlier-stage");
     });
@@ -497,24 +722,41 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(approveButton(page)).toBeEnabled();
       await click(approveButton(page));
       const dialog = page.getByRole("dialog", { name: `Approve v${number}` });
-      await expect(dialog.locator('[data-slot="dialog-description"]')).toContainText(`v${number} becomes Active.`);
-      await click(dialog.getByRole("button", { name: `Approve v${number}`, exact: true }));
+      await expect(
+        dialog.locator('[data-slot="dialog-description"]'),
+      ).toContainText(`v${number} becomes Active.`);
+      await click(
+        dialog.getByRole("button", { name: `Approve v${number}`, exact: true }),
+      );
       await expect(dialog).toBeHidden({ timeout: 20_000 });
-      await expect(page.locator("[data-go-live]")).toHaveCount(0, { timeout: 20_000 });
+      await expect(page.locator("[data-go-live]")).toHaveCount(0, {
+        timeout: 20_000,
+      });
       await expect(statusBadge(page)).toHaveText("Active");
       await expect(step(page, "done")).toHaveCount(2);
       await beat(page, 900);
       await shoot(page, "alex-second-stage-active");
 
-      const approvals = await rows("SELECT actor_id, stage_position, stage_name FROM approvals WHERE version_id = ? ORDER BY stage_position", [versionId]);
-      expect(approvals.map((a) => [a.actor_id, Number(a.stage_position), a.stage_name])).toEqual([
+      const approvals = await rows(
+        "SELECT actor_id, stage_position, stage_name FROM approvals WHERE version_id = ? ORDER BY stage_position",
+        [versionId],
+      );
+      expect(
+        approvals.map((a) => [
+          a.actor_id,
+          Number(a.stage_position),
+          a.stage_name,
+        ]),
+      ).toEqual([
         ["jordan", 0, "Team approver"],
         ["alex", 1, SECOND],
       ]);
     });
   });
 
-  test("the chain is reordered while v4 is between its stages, and the review still finishes (finding D3)", async ({ page }) => {
+  test("the chain is reordered while v4 is between its stages, and the review still finishes (finding D3)", async ({
+    page,
+  }) => {
     test.setTimeout(demoTimeout(240_000));
     const LEGAL_ID = "stage_e2e_legal";
     const seeded = await seededInReview();
@@ -523,12 +765,13 @@ test.describe("phase 6: two-stage approval", () => {
 
     // The chain starts as [Legal reviewer (Dana), Team approver], set up in the database: the tests above
     // cover adding a stage in the chain editor. afterEach re-seeds.
-    await rows("UPDATE approval_stages SET position = 1 WHERE id = 'stage_disclosure_0'");
-    await rows("INSERT INTO approval_stages (id, content_type_id, position, name, approver_rule) VALUES (?, 'ct_disclosure', 0, ?, ?)", [
-      LEGAL_ID,
-      STAGE,
-      JSON.stringify({ kind: "user", userId: "dana" }),
-    ]);
+    await rows(
+      "UPDATE approval_stages SET position = 1 WHERE id = 'stage_disclosure_0'",
+    );
+    await rows(
+      "INSERT INTO approval_stages (id, content_type_id, position, name, approver_rule) VALUES (?, 'ct_disclosure', 0, ?, ?)",
+      [LEGAL_ID, STAGE, JSON.stringify({ kind: "user", userId: "dana" })],
+    );
 
     await test.step("1. v3 goes Active on its one stage; Maya submits v4, which records Legal reviewer, then Team approver", async () => {
       const submitted = await goLiveThenResubmit(page, seeded);
@@ -553,30 +796,62 @@ test.describe("phase 6: two-stage approval", () => {
       await asPersona(page, "riley");
       await openLibrary(page, "all");
       const dialog = await openSettings(page, "Approval chains");
-      const chain = dialog.getByRole("region", { name: "Disclosure approval chain" });
-      const stages = chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem");
+      const chain = dialog.getByRole("region", {
+        name: "Disclosure approval chain",
+      });
+      const stages = chain
+        .getByRole("list", { name: "Disclosure stages" })
+        .getByRole("listitem");
       await expect(stages.first()).toContainText(STAGE);
       // v4 has passed Legal reviewer, so that stage could go; it still needs Team approver, so that one can't.
-      await expect(chain.getByRole("button", { name: `Remove ${STAGE}`, exact: true })).not.toHaveAttribute("aria-disabled", "true");
-      const removeTeam = chain.getByRole("button", { name: "Remove Team approver", exact: true });
+      await expect(
+        chain.getByRole("button", { name: `Remove ${STAGE}`, exact: true }),
+      ).not.toHaveAttribute("aria-disabled", "true");
+      const removeTeam = chain.getByRole("button", {
+        name: "Remove Team approver",
+        exact: true,
+      });
       await expect(removeTeam).toHaveAttribute("aria-disabled", "true");
       await removeTeam.hover();
-      await expect(page.getByText("1 version in review still needs Team approver.", { exact: true })).toBeVisible();
+      await expect(
+        page.getByText("1 version in review still needs Team approver.", {
+          exact: true,
+        }),
+      ).toBeVisible();
       await beat(page, 900);
       await shoot(page, "riley-remove-blocked");
-      await click(chain.getByRole("button", { name: "Move Team approver up", exact: true }));
+      await click(
+        chain.getByRole("button", {
+          name: "Move Team approver up",
+          exact: true,
+        }),
+      );
       await expect(stages.first()).toContainText("Team approver");
       const consequence = strip(chain);
-      await click(consequence.getByRole("button", { name: "Save chain", exact: true }));
+      await click(
+        consequence.getByRole("button", { name: "Save chain", exact: true }),
+      );
       await expect(consequence).toBeHidden({ timeout: 20_000 });
       await closeSettings(page);
 
-      const saved = await rows("SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position");
+      const saved = await rows(
+        "SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position",
+      );
       expect(saved.map((s) => s.id)).toEqual(["stage_disclosure_0", LEGAL_ID]);
-      const [version] = await rows("SELECT state, current_stage, stages FROM versions WHERE id = ?", [v4.versionId]);
+      const [version] = await rows(
+        "SELECT state, current_stage, stages FROM versions WHERE id = ?",
+        [v4.versionId],
+      );
       expect(version.state).toBe("in_review");
-      expect(Number(version.current_stage), "still at its second stage").toBe(1);
-      expect((JSON.parse(String(version.stages)) as { id: string }[]).map((s) => s.id), "its own order").toEqual([LEGAL_ID, "stage_disclosure_0"]);
+      expect(Number(version.current_stage), "still at its second stage").toBe(
+        1,
+      );
+      expect(
+        (JSON.parse(String(version.stages)) as { id: string }[]).map(
+          (s) => s.id,
+        ),
+        "its own order",
+      ).toEqual([LEGAL_ID, "stage_disclosure_0"]);
     });
 
     await test.step("4. Jordan sees Dana's approval under Legal reviewer and his stage current, and approves: v4 goes Active", async () => {
@@ -598,37 +873,63 @@ test.describe("phase 6: two-stage approval", () => {
     });
 
     await test.step("5. The database: each approval under the stage it was made at", async () => {
-      const approvals = await rows("SELECT actor_id, stage_id, stage_position, stage_name FROM approvals WHERE version_id = ? ORDER BY decided_at", [
-        v4.versionId,
-      ]);
-      expect(approvals.map((a) => [a.actor_id, a.stage_id, Number(a.stage_position), a.stage_name])).toEqual([
+      const approvals = await rows(
+        "SELECT actor_id, stage_id, stage_position, stage_name FROM approvals WHERE version_id = ? ORDER BY decided_at",
+        [v4.versionId],
+      );
+      expect(
+        approvals.map((a) => [
+          a.actor_id,
+          a.stage_id,
+          Number(a.stage_position),
+          a.stage_name,
+        ]),
+      ).toEqual([
         ["dana", LEGAL_ID, 0, STAGE],
         ["jordan", "stage_disclosure_0", 1, "Team approver"],
       ]);
-      const [version] = await rows("SELECT state FROM versions WHERE id = ?", [v4.versionId]);
+      const [version] = await rows("SELECT state FROM versions WHERE id = ?", [
+        v4.versionId,
+      ]);
       expect(version.state).toBe("active");
     });
   });
 
-  test("one person on two stages: the later stage says why, and Save stays disabled until it's fixed", async ({ page }) => {
+  test("one person on two stages: the later stage says why, and Save stays disabled until it's fixed", async ({
+    page,
+  }) => {
     test.setTimeout(demoTimeout(120_000));
     const REASON = "Dana Park already reviews stage 2.";
-    const chainRows = () => rows("SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position");
+    const chainRows = () =>
+      rows(
+        "SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position",
+      );
     const before = await chainRows();
 
     await asPersona(page, "riley");
     await openLibrary(page, "all");
     const dialog = await openSettings(page, "Approval chains");
-    const chain = dialog.getByRole("region", { name: "Disclosure approval chain" });
-    const stages = chain.getByRole("list", { name: "Disclosure stages" }).getByRole("listitem");
+    const chain = dialog.getByRole("region", {
+      name: "Disclosure approval chain",
+    });
+    const stages = chain
+      .getByRole("list", { name: "Disclosure stages" })
+      .getByRole("listitem");
     const reviewer = chain.getByRole("combobox", { name: "Reviewer" });
     const consequence = strip(chain);
-    const save = consequence.getByRole("button", { name: "Save chain", exact: true });
+    const save = consequence.getByRole("button", {
+      name: "Save chain",
+      exact: true,
+    });
 
     await test.step("1. Riley adds a Legal reviewer and a Final sign-off stage, both naming Dana Park", async () => {
       for (const name of [STAGE, "Final sign-off"]) {
-        await click(chain.getByRole("button", { name: "Add stage", exact: true }));
-        await expect(chain.getByRole("textbox", { name: "Stage name" })).toBeFocused();
+        await click(
+          chain.getByRole("button", { name: "Add stage", exact: true }),
+        );
+        await expect(
+          chain.getByRole("textbox", { name: "Stage name" }),
+        ).toBeFocused();
         await page.keyboard.type(name, { delay: 20 });
         await reviewer.selectOption("user:dana");
         await expect(reviewer).toHaveValue("user:dana");
@@ -637,26 +938,38 @@ test.describe("phase 6: two-stage approval", () => {
     });
 
     await test.step("2. The reason shows at the later stage, and Save is disabled with it beside", async () => {
-      await expect(stages.nth(2).locator('[data-problem="reviewer"]')).toHaveText(REASON);
+      await expect(
+        stages.nth(2).locator('[data-problem="reviewer"]'),
+      ).toHaveText(REASON);
       await expect(reviewer).toHaveAttribute("aria-invalid", "true");
-      await expect(stages.nth(1).locator("[data-problem]"), "the first stage naming her is fine").toHaveCount(0);
+      await expect(
+        stages.nth(1).locator("[data-problem]"),
+        "the first stage naming her is fine",
+      ).toHaveCount(0);
       await expect(save).toHaveAttribute("aria-disabled", "true");
       await expect(consequence).toContainText(REASON);
       await beat(page, 900);
       await shoot(page, "riley-chain-same-person-twice");
 
       await click(chain.getByRole("button", { name: "Done", exact: true }));
-      await expect(stages.nth(2).locator('[data-problem="reviewer"]'), "still said once the editor closes").toHaveText(REASON);
+      await expect(
+        stages.nth(2).locator('[data-problem="reviewer"]'),
+        "still said once the editor closes",
+      ).toHaveText(REASON);
       await expect(save).toHaveAttribute("aria-disabled", "true");
     });
 
     await test.step("3. Naming someone else clears it; Discard leaves the saved chain as it was", async () => {
-      await click(chain.getByRole("button", { name: "Edit Final sign-off", exact: true }));
+      await click(
+        chain.getByRole("button", { name: "Edit Final sign-off", exact: true }),
+      );
       await reviewer.selectOption("user:jordan");
       await expect(chain.locator("[data-problem]")).toHaveCount(0);
       await expect(save).not.toHaveAttribute("aria-disabled", "true");
 
-      await click(consequence.getByRole("button", { name: "Discard", exact: true }));
+      await click(
+        consequence.getByRole("button", { name: "Discard", exact: true }),
+      );
       await expect(consequence).toBeHidden();
       await expect(stages).toHaveCount(1);
       expect(await chainRows(), "nothing was saved").toEqual(before);

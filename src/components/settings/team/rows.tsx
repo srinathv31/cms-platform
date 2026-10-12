@@ -6,7 +6,11 @@ import type { ActionResult } from "@/domain/access-types";
 import type { Person } from "@/domain/review-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { ScrollRegion } from "@/components/primitives/scroll-region";
 import { useActionRun } from "@/components/primitives/use-action-run";
@@ -72,7 +76,11 @@ export interface StripSpec {
    * A note typed in the strip: its label above the field, its length limit, and the domain's check,
    * which holds the confirm while it returns a reason (a denial needs a note).
    */
-  note?: { label: string; max: number; problem: (note: string) => string | null };
+  note?: {
+    label: string;
+    max: number;
+    problem: (note: string) => string | null;
+  };
   run: (note?: string) => Promise<ActionResult>;
 }
 
@@ -104,15 +112,31 @@ export interface RowData {
 }
 
 function Blocked({ reason }: { reason: string }) {
-  return <span className="text-right text-[13px] leading-snug text-text-muted">{reason}</span>;
+  return (
+    <span className="text-right text-[13px] leading-snug text-text-muted">
+      {reason}
+    </span>
+  );
 }
 
-function Actions({ row, onPick }: { row: RowData; onPick: (act: RowAct) => void }) {
-  if (row.settled) return <span className="text-right text-[13px] leading-snug text-text-muted">{row.settled}</span>;
+function Actions({
+  row,
+  onPick,
+}: {
+  row: RowData;
+  onPick: (act: RowAct) => void;
+}) {
+  if (row.settled)
+    return (
+      <span className="text-right text-[13px] leading-snug text-text-muted">
+        {row.settled}
+      </span>
+    );
   if (row.actions.length === 0) return null;
   const reasons = row.actions.map((a) => a.blocked ?? null);
   // Everything blocked for one reason: say it once instead of two dead buttons.
-  if (reasons.every((r) => r !== null && r === reasons[0])) return <Blocked reason={reasons[0]!} />;
+  if (reasons.every((r) => r !== null && r === reasons[0]))
+    return <Blocked reason={reasons[0]!} />;
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       {row.actions.map((a) => {
@@ -130,7 +154,14 @@ function Actions({ row, onPick }: { row: RowData; onPick: (act: RowAct) => void 
         if (!a.blocked) return button;
         return (
           <Tooltip key={a.key}>
-            <TooltipTrigger render={<span tabIndex={0} className="inline-flex rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50" />}>
+            <TooltipTrigger
+              render={
+                <span
+                  tabIndex={0}
+                  className="inline-flex rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              }
+            >
               {button}
             </TooltipTrigger>
             <TooltipContent>{a.blocked}</TooltipContent>
@@ -174,7 +205,9 @@ export function RowTable({
   // After a strip closes without a change, focus returns to the button that opened it.
   useEffect(() => {
     if (open !== null || returnTo === null) return;
-    table.current?.querySelector<HTMLElement>(`[data-act="${CSS.escape(returnTo)}"]`)?.focus();
+    table.current
+      ?.querySelector<HTMLElement>(`[data-act="${CSS.escape(returnTo)}"]`)
+      ?.focus();
   }, [open, returnTo]);
 
   // The name column keeps 8rem; on a narrow dialog the table scrolls sideways inside the panel instead.
@@ -194,24 +227,47 @@ export function RowTable({
     if (act.run && direct.run(act.run)) setRanOn(row.id);
   };
 
-  if (rows.length === 0) return empty ? <p className="py-6 text-[15px] text-text-muted">{empty}</p> : null;
+  if (rows.length === 0)
+    return empty ? (
+      <p className="py-6 text-[15px] text-text-muted">{empty}</p>
+    ) : null;
 
   return (
     <ScrollRegion label={tableLabel ?? label} className="overscroll-x-contain">
-      <div ref={table} role="table" aria-label={tableLabel ?? label} className="min-w-min">
-        <div role="row" className="grid items-end gap-x-3 border-b border-hairline pb-2" style={{ gridTemplateColumns: grid }}>
-          <span role="columnheader" className="caps-label">{label}</span>
+      <div
+        ref={table}
+        role="table"
+        aria-label={tableLabel ?? label}
+        className="min-w-min"
+      >
+        <div
+          role="row"
+          className="grid items-end gap-x-3 border-b border-hairline pb-2"
+          style={{ gridTemplateColumns: grid }}
+        >
+          <span role="columnheader" className="caps-label">
+            {label}
+          </span>
           {columns.map((c) => (
-            <span role="columnheader" key={c} className="caps-label">{c}</span>
+            <span role="columnheader" key={c} className="caps-label">
+              {c}
+            </span>
           ))}
           <span role="columnheader">
             <span className="sr-only">Actions</span>
           </span>
         </div>
         {rows.map((row) => {
-          const act = open?.id === row.id ? row.actions.find((a) => a.key === open.key) : undefined;
+          const act =
+            open?.id === row.id
+              ? row.actions.find((a) => a.key === open.key)
+              : undefined;
           return (
-            <div key={row.id} role="rowgroup" className="border-b border-hairline">
+            <div
+              key={row.id}
+              role="rowgroup"
+              className="border-b border-hairline"
+            >
               <div
                 role="row"
                 data-person={row.person.id}
@@ -221,30 +277,61 @@ export function RowTable({
                 {/* A dimmed row: the avatar goes grey and the text goes muted (fading either would fail contrast). */}
                 <div role="cell" className="flex min-w-0 items-center gap-3">
                   <span aria-hidden className="shrink-0">
-                    <UserAvatar initials={row.person.initials} hue={row.person.hue} muted={row.dim} />
+                    <UserAvatar
+                      initials={row.person.initials}
+                      hue={row.person.hue}
+                      muted={row.dim}
+                    />
                   </span>
                   <div className="min-w-0">
-                    <div className={cn("truncate text-[15px] font-medium", row.dim ? "text-text-muted" : "text-text")}>
+                    <div
+                      className={cn(
+                        "truncate text-[15px] font-medium",
+                        row.dim ? "text-text-muted" : "text-text",
+                      )}
+                    >
                       {row.person.name}
-                      {row.aside ? <span className="font-normal text-text-muted"> {row.aside}</span> : null}
+                      {row.aside ? (
+                        <span className="font-normal text-text-muted">
+                          {" "}
+                          {row.aside}
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="truncate text-[13px] text-text-muted" title={typeof row.sub === "string" ? row.sub : undefined}>
+                    <div
+                      className="truncate text-[13px] text-text-muted"
+                      title={typeof row.sub === "string" ? row.sub : undefined}
+                    >
                       {row.sub}
                     </div>
                   </div>
                 </div>
                 {row.cells.map((cell, i) => (
-                  <div role="cell" key={columns[i]} className={cn("min-w-0 text-[14px]", row.dim ? "text-text-muted" : "text-text")}>
+                  <div
+                    role="cell"
+                    key={columns[i]}
+                    className={cn(
+                      "min-w-0 text-[14px]",
+                      row.dim ? "text-text-muted" : "text-text",
+                    )}
+                  >
                     {cell}
                   </div>
                 ))}
                 <div role="cell" className="flex justify-end">
-                  {act ? null : <Actions row={row} onPick={(a) => pick(row, a)} />}
+                  {act ? null : (
+                    <Actions row={row} onPick={(a) => pick(row, a)} />
+                  )}
                 </div>
               </div>
               {direct.error && ranOn === row.id ? (
                 <FullRow span={span}>
-                  <p role="alert" className="pb-3 text-right text-[13px] text-danger-text">{direct.error}</p>
+                  <p
+                    role="alert"
+                    className="pb-3 text-right text-[13px] text-danger-text"
+                  >
+                    {direct.error}
+                  </p>
                 </FullRow>
               ) : null}
               {act ? (
@@ -269,7 +356,15 @@ export function RowTable({
 }
 
 /** A row's strip, inside its rowgroup: one row, one cell spanning every column (valid table structure). */
-function FullRow({ span, className, children }: { span: number; className?: string; children: ReactNode }) {
+function FullRow({
+  span,
+  className,
+  children,
+}: {
+  span: number;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
     <div role="row" className={className}>
       <div role="cell" aria-colspan={span}>
@@ -285,10 +380,27 @@ export function GroupHeading({ children }: { children: ReactNode }) {
 }
 
 /** A thin determinate bar, brand fill on the selected tint. */
-export function Bar({ value, className }: { value: number; className?: string }) {
+export function Bar({
+  value,
+  className,
+}: {
+  value: number;
+  className?: string;
+}) {
   return (
-    <div className={cn("h-1.5 overflow-hidden rounded-full bg-selected", className)} aria-hidden>
-      <div className="h-full rounded-full bg-brand transition-[width]" style={{ width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%` }} />
+    <div
+      className={cn(
+        "h-1.5 overflow-hidden rounded-full bg-selected",
+        className,
+      )}
+      aria-hidden
+    >
+      <div
+        className="h-full rounded-full bg-brand transition-[width]"
+        style={{
+          width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%`,
+        }}
+      />
     </div>
   );
 }

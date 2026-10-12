@@ -1,7 +1,22 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore, useTransition, type ComponentType, type ReactNode } from "react";
-import { ChevronDown, History, Redo2, RotateCcw, RotateCw, Undo2, type LucideProps } from "lucide-react";
+import {
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import {
+  ChevronDown,
+  History,
+  Redo2,
+  RotateCcw,
+  RotateCw,
+  Undo2,
+  type LucideProps,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,7 +28,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { runAction } from "@/components/primitives/use-action-run";
 import { CHANNEL_FIELD_IDS } from "@/domain/channel-fields";
 import { formatAgo } from "@/domain/dates";
@@ -24,10 +43,24 @@ import type { BaseVersionContent } from "@/server/queries/base-version";
 import type { SaveFields } from "./autosave/autosave-scheduler";
 import { SaveIndicator } from "./autosave/save-indicator";
 import type { WorkspaceSession } from "./session/session-store";
-import { useCanRevert, useHistoryControls, useInert, useOwnsFields, useSaveStatus, useWorkspaceSession } from "./session/workspace-session";
+import {
+  useCanRevert,
+  useHistoryControls,
+  useInert,
+  useOwnsFields,
+  useSaveStatus,
+  useWorkspaceSession,
+} from "./session/workspace-session";
 
 /** What "Revert to v3" replaces: every versioned field of the draft, its name and every channel field included. */
-const VERSION_FIELDS = ["name", "body", "variables", "channels", ...CHANNEL_FIELD_IDS, "sampleSets"] as const;
+const VERSION_FIELDS = [
+  "name",
+  "body",
+  "variables",
+  "channels",
+  ...CHANNEL_FIELD_IDS,
+  "sampleSets",
+] as const;
 
 export interface SaveStatusProps {
   templateId: string;
@@ -62,7 +95,9 @@ export function SaveStatus({ templateId, basedOn }: SaveStatusProps) {
   const contentOnScreen = useOwnsFields(VERSION_FIELDS);
   const base = contentOnScreen ? basedOn : null;
   // Stopped, the reason is SaveStopped's: it needs more room than the status row has.
-  const indicator = <SaveIndicator status={status} error={stopped ? undefined : error} />;
+  const indicator = (
+    <SaveIndicator status={status} error={stopped ? undefined : error} />
+  );
   return (
     <span className="inline-flex items-center gap-1.5">
       <UndoRedo />
@@ -92,12 +127,19 @@ export function SaveStopped({ className }: { className?: string }) {
   const { error, stopped } = useSaveStatus();
   if (!stopped) return null;
   return (
-    <div data-slot="save-stopped" className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", className)}>
+    <div
+      data-slot="save-stopped"
+      className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", className)}
+    >
       <p role="alert" className="text-[13px] leading-5 text-danger-text">
         {error}
       </p>
       {/* A secondary action: the tab bar keeps the one black button. */}
-      <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => window.location.reload()}
+      >
         <RotateCw data-icon="inline-start" aria-hidden strokeWidth={1.75} />
         Reload
       </Button>
@@ -112,7 +154,11 @@ function UndoRedo() {
   // The server and hydration render the Ctrl shortcuts; an Apple platform's ⌘ ones follow straight after.
   const apple = useSyncExternalStore(noSubscribe, isApple, () => false);
   return (
-    <span role="group" aria-label="History" className="inline-flex items-center gap-0.5">
+    <span
+      role="group"
+      aria-label="History"
+      className="inline-flex items-center gap-0.5"
+    >
       <HistoryButton
         label="Undo"
         idle="Nothing to undo"
@@ -157,7 +203,10 @@ function HistoryButton({
             variant="ghost"
             size="icon-sm"
             aria-label={label}
-            aria-keyshortcuts={shortcut.replace("⌘", "Meta+").replace("⇧", "Shift+").replace("Ctrl", "Control")}
+            aria-keyshortcuts={shortcut
+              .replace("⌘", "Meta+")
+              .replace("⇧", "Shift+")
+              .replace("Ctrl", "Control")}
             disabled={!enabled}
             // A keyboard user pressing it to the end keeps their place on it. Focusable, it is marked
             // `data-disabled` (not the native `disabled`), so that is what greys it out below.
@@ -193,7 +242,11 @@ function HistoryButton({
  * else is edited, or a field it would put back leaves the screen (another tab). Putting the old
  * values back then would drop the newer edit, or save content the hidden tab doesn't show.
  */
-function offerUndo(session: WorkspaceSession, message: string, previous: SaveFields) {
+function offerUndo(
+  session: WorkspaceSession,
+  message: string,
+  previous: SaveFields,
+) {
   const since = session.getEditGeneration();
   let stop = () => {};
   const id = toast(message, {
@@ -248,7 +301,8 @@ function RevertMenu({
 
   function revert() {
     const previous = session.revert();
-    if (previous) offerUndo(session, "Reverted to when you opened it", previous);
+    if (previous)
+      offerUndo(session, "Reverted to when you opened it", previous);
   }
 
   function revertToBase() {
@@ -259,7 +313,11 @@ function RevertMenu({
     start(async () => {
       try {
         const result = await runAction(() =>
-          readTemplate<{ base: BaseVersionContent }>(templateId, "base-version", { draft: versionId }),
+          readTemplate<{ base: BaseVersionContent }>(
+            templateId,
+            "base-version",
+            { draft: versionId },
+          ),
         );
         setOpen(false);
         if (!result.ok) {
@@ -269,7 +327,12 @@ function RevertMenu({
         // Only the base version is read from the server: what Undo puts back is what is on screen now.
         const { number, round, state, ...fields } = result.base;
         const previous = session.replace(fields);
-        if (previous) offerUndo(session, `Reverted to ${versionLabel({ number, round, state }, { style: "sentence" })}`, previous);
+        if (previous)
+          offerUndo(
+            session,
+            `Reverted to ${versionLabel({ number, round, state }, { style: "sentence" })}`,
+            previous,
+          );
       } finally {
         reading.current = false;
       }
@@ -293,15 +356,27 @@ function RevertMenu({
         }
       >
         {children}
-        <ChevronDown aria-hidden strokeWidth={1.75} className="size-3.5 text-text-subtle" />
+        <ChevronDown
+          aria-hidden
+          strokeWidth={1.75}
+          className="size-3.5 text-text-subtle"
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-auto min-w-64">
         {sinceOpened ? (
-          <DropdownMenuItem onClick={revert} disabled={pending || inert} className="items-start gap-2.5 px-2 py-1.5">
+          <DropdownMenuItem
+            onClick={revert}
+            disabled={pending || inert}
+            className="items-start gap-2.5 px-2 py-1.5"
+          >
             <RotateCcw aria-hidden strokeWidth={1.75} className="mt-0.5" />
             <span className="flex flex-col">
-              <span className="text-[14px] leading-5">Revert to when you opened it</span>
-              <span className="text-[12px] leading-4 text-text-muted">Opened {opened}</span>
+              <span className="text-[14px] leading-5">
+                Revert to when you opened it
+              </span>
+              <span className="text-[12px] leading-4 text-text-muted">
+                Opened {opened}
+              </span>
             </span>
           </DropdownMenuItem>
         ) : null}
@@ -317,13 +392,29 @@ function RevertMenu({
           >
             <History aria-hidden strokeWidth={1.75} className="mt-0.5" />
             <span className="flex flex-col">
-              <span className="text-[14px] leading-5">Revert to {base.label}</span>
+              <span className="text-[14px] leading-5">
+                Revert to {base.label}
+              </span>
               {/* Both lines hold the cell, so the menu keeps its width as one replaces the other. */}
               <span className="grid text-[12px] leading-4 text-text-muted">
-                <span className={cn("col-start-1 row-start-1", pending && "invisible")}>
-                  {base.active ? "The Active version. The draft stays open." : "Where this draft started. It stays open."}
+                <span
+                  className={cn(
+                    "col-start-1 row-start-1",
+                    pending && "invisible",
+                  )}
+                >
+                  {base.active
+                    ? "The Active version. The draft stays open."
+                    : "Where this draft started. It stays open."}
                 </span>
-                <span className={cn("col-start-1 row-start-1", !pending && "invisible")}>Reverting…</span>
+                <span
+                  className={cn(
+                    "col-start-1 row-start-1",
+                    !pending && "invisible",
+                  )}
+                >
+                  Reverting…
+                </span>
               </span>
             </span>
           </DropdownMenuItem>

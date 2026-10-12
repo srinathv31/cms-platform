@@ -12,7 +12,9 @@ const CONTENT: PushContent = {
   time: "now",
 };
 
-function render(props: Partial<Parameters<typeof AndroidNotification>[0]> = {}) {
+function render(
+  props: Partial<Parameters<typeof AndroidNotification>[0]> = {},
+) {
   return renderToStaticMarkup(
     <AndroidNotification
       content={CONTENT}
@@ -44,6 +46,8 @@ describe("AndroidNotification", () => {
 
   it("is a toggle button only when it can toggle", () => {
     expect(render()).not.toContain("<button");
-    expect(render({ onToggle: () => {} })).toMatch(/<button[^>]*aria-expanded="false"/);
+    expect(render({ onToggle: () => {} })).toMatch(
+      /<button[^>]*aria-expanded="false"/,
+    );
   });
 });

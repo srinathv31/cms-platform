@@ -3,7 +3,10 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import { versions } from "@/server/db/schema/ucomp";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getCopilotPrompt } from "./copilot";
 
 // The Copilot prompt read against a temporary database filled by the real seed. Annual Fee Waiver
@@ -17,7 +20,9 @@ vi.mock("@/server/db/client", async () => {
 let db: Db;
 const people: Record<string, Viewer> = {};
 
-const ids = seededDatabasePerTest({ base: new Date("2026-10-04T12:00:00.000Z") });
+const ids = seededDatabasePerTest({
+  base: new Date("2026-10-04T12:00:00.000Z"),
+});
 
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
@@ -26,28 +31,57 @@ beforeAll(async () => {
 
 describe("getCopilotPrompt", () => {
   it("builds the prompt from the saved draft for someone who may edit it", async () => {
-    const result = await getCopilotPrompt(people.maya!, { templateId: ids["annual-fee-waiver"]! });
+    const result = await getCopilotPrompt(people.maya!, {
+      templateId: ids["annual-fee-waiver"]!,
+    });
     if (!result.ok) throw new Error(result.reason);
-    expect(result.prompt.text).toContain("Help me write the body of a disclosure for Coral Offers.");
-    expect(result.prompt.text).toContain("## Offer details\n## Rates and fees\n## Legal notices");
+    expect(result.prompt.text).toContain(
+      "Help me write the body of a disclosure for Coral Offers.",
+    );
+    expect(result.prompt.text).toContain(
+      "## Offer details\n## Rates and fees\n## Legal notices",
+    );
     expect(result.prompt.includesDraft).toBe(true);
     expect(result.prompt.text).toContain("Improve this draft:");
   });
 
   it("refuses a viewer who can't edit drafts on the team", async () => {
-    const result = await getCopilotPrompt(people.taylor!, { templateId: ids["annual-fee-waiver"]! });
+    const result = await getCopilotPrompt(people.taylor!, {
+      templateId: ids["annual-fee-waiver"]!,
+    });
     expect(result).toMatchObject({ ok: false, status: 403 });
   });
 
   it("says so when there is no draft, or no such template", async () => {
     const maya = people.maya!;
-    expect(await getCopilotPrompt(maya, { templateId: ids["cash-back"]! })).toEqual({ ok: false, status: 409, code: "no_draft_to_write", reason: "There is no draft to write." });
-    expect(await getCopilotPrompt(maya, { templateId: "UC-NOPE00" })).toEqual({ ok: false, status: 404, code: "template_unavailable", reason: "This template isn't available." });
-    expect(await getCopilotPrompt(maya, { templateId: "" })).toEqual({ ok: false, status: 400, code: "template_unavailable", reason: "This template isn't available." });
+    expect(
+      await getCopilotPrompt(maya, { templateId: ids["cash-back"]! }),
+    ).toEqual({
+      ok: false,
+      status: 409,
+      code: "no_draft_to_write",
+      reason: "There is no draft to write.",
+    });
+    expect(await getCopilotPrompt(maya, { templateId: "UC-NOPE00" })).toEqual({
+      ok: false,
+      status: 404,
+      code: "template_unavailable",
+      reason: "This template isn't available.",
+    });
+    expect(await getCopilotPrompt(maya, { templateId: "" })).toEqual({
+      ok: false,
+      status: 400,
+      code: "template_unavailable",
+      reason: "This template isn't available.",
+    });
   });
 
   it("refuses an alert's draft: Copilot writes a document's body, and an alert has none", async () => {
-    expect(await getCopilotPrompt(people.maya!, { templateId: ids["rate-change-heads-up"]! })).toEqual({
+    expect(
+      await getCopilotPrompt(people.maya!, {
+        templateId: ids["rate-change-heads-up"]!,
+      }),
+    ).toEqual({
       ok: false,
       status: 409,
       code: "copilot_documents_only",
@@ -56,8 +90,20 @@ describe("getCopilotPrompt", () => {
   });
 
   it("knows an alert by its content type, even when its draft's channels were emptied", async () => {
-    await db.update(versions).set({ channels: [] }).where(and(eq(versions.templateId, ids["rate-change-heads-up"]!), eq(versions.state, "draft")));
-    expect(await getCopilotPrompt(people.maya!, { templateId: ids["rate-change-heads-up"]! })).toMatchObject({
+    await db
+      .update(versions)
+      .set({ channels: [] })
+      .where(
+        and(
+          eq(versions.templateId, ids["rate-change-heads-up"]!),
+          eq(versions.state, "draft"),
+        ),
+      );
+    expect(
+      await getCopilotPrompt(people.maya!, {
+        templateId: ids["rate-change-heads-up"]!,
+      }),
+    ).toMatchObject({
       ok: false,
       code: "copilot_documents_only",
     });

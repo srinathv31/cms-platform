@@ -7,21 +7,48 @@ import type { ReviewScreenData } from "@/server/queries/review-models";
 import type { ThreadView } from "@/server/queries/threads";
 import type { JSONContent } from "@/domain/types";
 import type { DocumentEditorHandle } from "@/editor/types";
-import { useReviewComments, type ReviewCommentsState } from "./use-review-comments";
+import {
+  useReviewComments,
+  type ReviewCommentsState,
+} from "./use-review-comments";
 
 // The review screen's comments over a document that shows two kinds of anchor: blocks of its body, and its
 // email subject and preheader. The body keeps the editor's handle (or the redline's); the fields have a
 // handle of their own, and a call about an anchor goes to the one that owns it.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("@/server/actions/comments", () => ({ addComment: vi.fn(), reply: vi.fn(), resolveThread: vi.fn(), reopenThread: vi.fn() }));
+vi.mock("@/server/actions/comments", () => ({
+  addComment: vi.fn(),
+  reply: vi.fn(),
+  resolveThread: vi.fn(),
+  reopenThread: vi.fn(),
+}));
 
-const JORDAN: Person = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 212 };
-const line = (text: string): JSONContent => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+const JORDAN: Person = {
+  id: "jordan",
+  name: "Jordan Ellis",
+  initials: "JE",
+  hue: 212,
+};
+const line = (text: string): JSONContent => ({
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
 
 const version = {
-  body: { type: "doc", content: [{ type: "paragraph", attrs: { id: "b_intro" }, content: [{ type: "text", text: "Hello" }] }] },
+  body: {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        attrs: { id: "b_intro" },
+        content: [{ type: "text", text: "Hello" }],
+      },
+    ],
+  },
   channels: ["pdf", "email"],
   variables: [],
   channelFields: { email: { subject: line("Your terms are ready") } },
@@ -36,13 +63,26 @@ function thread(id: string, blockId: string): ThreadView {
     originVersionNumber: 1,
     originRound: 1,
     originLabel: "v1",
-    comments: [{ id: `${id}-c`, author: JORDAN, body: "Text", kind: "comment", createdAt: "2027-02-18T10:00:00Z" }],
+    comments: [
+      {
+        id: `${id}-c`,
+        author: JORDAN,
+        body: "Text",
+        kind: "comment",
+        createdAt: "2027-02-18T10:00:00Z",
+      },
+    ],
     orphaned: false,
   };
 }
-const THREADS = [thread("on-subject", "email.subject"), thread("on-block", "b_intro")];
+const THREADS = [
+  thread("on-subject", "email.subject"),
+  thread("on-block", "b_intro"),
+];
 
-function handle(): DocumentEditorHandle & { [K in keyof DocumentEditorHandle]: ReturnType<typeof vi.fn> } {
+function handle(): DocumentEditorHandle & {
+  [K in keyof DocumentEditorHandle]: ReturnType<typeof vi.fn>;
+} {
   return {
     focus: vi.fn(),
     focusThread: vi.fn(),
@@ -74,8 +114,10 @@ beforeEach(() => {
   act(() => root.render(<Probe onState={(next) => (state = next)} />));
   editor = handle();
   fields = handle();
-  (state.editorRef as { current: DocumentEditorHandle | null }).current = editor;
-  (state.fieldsRef as { current: DocumentEditorHandle | null }).current = fields;
+  (state.editorRef as { current: DocumentEditorHandle | null }).current =
+    editor;
+  (state.fieldsRef as { current: DocumentEditorHandle | null }).current =
+    fields;
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -117,9 +159,13 @@ describe("useReviewComments: a document's email fields beside its blocks", () =>
   });
 
   it("reads the fields first in reading order, and a field's text as its card quotes it", () => {
-    const order = ["email.subject", "email.preheader", "b_intro"].map((id) => state.blockPosition(id));
+    const order = ["email.subject", "email.preheader", "b_intro"].map((id) =>
+      state.blockPosition(id),
+    );
     expect(order).toEqual([0, 1, 2]);
-    expect(state.blockText("email.subject")).toBe("Email subject: Your terms are ready");
+    expect(state.blockText("email.subject")).toBe(
+      "Email subject: Your terms are ready",
+    );
     expect(state.blockText("email.preheader")).toBe("Email preheader");
     expect(state.blockText("b_intro")).toBe("Hello");
   });

@@ -1,7 +1,11 @@
 "use client";
 
 import { HelpCircle } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { Shortcut } from "@/components/primitives/keycap";
 import { StatusBadge } from "@/components/primitives/status-badge";
@@ -23,7 +27,14 @@ export function HelpPopover() {
   return (
     <Popover>
       <PopoverTrigger
-        render={<SidebarMenuButton className={cn(NAV_ROW, "hover:bg-hover active:bg-selected data-popup-open:bg-hover")} />}
+        render={
+          <SidebarMenuButton
+            className={cn(
+              NAV_ROW,
+              "hover:bg-hover active:bg-selected data-popup-open:bg-hover",
+            )}
+          />
+        }
       >
         <HelpCircle aria-hidden strokeWidth={NAV_ICON_STROKE} />
         <span>Help</span>
@@ -39,7 +50,10 @@ export function HelpPopover() {
           <div className="caps-label mb-3">Shortcuts</div>
           <ul className="flex flex-col gap-2.5">
             {SHORTCUTS.map((s) => (
-              <li key={s.label} className="flex items-center justify-between gap-4 text-[14px]">
+              <li
+                key={s.label}
+                className="flex items-center justify-between gap-4 text-[14px]"
+              >
                 <span className="text-text">{s.label}</span>
                 <Shortcut keys={s.keys} />
               </li>

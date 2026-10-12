@@ -3,12 +3,17 @@ import { act, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SaveFields } from "./autosave/autosave-scheduler";
-import { createWorkspaceSession, type WorkspaceSession } from "./session/session-store";
+import {
+  createWorkspaceSession,
+  type WorkspaceSession,
+} from "./session/session-store";
 
 // The name field: what it hands to autosave, and how Enter, Esc, an emptied field and the arrival
 // from "New template" (the one-shot "just created" cookie) behave.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let session: WorkspaceSession;
 
@@ -30,7 +35,9 @@ const markJustCreated = (templateId: string) => {
   document.cookie = `ucomp_created=${templateId}; path=/; max-age=60; samesite=lax`;
 };
 const justCreatedCookie = () =>
-  document.cookie.split("; ").find((part) => part.startsWith("ucomp_created=")) ?? null;
+  document.cookie
+    .split("; ")
+    .find((part) => part.startsWith("ucomp_created=")) ?? null;
 
 let root: Root;
 let container: HTMLElement;
@@ -44,14 +51,19 @@ const field = () => container.querySelector("textarea") as HTMLTextAreaElement;
 
 async function typeInto(el: HTMLTextAreaElement, value: string) {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
 
 async function press(el: HTMLElement, key: string) {
   await act(async () => {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
   });
 }
 
@@ -76,7 +88,9 @@ describe("NameField", () => {
   it("is plain text when the version can't be edited", async () => {
     await render(<NameField name="Rate Change Notice" editable={false} />);
     expect(container.querySelector("textarea")).toBeNull();
-    expect(container.querySelector("h1")?.textContent).toBe("Rate Change Notice");
+    expect(container.querySelector("h1")?.textContent).toBe(
+      "Rate Change Notice",
+    );
   });
 
   it("saves the trimmed name as the author types, and nothing while it is empty", async () => {
@@ -203,7 +217,9 @@ describe("NameField", () => {
       letGo = session.makeInert();
     });
     expect(field().readOnly).toBe(true);
-    expect(field().value, "what was typed stays on screen").toBe("Spring Travel");
+    expect(field().value, "what was typed stays on screen").toBe(
+      "Spring Travel",
+    );
     await press(field(), "Escape");
     await press(field(), "Enter");
     expect(field().value).toBe("Spring Travel");

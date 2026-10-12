@@ -7,7 +7,10 @@ import { simReadResponse } from "@/simulator/read-response";
 // A read, so a route handler and not a server action (decision 0019). Request-time only: it reads Coral's
 // table. The stored output itself is served by ../file.
 
-export async function GET(_request: Request, ctx: RouteContext<"/sim/deliveries/[deliveryId]/view">) {
+export async function GET(
+  _request: Request,
+  ctx: RouteContext<"/sim/deliveries/[deliveryId]/view">,
+) {
   await connection();
   const { deliveryId } = await ctx.params;
   return simReadResponse(await readSimDeliveryView(deliveryId));

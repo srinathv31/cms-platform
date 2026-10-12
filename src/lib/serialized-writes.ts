@@ -1,6 +1,13 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { createClient, type Client, type Config, type InStatement, type Transaction, type TransactionMode } from "@libsql/client";
+import {
+  createClient,
+  type Client,
+  type Config,
+  type InStatement,
+  type Transaction,
+  type TransactionMode,
+} from "@libsql/client";
 
 // One writer at a time per process, for a local SQLite file.
 //
@@ -41,9 +48,14 @@ function sharedLock(): WriteLock {
 }
 
 function busyError(waitMs: number): Error {
-  return Object.assign(new Error(`SQLITE_BUSY: waited ${waitMs}ms for this process's other write to finish`), {
-    code: "SQLITE_BUSY",
-  });
+  return Object.assign(
+    new Error(
+      `SQLITE_BUSY: waited ${waitMs}ms for this process's other write to finish`,
+    ),
+    {
+      code: "SQLITE_BUSY",
+    },
+  );
 }
 
 /** Waits for the turn and returns its release (idempotent). Gives up after `waitMs`, as SQLITE_BUSY. */
@@ -60,7 +72,10 @@ async function takeTurn(lock: WriteLock, waitMs: number): Promise<() => void> {
   const gaveUp = new Promise<"timeout">((resolve) => {
     timer = setTimeout(() => resolve("timeout"), waitMs);
   });
-  const outcome = await Promise.race([before.then(() => "turn" as const), gaveUp]);
+  const outcome = await Promise.race([
+    before.then(() => "turn" as const),
+    gaveUp,
+  ]);
   clearTimeout(timer);
   if (outcome === "timeout") {
     // Leave the queue: the next writer still waits for `before`, then for nothing.
@@ -87,11 +102,16 @@ function sqlOf(stmt: InStatement | [string, unknown?] | string): string {
 /** Calls through to the target with `this` bound to it: libSQL's classes keep their state in #private fields. */
 function bound<T extends object>(target: T, prop: string | symbol): unknown {
   const value = Reflect.get(target, prop, target) as unknown;
-  return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+  return typeof value === "function"
+    ? (value as (...args: unknown[]) => unknown).bind(target)
+    : value;
 }
 
 /** The transaction, releasing the turn once it settles (commit, rollback or close). */
-function releasingTransaction(tx: Transaction, release: () => void): Transaction {
+function releasingTransaction(
+  tx: Transaction,
+  release: () => void,
+): Transaction {
   return new Proxy(tx, {
     get(target, prop) {
       if (prop === "commit" || prop === "rollback") {
@@ -121,7 +141,10 @@ function releasingTransaction(tx: Transaction, release: () => void): Transaction
  * The client, with every write taking its turn on the process-wide lock. Reads pass straight through,
  * so a page can render while a transaction is open.
  */
-export function serializeWrites(client: Client, options: { waitMs?: number } = {}): Client {
+export function serializeWrites(
+  client: Client,
+  options: { waitMs?: number } = {},
+): Client {
   const waitMs = options.waitMs ?? DEFAULT_WAIT_MS;
   const lock = sharedLock();
 
@@ -143,10 +166,16 @@ export function serializeWrites(client: Client, options: { waitMs?: number } = {
               ? target.execute(stmt as never, args)
               : inTurn(() => target.execute(stmt as never, args));
         case "batch":
-          return (stmts: Parameters<Client["batch"]>[0], mode?: TransactionMode) =>
-            mode === "read" ? target.batch(stmts, mode) : inTurn(() => target.batch(stmts, mode));
+          return (
+            stmts: Parameters<Client["batch"]>[0],
+            mode?: TransactionMode,
+          ) =>
+            mode === "read"
+              ? target.batch(stmts, mode)
+              : inTurn(() => target.batch(stmts, mode));
         case "migrate":
-          return (stmts: Parameters<Client["migrate"]>[0]) => inTurn(() => target.migrate(stmts));
+          return (stmts: Parameters<Client["migrate"]>[0]) =>
+            inTurn(() => target.migrate(stmts));
         case "executeMultiple":
           return (sql: string) => inTurn(() => target.executeMultiple(sql));
         case "transaction":
@@ -154,7 +183,10 @@ export function serializeWrites(client: Client, options: { waitMs?: number } = {
             if (mode === "read") return target.transaction(mode);
             const release = await takeTurn(lock, waitMs);
             try {
-              return releasingTransaction(await target.transaction(mode), release);
+              return releasingTransaction(
+                await target.transaction(mode),
+                release,
+              );
             } catch (error) {
               release();
               throw error;
@@ -168,8 +200,11 @@ export function serializeWrites(client: Client, options: { waitMs?: number } = {
 }
 
 /** A client for the app's database: writes take turns here, and SQLite waits out other processes' locks. */
-export function createAppClient(config: Pick<Config, "url" | "authToken">): Client {
+export function createAppClient(
+  config: Pick<Config, "url" | "authToken">,
+): Client {
   // A fresh clone has no ./data (it's gitignored), and SQLite can't create the file in a missing folder.
-  if (config.url.startsWith("file:")) mkdirSync(dirname(config.url.slice("file:".length)), { recursive: true });
+  if (config.url.startsWith("file:"))
+    mkdirSync(dirname(config.url.slice("file:".length)), { recursive: true });
   return serializeWrites(createClient({ ...config, timeout: BUSY_TIMEOUT_MS }));
 }

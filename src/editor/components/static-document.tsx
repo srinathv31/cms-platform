@@ -14,13 +14,24 @@ import type { StaticDocumentProps } from "../types";
 import { cx } from "../lib/cx";
 import { variableLeafText } from "../lib/threads";
 import { listMarkerAttrs, withListMarkers } from "../extensions/list-markers";
-import { drawnThreads, reviewThreadMarks, withThreadHighlights } from "../extensions/review-threads";
+import {
+  drawnThreads,
+  reviewThreadMarks,
+  withThreadHighlights,
+} from "../extensions/review-threads";
 import { BLOCK_ID_TYPES, baseExtensions } from "../schema";
 import { VariableChipView } from "./variable-chip";
 import { DOC_CLASS, SURFACE_CLASS } from "./classes";
 import "../styles.css";
 
-export function StaticDocument({ content, variables, align = "center", className, threads, activeThreadId = null }: StaticDocumentProps) {
+export function StaticDocument({
+  content,
+  variables,
+  align = "center",
+  className,
+  threads,
+  activeThreadId = null,
+}: StaticDocumentProps) {
   const byKey = new Map(variables.map((v) => [v.key, v]));
   const highlighted = threads ? drawnThreads(threads) : [];
   const extensions = [
@@ -30,7 +41,13 @@ export function StaticDocument({ content, variables, align = "center", className
   ];
 
   const doc = highlighted.length
-    ? withThreadHighlights(content, extensions, highlighted, activeThreadId, variableLeafText((key) => byKey.get(key)))
+    ? withThreadHighlights(
+        content,
+        extensions,
+        highlighted,
+        activeThreadId,
+        variableLeafText((key) => byKey.get(key)),
+      )
     : getSchema(extensions).nodeFromJSON(content);
 
   const body = renderToReactElement({
@@ -40,7 +57,12 @@ export function StaticDocument({ content, variables, align = "center", className
       nodeMapping: {
         variable: ({ node }: { node: PMNode }) => {
           const key = (node.attrs.key as string | null) ?? null;
-          return <VariableChipView variableKey={key} variable={key ? byKey.get(key) : undefined} />;
+          return (
+            <VariableChipView
+              variableKey={key}
+              variable={key ? byKey.get(key) : undefined}
+            />
+          );
         },
         hardBreak: staticHardBreak,
       },
@@ -48,7 +70,11 @@ export function StaticDocument({ content, variables, align = "center", className
   });
 
   return (
-    <div className={cx(SURFACE_CLASS, className)} data-static-document="" data-align={align === "start" ? "start" : undefined}>
+    <div
+      className={cx(SURFACE_CLASS, className)}
+      data-static-document=""
+      data-align={align === "start" ? "start" : undefined}
+    >
       <div className={DOC_CLASS}>{body}</div>
     </div>
   );
@@ -58,7 +84,13 @@ export function StaticDocument({ content, variables, align = "center", className
  * A hard break in a static render. The last one in its paragraph or heading also gets the live
  * editor's trailing <br>, which keeps the empty line after it from collapsing.
  */
-export function staticHardBreak({ node, parent }: { node: PMNode; parent?: PMNode }) {
+export function staticHardBreak({
+  node,
+  parent,
+}: {
+  node: PMNode;
+  parent?: PMNode;
+}) {
   if (parent?.lastChild !== node) return <br />;
   return (
     <>

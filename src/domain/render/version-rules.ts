@@ -19,7 +19,8 @@ export interface VersionFacts {
   revokedAt: Date | null;
 }
 
-export type VersionCheck = { ok: true; newerVersion: number | null } | { ok: false; error: RenderError };
+export type VersionCheck =
+  { ok: true; newerVersion: number | null } | { ok: false; error: RenderError };
 
 export function checkVersion(input: {
   version: VersionFacts;
@@ -36,16 +37,30 @@ export function checkVersion(input: {
 
     case "superseded":
       if (version.sunsetAt && sunsetPassed(version, now)) {
-        return { ok: false, error: versionSunset(version.number, version.sunsetAt, activeNumber, zone) };
+        return {
+          ok: false,
+          error: versionSunset(
+            version.number,
+            version.sunsetAt,
+            activeNumber,
+            zone,
+          ),
+        };
       }
       return { ok: true, newerVersion: activeNumber };
 
     case "revoked":
-      return { ok: false, error: versionRevoked(version.number, version.revokedAt, activeNumber) };
+      return {
+        ok: false,
+        error: versionRevoked(version.number, version.revokedAt, activeNumber),
+      };
 
     case "in_review":
     case "changes_requested":
     case "draft":
-      return { ok: false, error: versionNotReleased(version.number, version.state, activeNumber) };
+      return {
+        ok: false,
+        error: versionNotReleased(version.number, version.state, activeNumber),
+      };
   }
 }

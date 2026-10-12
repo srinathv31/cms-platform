@@ -1,12 +1,26 @@
 "use client";
 
-import { Check, FileText, Globe, Mail, MessageSquareText, Smartphone, type LucideIcon } from "lucide-react";
+import {
+  Check,
+  FileText,
+  Globe,
+  Mail,
+  MessageSquareText,
+  Smartphone,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import { CHANNELS, type Channel } from "@/domain/types";
 
-const ICON: Readonly<Record<Channel, LucideIcon>> = { pdf: FileText, web: Globe, email: Mail, push: Smartphone, sms: MessageSquareText };
+const ICON: Readonly<Record<Channel, LucideIcon>> = {
+  pdf: FileText,
+  web: Globe,
+  email: Mail,
+  push: Smartphone,
+  sms: MessageSquareText,
+};
 
 const CHIP =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium [&_svg]:size-3.5";
@@ -37,7 +51,10 @@ export function ChannelSelector({
           const label = CHANNEL_LABELS[id];
           const Icon = ICON[id];
           return (
-            <li key={id} className={cn(CHIP, "border-transparent bg-selected text-text")}>
+            <li
+              key={id}
+              className={cn(CHIP, "border-transparent bg-selected text-text")}
+            >
               <Icon aria-hidden strokeWidth={1.75} />
               {label}
             </li>
@@ -47,7 +64,9 @@ export function ChannelSelector({
     );
   }
 
-  const on = CHANNELS.filter((id) => allowed.includes(id) && channels.includes(id));
+  const on = CHANNELS.filter(
+    (id) => allowed.includes(id) && channels.includes(id),
+  );
   return (
     <ToggleGroup
       aria-label="Channels"
@@ -69,14 +88,22 @@ export function ChannelSelector({
           <ToggleGroupItem
             key={id}
             value={id}
-            title={pressed && on.length === 1 ? "At least one channel is needed" : undefined}
+            title={
+              pressed && on.length === 1
+                ? "At least one channel is needed"
+                : undefined
+            }
             className={cn(
               CHIP,
               "border-hairline bg-transparent text-text-muted hover:bg-hover hover:text-text",
               "aria-pressed:border-transparent aria-pressed:bg-selected aria-pressed:text-text",
             )}
           >
-            {pressed ? <Check aria-hidden strokeWidth={2} /> : <Icon aria-hidden strokeWidth={1.75} />}
+            {pressed ? (
+              <Check aria-hidden strokeWidth={2} />
+            ) : (
+              <Icon aria-hidden strokeWidth={1.75} />
+            )}
             {label}
           </ToggleGroupItem>
         );

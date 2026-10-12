@@ -22,7 +22,8 @@ export const isDemo = () => process.env.UCOMP_DEMO === "1";
 export const isShooting = () => isDemo() || process.env.UCOMP_STILLS === "1";
 
 /** A timeout that leaves room for demo pacing: the pauses and the stills add up to a few times the run. */
-export const demoTimeout = (ms: number, factor = 3) => (isDemo() ? ms * factor : ms);
+export const demoTimeout = (ms: number, factor = 3) =>
+  isDemo() ? ms * factor : ms;
 
 /** The size of the recording, and the fallback when a page reports no viewport. */
 export const DEMO_VIEWPORT = { width: 1440, height: 900 } as const;
@@ -190,11 +191,14 @@ export async function demoCursor(page: Page) {
 
 /** The cursor as the page last drew it, if it has one. */
 async function cursorPosition(page: Page): Promise<Point | null> {
-  const seen = await page.evaluate(() => (window as CursorWindow).__ucompCursor?.pos ?? null).catch(() => null);
+  const seen = await page
+    .evaluate(() => (window as CursorWindow).__ucompCursor?.pos ?? null)
+    .catch(() => null);
   return seen ?? lastSeen.get(page) ?? null;
 }
 
-const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const easeInOut = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
 /**
  * Moves the real mouse from where it is to `to` along a gentle arc, eased, in steps small enough to
@@ -223,14 +227,22 @@ export async function glide(page: Page, to: Point) {
       const e = easeInOut(t);
       const arc = Math.sin(Math.PI * t) * bow;
       // The arc leans on the normal of the straight line.
-      await page.mouse.move(from.x + dx * e - (dy / distance) * arc, from.y + dy * e + (dx / distance) * arc);
+      await page.mouse.move(
+        from.x + dx * e - (dy / distance) * arc,
+        from.y + dy * e + (dx / distance) * arc,
+      );
       await page.waitForTimeout(duration / steps);
     }
   }
   await page.mouse.move(to.x, to.y);
   lastSeen.set(page, to);
   // The pointer over a frame is the frame's to hear: set the dot ourselves so it ends where it should.
-  await page.evaluate(({ x, y }) => (window as CursorWindow).__ucompCursor?.set(x, y), to).catch(() => {});
+  await page
+    .evaluate(
+      ({ x, y }) => (window as CursorWindow).__ucompCursor?.set(x, y),
+      to,
+    )
+    .catch(() => {});
 }
 
 /**
@@ -244,7 +256,10 @@ export async function moveTo(page: Page, target: Locator, at?: Point) {
     await target.scrollIntoViewIfNeeded({ timeout: 2_000 });
     const box = await target.boundingBox({ timeout: 2_000 });
     if (!box) return;
-    await glide(page, { x: box.x + (at?.x ?? box.width / 2), y: box.y + (at?.y ?? box.height / 2) });
+    await glide(page, {
+      x: box.x + (at?.x ?? box.width / 2),
+      y: box.y + (at?.y ?? box.height / 2),
+    });
   } catch {
     // Not found, not unique, or gone: let the click say so.
   }
@@ -267,21 +282,27 @@ export function dropDemoNoise(problems: string[]) {
     /Unexpected duplicate view-transition-name: ucomp-demo-cursor/,
     /^pageerror: Transition was aborted because of invalid state/,
   ];
-  for (let i = problems.length - 1; i >= 0; i--) if (noise.some((pattern) => pattern.test(problems[i]))) problems.splice(i, 1);
+  for (let i = problems.length - 1; i >= 0; i--)
+    if (noise.some((pattern) => pattern.test(problems[i])))
+      problems.splice(i, 1);
 }
 
 // ── The stills ───────────────────────────────────────────────────────────────
 
 /** `scenario-02.spec.ts` → `scenario-02`. */
-export const specName = () => path.basename(test.info().file).replace(/\.spec\.[cm]?[jt]s$/, "");
+export const specName = () =>
+  path.basename(test.info().file).replace(/\.spec\.[cm]?[jt]s$/, "");
 
 /** Where this spec's gate media goes: e2e/__screens__/gate/<spec-name>/. */
-const stillsDir = () => path.join(test.info().project.testDir, "__screens__", "gate", specName());
+const stillsDir = () =>
+  path.join(test.info().project.testDir, "__screens__", "gate", specName());
 
 /** Waits (in the page) until what a still would show is on screen, drawn, and not about to change. */
 async function untilRendered(page: Page) {
   await page.evaluate(() => document.fonts.ready);
-  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+  await page
+    .waitForLoadState("networkidle", { timeout: 5_000 })
+    .catch(() => {});
 
   // Preview frames: loaded, with content, their own images and fonts in.
   await page.waitForFunction(
@@ -306,10 +327,14 @@ async function untilRendered(page: Page) {
   // The PDF: every page on screen has its canvas, sized for the page as it is now, with something on it.
   await page.waitForFunction(
     () => {
-      const region = document.querySelector<HTMLElement>('[role="region"][aria-label="PDF preview"]');
+      const region = document.querySelector<HTMLElement>(
+        '[role="region"][aria-label="PDF preview"]',
+      );
       if (!region || !region.checkVisibility()) return true; // no PDF in view
       if (region.getAttribute("aria-busy") === "true") return false;
-      const sheets = [...region.querySelectorAll<HTMLElement>('[role="group"]')].filter((sheet) => {
+      const sheets = [
+        ...region.querySelectorAll<HTMLElement>('[role="group"]'),
+      ].filter((sheet) => {
         const r = sheet.getBoundingClientRect();
         return r.bottom > 0 && r.top < window.innerHeight && r.width > 0;
       });
@@ -318,14 +343,26 @@ async function untilRendered(page: Page) {
       return sheets.every((sheet) => {
         const canvas = sheet.querySelector("canvas");
         if (!canvas || canvas.width < 2) return false;
-        if (canvas.width < sheet.getBoundingClientRect().width * dpr * 0.9) return false; // an old, smaller draw
-        const hasText = [...sheet.querySelectorAll("span")].some((span) => (span.textContent ?? "").trim());
+        if (canvas.width < sheet.getBoundingClientRect().width * dpr * 0.9)
+          return false; // an old, smaller draw
+        const hasText = [...sheet.querySelectorAll("span")].some((span) =>
+          (span.textContent ?? "").trim(),
+        );
         if (!hasText) return true;
         const context = canvas.getContext("2d");
         if (!context) return true;
-        const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+        const { data } = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
         for (let i = 0; i < data.length; i += 16) {
-          if (data[i + 3] > 0 && (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250)) return true;
+          if (
+            data[i + 3] > 0 &&
+            (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250)
+          )
+            return true;
         }
         return false; // still blank paper
       });
@@ -335,7 +372,12 @@ async function untilRendered(page: Page) {
   );
 
   // Two frames, so that what was just laid out has been painted.
-  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      ),
+  );
 }
 
 /**
@@ -350,14 +392,28 @@ export async function shoot(page: Page, name: string) {
   const dir = stillsDir();
   await mkdir(dir, { recursive: true });
   const { width } = page.viewportSize() ?? DEMO_VIEWPORT;
-  await page.evaluate(() => (window as CursorWindow).__ucompCursor?.hide()).catch(() => {});
+  await page
+    .evaluate(() => (window as CursorWindow).__ucompCursor?.hide())
+    .catch(() => {});
   try {
     await untilRendered(page);
   } catch (error) {
-    const why = error instanceof Error ? error.message.split("\n")[0] : String(error);
-    test.info().annotations.push({ type: "shoot", description: `${width}-${name}: not settled (${why})` });
-    console.warn(`shoot ${specName()}/${width}-${name}: not settled, shot anyway (${why})`);
+    const why =
+      error instanceof Error ? error.message.split("\n")[0] : String(error);
+    test.info().annotations.push({
+      type: "shoot",
+      description: `${width}-${name}: not settled (${why})`,
+    });
+    console.warn(
+      `shoot ${specName()}/${width}-${name}: not settled, shot anyway (${why})`,
+    );
   }
-  await page.screenshot({ path: path.join(dir, `${width}-${name}.png`), animations: "disabled", caret: "hide" });
-  await page.evaluate(() => (window as CursorWindow).__ucompCursor?.show()).catch(() => {});
+  await page.screenshot({
+    path: path.join(dir, `${width}-${name}.png`),
+    animations: "disabled",
+    caret: "hide",
+  });
+  await page
+    .evaluate(() => (window as CursorWindow).__ucompCursor?.show())
+    .catch(() => {});
 }

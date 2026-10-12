@@ -18,14 +18,23 @@
 // Patterns use [0-9], not \d: some validators (Python's re, for one) read \d as any Unicode digit.
 
 import { TYPE_META, US_STATES, validateValue } from "@/editor/model/variables";
-import type { ApiJsonSchema, ApiJsonSchemaProperty, ApiVariable, Variable } from "../golive-types";
+import type {
+  ApiJsonSchema,
+  ApiJsonSchemaProperty,
+  ApiVariable,
+  Variable,
+} from "../golive-types";
 import { MAX_VALUE_LENGTH } from "../render/types";
 import type { VariableType } from "../types";
 
-export const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema" as const;
+export const JSON_SCHEMA_DIALECT =
+  "https://json-schema.org/draft/2020-12/schema" as const;
 
 /** Where a contract's schema says it lives. Nothing is served there; it names the schema. */
-export function jsonSchemaId(templateId: string, versionNumber: number): string {
+export function jsonSchemaId(
+  templateId: string,
+  versionNumber: number,
+): string {
   return `https://stencil.example/schemas/${templateId}/v${versionNumber}/values.json`;
 }
 
@@ -34,7 +43,8 @@ export function jsonSchemaId(templateId: string, versionNumber: number): string 
  * "1000", "1000.50", "-12.5", "0", "0.5". Not "007", ".5", "5.", "-0" or "1e3". The digits render as
  * sent (no rounding), so the only limit on them is every value's `maxLength`.
  */
-export const DECIMAL_PATTERN = "^(?!-0(?:\\.0+)?$)-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$";
+export const DECIMAL_PATTERN =
+  "^(?!-0(?:\\.0+)?$)-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$";
 /**
  * A real calendar day as YYYY-MM-DD: month lengths and leap years (every 4th year, not centuries
  * unless divisible by 400), years 0001–9999. `format: "date"` says the same, but validators may treat
@@ -52,10 +62,13 @@ export const US_STATE_CODES: readonly string[] = Object.keys(US_STATES);
 
 const DESCRIPTIONS: Readonly<Record<VariableType, string>> = {
   text: "Text.",
-  currency: "Currency, canonical form like 1000 or 1000.50. Renders as $1,000.50, digits exactly as sent.",
-  percent: "Percent, canonical form like 21.99 (no % sign). Renders as 21.99%, digits exactly as sent.",
+  currency:
+    "Currency, canonical form like 1000 or 1000.50. Renders as $1,000.50, digits exactly as sent.",
+  percent:
+    "Percent, canonical form like 21.99 (no % sign). Renders as 21.99%, digits exactly as sent.",
   date: "Date, canonical form YYYY-MM-DD like 2027-03-04. Renders as March 4, 2027.",
-  number: "Number, canonical form like 20000 or 1.5. Renders as 20,000, digits exactly as sent.",
+  number:
+    "Number, canonical form like 20000 or 1.5. Renders as 20,000, digits exactly as sent.",
   us_state: "US state, the two-letter code like NJ.",
 };
 
@@ -79,7 +92,9 @@ function propertyOf(variable: Variable): ApiJsonSchemaProperty {
   };
   switch (variable.type) {
     case "text":
-      return variable.required ? { ...base, type: "string", minLength: 1, pattern: NON_BLANK_PATTERN } : { ...base, type: "string" };
+      return variable.required
+        ? { ...base, type: "string", minLength: 1, pattern: NON_BLANK_PATTERN }
+        : { ...base, type: "string" };
     case "currency":
     case "percent":
     case "number":
@@ -105,7 +120,9 @@ export function contractJsonSchema(input: {
     $id: jsonSchemaId(input.templateId, input.versionNumber),
     title: `${input.templateName} v${input.versionNumber}: values`,
     type: "object",
-    properties: Object.fromEntries(input.variables.map((v) => [v.key, propertyOf(v)])),
+    properties: Object.fromEntries(
+      input.variables.map((v) => [v.key, propertyOf(v)]),
+    ),
     required: input.variables.filter((v) => v.required).map((v) => v.key),
     additionalProperties: true,
   };
@@ -113,5 +130,11 @@ export function contractJsonSchema(input: {
 
 /** The contract's variable list, in the version's order. */
 export function apiVariables(variables: readonly Variable[]): ApiVariable[] {
-  return variables.map((v) => ({ key: v.key, label: v.label, type: v.type, required: v.required, example: exampleOf(v) }));
+  return variables.map((v) => ({
+    key: v.key,
+    label: v.label,
+    type: v.type,
+    required: v.required,
+    example: exampleOf(v),
+  }));
 }

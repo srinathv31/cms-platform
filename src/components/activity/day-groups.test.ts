@@ -23,7 +23,8 @@ const item = (id: string, at: string): ActivityItem => ({
   summary: id,
 });
 
-const labels = (items: ActivityItem[], now = NOW) => dayGroups(items, now).map((g) => [g.label, g.items.map((i) => i.id)]);
+const labels = (items: ActivityItem[], now = NOW) =>
+  dayGroups(items, now).map((g) => [g.label, g.items.map((i) => i.id)]);
 
 beforeAll(() => {
   // The zone really is New York: the same instant has two different days.
@@ -35,14 +36,26 @@ beforeAll(() => {
 describe("dayGroups", () => {
   it("labels a UTC day Today, Yesterday, then its UTC date", () => {
     expect(labels([item("a", BOUNDARY)])).toEqual([["Today", ["a"]]]);
-    expect(labels([item("a", "2026-10-04T23:30:00.000Z")])).toEqual([["Yesterday", ["a"]]]);
-    expect(labels([item("a", "2026-10-03T23:30:00.000Z")])).toEqual([["Oct 3", ["a"]]]);
-    expect(labels([item("a", "2025-12-30T12:00:00.000Z")])).toEqual([["Dec 30, 2025", ["a"]]]);
+    expect(labels([item("a", "2026-10-04T23:30:00.000Z")])).toEqual([
+      ["Yesterday", ["a"]],
+    ]);
+    expect(labels([item("a", "2026-10-03T23:30:00.000Z")])).toEqual([
+      ["Oct 3", ["a"]],
+    ]);
+    expect(labels([item("a", "2025-12-30T12:00:00.000Z")])).toEqual([
+      ["Dec 30, 2025", ["a"]],
+    ]);
   });
 
   it("splits at midnight UTC, not at midnight in the server's zone", () => {
     // Both are October 4 in New York (22:29 and 19:30), but October 5 and October 4 in UTC.
-    expect(labels([item("later", BOUNDARY), item("earlier", "2026-10-04T23:30:00.000Z"), item("older", "2026-10-03T10:00:00.000Z")])).toEqual([
+    expect(
+      labels([
+        item("later", BOUNDARY),
+        item("earlier", "2026-10-04T23:30:00.000Z"),
+        item("older", "2026-10-03T10:00:00.000Z"),
+      ]),
+    ).toEqual([
       ["Today", ["later"]],
       ["Yesterday", ["earlier"]],
       ["Oct 3", ["older"]],
@@ -51,10 +64,20 @@ describe("dayGroups", () => {
 
   it("keeps one UTC day together, however the local clock splits it", () => {
     // 20:00 UTC on October 4 is 16:00 in New York, 00:30 UTC on October 4 is 20:30 on October 3 there.
-    expect(labels([item("a", "2026-10-04T20:00:00.000Z"), item("b", "2026-10-04T00:30:00.000Z")])).toEqual([["Yesterday", ["a", "b"]]]);
+    expect(
+      labels([
+        item("a", "2026-10-04T20:00:00.000Z"),
+        item("b", "2026-10-04T00:30:00.000Z"),
+      ]),
+    ).toEqual([["Yesterday", ["a", "b"]]]);
   });
 
   it("calls 23:00 yesterday Yesterday at 01:00, though only two hours have passed (D9)", () => {
-    expect(labels([item("a", "2026-10-04T23:00:00.000Z")], new Date("2026-10-05T01:00:00.000Z"))).toEqual([["Yesterday", ["a"]]]);
+    expect(
+      labels(
+        [item("a", "2026-10-04T23:00:00.000Z")],
+        new Date("2026-10-05T01:00:00.000Z"),
+      ),
+    ).toEqual([["Yesterday", ["a"]]]);
   });
 });

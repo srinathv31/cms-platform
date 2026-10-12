@@ -11,9 +11,13 @@ import { dayGroups } from "./day-groups";
 
 /** Who did it: their avatar, or a quiet gear for the system. */
 function Actor({ actor }: { actor: ActivityItem["actor"] }) {
-  if (actor) return <UserAvatar initials={actor.initials} hue={actor.hue} size="sm" />;
+  if (actor)
+    return <UserAvatar initials={actor.initials} hue={actor.hue} size="sm" />;
   return (
-    <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-full bg-surface-tinted text-text-muted">
+    <span
+      aria-hidden
+      className="grid size-6 shrink-0 place-items-center rounded-full bg-surface-tinted text-text-muted"
+    >
       <Cog strokeWidth={1.75} className="size-3.5" />
     </span>
   );
@@ -50,7 +54,11 @@ export async function ActivityContent({
   const groups = dayGroups(items, nowDate);
 
   return (
-    <section data-slot="activity" aria-label="Activity" className={cn(WS.doc, "flex flex-col gap-8")}>
+    <section
+      data-slot="activity"
+      aria-label="Activity"
+      className={cn(WS.doc, "flex flex-col gap-8")}
+    >
       {groups.length === 0 ? (
         <p className="text-[14px] text-text-muted">No activity yet.</p>
       ) : (
@@ -71,7 +79,11 @@ export async function ActivityContent({
                     </span>
                   ) : null}
                   <span className="flex h-6 w-24 shrink-0 items-center justify-end">
-                    <Stamp iso={item.at} relative={formatAgo(item.at, nowDate)} absolute={formatStamp(item.at)} />
+                    <Stamp
+                      iso={item.at}
+                      relative={formatAgo(item.at, nowDate)}
+                      absolute={formatStamp(item.at)}
+                    />
                   </span>
                 </li>
               ))}

@@ -15,7 +15,12 @@
 // time, so the whole document is there for screen readers and find in page.
 
 import type { PDFPageProxy } from "pdfjs-dist";
-import { loadPdfjs, openPdf, type OpenedPdf, type PdfRuntime } from "./load-pdfjs";
+import {
+  loadPdfjs,
+  openPdf,
+  type OpenedPdf,
+  type PdfRuntime,
+} from "./load-pdfjs";
 import {
   drawCanvas,
   drawTextLayer,
@@ -134,7 +139,11 @@ export class PdfController {
 
   private generation = 0;
   private current: Loaded | null = null;
-  private incoming: { generation: number; abort: AbortController; loaded: Loaded | null } | null = null;
+  private incoming: {
+    generation: number;
+    abort: AbortController;
+    loaded: Loaded | null;
+  } | null = null;
   private textFill: AbortController | null = null;
   private shownListener: ((doc: LoadedPdf) => void) | null = null;
 
@@ -157,24 +166,35 @@ export class PdfController {
     this.setLiveWidth(contentWidth(column));
     this.renderWidth = this.liveWidth;
     this.resizeObserver = new ResizeObserver(([entry]) => {
-      const width = entry?.contentBoxSize[0]?.inlineSize ?? entry?.contentRect.width ?? 0;
+      const width =
+        entry?.contentBoxSize[0]?.inlineSize ?? entry?.contentRect.width ?? 0;
       // Zero means hidden (display: none, e.g. a route kept mounted in the background): keep what we have.
       if (width < 1 || width === this.liveWidth) return;
       this.setLiveWidth(width);
       window.clearTimeout(this.resizeTimer);
       if (this.renderWidth < 1) this.applyRenderWidth();
-      else this.resizeTimer = window.setTimeout(() => this.applyRenderWidth(), RESIZE_DEBOUNCE_MS);
+      else
+        this.resizeTimer = window.setTimeout(
+          () => this.applyRenderWidth(),
+          RESIZE_DEBOUNCE_MS,
+        );
     });
     this.resizeObserver.observe(column);
 
-    this.nearObserver = new IntersectionObserver((entries) => this.onNear(entries), {
-      root: this.scrollRoot,
-      rootMargin: NEAR_MARGIN,
-    });
-    this.keepObserver = new IntersectionObserver((entries) => this.onKeep(entries), {
-      root: this.scrollRoot,
-      rootMargin: KEEP_MARGIN,
-    });
+    this.nearObserver = new IntersectionObserver(
+      (entries) => this.onNear(entries),
+      {
+        root: this.scrollRoot,
+        rootMargin: NEAR_MARGIN,
+      },
+    );
+    this.keepObserver = new IntersectionObserver(
+      (entries) => this.onKeep(entries),
+      {
+        root: this.scrollRoot,
+        rootMargin: KEEP_MARGIN,
+      },
+    );
     for (const slot of this.slots.values()) this.observe(slot);
 
     this.watchPixelRatio();
@@ -249,10 +269,14 @@ export class PdfController {
       const prepared = loaded.prepared.get(slot.index);
       if (!prepared) continue; // keeps the old page's pixels until its own render lands
       loaded.prepared.delete(slot.index);
-      slot.showCanvas(prepared.canvas, `${loaded.generation}:${prepared.pixelWidth}`);
+      slot.showCanvas(
+        prepared.canvas,
+        `${loaded.generation}:${prepared.pixelWidth}`,
+      );
       if (prepared.text) slot.showText(prepared.text, loaded.generation);
     }
-    for (const leftover of loaded.prepared.values()) releaseCanvas(leftover.canvas);
+    for (const leftover of loaded.prepared.values())
+      releaseCanvas(leftover.canvas);
     loaded.prepared.clear();
 
     if (previous) destroyTask(previous.opened);
@@ -262,7 +286,11 @@ export class PdfController {
     this.shownListener?.(loaded);
   }
 
-  private async prepare(generation: number, bytes: Uint8Array, signal: AbortSignal): Promise<Loaded> {
+  private async prepare(
+    generation: number,
+    bytes: Uint8Array,
+    signal: AbortSignal,
+  ): Promise<Loaded> {
     const runtime = await loadPdfjs();
     signal.throwIfAborted();
     const opened = openPdf(runtime, bytes);
@@ -270,25 +298,38 @@ export class PdfController {
 
     const doc = await opened.loaded;
     signal.throwIfAborted();
-    const pages = await Promise.all(Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)));
+    const pages = await Promise.all(
+      Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)),
+    );
     signal.throwIfAborted();
     const sizes = pages.map(pageSize);
-    const loaded: Loaded = { generation, numPages: doc.numPages, sizes, runtime, opened, pages, prepared: new Map() };
+    const loaded: Loaded = {
+      generation,
+      numPages: doc.numPages,
+      sizes,
+      runtime,
+      opened,
+      pages,
+      prepared: new Map(),
+    };
 
     const width = this.renderWidth;
     if (width >= 1) {
       const pixelWidth = this.pixelWidth();
       const drawn = await Promise.all(
-        this.visibleIndices(sizes, width).map(async (index): Promise<[number, Prepared]> => {
-          const page = pages[index];
-          const [canvas, text] = await Promise.all([
-            drawCanvas(page, sizes[index], pixelWidth, signal),
-            drawTextLayer(runtime.pdfjs, page, signal),
-          ]);
-          return [index, { canvas, pixelWidth, text }];
-        }),
+        this.visibleIndices(sizes, width).map(
+          async (index): Promise<[number, Prepared]> => {
+            const page = pages[index];
+            const [canvas, text] = await Promise.all([
+              drawCanvas(page, sizes[index], pixelWidth, signal),
+              drawTextLayer(runtime.pdfjs, page, signal),
+            ]);
+            return [index, { canvas, pixelWidth, text }];
+          },
+        ),
       );
-      for (const [index, prepared] of drawn) loaded.prepared.set(index, prepared);
+      for (const [index, prepared] of drawn)
+        loaded.prepared.set(index, prepared);
     }
     return loaded;
   }
@@ -298,7 +339,8 @@ export class PdfController {
     if (!incoming) return;
     this.incoming = null;
     incoming.abort.abort();
-    for (const prepared of incoming.loaded?.prepared.values() ?? []) releaseCanvas(prepared.canvas);
+    for (const prepared of incoming.loaded?.prepared.values() ?? [])
+      releaseCanvas(prepared.canvas);
   }
 
   private destroyCurrent() {
@@ -375,10 +417,12 @@ export class PdfController {
 
   private schedule(slot: PageSlot | undefined) {
     const doc = this.current;
-    if (!slot || !doc || slot.index >= doc.numPages || this.renderWidth < 1) return;
+    if (!slot || !doc || slot.index >= doc.numPages || this.renderWidth < 1)
+      return;
     if (!this.near.has(slot.index)) return;
     const key = `${doc.generation}:${this.pixelWidth()}`;
-    if (slot.canvasKey === key && slot.textGeneration === doc.generation) return;
+    if (slot.canvasKey === key && slot.textGeneration === doc.generation)
+      return;
     if (slot.job?.key === key) return;
     this.cancelJob(slot);
     this.queue.add(slot);
@@ -424,9 +468,18 @@ export class PdfController {
     try {
       const page = doc.pages[slot.index];
       const canvas =
-        slot.canvasKey === key ? null : await drawCanvas(page, doc.sizes[slot.index], pixelWidth, abort.signal);
+        slot.canvasKey === key
+          ? null
+          : await drawCanvas(
+              page,
+              doc.sizes[slot.index],
+              pixelWidth,
+              abort.signal,
+            );
       const text =
-        slot.textGeneration === doc.generation ? null : await drawTextLayer(doc.runtime.pdfjs, page, abort.signal);
+        slot.textGeneration === doc.generation
+          ? null
+          : await drawTextLayer(doc.runtime.pdfjs, page, abort.signal);
       if (abort.signal.aborted) {
         if (canvas) releaseCanvas(canvas);
         return;
@@ -451,22 +504,33 @@ export class PdfController {
     void (async () => {
       // A page with a render in flight gets its text from that render; if the render is dropped
       // (scrolled past), a later round picks the page up. Rounds that find only busy pages are capped.
-      for (let busyRounds = 0; !signal.aborted && busyRounds < 20; ) {
+      for (let busyRounds = 0; !signal.aborted && busyRounds < 20;) {
         const missing = [...this.slots.values()].filter(
-          (s) => s.index < doc.numPages && s.textGeneration !== doc.generation && !tried.has(s),
+          (s) =>
+            s.index < doc.numPages &&
+            s.textGeneration !== doc.generation &&
+            !tried.has(s),
         );
         if (missing.length === 0) return;
         await whenIdle(signal);
         if (signal.aborted) return;
-        const slot = missing.find((s) => !s.job && !this.queue.has(s) && s.textGeneration !== doc.generation);
+        const slot = missing.find(
+          (s) =>
+            !s.job && !this.queue.has(s) && s.textGeneration !== doc.generation,
+        );
         if (!slot) {
           busyRounds++;
           continue;
         }
         tried.add(slot);
         try {
-          const text = await drawTextLayer(doc.runtime.pdfjs, doc.pages[slot.index], signal);
-          if (text && !signal.aborted && this.slots.get(slot.index) === slot) slot.showText(text, doc.generation);
+          const text = await drawTextLayer(
+            doc.runtime.pdfjs,
+            doc.pages[slot.index],
+            signal,
+          );
+          if (text && !signal.aborted && this.slots.get(slot.index) === slot)
+            slot.showText(text, doc.generation);
         } catch {
           if (signal.aborted) return;
         }
@@ -507,7 +571,10 @@ export class PdfController {
     if (!column) return [0];
     const style = getComputedStyle(column);
     const gap = parseFloat(style.rowGap) || 0;
-    let top = column.getBoundingClientRect().top + (parseFloat(style.paddingTop) || 0) + (parseFloat(style.borderTopWidth) || 0);
+    let top =
+      column.getBoundingClientRect().top +
+      (parseFloat(style.paddingTop) || 0) +
+      (parseFloat(style.borderTopWidth) || 0);
     const view = this.visibleRect();
     const indices: number[] = [];
     for (let index = 0; index < sizes.length && top < view.bottom; index++) {
@@ -528,7 +595,8 @@ export class PdfController {
       query?.removeEventListener("change", onChange);
       query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
       query.addEventListener("change", onChange);
-      if (this.current) for (const index of this.near) this.schedule(this.slots.get(index));
+      if (this.current)
+        for (const index of this.near) this.schedule(this.slots.get(index));
     };
     query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
     query.addEventListener("change", onChange);
@@ -538,11 +606,14 @@ export class PdfController {
   /** pdf.js's selection aid: mark the text layer being dragged in until the pointer is released. */
   private watchSelection(column: HTMLElement) {
     const start = (event: PointerEvent) => {
-      const layer = (event.target as Element | null)?.closest?.(`.${TEXT_LAYER_CLASS}`);
+      const layer = (event.target as Element | null)?.closest?.(
+        `.${TEXT_LAYER_CLASS}`,
+      );
       layer?.classList.add(SELECTING_CLASS);
     };
     const end = () => {
-      for (const layer of column.querySelectorAll(`.${SELECTING_CLASS}`)) layer.classList.remove(SELECTING_CLASS);
+      for (const layer of column.querySelectorAll(`.${SELECTING_CLASS}`))
+        layer.classList.remove(SELECTING_CLASS);
     };
     column.addEventListener("pointerdown", start);
     document.addEventListener("pointerup", end);
@@ -557,9 +628,18 @@ export class PdfController {
 
 /** The nearest ancestor that scrolls vertically, or null when the document itself scrolls. */
 export function findScrollRoot(el: HTMLElement): HTMLElement | null {
-  for (let node = el.parentElement; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+  for (
+    let node = el.parentElement;
+    node && node !== document.body && node !== document.documentElement;
+    node = node.parentElement
+  ) {
     const { overflowY } = getComputedStyle(node);
-    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return node;
+    if (
+      overflowY === "auto" ||
+      overflowY === "scroll" ||
+      overflowY === "overlay"
+    )
+      return node;
   }
   return null;
 }
@@ -571,16 +651,23 @@ function destroyTask({ task }: OpenedPdf) {
 
 function contentWidth(el: HTMLElement): number {
   const style = getComputedStyle(el);
-  return el.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+  return (
+    el.clientWidth -
+    (parseFloat(style.paddingLeft) || 0) -
+    (parseFloat(style.paddingRight) || 0)
+  );
 }
 
 function whenIdle(signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (signal.aborted) return resolve();
-    const id = window.requestIdleCallback(() => {
-      signal.removeEventListener("abort", stop);
-      resolve();
-    }, { timeout: 2000 });
+    const id = window.requestIdleCallback(
+      () => {
+        signal.removeEventListener("abort", stop);
+        resolve();
+      },
+      { timeout: 2000 },
+    );
     const stop = () => {
       window.cancelIdleCallback(id);
       resolve();

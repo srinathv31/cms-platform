@@ -15,11 +15,15 @@ import { SmsOutput } from "./phone-output";
 
 // The phone kit loads its fonts through next/font; the well's part is what is around the phone.
 vi.mock("@/components/device", () => ({
-  SmsPreview: ({ content }: { content: SmsContent }) => <figure data-phone="sms">{content.text}</figure>,
+  SmsPreview: ({ content }: { content: SmsContent }) => (
+    <figure data-phone="sms">{content.text}</figure>
+  ),
   PushPreview: () => <figure data-phone="push" />,
 }));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
@@ -33,13 +37,23 @@ afterEach(() => {
   container.remove();
 });
 
-const tooLong = (parts: number): RenderError => smsTooLong({ parts, encoding: "GSM-7", characters: parts * 153 });
+const tooLong = (parts: number): RenderError =>
+  smsTooLong({ parts, encoding: "GSM-7", characters: parts * 153 });
 
 function show(refusal: RenderError | null) {
-  const output: Extract<MessageOutput, { kind: "sms" }> = { kind: "sms", text: "Hi Maya.", refusal };
+  const output: Extract<MessageOutput, { kind: "sms" }> = {
+    kind: "sms",
+    text: "Hi Maya.",
+    refusal,
+  };
   act(() =>
     root.render(
-      <SmsOutput output={output} settings={INITIAL_PHONE} senders={{ appName: "Coral", smsSender: "26725" }} clock={{ time: "9:41", date: "Friday, October 9" }} />,
+      <SmsOutput
+        output={output}
+        settings={INITIAL_PHONE}
+        senders={{ appName: "Coral", smsSender: "26725" }}
+        clock={{ time: "9:41", date: "Friday, October 9" }}
+      />,
     ),
   );
 }
@@ -50,7 +64,9 @@ const status = () => container.querySelector('[role="status"]');
 describe("a refused message's sentence", () => {
   it("is shown, but never as an alert", () => {
     show(tooLong(11));
-    expect(sentence()?.textContent).toBe("The SMS is 11 parts in GSM-7. It can be at most 10 parts.");
+    expect(sentence()?.textContent).toBe(
+      "The SMS is 11 parts in GSM-7. It can be at most 10 parts.",
+    );
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(container.querySelector("[aria-live]")).toBeNull();
   });
@@ -80,8 +96,12 @@ describe("a refused message's sentence", () => {
 describe("refusalNotice", () => {
   it("names the limit, not the message's size", () => {
     expect(refusalNotice(tooLong(14))).toBe("The SMS is over 10 parts.");
-    expect(refusalNotice({ code: "push_payload_too_large", message: "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes." })).toBe(
-      "The push is over 4,096 bytes.",
-    );
+    expect(
+      refusalNotice({
+        code: "push_payload_too_large",
+        message:
+          "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes.",
+      }),
+    ).toBe("The push is over 4,096 bytes.");
   });
 });

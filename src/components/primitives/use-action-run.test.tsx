@@ -9,7 +9,9 @@ import type { ActionResult } from "@/domain/review-types";
 // the refusal's sentence to show, a screen's own sentence when the call throws, and Next's redirect
 // handed back to Next.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 /** Next's redirect, as `unstable_rethrow` recognises it. */
 class NextRedirect extends Error {
@@ -23,7 +25,8 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { GENERIC_FAILURE, runAction, useActionRun } = await import("./use-action-run");
+const { GENERIC_FAILURE, runAction, useActionRun } =
+  await import("./use-action-run");
 
 const SCREEN_FAILURE = "Couldn't open a draft. Try again.";
 
@@ -49,7 +52,10 @@ function Harness({ failure }: { failure?: string }) {
     hook.current = run;
   });
   return (
-    <p data-pending={run.pending ? "" : undefined} role={run.error ? "alert" : undefined}>
+    <p
+      data-pending={run.pending ? "" : undefined}
+      role={run.error ? "alert" : undefined}
+    >
       {run.error}
     </p>
   );
@@ -72,16 +78,29 @@ afterEach(() => {
 
 describe("runAction", () => {
   it("answers the action's result, accepted or refused", async () => {
-    expect(await runAction(async () => ({ ok: true, number: 3 }))).toEqual({ ok: true, number: 3 });
-    expect(await runAction(async () => ({ ok: false, ...REFUSALS.newerInReview }))).toEqual({ ok: false, ...REFUSALS.newerInReview });
+    expect(await runAction(async () => ({ ok: true, number: 3 }))).toEqual({
+      ok: true,
+      number: 3,
+    });
+    expect(
+      await runAction(async () => ({ ok: false, ...REFUSALS.newerInReview })),
+    ).toEqual({ ok: false, ...REFUSALS.newerInReview });
   });
 
   it("turns a call that throws into the code `failed` with the screen's sentence, or the generic one", async () => {
     const offline = async (): Promise<ActionResult> => {
       throw new TypeError("Failed to fetch");
     };
-    expect(await runAction(offline, SCREEN_FAILURE)).toEqual({ ok: false, code: "failed", reason: SCREEN_FAILURE });
-    expect(await runAction(offline)).toEqual({ ok: false, code: "failed", reason: GENERIC_FAILURE });
+    expect(await runAction(offline, SCREEN_FAILURE)).toEqual({
+      ok: false,
+      code: "failed",
+      reason: SCREEN_FAILURE,
+    });
+    expect(await runAction(offline)).toEqual({
+      ok: false,
+      code: "failed",
+      reason: GENERIC_FAILURE,
+    });
   });
 
   it("hands Next's redirect back instead of swallowing it", async () => {
@@ -112,11 +131,17 @@ describe("useActionRun", () => {
     const onRefused = vi.fn();
     const onOk = vi.fn();
     await act(async () => {
-      api().run(async () => ({ ok: false, ...REFUSALS.newerInReview }), { onOk, onRefused });
+      api().run(async () => ({ ok: false, ...REFUSALS.newerInReview }), {
+        onOk,
+        onRefused,
+      });
     });
     expect(shown().getAttribute("role")).toBe("alert");
     expect(shown().textContent).toBe("A newer version is in review.");
-    expect(onRefused).toHaveBeenCalledWith({ ok: false, ...REFUSALS.newerInReview });
+    expect(onRefused).toHaveBeenCalledWith({
+      ok: false,
+      ...REFUSALS.newerInReview,
+    });
     expect(onOk).not.toHaveBeenCalled();
   });
 
@@ -131,7 +156,11 @@ describe("useActionRun", () => {
       );
     });
     expect(shown().textContent).toBe(SCREEN_FAILURE);
-    expect(onRefused).toHaveBeenCalledWith({ ok: false, code: "failed", reason: SCREEN_FAILURE });
+    expect(onRefused).toHaveBeenCalledWith({
+      ok: false,
+      code: "failed",
+      reason: SCREEN_FAILURE,
+    });
   });
 
   it("runs one action at a time: a second press while one is out is ignored", async () => {

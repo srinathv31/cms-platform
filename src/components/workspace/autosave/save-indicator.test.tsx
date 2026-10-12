@@ -14,13 +14,16 @@ describe("saveIndicatorText", () => {
   });
 
   it("shows the error message, with a plain fallback", () => {
-    expect(saveIndicatorText("error", "Not saved. Retrying…")).toBe("Not saved. Retrying…");
+    expect(saveIndicatorText("error", "Not saved. Retrying…")).toBe(
+      "Not saved. Retrying…",
+    );
     expect(saveIndicatorText("error")).toBe("Not saved.");
   });
 });
 
 describe("SaveIndicator", () => {
-  const html = (props: Parameters<typeof SaveIndicator>[0]) => renderToStaticMarkup(<SaveIndicator {...props} />);
+  const html = (props: Parameters<typeof SaveIndicator>[0]) =>
+    renderToStaticMarkup(<SaveIndicator {...props} />);
 
   it("is a polite live region", () => {
     const out = html({ status: "saved" });
@@ -48,7 +51,11 @@ describe("SaveIndicator", () => {
   });
 
   it("marks an error so it isn't missed", () => {
-    const out = html({ status: "error", error: "Your latest changes can't be saved — this draft changed elsewhere." });
+    const out = html({
+      status: "error",
+      error:
+        "Your latest changes can't be saved — this draft changed elsewhere.",
+    });
     expect(out).toContain("text-danger-text");
     expect(out).not.toContain("text-text-muted");
     expect(out).toContain("this draft changed elsewhere");

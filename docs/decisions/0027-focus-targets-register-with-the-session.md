@@ -24,7 +24,7 @@ kept mounted but hidden (`<Activity>`) could also answer a page-wide query first
   `useFocusTarget(name, state?)` (or, for the name field, in an effect beside its own ref), and unregisters on unmount.
   A later registration under the same name replaces the earlier one; taking out a replaced one does nothing.
 - **Callers ask the registry, never the DOM.** `get(name)` for a control that is there now; `waitFor(name, { accept,
-  timeout })` for one that is about to mount. It resolves at once when the registered one is accepted, when an
+timeout })` for one that is about to mount. It resolves at once when the registered one is accepted, when an
   accepted one registers, or with null at the timeout. The timeout is the bounded fallback: focus stays where it is.
 - **A target can register with what it shows.** The status row registers with its version state, so a submit waits
   for the row that reads In review (3 seconds at most, as before) instead of polling for a badge inside it. The

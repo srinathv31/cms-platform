@@ -13,6 +13,8 @@ export default class SeedReporter implements Reporter {
     if (!testModules.some((module) => module.state() === "failed")) return;
     const seed = this.vitest?.config.sequence.seed;
     if (seed === undefined) return;
-    console.error(`\nTests run in a random order. Run this order again with: npx vitest run --sequence.seed=${seed}\n`);
+    console.error(
+      `\nTests run in a random order. Run this order again with: npx vitest run --sequence.seed=${seed}\n`,
+    );
   }
 }

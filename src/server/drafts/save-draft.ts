@@ -17,7 +17,11 @@ export function draftAccessRefusal(viewer: Viewer, versionId: string) {
  * merged audit row, in one transaction. `patch` must come from `parseDraftPatch`.
  * Returns the contract's response; the route maps a refusal's `code` to an HTTP status.
  */
-export async function saveDraft(viewer: Viewer, versionId: string, patch: DraftPatch): Promise<DraftSaveResponse> {
+export async function saveDraft(
+  viewer: Viewer,
+  versionId: string,
+  patch: DraftPatch,
+): Promise<DraftSaveResponse> {
   // Read the demo clock before the transaction opens: it queries the database on its own connection.
   const at = await now();
   return applyDraftPatch(db, { viewer, versionId, patch, at });

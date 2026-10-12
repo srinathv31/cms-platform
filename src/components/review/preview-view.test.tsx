@@ -2,7 +2,11 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { channelNotAllowed, renderFailed, renderFailedGlyphs } from "@/domain/render/errors";
+import {
+  channelNotAllowed,
+  renderFailed,
+  renderFailedGlyphs,
+} from "@/domain/render/errors";
 import type { RenderError } from "@/domain/render/types";
 import type { PreviewSlot } from "@/components/preview/use-preview-render";
 import type { Channel } from "@/domain/types";
@@ -14,10 +18,17 @@ import { PreviewView } from "./preview-view";
 
 const route = vi.hoisted(() => ({ slots: {} as Record<string, unknown> }));
 vi.mock("@/components/preview/use-preview-render", () => ({
-  usePreviewRender: () => ({ slots: route.slots, rendering: false, retry: () => {} }),
+  usePreviewRender: () => ({
+    slots: route.slots,
+    rendering: false,
+    retry: () => {},
+  }),
 }));
 vi.mock("@/components/preview/preview-pane", () => ({
-  PreviewPane: (props: { channel: Channel; onPdfShown?: () => void }): ReactNode => (
+  PreviewPane: (props: {
+    channel: Channel;
+    onPdfShown?: () => void;
+  }): ReactNode => (
     <div data-channel={props.channel}>
       <button type="button" onClick={props.onPdfShown}>
         pdf shown
@@ -26,7 +37,9 @@ vi.mock("@/components/preview/preview-pane", () => ({
   ),
 }));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const onViewed = vi.fn();
 const onFailed = vi.fn();
@@ -74,9 +87,17 @@ function show(channels: Channel[], enabled = true) {
   );
 }
 
-const slot = (over: Partial<PreviewSlot>): PreviewSlot => ({ output: null, error: null, ...over });
+const slot = (over: Partial<PreviewSlot>): PreviewSlot => ({
+  output: null,
+  error: null,
+  ...over,
+});
 const WEB = { kind: "web", html: "<p>Hi</p>" } as const;
-const PDF = { kind: "pdf", bytes: new Uint8Array([1]), filename: "UC-4F7K2Q-v3.pdf" } as const;
+const PDF = {
+  kind: "pdf",
+  bytes: new Uint8Array([1]),
+  filename: "UC-4F7K2Q-v3.pdf",
+} as const;
 
 describe("PreviewView reports the output on screen", () => {
   it("a rendered output is viewed and not failed", () => {
@@ -102,13 +123,17 @@ describe("PreviewView reports the output on screen", () => {
   });
 
   it("a channel the content type no longer allows is failed", () => {
-    route.slots = { web: slot({ error: channelNotAllowed("Disclosure", "web") }) };
+    route.slots = {
+      web: slot({ error: channelNotAllowed("Disclosure", "web") }),
+    };
     show(["web"]);
     expect(onFailed).toHaveBeenLastCalledWith("web", true);
   });
 
   it("a failure on top of an earlier good render is still failed, and stops being once it renders again", () => {
-    route.slots = { web: slot({ output: WEB, error: channelNotAllowed("Disclosure", "web") }) };
+    route.slots = {
+      web: slot({ output: WEB, error: channelNotAllowed("Disclosure", "web") }),
+    };
     show(["web"]);
     expect(onFailed).toHaveBeenLastCalledWith("web", true);
     route.slots = { web: slot({ output: WEB }) };
@@ -117,7 +142,11 @@ describe("PreviewView reports the output on screen", () => {
   });
 
   it("a problem with the sample set's values, or a failure that may pass on trying again, is not failed", () => {
-    const values: RenderError = { code: "missing_variables", message: "Missing required variables: first_name.", details: { missing: ["first_name"], invalid: [] } };
+    const values: RenderError = {
+      code: "missing_variables",
+      message: "Missing required variables: first_name.",
+      details: { missing: ["first_name"], invalid: [] },
+    };
     route.slots = { pdf: slot({ error: values }) };
     show(["pdf"]);
     expect(onFailed).toHaveBeenLastCalledWith("pdf", false);
@@ -129,7 +158,9 @@ describe("PreviewView reports the output on screen", () => {
   });
 
   it("says nothing while the Preview isn't the view showing", () => {
-    route.slots = { web: slot({ error: channelNotAllowed("Disclosure", "web") }) };
+    route.slots = {
+      web: slot({ error: channelNotAllowed("Disclosure", "web") }),
+    };
     show(["web"], false);
     expect(onFailed).not.toHaveBeenCalled();
     expect(onViewed).not.toHaveBeenCalled();

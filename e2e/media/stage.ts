@@ -8,8 +8,15 @@ import { presentation } from "./presentation";
 //   - `demo`: demo mode on (UCOMP_DEMO), the cursor on the page, and presentation pacing for clicks, typing and drags.
 //   - `stills-1280`: shooting on (UCOMP_STILLS). Full speed, no cursor.
 
-export async function demoStage({ page }: { page: Page }, provide: () => Promise<void>, testInfo: TestInfo) {
-  const before = { UCOMP_DEMO: process.env.UCOMP_DEMO, UCOMP_STILLS: process.env.UCOMP_STILLS };
+export async function demoStage(
+  { page }: { page: Page },
+  provide: () => Promise<void>,
+  testInfo: TestInfo,
+) {
+  const before = {
+    UCOMP_DEMO: process.env.UCOMP_DEMO,
+    UCOMP_STILLS: process.env.UCOMP_STILLS,
+  };
   const demo = !!testInfo.project.metadata?.demo;
   if (demo) {
     process.env.UCOMP_DEMO = "1";
@@ -18,7 +25,9 @@ export async function demoStage({ page }: { page: Page }, provide: () => Promise
   if (testInfo.project.metadata?.stills) process.env.UCOMP_STILLS = "1";
   await demoCursor(page);
   await provide();
-  if (demo) for (const key of Object.keys(pacing) as (keyof typeof pacing)[]) delete pacing[key];
+  if (demo)
+    for (const key of Object.keys(pacing) as (keyof typeof pacing)[])
+      delete pacing[key];
   for (const [key, value] of Object.entries(before)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

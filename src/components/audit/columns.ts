@@ -17,7 +17,9 @@ export const AUDIT_CELL = {
   det: grid.det,
 } as const;
 
-export function auditHeads(showTeam: boolean): { label: string; area: string }[] {
+export function auditHeads(
+  showTeam: boolean,
+): { label: string; area: string }[] {
   return [
     { label: "When", area: grid.when },
     { label: "Who", area: grid.who },

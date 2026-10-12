@@ -29,11 +29,22 @@ import {
 } from "../channel-fields";
 import { sampleSetValues } from "@/editor/model/sample-sets";
 import { SMS_MAX_PARTS, smsLength } from "../messages/gsm7";
-import { PUSH_MAX_BYTES, pushPayloadBytes, type PushPlatform } from "../messages/push";
+import {
+  PUSH_MAX_BYTES,
+  pushPayloadBytes,
+  type PushPlatform,
+} from "../messages/push";
 import type { JSONContent, SampleSet, Variable } from "../types";
 import { pushPayloadTooLarge, smsTooLong } from "./errors";
 import { resolveInlineField, resolveLinesField } from "./resolve";
-import type { CanonicalValues, MessageTarget, PushRender, RenderError, ResolveContext, SmsRender } from "./types";
+import type {
+  CanonicalValues,
+  MessageTarget,
+  PushRender,
+  RenderError,
+  ResolveContext,
+  SmsRender,
+} from "./types";
 import { validateValues } from "./validate";
 
 /** The content type's rules a message renders with. */
@@ -59,7 +70,8 @@ export interface MessageInput {
 export type PushText = Omit<PushRender, "payloadBytes">;
 
 /** Rendered, or refused with the error the API returns. */
-export type MessageResult<T> = { ok: true; output: T } | { ok: false; error: RenderError };
+export type MessageResult<T> =
+  { ok: true; output: T } | { ok: false; error: RenderError };
 
 /**
  * A channel field as the text its channel prints: one line (`line`, `paragraph`) or its lines kept
@@ -68,7 +80,11 @@ export type MessageResult<T> = { ok: true; output: T } | { ok: false; error: Ren
  * the non-joiner in a Persian name) stay, in the text and in values. The email's lose them too, as the
  * document does (`fieldCharacters`). `null` gives "". Throws a ResolveError for JSON the resolver can't place.
  */
-export function resolveChannelField(value: JSONContent | null, field: FieldOf, ctx: ResolveContext): string {
+export function resolveChannelField(
+  value: JSONContent | null,
+  field: FieldOf,
+  ctx: ResolveContext,
+): string {
   const characters = fieldCharacters(field);
   switch (field.shape) {
     case "line":
@@ -86,21 +102,42 @@ export function resolveChannelField(value: JSONContent | null, field: FieldOf, c
  * platform (no subtitle on Android, none on iPhone when it's empty), or the SMS with its footer. The
  * preview shows this even when `renderMessage` refuses it.
  */
-export function resolveMessage(target: { channel: "push"; platform: PushPlatform }, input: MessageInput): PushText;
-export function resolveMessage(target: { channel: "sms" }, input: MessageInput): string;
-export function resolveMessage(target: MessageTarget, input: MessageInput): PushText | string;
-export function resolveMessage(target: MessageTarget, input: MessageInput): PushText | string {
+export function resolveMessage(
+  target: { channel: "push"; platform: PushPlatform },
+  input: MessageInput,
+): PushText;
+export function resolveMessage(
+  target: { channel: "sms" },
+  input: MessageInput,
+): string;
+export function resolveMessage(
+  target: MessageTarget,
+  input: MessageInput,
+): PushText | string;
+export function resolveMessage(
+  target: MessageTarget,
+  input: MessageInput,
+): PushText | string {
   switch (target.channel) {
     case "push": {
       // Only the fields the platform shows: Android has no subtitle (the registry's `platforms`).
       const text = textOf(
-        channelFieldsOf("push").filter((field) => fieldOnPlatform(field, target.platform)),
+        channelFieldsOf("push").filter((field) =>
+          fieldOnPlatform(field, target.platform),
+        ),
         input,
       );
-      return { title: text.title ?? "", ...(text.subtitle ? { subtitle: text.subtitle } : {}), body: text.body ?? "" };
+      return {
+        title: text.title ?? "",
+        ...(text.subtitle ? { subtitle: text.subtitle } : {}),
+        body: text.body ?? "",
+      };
     }
     case "sms":
-      return withFooter(textOf(channelFieldsOf("sms"), input).text ?? "", input.rules.smsFooter);
+      return withFooter(
+        textOf(channelFieldsOf("sms"), input).text ?? "",
+        input.rules.smsFooter,
+      );
     default:
       return assertNever(target, "message target");
   }
@@ -111,22 +148,47 @@ export function resolveMessage(target: MessageTarget, input: MessageInput): Push
  * notification JSON and refused past PUSH_MAX_BYTES (push_payload_too_large); the SMS is measured in
  * parts and refused past SMS_MAX_PARTS (sms_too_long). Never truncates, never transliterates.
  */
-export function renderMessage(target: { channel: "push"; platform: PushPlatform }, input: MessageInput): MessageResult<PushRender>;
-export function renderMessage(target: { channel: "sms" }, input: MessageInput): MessageResult<SmsRender>;
-export function renderMessage(target: MessageTarget, input: MessageInput): MessageResult<PushRender | SmsRender>;
-export function renderMessage(target: MessageTarget, input: MessageInput): MessageResult<PushRender | SmsRender> {
+export function renderMessage(
+  target: { channel: "push"; platform: PushPlatform },
+  input: MessageInput,
+): MessageResult<PushRender>;
+export function renderMessage(
+  target: { channel: "sms" },
+  input: MessageInput,
+): MessageResult<SmsRender>;
+export function renderMessage(
+  target: MessageTarget,
+  input: MessageInput,
+): MessageResult<PushRender | SmsRender>;
+export function renderMessage(
+  target: MessageTarget,
+  input: MessageInput,
+): MessageResult<PushRender | SmsRender> {
   switch (target.channel) {
     case "push": {
       const push = resolveMessage(target, input);
       const payloadBytes = pushPayloadBytes(target.platform, push);
-      if (payloadBytes > PUSH_MAX_BYTES) return { ok: false, error: pushPayloadTooLarge(target.platform, payloadBytes) };
+      if (payloadBytes > PUSH_MAX_BYTES)
+        return {
+          ok: false,
+          error: pushPayloadTooLarge(target.platform, payloadBytes),
+        };
       return { ok: true, output: { ...push, payloadBytes } };
     }
     case "sms": {
       const text = resolveMessage(target, input);
       const length = smsLength(text);
-      if (length.parts > SMS_MAX_PARTS) return { ok: false, error: smsTooLong(length) };
-      return { ok: true, output: { text, encoding: length.encoding, parts: length.parts, characters: length.characters } };
+      if (length.parts > SMS_MAX_PARTS)
+        return { ok: false, error: smsTooLong(length) };
+      return {
+        ok: true,
+        output: {
+          text,
+          encoding: length.encoding,
+          parts: length.parts,
+          characters: length.characters,
+        },
+      };
     }
     default:
       return assertNever(target, "message target");
@@ -153,10 +215,14 @@ export function longSampleValues(
 ): CanonicalValues {
   const generated = sampleSetValues(GENERATED_LONG, version.variables, today);
   const own = version.sampleSets.find((s) => s.id === "long");
-  const given = own ? sampleSetValues(own, version.variables, today) : generated;
+  const given = own
+    ? sampleSetValues(own, version.variables, today)
+    : generated;
   const values: Record<string, string> = {};
   for (const variable of version.variables) {
-    const value = canonicalValue(variable, given[variable.key]) ?? canonicalValue(variable, generated[variable.key]);
+    const value =
+      canonicalValue(variable, given[variable.key]) ??
+      canonicalValue(variable, generated[variable.key]);
     if (value !== null) values[variable.key] = value;
   }
   return values;
@@ -172,9 +238,18 @@ function canonicalValue(variable: Variable, value: unknown): string | null {
 }
 
 /** The fields, each resolved to its text, by key. */
-function textOf(fields: readonly ChannelField[], input: MessageInput): Readonly<Record<string, string>> {
-  const ctx: ResolveContext = { variables: input.variables, values: input.values };
+function textOf(
+  fields: readonly ChannelField[],
+  input: MessageInput,
+): Readonly<Record<string, string>> {
+  const ctx: ResolveContext = {
+    variables: input.variables,
+    values: input.values,
+  };
   return Object.fromEntries(
-    fields.map((field) => [field.key, resolveChannelField(channelFieldValue(input.fields, field), field, ctx)]),
+    fields.map((field) => [
+      field.key,
+      resolveChannelField(channelFieldValue(input.fields, field), field, ctx),
+    ]),
   );
 }

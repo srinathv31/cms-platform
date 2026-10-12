@@ -13,15 +13,22 @@ import { sunsetPassed } from "./sunset";
  * as for a first version. Submit stores the diff against it, and the submit dialog and the
  * workspace's variable flags compare with the same version.
  */
-export function contractBaseline<V extends { state: VersionState; number: number | null; sunsetAt: Date | null }>(
-  versions: readonly V[],
-  now: Date,
-): V | null {
+export function contractBaseline<
+  V extends {
+    state: VersionState;
+    number: number | null;
+    sunsetAt: Date | null;
+  },
+>(versions: readonly V[], now: Date): V | null {
   const active = versions.find((v) => v.state === "active");
   if (active) return active;
   return versions
     .filter((v) => v.state === "superseded" && !sunsetPassed(v, now))
-    .reduce<V | null>((best, v) => (best === null || (v.number ?? 0) > (best.number ?? 0) ? v : best), null);
+    .reduce<V | null>(
+      (best, v) =>
+        best === null || (v.number ?? 0) > (best.number ?? 0) ? v : best,
+      null,
+    );
 }
 
 /** What `reviewBaseline` reads of each of the template's versions. */
@@ -50,7 +57,11 @@ export interface BaselineFacts {
  *
  * Not the Approve dialog's previous version: that is the Active one only.
  */
-export function reviewBaseline<V extends BaselineFacts>(versions: readonly V[], versionId: string, now: Date): V | null {
+export function reviewBaseline<V extends BaselineFacts>(
+  versions: readonly V[],
+  versionId: string,
+  now: Date,
+): V | null {
   const own = ownNumber(versions, versionId);
   const active = versions.find((v) => v.state === "active");
   if (active?.id === versionId) return null;
@@ -58,7 +69,10 @@ export function reviewBaseline<V extends BaselineFacts>(versions: readonly V[], 
 
   const byId = new Map(versions.map((v) => [v.id, v]));
   const seen = new Set([versionId]);
-  for (let id = byId.get(versionId)?.basedOnVersionId ?? null; id !== null && !seen.has(id); ) {
+  for (
+    let id = byId.get(versionId)?.basedOnVersionId ?? null;
+    id !== null && !seen.has(id);
+  ) {
     seen.add(id);
     const base = byId.get(id);
     if (!base) break;
@@ -77,14 +91,23 @@ export function reviewBaseline<V extends BaselineFacts>(versions: readonly V[], 
  * release, so it is what the round was drafted from instead (`reviewBaseline`). Null when what customers
  * get is this version, or nothing renders.
  */
-export function renameBaseline<V extends BaselineFacts>(versions: readonly V[], versionId: string, now: Date): V | null {
+export function renameBaseline<V extends BaselineFacts>(
+  versions: readonly V[],
+  versionId: string,
+  now: Date,
+): V | null {
   const live = contractBaseline(versions, now);
   if (!live || live.id === versionId) return null;
-  return ownNumber(versions, versionId)(live) ? reviewBaseline(versions, versionId, now) : live;
+  return ownNumber(versions, versionId)(live)
+    ? reviewBaseline(versions, versionId, now)
+    : live;
 }
 
 /** Whether a row is the version `versionId` or another round of its number. */
-function ownNumber<V extends BaselineFacts>(versions: readonly V[], versionId: string): (v: V) => boolean {
+function ownNumber<V extends BaselineFacts>(
+  versions: readonly V[],
+  versionId: string,
+): (v: V) => boolean {
   const number = versions.find((v) => v.id === versionId)?.number ?? null;
   return (v) => v.id === versionId || (number !== null && v.number === number);
 }

@@ -4,7 +4,10 @@ import { channelFieldValues } from "@/domain/channel-fields";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { loadPersona, seededDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  loadPersona,
+  seededDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getBaseVersion } from "./base-version";
 
 // "Revert to v1" reads the base of the draft on the author's screen, named by its version id, against
@@ -28,11 +31,16 @@ beforeAll(async () => {
   for (const id of ["maya", "eli"]) people[id] = await loadPersona(db, id);
 });
 
-const version = (templateId: string, where: { number?: number; state?: "draft" }) =>
+const version = (
+  templateId: string,
+  where: { number?: number; state?: "draft" },
+) =>
   db.query.versions.findFirst({
     where: and(
       eq(versions.templateId, templateId),
-      where.number !== undefined ? eq(versions.number, where.number) : undefined,
+      where.number !== undefined
+        ? eq(versions.number, where.number)
+        : undefined,
       where.state ? eq(versions.state, where.state) : undefined,
     ),
   });
@@ -44,7 +52,10 @@ describe("getBaseVersion", () => {
     const v1 = (await version(templateId, { number: 1 }))!;
     expect(draft.basedOnVersionId).toBe(v1.id);
 
-    const result = await getBaseVersion(people.maya!, { templateId, versionId: draft.id });
+    const result = await getBaseVersion(people.maya!, {
+      templateId,
+      versionId: draft.id,
+    });
     expect(result).toEqual({
       ok: true,
       base: {
@@ -65,7 +76,9 @@ describe("getBaseVersion", () => {
   it("refuses when the version named isn't an open draft any more, rather than reading another draft's base", async () => {
     const templateId = ids["annual-fee-waiver"]!;
     const v1 = (await version(templateId, { number: 1 }))!;
-    expect(await getBaseVersion(people.maya!, { templateId, versionId: v1.id })).toEqual({
+    expect(
+      await getBaseVersion(people.maya!, { templateId, versionId: v1.id }),
+    ).toEqual({
       ok: false,
       status: 409,
       code: "no_draft_to_revert",
@@ -74,8 +87,15 @@ describe("getBaseVersion", () => {
   });
 
   it("refuses a version of another template", async () => {
-    const draft = (await version(ids["annual-fee-waiver"]!, { state: "draft" }))!;
-    expect(await getBaseVersion(people.maya!, { templateId: ids["cash-back"]!, versionId: draft.id })).toEqual({
+    const draft = (await version(ids["annual-fee-waiver"]!, {
+      state: "draft",
+    }))!;
+    expect(
+      await getBaseVersion(people.maya!, {
+        templateId: ids["cash-back"]!,
+        versionId: draft.id,
+      }),
+    ).toEqual({
       ok: false,
       status: 404,
       code: "no_draft_to_revert",
@@ -86,12 +106,20 @@ describe("getBaseVersion", () => {
   it("refuses someone who can't edit the team's drafts", async () => {
     const templateId = ids["annual-fee-waiver"]!;
     const draft = (await version(templateId, { state: "draft" }))!;
-    const result = await getBaseVersion(people.eli!, { templateId, versionId: draft.id });
+    const result = await getBaseVersion(people.eli!, {
+      templateId,
+      versionId: draft.id,
+    });
     expect(result).toMatchObject({ ok: false, status: 403 });
   });
 
   it("refuses a template that doesn't exist", async () => {
-    expect(await getBaseVersion(people.maya!, { templateId: "UC-ZZZZZZ", versionId: "v_none" })).toEqual({
+    expect(
+      await getBaseVersion(people.maya!, {
+        templateId: "UC-ZZZZZZ",
+        versionId: "v_none",
+      }),
+    ).toEqual({
       ok: false,
       status: 404,
       code: "template_unavailable",
@@ -101,8 +129,18 @@ describe("getBaseVersion", () => {
 
   it("refuses input that doesn't parse", async () => {
     const templateId = ids["annual-fee-waiver"]!;
-    for (const input of [{ templateId, versionId: "" }, { templateId, versionId: "v".repeat(65) }, { templateId, versionId: null }, { templateId }]) {
-      expect(await getBaseVersion(people.maya!, input as never)).toEqual({ ok: false, status: 400, code: "template_unavailable", reason: "This template isn't available." });
+    for (const input of [
+      { templateId, versionId: "" },
+      { templateId, versionId: "v".repeat(65) },
+      { templateId, versionId: null },
+      { templateId },
+    ]) {
+      expect(await getBaseVersion(people.maya!, input as never)).toEqual({
+        ok: false,
+        status: 400,
+        code: "template_unavailable",
+        reason: "This template isn't available.",
+      });
     }
   });
 });

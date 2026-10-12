@@ -2,8 +2,16 @@ import "server-only";
 import { z } from "zod";
 import { assertNever } from "@/domain/assert-never";
 import { PUSH_PLATFORMS } from "@/domain/messages/push";
-import { BAD_REQUEST_MESSAGES, MAX_BODY_BYTES, badRequest, bodyTooLarge } from "@/domain/render";
-import { parseJsonWithNumberText, type JsonWithNumberText } from "@/domain/render/json-number-text";
+import {
+  BAD_REQUEST_MESSAGES,
+  MAX_BODY_BYTES,
+  badRequest,
+  bodyTooLarge,
+} from "@/domain/render";
+import {
+  parseJsonWithNumberText,
+  type JsonWithNumberText,
+} from "@/domain/render/json-number-text";
 import type {
   Base64ResponseBody,
   EmailRender,
@@ -57,7 +65,8 @@ const FIELD_MESSAGES: Readonly<Record<string, string>> = {
 /** The bad_request sentence for a preview's `round` that isn't a whole number from 1. */
 export const ROUND_MESSAGE = "round must be a whole number from 1.";
 
-export type ReadRender = { ok: true; body: RenderRequestBody } | { ok: false; error: RenderError };
+export type ReadRender =
+  { ok: true; body: RenderRequestBody } | { ok: false; error: RenderError };
 
 /**
  * The body, read within the limit and checked. A JSON number in `values` becomes its exact source
@@ -66,7 +75,8 @@ export type ReadRender = { ok: true; body: RenderRequestBody } | { ok: false; er
  */
 export async function readRenderRequest(request: Request): Promise<ReadRender> {
   // Too large: refused from the declared length when there is one, else as soon as the count passes it.
-  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return { ok: false, error: bodyTooLarge() };
+  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES)
+    return { ok: false, error: bodyTooLarge() };
   const read = await readBodyCapped(request.body, MAX_BODY_BYTES);
   if (!read.ok) return { ok: false, error: bodyTooLarge() };
   return parseRenderBody(new TextDecoder().decode(read.bytes));
@@ -81,14 +91,22 @@ function parseRenderBody(text: string): ReadRender {
   }
   const { json, numbersAsText } = read;
   const required = ["version", "channel", "values"];
-  if (!isPlainObject(json) || !required.every((key) => Object.hasOwn(json, key))) {
+  if (
+    !isPlainObject(json) ||
+    !required.every((key) => Object.hasOwn(json, key))
+  ) {
     return { ok: false, error: badRequest(BAD_REQUEST_MESSAGES.body) };
   }
-  const values = isPlainObject(json.values) ? numbersAsText(json.values) : json.values;
+  const values = isPlainObject(json.values)
+    ? numbersAsText(json.values)
+    : json.values;
   const parsed = RequestBody.safeParse({ ...json, values });
   if (!parsed.success) {
     const field = String(parsed.error.issues[0]?.path[0] ?? "");
-    return { ok: false, error: badRequest(FIELD_MESSAGES[field] ?? BAD_REQUEST_MESSAGES.body) };
+    return {
+      ok: false,
+      error: badRequest(FIELD_MESSAGES[field] ?? BAD_REQUEST_MESSAGES.body),
+    };
   }
   return { ok: true, body: parsed.data };
 }
@@ -96,43 +114,71 @@ function parseRenderBody(text: string): ReadRender {
 // ── Responses ────────────────────────────────────────────────────────────────
 
 // The web document has no scripts and loads nothing; this keeps it that way if it's opened directly.
-const WEB_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'";
+const WEB_CSP =
+  "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'";
 
 const toBase64 = (data: Uint8Array | string) =>
-  (typeof data === "string" ? Buffer.from(data, "utf8") : Buffer.from(data)).toString("base64");
+  (typeof data === "string"
+    ? Buffer.from(data, "utf8")
+    : Buffer.from(data)
+  ).toString("base64");
 
 type Rendered = Extract<RenderResult, { ok: true }>;
 
 /** The 200 for a render: the channel's body, and the X-Stencil headers (`X-Stencil-Preview` on a preview only). */
 export function renderSuccessResponse(
   result: Rendered,
-  opts: { templateId: string; preview: boolean; encoding?: "base64"; correlationId: string },
+  opts: {
+    templateId: string;
+    preview: boolean;
+    encoding?: "base64";
+    correlationId: string;
+  },
 ): Response {
   const headers = baseHeaders(opts.correlationId);
   headers.set("X-Stencil-Template-Id", opts.templateId);
-  headers.set("X-Stencil-Version", result.versionNumber === null ? "draft" : String(result.versionNumber));
-  if (result.newerVersion !== null) headers.set("X-Stencil-Newer-Version", String(result.newerVersion));
+  headers.set(
+    "X-Stencil-Version",
+    result.versionNumber === null ? "draft" : String(result.versionNumber),
+  );
+  if (result.newerVersion !== null)
+    headers.set("X-Stencil-Newer-Version", String(result.newerVersion));
   if (opts.preview) headers.set("X-Stencil-Preview", "true");
 
   const { newerVersion } = result;
   // PDF and web are files: as they are, or wrapped in JSON as base64.
-  const base64 = (channel: Base64ResponseBody["channel"], contentType: Base64ResponseBody["contentType"], data: Uint8Array | string) => {
-    const body: Base64ResponseBody = { channel, contentType, encoding: "base64", data: toBase64(data), newerVersion };
+  const base64 = (
+    channel: Base64ResponseBody["channel"],
+    contentType: Base64ResponseBody["contentType"],
+    data: Uint8Array | string,
+  ) => {
+    const body: Base64ResponseBody = {
+      channel,
+      contentType,
+      encoding: "base64",
+      data: toBase64(data),
+      newerVersion,
+    };
     return Response.json(body, { headers });
   };
 
   switch (result.channel) {
     case "pdf": {
       const bytes = result.body as Uint8Array;
-      if (opts.encoding === "base64") return base64("pdf", "application/pdf", bytes);
+      if (opts.encoding === "base64")
+        return base64("pdf", "application/pdf", bytes);
       headers.set("Content-Type", "application/pdf");
-      headers.set("Content-Disposition", `inline; filename="${result.filename.replace(/[^\w.-]/g, "_")}"`);
+      headers.set(
+        "Content-Disposition",
+        `inline; filename="${result.filename.replace(/[^\w.-]/g, "_")}"`,
+      );
       // A copy on its own ArrayBuffer: the Response body type wants exactly that.
       return new Response(new Uint8Array(bytes), { headers });
     }
     case "web": {
       const html = result.body as string;
-      if (opts.encoding === "base64") return base64("web", "text/html; charset=utf-8", html);
+      if (opts.encoding === "base64")
+        return base64("web", "text/html; charset=utf-8", html);
       headers.set("Content-Type", "text/html; charset=utf-8");
       headers.set("Content-Security-Policy", WEB_CSP);
       return new Response(html, { headers });
@@ -141,17 +187,29 @@ export function renderSuccessResponse(
       const email = result.body as EmailRender;
       const body: EmailResponseBody =
         opts.encoding === "base64"
-          ? { ...email, html: toBase64(email.html), text: toBase64(email.text), newerVersion, encoding: "base64" }
+          ? {
+              ...email,
+              html: toBase64(email.html),
+              text: toBase64(email.text),
+              newerVersion,
+              encoding: "base64",
+            }
           : { ...email, newerVersion };
       return Response.json(body, { headers });
     }
     // Messages are JSON already: the platform's push, or the SMS as sent.
     case "push": {
-      const body: PushResponseBody = { ...(result.body as PushRender), newerVersion };
+      const body: PushResponseBody = {
+        ...(result.body as PushRender),
+        newerVersion,
+      };
       return Response.json(body, { headers });
     }
     case "sms": {
-      const body: SmsResponseBody = { ...(result.body as SmsRender), newerVersion };
+      const body: SmsResponseBody = {
+        ...(result.body as SmsRender),
+        newerVersion,
+      };
       return Response.json(body, { headers });
     }
     default:

@@ -14,7 +14,10 @@ import { androidText } from "./type";
  * where. Collapsed (lock screen, heads-up): one line of title, one of text. Expanded in the shade (the
  * long-text style): one line of title, about eight of text. Android never shows a subtitle.
  */
-export const ANDROID_LINES: Record<PushScreen, { title: number; subtitle: number; body: number }> = {
+export const ANDROID_LINES: Record<
+  PushScreen,
+  { title: number; subtitle: number; body: number }
+> = {
   lock: { title: 1, subtitle: 0, body: 1 },
   banner: { title: 1, subtitle: 0, body: 1 },
   expanded: { title: 1, subtitle: 0, body: 8 },
@@ -26,7 +29,12 @@ export const ANDROID_HIDDEN_BODY = "Contents hidden";
 const ICON = 40;
 
 function clamp(lines: number): CSSProperties {
-  return { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: lines, overflow: "hidden" };
+  return {
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: lines,
+    overflow: "hidden",
+  };
 }
 
 /**
@@ -80,30 +88,50 @@ export function AndroidNotification({
   const text: ReactNode = (
     <span
       className="grid min-w-0 content-center"
-      style={{ gridTemplateColumns: "minmax(0, max-content) auto", columnGap: pt(4), rowGap: header ? pt(2) : 0 }}
+      style={{
+        gridTemplateColumns: "minmax(0, max-content) auto",
+        columnGap: pt(4),
+        rowGap: header ? pt(2) : 0,
+      }}
     >
       {header ? (
-        <span style={{ ...label, ...clamp(1), gridColumn: 1, gridRow: 1 }} className="text-(--device-m3-on-surface-variant)">
+        <span
+          style={{ ...label, ...clamp(1), gridColumn: 1, gridRow: 1 }}
+          className="text-(--device-m3-on-surface-variant)"
+        >
           {content.appName}
         </span>
       ) : null}
       <span
         data-field="title"
         data-max-lines={lines.title}
-        style={{ ...title, ...clamp(lines.title), ...(header ? SPAN : { gridColumn: 1 }), gridRow: header ? 2 : 1 }}
+        style={{
+          ...title,
+          ...clamp(lines.title),
+          ...(header ? SPAN : { gridColumn: 1 }),
+          gridRow: header ? 2 : 1,
+        }}
         className="font-medium text-(--device-m3-on-surface)"
       >
         {content.title}
       </span>
       {previewsHidden ? (
-        <span style={{ ...body, ...clamp(1), ...SPAN, gridRow: 3 }} className="text-(--device-m3-on-surface-variant)">
+        <span
+          style={{ ...body, ...clamp(1), ...SPAN, gridRow: 3 }}
+          className="text-(--device-m3-on-surface-variant)"
+        >
           {ANDROID_HIDDEN_BODY}
         </span>
       ) : (
         <span
           data-field="body"
           data-max-lines={lines.body}
-          style={{ ...body, ...clamp(lines.body), ...SPAN, gridRow: header ? 3 : 2 }}
+          style={{
+            ...body,
+            ...clamp(lines.body),
+            ...SPAN,
+            gridRow: header ? 3 : 2,
+          }}
           className="text-(--device-m3-on-surface-variant)"
         >
           {content.body}
@@ -128,16 +156,26 @@ export function AndroidNotification({
       padding: `${pt(14)} ${pt(12)} ${pt(14)} ${pt(16)}`,
       gridTemplateColumns: `${pt(ICON)} minmax(0, 1fr) auto`,
       columnGap: pt(12),
-      boxShadow: shadow ? `0 ${pt(6)} ${pt(18)} ${pt(-4)} var(--device-m3-shadow)` : undefined,
+      boxShadow: shadow
+        ? `0 ${pt(6)} ${pt(18)} ${pt(-4)} var(--device-m3-shadow)`
+        : undefined,
     } satisfies CSSProperties,
-    className: cn("grid w-full text-left whitespace-pre-wrap [overflow-wrap:anywhere]", className),
+    className: cn(
+      "grid w-full text-left whitespace-pre-wrap [overflow-wrap:anywhere]",
+      className,
+    ),
     ...motion,
   };
 
   const cells = (
     <>
       <span className="flex" style={{ alignSelf: header ? "start" : "center" }}>
-        <AppMark mark={content.appMark} size={ICON} corner={0.5} label={header ? undefined : content.appName} />
+        <AppMark
+          mark={content.appMark}
+          size={ICON}
+          corner={0.5}
+          label={header ? undefined : content.appName}
+        />
       </span>
       {text}
       <span
@@ -146,16 +184,27 @@ export function AndroidNotification({
         style={{ width: pt(28), height: pt(24), marginTop: header ? 0 : pt(8) }}
       >
         {expanded ? (
-          <ChevronUp strokeWidth={2.2} style={{ width: pt(16), height: pt(16) }} />
+          <ChevronUp
+            strokeWidth={2.2}
+            style={{ width: pt(16), height: pt(16) }}
+          />
         ) : (
-          <ChevronDown strokeWidth={2.2} style={{ width: pt(16), height: pt(16) }} />
+          <ChevronDown
+            strokeWidth={2.2}
+            style={{ width: pt(16), height: pt(16) }}
+          />
         )}
       </span>
     </>
   );
 
   return onToggle ? (
-    <m.button type="button" aria-expanded={expanded} onClick={onToggle} {...shell}>
+    <m.button
+      type="button"
+      aria-expanded={expanded}
+      onClick={onToggle}
+      {...shell}
+    >
       {cells}
     </m.button>
   ) : (

@@ -1,10 +1,20 @@
 import "server-only";
-import { normalizeAndCheckChannelField, type FieldOf } from "@/domain/channel-fields";
+import {
+  normalizeAndCheckChannelField,
+  type FieldOf,
+} from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
-import { normalizeAndCheckBody, type Checked } from "@/editor/model/document-check";
+import {
+  normalizeAndCheckBody,
+  type Checked,
+} from "@/editor/model/document-check";
 import { normalizeDocument } from "@/editor/model/normalize";
 import { ensureBlockIds } from "@/editor/schema";
-import { DOCUMENT_MESSAGES, RenderDocumentError, parseWithSchema } from "@/server/render/schema-check";
+import {
+  DOCUMENT_MESSAGES,
+  RenderDocumentError,
+  parseWithSchema,
+} from "@/server/render/schema-check";
 
 // The one way a document is made ready for storage (docs/render-spec.md §3), whoever wrote it: the
 // autosave (src/server/drafts/apply-patch.ts) and the import (src/server/import/create.ts). Stored
@@ -12,7 +22,8 @@ import { DOCUMENT_MESSAGES, RenderDocumentError, parseWithSchema } from "@/serve
 // unknown node type, a list start of 20000, lists ten deep, a table whose cells don't line up) is
 // refused here with the check's sentence, rather than failing the render pipeline weeks later.
 
-export type Prepared = { ok: true; doc: JSONContent } | { ok: false; message: string };
+export type Prepared =
+  { ok: true; doc: JSONContent } | { ok: false; message: string };
 
 /**
  * A body as it is stored: normalized (tabs, control and invisible characters, heading levels, cell
@@ -38,16 +49,31 @@ export function prepareBody(doc: JSONContent): Prepared {
  * is normalized to one line; a `lines` field (an SMS message) keeps its line breaks as hard breaks.
  */
 export function prepareField(doc: JSONContent, field: FieldOf): Prepared {
-  return prepare(doc, (value) => normalizeAndCheckChannelField(field, value), (normalized) => normalized);
+  return prepare(
+    doc,
+    (value) => normalizeAndCheckChannelField(field, value),
+    (normalized) => normalized,
+  );
 }
 
-function prepare(doc: JSONContent, check: (doc: JSONContent) => Checked, finish: (doc: JSONContent) => JSONContent): Prepared {
+function prepare(
+  doc: JSONContent,
+  check: (doc: JSONContent) => Checked,
+  finish: (doc: JSONContent) => JSONContent,
+): Prepared {
   try {
     const checked = check(doc);
-    if (checked.problem) return { ok: false, message: DOCUMENT_MESSAGES[checked.problem] };
+    if (checked.problem)
+      return { ok: false, message: DOCUMENT_MESSAGES[checked.problem] };
     parseWithSchema(checked.doc);
     return { ok: true, doc: finish(checked.doc) };
   } catch (error) {
-    return { ok: false, message: error instanceof RenderDocumentError ? error.message : DOCUMENT_MESSAGES.unsupported };
+    return {
+      ok: false,
+      message:
+        error instanceof RenderDocumentError
+          ? error.message
+          : DOCUMENT_MESSAGES.unsupported,
+    };
   }
 }

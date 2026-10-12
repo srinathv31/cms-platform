@@ -36,7 +36,10 @@ export function scrollTargetOnPageChange(
  * Forgets entries that are no longer in the history list (the browser drops forward entries when you
  * push from the middle, and caps the list), so the map cannot grow without bound.
  */
-export function pruneSavedPositions(saved: SavedPositions, liveKeys: Iterable<string>): void {
+export function pruneSavedPositions(
+  saved: SavedPositions,
+  liveKeys: Iterable<string>,
+): void {
   const live = new Set(liveKeys);
   for (const key of saved.keys()) {
     if (!live.has(key)) saved.delete(key);

@@ -20,13 +20,25 @@ const NO_README = new Set(["hooks", "lib", "styles"]);
 const PATH_PREFIX = /^(?:(?:src|docs|e2e|scripts)\/|@\/)/;
 const NOT_A_PATH = /[*…<>{}$|\s]/;
 // How a path written without its extension (or as a folder import) can resolve.
-const RESOLVE_AS = ["", ".ts", ".tsx", ".mts", ".mjs", ".js", ".css", ".json", "/index.ts", "/index.tsx"];
+const RESOLVE_AS = [
+  "",
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".mjs",
+  ".js",
+  ".css",
+  ".json",
+  "/index.ts",
+  "/index.tsx",
+];
 
 const CODE_FILE = /\.(?:ts|tsx|mts|mjs|js|cjs)$/;
 const DOCS_REF_IN_CODE = /(?<![\w/.-])docs\/[\w./()-]*\.md/g;
 
 // One level of balanced parentheses in the destination, for route groups such as `app/(product)/page.tsx`.
-const INLINE_LINK = /!?\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*(<[^>]*>|(?:[^()\s]|\([^()\s]*\))+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g;
+const INLINE_LINK =
+  /!?\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*(<[^>]*>|(?:[^()\s]|\([^()\s]*\))+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g;
 const REFERENCE_DEFINITION = /^ {0,3}\[[^\]]+\]:\s*(<[^>]*>|\S+)/;
 const CODE_SPAN = /`([^`\n]+)`/g;
 
@@ -47,13 +59,21 @@ function report(file: string, line: number, message: string) {
 // checked against this rather than the disk, so a gitignored local file can't make the check pass on one machine
 // and fail on another.
 const files = new Set(
-  execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: ROOT, encoding: "utf8" })
+  execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard"],
+    { cwd: ROOT, encoding: "utf8" },
+  )
     .split("\n")
     .filter((path) => path && existsSync(join(ROOT, path))),
 );
 const folders = new Set<string>();
 for (const path of files) {
-  for (let slash = path.indexOf("/"); slash !== -1; slash = path.indexOf("/", slash + 1)) {
+  for (
+    let slash = path.indexOf("/");
+    slash !== -1;
+    slash = path.indexOf("/", slash + 1)
+  ) {
     folders.add(path.slice(0, slash));
   }
 }
@@ -106,7 +126,8 @@ function anchorsOf(file: string): Set<string> {
       seen.set(base, n + 1);
       anchors.add(n === 0 ? base : `${base}-${n}`);
     }
-    for (const html of line.matchAll(/<a\s+(?:id|name)="([^"]+)"/g)) anchors.add(html[1]);
+    for (const html of line.matchAll(/<a\s+(?:id|name)="([^"]+)"/g))
+      anchors.add(html[1]);
   }
   anchorCache.set(file, anchors);
   return anchors;
@@ -122,7 +143,8 @@ function checkLink(from: string, line: number, raw: string) {
   counts.links++;
   const hash = target.indexOf("#");
   const pathPart = hash === -1 ? target : target.slice(0, hash);
-  const fragment = hash === -1 ? "" : decodeURIComponent(target.slice(hash + 1));
+  const fragment =
+    hash === -1 ? "" : decodeURIComponent(target.slice(hash + 1));
   const file =
     pathPart === ""
       ? from
@@ -145,13 +167,15 @@ function checkPath(from: string, line: number, raw: string) {
     .replace(/^@\//, "src/")
     .replace(/:\d+(?:-\d+)?$/, "")
     .replace(/#.*$/, "");
-  if (!resolves(join(ROOT, path))) report(from, line, `\`${raw}\` doesn't exist`);
+  if (!resolves(join(ROOT, path)))
+    report(from, line, `\`${raw}\` doesn't exist`);
 }
 
 function checkMarkdown(file: string) {
   counts.docs++;
   for (const [n, line] of proseLines(readFileSync(file, "utf8"))) {
-    for (const span of line.matchAll(CODE_SPAN)) checkPath(file, n, span[1].trim());
+    for (const span of line.matchAll(CODE_SPAN))
+      checkPath(file, n, span[1].trim());
     const prose = line.replace(CODE_SPAN, "``"); // a link inside a code span isn't a link
     for (const link of prose.matchAll(INLINE_LINK)) checkLink(file, n, link[1]);
     const definition = REFERENCE_DEFINITION.exec(prose);
@@ -164,7 +188,8 @@ function checkCodeComments(file: string) {
   lines.forEach((line, i) => {
     for (const ref of line.matchAll(DOCS_REF_IN_CODE)) {
       counts.codeRefs++;
-      if (!exists(join(ROOT, ref[0]))) report(file, i + 1, `points at ${ref[0]}, which doesn't exist`);
+      if (!exists(join(ROOT, ref[0])))
+        report(file, i + 1, `points at ${ref[0]}, which doesn't exist`);
     }
   });
 }
@@ -175,7 +200,12 @@ function checkLayerReadmes() {
     if (!entry.isDirectory() || NO_README.has(entry.name)) continue;
     counts.readmes++;
     const readme = join(src, entry.name, "README.md");
-    if (!exists(readme)) report(readme, 0, "missing: every folder directly under src/ needs a README");
+    if (!exists(readme))
+      report(
+        readme,
+        0,
+        "missing: every folder directly under src/ needs a README",
+      );
   }
 }
 
@@ -189,8 +219,11 @@ function main() {
   checkLayerReadmes();
 
   if (problems.length > 0) {
-    console.error(`docs:check found ${problems.length} problem${problems.length === 1 ? "" : "s"}:`);
-    for (const p of problems) console.error(`  ${p.file}${p.line ? `:${p.line}` : ""}  ${p.message}`);
+    console.error(
+      `docs:check found ${problems.length} problem${problems.length === 1 ? "" : "s"}:`,
+    );
+    for (const p of problems)
+      console.error(`  ${p.file}${p.line ? `:${p.line}` : ""}  ${p.message}`);
     process.exit(1);
   }
   console.log(

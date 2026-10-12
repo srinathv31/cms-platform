@@ -46,11 +46,15 @@ export interface TableGrid {
 /** A span attribute: absent or null is 1 (docs/render-spec.md §2); anything but an integer ≥ 1 is invalid (null). */
 export function spanValue(value: unknown): number | null {
   if (value === undefined || value === null) return 1;
-  return typeof value === "number" && Number.isInteger(value) && value >= 1 ? value : null;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1
+    ? value
+    : null;
 }
 
 function rowsOf(table: JSONContent): JSONContent[][] {
-  return (table.content ?? []).map((row) => (Array.isArray(row?.content) ? row.content : []));
+  return (table.content ?? []).map((row) =>
+    Array.isArray(row?.content) ? row.content : [],
+  );
 }
 
 export function tableGrid(table: JSONContent): TableGrid {
@@ -73,7 +77,8 @@ export function tableGrid(table: JSONContent): TableGrid {
     let covered = carried[r]!;
     for (const { colspan, rowspan } of cells) {
       covered += colspan;
-      for (let below = 1; below < rowspan && r + below < height; below++) carried[r + below]! += colspan;
+      for (let below = 1; below < rowspan && r + below < height; below++)
+        carried[r + below]! += colspan;
     }
     width = Math.max(width, covered);
   });
@@ -106,10 +111,20 @@ export function tableGrid(table: JSONContent): TableGrid {
       at += colspan;
     });
     placed.push(out);
-    missing.push(width - taken[r]!.reduce((sum, [start, stop]) => sum + stop - start, 0));
+    missing.push(
+      width - taken[r]!.reduce((sum, [start, stop]) => sum + stop - start, 0),
+    );
   });
 
-  return { width, height, rows: placed, missing, badSpan, collision, overlongRowspan };
+  return {
+    width,
+    height,
+    rows: placed,
+    missing,
+    badSpan,
+    collision,
+    overlongRowspan,
+  };
 }
 
 /** Columns [start, end) of one row. */
@@ -118,7 +133,8 @@ type Range = [number, number];
 /** The first column at or after `at` that no range holds. */
 function nextFree(ranges: readonly Range[], at: number): number {
   let column = at;
-  for (const [start, end] of ranges) if (start <= column && column < end) column = end;
+  for (const [start, end] of ranges)
+    if (start <= column && column < end) column = end;
   return column;
 }
 
@@ -143,5 +159,10 @@ function take(ranges: Range[], start: number, end: number): boolean {
 
 /** Whether every row covers exactly the table's width with no overlaps or overruns. */
 export function linesUp(grid: TableGrid): boolean {
-  return !grid.badSpan && !grid.collision && !grid.overlongRowspan && grid.missing.every((n) => n === 0);
+  return (
+    !grid.badSpan &&
+    !grid.collision &&
+    !grid.overlongRowspan &&
+    grid.missing.every((n) => n === 0)
+  );
 }

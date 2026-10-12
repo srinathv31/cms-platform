@@ -2,7 +2,21 @@ import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { removeTemplate, rowsOf } from "./helpers/cleanup";
-import { asPersona, beat, demoTimeout, expect, expectAutosaved, hydrated, liveField, nameField, openLibrary, tap, test, typeSlowly, untilUncovered } from "./helpers/scenario";
+import {
+  asPersona,
+  beat,
+  demoTimeout,
+  expect,
+  expectAutosaved,
+  hydrated,
+  liveField,
+  nameField,
+  openLibrary,
+  tap,
+  test,
+  typeSlowly,
+  untilUncovered,
+} from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
 
 // Alerts end to end (decision 0034): an alert is made, written with its phone live beside it, held at
@@ -40,7 +54,8 @@ const BODY_ADDED = " Thanks for banking with Coral. Pay in the app.";
 const SUBTITLE = "Coral Rewards card";
 const SMS_ADDED_CURLY = " We’re here to help.";
 const SMS_ADDED = " We're here to help.";
-const REFUSED = "Replace ’ in the SMS message before submitting. It isn't in the SMS character set.";
+const REFUSED =
+  "Replace ’ in the SMS message before submitting. It isn't in the SMS character set.";
 const TITLE_ADDED = " now";
 const SMS_ADDED_V2 = " Thanks.";
 const COMMENT = "Is “now” right for a statement sent overnight?";
@@ -64,18 +79,34 @@ test.afterAll(async () => {
 
 // ── The screens ──────────────────────────────────────────────────────────────
 
-const field = (page: Page, name: string) => page.getByRole("textbox", { name }).filter({ visible: true });
+const field = (page: Page, name: string) =>
+  page.getByRole("textbox", { name }).filter({ visible: true });
 /** The phone in the preview's well (the composer measures cuts on hidden phones of its own). */
-const phone = (page: Page) => page.locator('[data-slot="preview-well"] figure[data-device]').filter({ visible: true });
-const onPhone = (page: Page, key: "title" | "subtitle" | "body") => phone(page).locator(`[data-field="${key}"]`);
-const smsMeta = (page: Page) => page.locator('[data-slot="sms-meta"]').filter({ visible: true });
-const cutWarnings = (page: Page) => page.locator('[data-slot="cut-warning"]').filter({ visible: true });
-const flags = (page: Page) => page.locator(".ucomp-flag").filter({ visible: true });
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
-const decision = (page: Page) => page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+const phone = (page: Page) =>
+  page
+    .locator('[data-slot="preview-well"] figure[data-device]')
+    .filter({ visible: true });
+const onPhone = (page: Page, key: "title" | "subtitle" | "body") =>
+  phone(page).locator(`[data-field="${key}"]`);
+const smsMeta = (page: Page) =>
+  page.locator('[data-slot="sms-meta"]').filter({ visible: true });
+const cutWarnings = (page: Page) =>
+  page.locator('[data-slot="cut-warning"]').filter({ visible: true });
+const flags = (page: Page) =>
+  page.locator(".ucomp-flag").filter({ visible: true });
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
+const decision = (page: Page) =>
+  page.locator('aside[aria-label="Decision"]').filter({ visible: true });
 /** A field of the version on the review screen or in Compare, by its id ("push.title"). */
-const fieldFrame = (scope: Page | Locator, id: string) => scope.locator(`[data-fields-document] .ucomp-doc > [data-block-id="${id}"]`);
-const gutterMarkers = (page: Page) => page.locator('[data-slot="gutter-markers"] [data-marker]').filter({ visible: true });
+const fieldFrame = (scope: Page | Locator, id: string) =>
+  scope.locator(`[data-fields-document] .ucomp-doc > [data-block-id="${id}"]`);
+const gutterMarkers = (page: Page) =>
+  page
+    .locator('[data-slot="gutter-markers"] [data-marker]')
+    .filter({ visible: true });
 
 /** The end of a field's text, then the words, as an author types them. */
 async function typeAtEnd(page: Page, target: Locator, text: string) {
@@ -89,7 +120,9 @@ async function typeAtEnd(page: Page, target: Locator, text: string) {
 async function openTemplate(page: Page, persona: string) {
   await asPersona(page, persona);
   await page.goto(`/${TEAM}/templates/${templateId}`);
-  await expect(page.getByRole("heading", { level: 1, name: NAME }).or(nameField(page))).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: NAME }).or(nameField(page)),
+  ).toBeVisible();
   await hydrated(page);
 }
 
@@ -97,9 +130,14 @@ async function openTemplate(page: Page, persona: string) {
 async function openReview(page: Page, persona: string, n: number) {
   await asPersona(page, persona);
   await page.goto(`/${TEAM}/review/${templateId}/${n}`);
-  await expect(page.getByRole("heading", { level: 1, name: NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: NAME }),
+  ).toBeVisible();
   await hydrated(page);
-  await expect(page.getByRole("tab", { name: "Document" }), "an alert's review opens on what was written").toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("tab", { name: "Document" }),
+    "an alert's review opens on what was written",
+  ).toHaveAttribute("aria-selected", "true");
 }
 
 /** Submit for review → Submit vN, through. */
@@ -115,7 +153,9 @@ async function submit(page: Page, n: number) {
 /** Approve → Approve vN, as the decision rail offers it: the version goes Active. */
 async function approve(page: Page, n: number) {
   await viewEveryOutput(page);
-  await tap(decision(page).getByRole("button", { name: "Approve", exact: true }));
+  await tap(
+    decision(page).getByRole("button", { name: "Approve", exact: true }),
+  );
   const dialog = page.getByRole("dialog", { name: `Approve v${n}` });
   await expect(dialog).toBeVisible();
   await tap(dialog.getByRole("button", { name: `Approve v${n}`, exact: true }));
@@ -124,7 +164,11 @@ async function approve(page: Page, n: number) {
 }
 
 const storedSms = async (n: number) => {
-  const [row] = await rowsOf(db, "SELECT channel_fields FROM versions WHERE template_id = ? AND number = ?", [templateId, n]);
+  const [row] = await rowsOf(
+    db,
+    "SELECT channel_fields FROM versions WHERE template_id = ? AND number = ?",
+    [templateId, n],
+  );
   return JSON.stringify(JSON.parse(String(row.channel_fields)).sms.text);
 };
 
@@ -133,7 +177,9 @@ const storedSms = async (n: number) => {
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
 test.describe("alerts", () => {
-  test("an alert is composed with its phone live, held at submit for a character, reviewed with its fields redlined, commented on and compared", async ({ page }) => {
+  test("an alert is composed with its phone live, held at submit for a character, reviewed with its fields redlined, commented on and compared", async ({
+    page,
+  }) => {
     test.setTimeout(demoTimeout(240_000));
 
     await asPersona(page, "maya");
@@ -141,13 +187,28 @@ test.describe("alerts", () => {
 
     await test.step("0. The Library names each template's kind beside its ID: the seeded alerts are Alerts, a disclosure is a Document", async () => {
       const kindOf = (name: string) =>
-        page.locator("main ul > li > a[href*='/templates/']").filter({ hasText: name }).locator("[data-kind]");
-      for (const alert of ["Payment Due Reminder", "Card Used Abroad", "Rate Change Heads-up"]) {
-        await expect(kindOf(alert), `${alert} is an alert`).toHaveText(/Alert$/);
+        page
+          .locator("main ul > li > a[href*='/templates/']")
+          .filter({ hasText: name })
+          .locator("[data-kind]");
+      for (const alert of [
+        "Payment Due Reminder",
+        "Card Used Abroad",
+        "Rate Change Heads-up",
+      ]) {
+        await expect(kindOf(alert), `${alert} is an alert`).toHaveText(
+          /Alert$/,
+        );
         await expect(kindOf(alert)).toHaveAttribute("data-kind", "message");
       }
-      await expect(kindOf("Rate Change Notice"), "a disclosure is a document").toHaveText(/Document$/);
-      await expect(kindOf("Rate Change Notice")).toHaveAttribute("data-kind", "document");
+      await expect(
+        kindOf("Rate Change Notice"),
+        "a disclosure is a document",
+      ).toHaveText(/Document$/);
+      await expect(kindOf("Rate Change Notice")).toHaveAttribute(
+        "data-kind",
+        "document",
+      );
     });
 
     await test.step("1. New template → Alert → Statement ready: Alert's own starters, Import greyed, the composer", async () => {
@@ -157,10 +218,20 @@ test.describe("alerts", () => {
       const alert = gallery.getByRole("button", { name: "Alert", exact: true });
       await tap(alert);
       await expect(alert).toHaveAttribute("aria-pressed", "true");
-      for (const starter of ["Blank", "Payment reminder", "Card activity", "Statement ready"]) {
-        await expect(gallery.getByRole("button", { name: new RegExp(`^${starter}`) })).toBeVisible();
+      for (const starter of [
+        "Blank",
+        "Payment reminder",
+        "Card activity",
+        "Statement ready",
+      ]) {
+        await expect(
+          gallery.getByRole("button", { name: new RegExp(`^${starter}`) }),
+        ).toBeVisible();
       }
-      await expect(gallery.getByRole("button", { name: /^Card offer terms/ }), "a document's starter isn't an alert's").toHaveCount(0);
+      await expect(
+        gallery.getByRole("button", { name: /^Card offer terms/ }),
+        "a document's starter isn't an alert's",
+      ).toHaveCount(0);
       const importRow = gallery.getByRole("button", { name: /^Import a file/ });
       await expect(importRow, "Import stays in place").toBeVisible();
       await expect(importRow).toHaveAttribute("aria-disabled", "true");
@@ -170,29 +241,49 @@ test.describe("alerts", () => {
       await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
       templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
       await expect(nameField(page)).toHaveValue(NAME);
-      await expect(page.getByRole("heading", { name: "Push notification" })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Text message" })).toBeVisible();
-      for (const name of ["Push title", "Push subtitle", "Push body", "SMS message"]) await expect(field(page, name)).toBeVisible();
-      await expect(page.locator('[data-slot="sms-footer"]').filter({ visible: true })).toHaveText("Coral: Reply STOP to opt out, HELP for help.");
+      await expect(
+        page.getByRole("heading", { name: "Push notification" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Text message" }),
+      ).toBeVisible();
+      for (const name of [
+        "Push title",
+        "Push subtitle",
+        "Push body",
+        "SMS message",
+      ])
+        await expect(field(page, name)).toBeVisible();
+      await expect(
+        page.locator('[data-slot="sms-footer"]').filter({ visible: true }),
+      ).toHaveText("Coral: Reply STOP to opt out, HELP for help.");
       // Copilot writes a document's body: on an alert the row stays, greyed, with why.
       const copilot = page.getByRole("button", { name: "Copilot prompt" });
       await expect(copilot).toHaveAttribute("aria-disabled", "true");
-      await expect(copilot).toHaveAccessibleDescription("Copilot drafts documents only.");
+      await expect(copilot).toHaveAccessibleDescription(
+        "Copilot drafts documents only.",
+      );
     });
 
     await test.step("2. Preview: the push on an iPhone lock screen; the body changes on the phone as it is typed, and warns where the lock screen cuts it", async () => {
       await tap(page.getByRole("button", { name: "Preview", exact: true }));
       await expect(phone(page)).toHaveAttribute("data-device", "ios");
-      await expect(onPhone(page, "title")).toHaveText("Your statement is ready");
+      await expect(onPhone(page, "title")).toHaveText(
+        "Your statement is ready",
+      );
       // The sample values, filled in: no chip and no key on the phone.
-      await expect(onPhone(page, "body")).toContainText("Hi Maya, your new statement is ready.");
+      await expect(onPhone(page, "body")).toContainText(
+        "Hi Maya, your new statement is ready.",
+      );
       await expect(cutWarnings(page)).toHaveCount(0);
 
       await typeAtEnd(page, field(page, "Push body"), BODY_ADDED);
       // Before any save: the phone renders what is typed, in the browser (decision 0036).
       await expect(onPhone(page, "body")).toContainText(BODY_ADDED.trim());
       await expect(cutWarnings(page)).toHaveCount(1);
-      await expect(cutWarnings(page)).toHaveText(/^iPhone lock screen cuts after “…[^”]+”\.$/);
+      await expect(cutWarnings(page)).toHaveText(
+        /^iPhone lock screen cuts after “…[^”]+”\.$/,
+      );
       await expectAutosaved(page);
     });
 
@@ -201,10 +292,17 @@ test.describe("alerts", () => {
       await expect(onPhone(page, "subtitle")).toHaveText(SUBTITLE);
 
       const platforms = page.getByRole("group", { name: "Phone" });
-      await tap(platforms.getByRole("button", { name: "Android", exact: true }));
+      await tap(
+        platforms.getByRole("button", { name: "Android", exact: true }),
+      );
       await expect(phone(page)).toHaveAttribute("data-device", "android");
-      await expect(onPhone(page, "title")).toContainText("Your statement is ready");
-      await expect(phone(page), "Android never shows the iPhone's subtitle").not.toContainText(SUBTITLE);
+      await expect(onPhone(page, "title")).toContainText(
+        "Your statement is ready",
+      );
+      await expect(
+        phone(page),
+        "Android never shows the iPhone's subtitle",
+      ).not.toContainText(SUBTITLE);
       await expect(onPhone(page, "subtitle")).toHaveCount(0);
 
       await tap(platforms.getByRole("button", { name: "iPhone", exact: true }));
@@ -212,34 +310,68 @@ test.describe("alerts", () => {
       await expect(onPhone(page, "subtitle")).toHaveText(SUBTITLE);
 
       // The Device options hold still: Banner greys Previews with its reason under it, and no row moves.
-      await tap(page.locator('[data-slot="preview-controls"]').getByRole("button", { name: "Device options" }));
+      await tap(
+        page
+          .locator('[data-slot="preview-controls"]')
+          .getByRole("button", { name: "Device options" }),
+      );
       const options = page.getByRole("dialog", { name: "Device options" });
       await expect(options).toBeVisible();
       // Measured once the popover has finished opening (it zooms in from 95%).
       const geometry = () =>
         options.evaluate(async (el) => {
-          await Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished));
-          return [el.getBoundingClientRect().height, ...[...el.querySelectorAll('[role="group"]')].map((g) => g.getBoundingClientRect().y)];
+          await Promise.all(
+            el
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished),
+          );
+          return [
+            el.getBoundingClientRect().height,
+            ...[...el.querySelectorAll('[role="group"]')].map(
+              (g) => g.getBoundingClientRect().y,
+            ),
+          ];
         });
       const before = await geometry();
-      await tap(options.getByRole("group", { name: "Screen" }).getByRole("button", { name: "Banner", exact: true }));
-      await expect(phone(page).locator("figcaption")).toHaveText("Banner, iOS-style preview");
-      await expect(options.locator('[role="group"][aria-disabled="true"]')).toHaveAccessibleDescription("Lock screen only");
-      expect(await geometry(), "picking Banner moves no row of the popover").toEqual(before);
-      await tap(options.getByRole("group", { name: "Screen" }).getByRole("button", { name: "Lock screen", exact: true }));
+      await tap(
+        options
+          .getByRole("group", { name: "Screen" })
+          .getByRole("button", { name: "Banner", exact: true }),
+      );
+      await expect(phone(page).locator("figcaption")).toHaveText(
+        "Banner, iOS-style preview",
+      );
+      await expect(
+        options.locator('[role="group"][aria-disabled="true"]'),
+      ).toHaveAccessibleDescription("Lock screen only");
+      expect(
+        await geometry(),
+        "picking Banner moves no row of the popover",
+      ).toEqual(before);
+      await tap(
+        options
+          .getByRole("group", { name: "Screen" })
+          .getByRole("button", { name: "Lock screen", exact: true }),
+      );
       await page.keyboard.press("Escape");
       await expect(options).toBeHidden();
     });
 
     await test.step("4. The SMS meta line, and a curly apostrophe flagged where it was typed: UCS-2, 3 parts", async () => {
-      await expect(smsMeta(page)).toHaveText(/^GSM-7 · 1 part\s*,?\s*· Long values: 1 part$/);
+      await expect(smsMeta(page)).toHaveText(
+        /^GSM-7 · 1 part\s*,?\s*· Long values: 1 part$/,
+      );
       await typeAtEnd(page, field(page, "SMS message"), SMS_ADDED_CURLY);
       await expect(flags(page)).toHaveCount(1);
       await expect(flags(page)).toHaveText("’");
       await expect(smsMeta(page)).toHaveText(/^UCS-2 · 3 parts/);
 
       // The phone's Messages thread shows the text as the customer gets it, with the footer.
-      await tap(page.getByRole("group", { name: "Channel" }).getByRole("button", { name: "SMS", exact: true }));
+      await tap(
+        page
+          .getByRole("group", { name: "Channel" })
+          .getByRole("button", { name: "SMS", exact: true }),
+      );
       const bubble = phone(page).locator('[data-slot="sms-bubble"]');
       await expect(bubble).toContainText("We’re here to help.");
       await expect(bubble).toContainText("Reply STOP to opt out");
@@ -261,7 +393,12 @@ test.describe("alerts", () => {
 
       await untilUncovered(flags(page).first());
       await tap(flags(page).first());
-      await expect(page.getByRole("heading", { name: "’ isn't in the SMS character set." }), "the flag says why").toBeVisible();
+      await expect(
+        page.getByRole("heading", {
+          name: "’ isn't in the SMS character set.",
+        }),
+        "the flag says why",
+      ).toBeVisible();
       // The fix stands in the field's place in the Tab order: Tab reaches it and Shift+Tab goes back; Tab
       // from it closes the popover and goes on past the field, never round to the field again.
       const fix = page.getByRole("button", { name: "Replace with '" });
@@ -274,10 +411,15 @@ test.describe("alerts", () => {
       await page.keyboard.press("Tab");
       await expect(fix).toBeHidden();
       await expect(field(page, "SMS message")).not.toBeFocused();
-      expect(await page.evaluate(() => document.activeElement !== document.body), "Tab lands on a control").toBe(true);
+      expect(
+        await page.evaluate(() => document.activeElement !== document.body),
+        "Tab lands on a control",
+      ).toBe(true);
       // Tab landed in the rail, which scrolled the canvas: bring the flag back into view, as a person would,
       // since a popover whose flag is clipped at the canvas's edge stays hidden.
-      await flags(page).first().evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await flags(page)
+        .first()
+        .evaluate((el) => el.scrollIntoView({ block: "center" }));
       await untilUncovered(flags(page).first());
       await tap(flags(page).first());
       await tap(fix);
@@ -286,7 +428,11 @@ test.describe("alerts", () => {
       await expectAutosaved(page);
 
       await submit(page, 1);
-      const [v1] = await rowsOf(db, "SELECT state, submitted_by FROM versions WHERE template_id = ? AND number = 1", [templateId]);
+      const [v1] = await rowsOf(
+        db,
+        "SELECT state, submitted_by FROM versions WHERE template_id = ? AND number = 1",
+        [templateId],
+      );
       expect(v1).toEqual({ state: "in_review", submitted_by: "maya" });
       expect(await storedSms(1)).toContain(SMS_ADDED.trim());
       await beat(page);
@@ -294,11 +440,20 @@ test.describe("alerts", () => {
 
     await test.step("6. Jordan reviews v1: the alert's fields, read-only, nothing to compare with yet; he approves it", async () => {
       await openReview(page, "jordan", 1);
-      await expect(fieldFrame(page, "push.title")).toContainText("Your statement is ready");
+      await expect(fieldFrame(page, "push.title")).toContainText(
+        "Your statement is ready",
+      );
       await expect(fieldFrame(page, "push.subtitle")).toContainText(SUBTITLE);
-      await expect(fieldFrame(page, "sms.text")).toContainText(SMS_ADDED.trim());
-      await expect(fieldFrame(page, "sms.text").locator('[data-slot="sms-footer"]')).toContainText("Reply STOP to opt out");
-      await expect(page.getByRole("switch", { name: "Show changes" }), "a first version has nothing to redline against").toHaveCount(0);
+      await expect(fieldFrame(page, "sms.text")).toContainText(
+        SMS_ADDED.trim(),
+      );
+      await expect(
+        fieldFrame(page, "sms.text").locator('[data-slot="sms-footer"]'),
+      ).toContainText("Reply STOP to opt out");
+      await expect(
+        page.getByRole("switch", { name: "Show changes" }),
+        "a first version has nothing to redline against",
+      ).toHaveCount(0);
       await approve(page, 1);
     });
 
@@ -316,21 +471,40 @@ test.describe("alerts", () => {
       await openReview(page, "jordan", 2);
       const show = page.getByRole("switch", { name: "Show changes" });
       await expect(show).toBeVisible();
-      await expect(page.locator('[data-change-toggles] [title="2 changed"]'), "two fields changed").toHaveText("2");
+      await expect(
+        page.locator('[data-change-toggles] [title="2 changed"]'),
+        "two fields changed",
+      ).toHaveText("2");
       await tap(show);
-      await expect(page.locator('[data-slot="baseline-label"]')).toHaveText("vs v1");
+      await expect(page.locator('[data-slot="baseline-label"]')).toHaveText(
+        "vs v1",
+      );
 
       const title = fieldFrame(page, "push.title");
       await expect(title).toHaveAttribute("data-redline", "changed");
       await expect(title).toHaveAccessibleName("Push title, changed");
-      await expect(title.locator('ins[data-redline-op="insert"]')).toHaveText(TITLE_ADDED);
-      await expect(fieldFrame(page, "sms.text")).toHaveAttribute("data-redline", "changed");
-      await expect(fieldFrame(page, "sms.text").locator('ins[data-redline-op="insert"]')).toHaveText(SMS_ADDED_V2);
-      await expect(fieldFrame(page, "push.subtitle")).toHaveAttribute("data-redline", "unchanged");
+      await expect(title.locator('ins[data-redline-op="insert"]')).toHaveText(
+        TITLE_ADDED,
+      );
+      await expect(fieldFrame(page, "sms.text")).toHaveAttribute(
+        "data-redline",
+        "changed",
+      );
+      await expect(
+        fieldFrame(page, "sms.text").locator('ins[data-redline-op="insert"]'),
+      ).toHaveText(SMS_ADDED_V2);
+      await expect(fieldFrame(page, "push.subtitle")).toHaveAttribute(
+        "data-redline",
+        "unchanged",
+      );
 
       await tap(page.getByRole("switch", { name: "Changes only" }));
-      await expect(fieldFrame(page, "push.subtitle")).toContainText("Unchanged");
-      await expect(fieldFrame(page, "push.title").locator('ins[data-redline-op="insert"]')).toHaveText(TITLE_ADDED);
+      await expect(fieldFrame(page, "push.subtitle")).toContainText(
+        "Unchanged",
+      );
+      await expect(
+        fieldFrame(page, "push.title").locator('ins[data-redline-op="insert"]'),
+      ).toHaveText(TITLE_ADDED);
       await tap(page.getByRole("switch", { name: "Changes only" }));
 
       // A comment on the push title, from the gutter beside it.
@@ -339,18 +513,37 @@ test.describe("alerts", () => {
       await expect(add).toBeVisible();
       await tap(add);
       const composer = decision(page).locator("article[data-compose]");
-      await expect(composer).toContainText("Push title: Your statement is ready now");
-      await expect(composer.getByRole("textbox", { name: "Add a comment" })).toBeFocused();
+      await expect(composer).toContainText(
+        "Push title: Your statement is ready now",
+      );
+      await expect(
+        composer.getByRole("textbox", { name: "Add a comment" }),
+      ).toBeFocused();
       await typeSlowly(page, COMMENT);
       await tap(composer.getByRole("button", { name: "Comment", exact: true }));
-      const thread = decision(page).locator("article[data-thread]").filter({ hasText: COMMENT });
+      const thread = decision(page)
+        .locator("article[data-thread]")
+        .filter({ hasText: COMMENT });
       await expect(thread).toBeVisible();
       await expect(thread).toHaveAccessibleName("Comment on the push title");
       await expect(gutterMarkers(page)).toHaveCount(1);
-      await expect(gutterMarkers(page).first()).toHaveAttribute("data-marker", "push.title");
-      await expect(gutterMarkers(page).first()).toHaveAccessibleName("1 comment on this field");
+      await expect(gutterMarkers(page).first()).toHaveAttribute(
+        "data-marker",
+        "push.title",
+      );
+      await expect(gutterMarkers(page).first()).toHaveAccessibleName(
+        "1 comment on this field",
+      );
       await expect
-        .poll(async () => (await rowsOf(db, "SELECT block_id, quote FROM comment_threads WHERE template_id = ?", [templateId])).map((r) => `${r.block_id}:${r.quote}`))
+        .poll(async () =>
+          (
+            await rowsOf(
+              db,
+              "SELECT block_id, quote FROM comment_threads WHERE template_id = ?",
+              [templateId],
+            )
+          ).map((r) => `${r.block_id}:${r.quote}`),
+        )
         .toEqual(["push.title:null"]);
 
       await approve(page, 2);
@@ -363,13 +556,31 @@ test.describe("alerts", () => {
       await tap(page.getByRole("button", { name: "Compare versions" }));
       const dialog = page.getByRole("dialog", { name: "Compare versions" });
       await expect(dialog).toBeVisible();
-      await expect(dialog.locator('[data-slot="redline-summary"]')).toHaveText("2 changed");
-      await expect(dialog.getByRole("heading", { name: "Push notification" })).toBeVisible();
-      await expect(dialog.getByRole("heading", { name: "Text message" })).toBeVisible();
-      await expect(fieldFrame(dialog, "push.title").locator('ins[data-redline-op="insert"]')).toHaveText(TITLE_ADDED);
-      await expect(fieldFrame(dialog, "sms.text").locator('ins[data-redline-op="insert"]')).toHaveText(SMS_ADDED_V2);
-      await expect(fieldFrame(dialog, "push.body")).toHaveAttribute("data-redline", "unchanged");
-      await expect(dialog.locator("[data-redline-document]"), "an alert has no body to redline").toHaveCount(0);
+      await expect(dialog.locator('[data-slot="redline-summary"]')).toHaveText(
+        "2 changed",
+      );
+      await expect(
+        dialog.getByRole("heading", { name: "Push notification" }),
+      ).toBeVisible();
+      await expect(
+        dialog.getByRole("heading", { name: "Text message" }),
+      ).toBeVisible();
+      await expect(
+        fieldFrame(dialog, "push.title").locator(
+          'ins[data-redline-op="insert"]',
+        ),
+      ).toHaveText(TITLE_ADDED);
+      await expect(
+        fieldFrame(dialog, "sms.text").locator('ins[data-redline-op="insert"]'),
+      ).toHaveText(SMS_ADDED_V2);
+      await expect(fieldFrame(dialog, "push.body")).toHaveAttribute(
+        "data-redline",
+        "unchanged",
+      );
+      await expect(
+        dialog.locator("[data-redline-document]"),
+        "an alert has no body to redline",
+      ).toHaveCount(0);
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
     });

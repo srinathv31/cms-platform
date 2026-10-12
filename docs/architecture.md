@@ -14,19 +14,19 @@ keep both open, which mostly means: rules in `src/domain`, database access only 
 
 ## Layers
 
-| Folder | What it is | README |
-| --- | --- | --- |
-| `src/app` | Routes, layouts, and route handlers. Thin: pages render a `<Stream>` around a component; handlers parse HTTP and call `src/server`. | [src/app](../src/app/README.md) |
-| `src/components` | The React UI: generated shadcn kit, shared primitives, motion, app shell, one folder per feature. | [src/components](../src/components/README.md) |
-| `src/editor` | The document editor (TipTap v3), framework-agnostic and liftable into another app. | [src/editor](../src/editor/README.md) |
-| `src/domain` | The business rules as pure TypeScript: lifecycle, permissions, access, approval chain, render rules, import, and every sentence people read about them. | [src/domain](../src/domain/README.md) |
-| `src/server` | Everything that touches the database, the persona cookie, the clock, or the file system: server actions, read models, schema, render pipeline, import, autosave, seed. | [src/server](../src/server/README.md) |
-| `src/contracts` | The `/api/v1` wire types, with no imports, shared by the API and Coral. | [src/contracts](../src/contracts/README.md) |
-| `src/simulator` | Coral, the simulated consumer, with routes in `src/app/(simulator)`. | [src/simulator](../src/simulator/README.md) |
-| `src/hooks`, `src/lib`, `src/styles` | `useIsMobile`; `cn` and the SQLite write lock; design tokens and fonts. | Covered in [src/components](../src/components/README.md#srchooks-srclib-srcstyles) |
-| `e2e` | Playwright specs, helpers, and fixtures. | [Testing](#testing) |
-| `scripts` | `db:migrate`, `db:reset`, `docs:check`. | |
-| `data` | The SQLite file and uploaded originals. Gitignored; `npm run db:reset` creates it. | |
+| Folder                               | What it is                                                                                                                                                             | README                                                                             |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `src/app`                            | Routes, layouts, and route handlers. Thin: pages render a `<Stream>` around a component; handlers parse HTTP and call `src/server`.                                    | [src/app](../src/app/README.md)                                                    |
+| `src/components`                     | The React UI: generated shadcn kit, shared primitives, motion, app shell, one folder per feature.                                                                      | [src/components](../src/components/README.md)                                      |
+| `src/editor`                         | The document editor (TipTap v3), framework-agnostic and liftable into another app.                                                                                     | [src/editor](../src/editor/README.md)                                              |
+| `src/domain`                         | The business rules as pure TypeScript: lifecycle, permissions, access, approval chain, render rules, import, and every sentence people read about them.                | [src/domain](../src/domain/README.md)                                              |
+| `src/server`                         | Everything that touches the database, the persona cookie, the clock, or the file system: server actions, read models, schema, render pipeline, import, autosave, seed. | [src/server](../src/server/README.md)                                              |
+| `src/contracts`                      | The `/api/v1` wire types, with no imports, shared by the API and Coral.                                                                                                | [src/contracts](../src/contracts/README.md)                                        |
+| `src/simulator`                      | Coral, the simulated consumer, with routes in `src/app/(simulator)`.                                                                                                   | [src/simulator](../src/simulator/README.md)                                        |
+| `src/hooks`, `src/lib`, `src/styles` | `useIsMobile`; `cn` and the SQLite write lock; design tokens and fonts.                                                                                                | Covered in [src/components](../src/components/README.md#srchooks-srclib-srcstyles) |
+| `e2e`                                | Playwright specs, helpers, and fixtures.                                                                                                                               | [Testing](#testing)                                                                |
+| `scripts`                            | `db:migrate`, `db:reset`, `docs:check`.                                                                                                                                |                                                                                    |
+| `data`                               | The SQLite file and uploaded originals. Gitignored; `npm run db:reset` creates it.                                                                                     |                                                                                    |
 
 ## What may import what
 
@@ -65,7 +65,7 @@ Conventions that nothing enforces yet, and where the code already breaks them:
 
 ### A page: the Versions tab
 
-1. [versions/page.tsx](../src/app/(product)/[team]/templates/[templateId]/versions/page.tsx) is synchronous. It
+1. [versions/page.tsx](<../src/app/(product)/[team]/templates/[templateId]/versions/page.tsx>) is synchronous. It
    renders `<Stream fallback={<VersionsSkeleton />}>` around `VersionsContent` and passes the `params` promise
    down unawaited.
 2. Above it, the layouts: the root layout mounts fonts and `<Providers>`; `(product)/layout.tsx` renders the static
@@ -200,14 +200,14 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
   as Maya.
 - **Seed** ([src/server/seed](../src/server/seed/index.ts)), deterministic, rebuilt by `npm run db:reset`:
 
-  | | |
-  | --- | --- |
-  | Teams | `coral-offers`, `deposits`, `card-statements` (ids equal slugs); `all` is the cross-team space |
-  | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer) |
-  | Content types | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a 3-part budget |
-  | Templates | Coral Offers: five disclosures, one in each lifecycle state, and three alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: three disclosures each |
-  | Template ids | `UC-` plus 6 Crockford base32 characters, e.g. `UC-4F7K2Q` |
-  | Consumer | `coral`, with offers, customers, and links in the `sim_*` tables |
+  |                     |                                                                                                                                                                                                                             |
+  | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Teams               | `coral-offers`, `deposits`, `card-statements` (ids equal slugs); `all` is the cross-team space                                                                                                                              |
+  | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer)                                                                                         |
+  | Content types       | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a 3-part budget                         |
+  | Templates           | Coral Offers: five disclosures, one in each lifecycle state, and three alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: three disclosures each |
+  | Template ids        | `UC-` plus 6 Crockford base32 characters, e.g. `UC-4F7K2Q`                                                                                                                                                                  |
+  | Consumer            | `coral`, with offers, customers, and links in the `sim_*` tables                                                                                                                                                            |
 
 ## Configuration
 
@@ -255,3 +255,6 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   split the screens into files of about the same duration so they can run in parallel. They are read-only and can
   run against a dev server: `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts --workers=1`.
 - **Docs:** `npm run docs:check` ([scripts/docs-check.ts](../scripts/docs-check.ts)).
+- **Formatting:** Prettier with its default configuration (`.prettierrc` is `{}`). `npm run format` rewrites files;
+  `npm run format:check` fails on a file it would change. `.prettierignore` lists what Prettier skips, by group:
+  build output, the byte-exact fixtures and render goldens, generated code, and the frozen documents.

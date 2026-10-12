@@ -30,7 +30,10 @@ export async function findRound(
         round == null ? undefined : eq(versions.round, round),
       ),
     )
-    .orderBy(desc(inArray(versions.state, [...RELEASED_STATES])), desc(versions.round))
+    .orderBy(
+      desc(inArray(versions.state, [...RELEASED_STATES])),
+      desc(versions.round),
+    )
     .limit(1);
   return row;
 }

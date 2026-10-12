@@ -3,13 +3,19 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
 import { NAV_ICON_STROKE } from "@/components/app-shell/nav";
 import { subscribeLibraryIntent, takeLibraryIntent } from "./library-intent";
 import { StarterGallery } from "./starter-gallery";
 
-const TABBABLE = 'button:not([disabled]), [href], input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])';
+const TABBABLE =
+  'button:not([disabled]), [href], input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Tab wraps inside the dialog at once. Base UI's own trap hands focus over from a guard element a
@@ -18,7 +24,9 @@ const TABBABLE = 'button:not([disabled]), [href], input:not([hidden]):not([disab
  */
 function wrapTab(event: KeyboardEvent<HTMLElement>) {
   if (event.key !== "Tab" || event.defaultPrevented) return;
-  const stops = [...event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE)].filter((el) => el.getClientRects().length > 0);
+  const stops = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE),
+  ].filter((el) => el.getClientRects().length > 0);
   const first = stops[0];
   const last = stops[stops.length - 1];
   if (!first || !last) return;
@@ -68,7 +76,11 @@ export function NewTemplate({ teamSlug }: { teamSlug: string }) {
         if (!next) setStartOnImport(false);
       }}
     >
-      <DialogTrigger render={<Button size="lg" className="h-10 rounded-full px-5 text-[14px]" />}>
+      <DialogTrigger
+        render={
+          <Button size="lg" className="h-10 rounded-full px-5 text-[14px]" />
+        }
+      >
         New template
       </DialogTrigger>
       <ScrimDialogContent

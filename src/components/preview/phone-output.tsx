@@ -59,7 +59,12 @@ export function PushOutput({
         onScreenChange={onScreen}
         fit={FIT}
         clock={clock}
-        content={{ appName, appMark: { monogram: monogramOf(appName) }, ...output.push, time: "now" }}
+        content={{
+          appName,
+          appMark: { monogram: monogramOf(appName) },
+          ...output.push,
+          time: "now",
+        }}
       />
     </PhoneWell>
   );
@@ -78,7 +83,16 @@ export function SmsOutput({
 }) {
   return (
     <PhoneWell refusal={output.refusal}>
-      <SmsPreview settings={settings} clock={clock} fit={FIT} content={{ sender: senders.smsSender, text: output.text, time: SMS_TIME }} />
+      <SmsPreview
+        settings={settings}
+        clock={clock}
+        fit={FIT}
+        content={{
+          sender: senders.smsSender,
+          text: output.text,
+          time: SMS_TIME,
+        }}
+      />
     </PhoneWell>
   );
 }
@@ -94,7 +108,13 @@ export function monogramOf(appName: string): string {
  * region. A screen reader hears a fixed sentence once, from a polite region, when the message goes from
  * sendable to refused (`refusalNotice`); a message that opens already refused says nothing until it is read.
  */
-function PhoneWell({ refusal, children }: { refusal: RenderError | null; children: React.ReactNode }) {
+function PhoneWell({
+  refusal,
+  children,
+}: {
+  refusal: RenderError | null;
+  children: React.ReactNode;
+}) {
   const notice = useRefusalNotice(refusal);
   return (
     <div className={`flex h-full flex-col ${PHONE_INSET}`}>
@@ -102,9 +122,18 @@ function PhoneWell({ refusal, children }: { refusal: RenderError | null; childre
         {notice}
       </p>
       {refusal ? (
-        <p data-slot="message-refusal" className="mb-3 flex shrink-0 items-start gap-2 text-[13px] leading-5 text-text">
-          <CircleAlert aria-hidden strokeWidth={1.75} className="mt-0.5 size-4 shrink-0 text-warning" />
-          <span className="min-w-0 [overflow-wrap:anywhere]">{refusal.message}</span>
+        <p
+          data-slot="message-refusal"
+          className="mb-3 flex shrink-0 items-start gap-2 text-[13px] leading-5 text-text"
+        >
+          <CircleAlert
+            aria-hidden
+            strokeWidth={1.75}
+            className="mt-0.5 size-4 shrink-0 text-warning"
+          />
+          <span className="min-w-0 [overflow-wrap:anywhere]">
+            {refusal.message}
+          </span>
         </p>
       ) : null}
       <div className="min-h-0 flex-1">{children}</div>

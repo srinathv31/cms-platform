@@ -5,7 +5,14 @@ import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import { m } from "motion/react";
 import { spring } from "@/components/motion/presets";
 import { cn } from "@/lib/utils";
-import { TAB, TAB_ACTIVE, TAB_BAR_SCROLLS, TAB_IDLE, TAB_LABEL, TAB_UNDERLINE } from "./tab-styles";
+import {
+  TAB,
+  TAB_ACTIVE,
+  TAB_BAR_SCROLLS,
+  TAB_IDLE,
+  TAB_LABEL,
+  TAB_UNDERLINE,
+} from "./tab-styles";
 
 // View switches in the page (Overview | Consumers, Document | Preview, the review queue): Base UI Tabs
 // in the tab idiom of the workspace tab bar (tab-styles.ts), with the underline sliding to the chosen
@@ -41,16 +48,32 @@ export function Tabs<T extends string>({
   // One underline per bar: it slides between this bar's tabs and never to another bar's.
   const underline = useId();
   return (
-    <TabsPrimitive.Root value={value} onValueChange={(next) => onValueChange(next as T)} className={className}>
+    <TabsPrimitive.Root
+      value={value}
+      onValueChange={(next) => onValueChange(next as T)}
+      className={className}
+    >
       <Bar.Provider value={{ value, underline }}>{children}</Bar.Provider>
     </TabsPrimitive.Root>
   );
 }
 
 /** The bar: tabs 28px apart. Arrow keys choose as they move. */
-export function TabList({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
+export function TabList({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <TabsPrimitive.List aria-label={label} activateOnFocus className={cn("flex gap-7", TAB_BAR_SCROLLS, className)}>
+    <TabsPrimitive.List
+      aria-label={label}
+      activateOnFocus
+      className={cn("flex gap-7", TAB_BAR_SCROLLS, className)}
+    >
       {children}
     </TabsPrimitive.List>
   );
@@ -70,7 +93,11 @@ export function Tab({
   const bar = useContext(Bar);
   const active = bar !== null && bar.value === value;
   return (
-    <TabsPrimitive.Tab {...props} value={value} className={cn(TAB, active ? TAB_ACTIVE : TAB_IDLE, className)}>
+    <TabsPrimitive.Tab
+      {...props}
+      value={value}
+      className={cn(TAB, active ? TAB_ACTIVE : TAB_IDLE, className)}
+    >
       <span className={TAB_LABEL}>{children}</span>
       {active ? <TabUnderline layoutId={bar.underline} /> : null}
     </TabsPrimitive.Tab>
@@ -79,7 +106,13 @@ export function Tab({
 
 /** The chosen tab's underline. Tabs that share a `layoutId` slide it between them (links that look like tabs use it too). */
 export function TabUnderline({ layoutId }: { layoutId: string }) {
-  return <m.span layoutId={layoutId} transition={spring.soft} className={TAB_UNDERLINE} />;
+  return (
+    <m.span
+      layoutId={layoutId}
+      transition={spring.soft}
+      className={TAB_UNDERLINE}
+    />
+  );
 }
 
 /**
@@ -90,5 +123,11 @@ export function TabPanel({
   className,
   ...props
 }: Omit<TabsPrimitive.Panel.Props, "className"> & { className?: string }) {
-  return <TabsPrimitive.Panel tabIndex={-1} {...props} className={cn("outline-none", className)} />;
+  return (
+    <TabsPrimitive.Panel
+      tabIndex={-1}
+      {...props}
+      className={cn("outline-none", className)}
+    />
+  );
 }

@@ -1,8 +1,19 @@
-import { TAB, TAB_ACTIVE, TAB_LABEL, TAB_UNDERLINE } from "@/components/primitives/tab-styles";
+import {
+  TAB,
+  TAB_ACTIVE,
+  TAB_LABEL,
+  TAB_UNDERLINE,
+} from "@/components/primitives/tab-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { heatmapBox } from "./charts";
-import { BARS_HEIGHT, HEAT_FOOTER, RATE_HEIGHT, STAT_CARD, TOP_TEMPLATES } from "./geometry";
+import {
+  BARS_HEIGHT,
+  HEAT_FOOTER,
+  RATE_HEIGHT,
+  STAT_CARD,
+  TOP_TEMPLATES,
+} from "./geometry";
 import { Panel } from "./panel";
 import { HEATMAP_WEEKS } from "@/domain/golive-types";
 
@@ -59,7 +70,10 @@ export function UsageSkeleton() {
                 <div className="flex h-[1.125rem] items-center">
                   <Skeleton className="h-3 w-40" />
                 </div>
-                <Skeleton className="h-9" style={{ width: `${100 - i * 14}%` }} />
+                <Skeleton
+                  className="h-9"
+                  style={{ width: `${100 - i * 14}%` }}
+                />
               </div>
             ))}
           </div>
@@ -71,7 +85,10 @@ export function UsageSkeleton() {
               <div />
               <div />
               <div />
-              <Skeleton className="w-full" style={{ aspectRatio: `${heat.width} / ${heat.height}` }} />
+              <Skeleton
+                className="w-full"
+                style={{ aspectRatio: `${heat.width} / ${heat.height}` }}
+              />
             </div>
           </div>
           <div className={HEAT_FOOTER} />

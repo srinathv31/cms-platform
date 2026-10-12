@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { pruneSavedPositions, scrollTargetOnPageChange } from "./scroll-positions";
+import {
+  pruneSavedPositions,
+  scrollTargetOnPageChange,
+} from "./scroll-positions";
 
 describe("scrollTargetOnPageChange", () => {
   it("opens a page reached by a push at the top (a new entry has nothing saved)", () => {

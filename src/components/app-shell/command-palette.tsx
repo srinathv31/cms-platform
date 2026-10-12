@@ -26,7 +26,10 @@ import {
 import { Shortcut } from "@/components/primitives/keycap";
 import { StatusBadge } from "@/components/primitives/status-badge";
 import { requestLibraryIntent } from "@/components/library/library-intent";
-import { paletteGroups, templateIdFromPath } from "@/components/palette/commands";
+import {
+  paletteGroups,
+  templateIdFromPath,
+} from "@/components/palette/commands";
 import { usePaletteResults } from "@/components/palette/use-palette-results";
 import { findSection } from "@/components/settings/sections";
 import type { PaletteItem, TemplateTabKey } from "@/domain/import-types";
@@ -55,15 +58,22 @@ const GROUP_LABEL = { team: "Team", platform: "Platform" } as const;
  * is on screen counts: a dialog kept mounted under a hidden route (`<Activity>`) is not in the way.
  */
 function modalIsOpen(): boolean {
-  return [...document.querySelectorAll('[data-slot$="-overlay"][data-open]')].some((el) => el.checkVisibility());
+  return [
+    ...document.querySelectorAll('[data-slot$="-overlay"][data-open]'),
+  ].some((el) => el.checkVisibility());
 }
 
-function itemIcon(item: PaletteItem, spaces: SpaceNav[]): { icon: LucideIcon | null; team?: string } {
+function itemIcon(
+  item: PaletteItem,
+  spaces: SpaceNav[],
+): { icon: LucideIcon | null; team?: string } {
   switch (item.kind) {
     case "template":
       return { icon: FileText };
     case "page":
-      return { icon: NAV_ITEMS.find((i) => i.key === item.key)?.icon ?? FileText };
+      return {
+        icon: NAV_ITEMS.find((i) => i.key === item.key)?.icon ?? FileText,
+      };
     case "template_tab":
       return { icon: TAB_ICON[item.key] };
     case "settings":
@@ -71,12 +81,19 @@ function itemIcon(item: PaletteItem, spaces: SpaceNav[]): { icon: LucideIcon | n
     case "action":
       return { icon: item.key === "import" ? Upload : Plus };
     case "team":
-      return { icon: null, team: spaces.find((s) => s.slug === item.slug)?.icon ?? "users" };
+      return {
+        icon: null,
+        team: spaces.find((s) => s.slug === item.slug)?.icon ?? "users",
+      };
   }
 }
 
 function itemLabel(item: PaletteItem): string {
-  return item.kind === "template" ? item.name : item.kind === "team" ? item.name : item.label;
+  return item.kind === "template"
+    ? item.name
+    : item.kind === "team"
+      ? item.name
+      : item.label;
 }
 
 function itemKey(item: PaletteItem): string {
@@ -90,21 +107,35 @@ function itemKey(item: PaletteItem): string {
   }
 }
 
-export function CommandPalette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] }) {
+export function CommandPalette({
+  viewerId,
+  spaces,
+}: {
+  viewerId: string;
+  spaces: SpaceNav[];
+}) {
   // Everything the palette keeps (its answers, what was typed) is one viewer's: when the viewer changes
   // (a persona switch, later a sign-in) a new palette starts empty, so nobody sees what was read for
   // somebody else.
   return <Palette key={viewerId} viewerId={viewerId} spaces={spaces} />;
 }
 
-function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] }) {
+function Palette({
+  viewerId,
+  spaces,
+}: {
+  viewerId: string;
+  spaces: SpaceNav[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const { team } = useParams<{ team?: string }>();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   // The row Enter opens, and the answer it was picked in (see `selected` below).
-  const [pick, setPick] = useState<{ value: string; inAnswer: string } | null>(null);
+  const [pick, setPick] = useState<{ value: string; inAnswer: string } | null>(
+    null,
+  );
   const opener = useRef<HTMLElement | null>(null);
   const space = spaces.find((s) => s.slug === team) ?? spaces[0];
   const { results, exact, failed } = usePaletteResults({
@@ -117,7 +148,8 @@ function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] })
 
   const show = useCallback(() => {
     const active = document.activeElement;
-    opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    opener.current =
+      active instanceof HTMLElement && active !== document.body ? active : null;
     setOpen(true);
   }, []);
 
@@ -131,7 +163,13 @@ function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] })
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (
+        e.key.toLowerCase() !== "k" ||
+        !(e.metaKey || e.ctrlKey) ||
+        e.altKey ||
+        e.shiftKey
+      )
+        return;
       // Something nearer already used it (the editor's ⌘K opens its link field on selected text).
       if (e.defaultPrevented) return;
       e.preventDefault();
@@ -143,7 +181,8 @@ function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] })
   }, [open, show, change]);
 
   const groups = useMemo(
-    () => (space ? paletteGroups({ space, spaces, results, pathname, query }) : []),
+    () =>
+      space ? paletteGroups({ space, spaces, results, pathname, query }) : [],
     [space, spaces, results, pathname, query],
   );
 
@@ -159,17 +198,31 @@ function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] })
   // the server's answer to what was typed replaces a narrowed one, which can put better matches above
   // the row picked meanwhile, so Enter opens the best match, as it always has.
   const answer = results ? `${results.query}|${exact}` : "";
-  const values = groups.flatMap((g) => g.items.map((item) => `${g.key}:${itemKey(item)}`));
-  const selected = pick && pick.inAnswer === answer && values.includes(pick.value) ? pick.value : (values[0] ?? "");
+  const values = groups.flatMap((g) =>
+    g.items.map((item) => `${g.key}:${itemKey(item)}`),
+  );
+  const selected =
+    pick && pick.inAnswer === answer && values.includes(pick.value)
+      ? pick.value
+      : (values[0] ?? "");
 
   // The Team/Platform tag on a settings row says which kind it is; it only helps where both kinds are listed.
-  const mixedSettings = new Set(
-    groups.flatMap((g) => g.items.flatMap((item) => (item.kind === "settings" ? [item.group] : []))),
-  ).size > 1;
+  const mixedSettings =
+    new Set(
+      groups.flatMap((g) =>
+        g.items.flatMap((item) =>
+          item.kind === "settings" ? [item.group] : [],
+        ),
+      ),
+    ).size > 1;
 
   function choose(item: PaletteItem) {
     change(false);
-    if (item.kind === "action") requestLibraryIntent(item.key === "import" ? "import" : "new", space!.slug);
+    if (item.kind === "action")
+      requestLibraryIntent(
+        item.key === "import" ? "import" : "new",
+        space!.slug,
+      );
     router.push(item.href as Route);
   }
 
@@ -198,15 +251,30 @@ function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] })
             onValueChange={(value) => setPick({ value, inAnswer: answer })}
             className="rounded-2xl! bg-surface p-2"
           >
-            <CommandInput aria-label="Search" value={query} onValueChange={setQuery} maxLength={PALETTE_QUERY_MAX} />
-            <CommandList aria-busy={waiting || undefined} className="max-h-[22rem] pt-1 pb-1">
-              {settled ? <CommandEmpty className="text-text-muted">Nothing found</CommandEmpty> : null}
+            <CommandInput
+              aria-label="Search"
+              value={query}
+              onValueChange={setQuery}
+              maxLength={PALETTE_QUERY_MAX}
+            />
+            <CommandList
+              aria-busy={waiting || undefined}
+              className="max-h-[22rem] pt-1 pb-1"
+            >
+              {settled ? (
+                <CommandEmpty className="text-text-muted">
+                  Nothing found
+                </CommandEmpty>
+              ) : null}
               {waiting
                 ? null
                 : groups.map((group) => (
                     <CommandGroup key={group.key} heading={group.heading}>
                       {group.items.map((item) => {
-                        const { icon: Icon, team: teamIcon } = itemIcon(item, spaces);
+                        const { icon: Icon, team: teamIcon } = itemIcon(
+                          item,
+                          spaces,
+                        );
                         return (
                           <CommandItem
                             key={itemKey(item)}
@@ -215,21 +283,39 @@ function Palette({ viewerId, spaces }: { viewerId: string; spaces: SpaceNav[] })
                             className="h-10 gap-3 px-3 data-selected:bg-hover"
                           >
                             {Icon ? (
-                              <Icon aria-hidden strokeWidth={NAV_ICON_STROKE} className="size-[18px] text-text-muted" />
+                              <Icon
+                                aria-hidden
+                                strokeWidth={NAV_ICON_STROKE}
+                                className="size-[18px] text-text-muted"
+                              />
                             ) : teamIcon ? (
-                              <TeamIcon name={teamIcon} className="size-[18px] text-text-muted" />
+                              <TeamIcon
+                                name={teamIcon}
+                                className="size-[18px] text-text-muted"
+                              />
                             ) : null}
-                            <span className="min-w-0 flex-1 truncate">{itemLabel(item)}</span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {itemLabel(item)}
+                            </span>
                             {item.kind === "template" ? (
                               <>
                                 {space.kind === "all" ? (
-                                  <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">{item.teamName}</span>
+                                  <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">
+                                    {item.teamName}
+                                  </span>
                                 ) : null}
-                                <StatusBadge state={item.status} className="shrink-0" />
-                                <span className="shrink-0 font-mono text-xs text-text-muted group-data-selected/command-item:text-text">{item.id}</span>
+                                <StatusBadge
+                                  state={item.status}
+                                  className="shrink-0"
+                                />
+                                <span className="shrink-0 font-mono text-xs text-text-muted group-data-selected/command-item:text-text">
+                                  {item.id}
+                                </span>
                               </>
                             ) : item.kind === "settings" && mixedSettings ? (
-                              <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">{GROUP_LABEL[item.group]}</span>
+                              <span className="shrink-0 text-xs text-text-muted group-data-selected/command-item:text-text">
+                                {GROUP_LABEL[item.group]}
+                              </span>
                             ) : null}
                           </CommandItem>
                         );

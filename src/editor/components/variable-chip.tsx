@@ -21,7 +21,12 @@ export interface VariableChipViewProps {
 const BASE =
   "inline-block max-w-full whitespace-nowrap rounded-md border px-[0.4em] align-baseline text-[0.875em] font-medium leading-[1.45] [overflow-wrap:normal] transition-shadow duration-150";
 
-export function VariableChipView({ variableKey, variable, selected = false, className }: VariableChipViewProps) {
+export function VariableChipView({
+  variableKey,
+  variable,
+  selected = false,
+  className,
+}: VariableChipViewProps) {
   const known = variable !== undefined;
   const Icon = known ? TYPE_ICONS[variable.type] : TriangleAlert;
 
@@ -43,9 +48,18 @@ export function VariableChipView({ variableKey, variable, selected = false, clas
       <Icon
         aria-hidden
         strokeWidth={1.75}
-        className={cx("mr-[0.3em] inline-block size-[0.95em] align-[-0.14em]", known ? "text-chip-icon" : "text-warning")}
+        className={cx(
+          "mr-[0.3em] inline-block size-[0.95em] align-[-0.14em]",
+          known ? "text-chip-icon" : "text-warning",
+        )}
       />
-      {known ? variable.label : <span className="font-mono text-[0.92em]">{variableKey || "unknown"}</span>}
+      {known ? (
+        variable.label
+      ) : (
+        <span className="font-mono text-[0.92em]">
+          {variableKey || "unknown"}
+        </span>
+      )}
     </span>
   );
 }

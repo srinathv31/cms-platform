@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SampleSet, Variable } from "@/editor/model/types";
-import { isDefaultSet, listSets, sampleSetValues } from "@/editor/model/sample-sets";
+import {
+  isDefaultSet,
+  listSets,
+  sampleSetValues,
+} from "@/editor/model/sample-sets";
 import {
   addSet,
   commitInput,
@@ -19,7 +23,13 @@ import {
 
 const TODAY = "2026-10-04";
 
-const v = (key: string, type: Variable["type"], label: string, required = true, sample = ""): Variable => ({
+const v = (
+  key: string,
+  type: Variable["type"],
+  label: string,
+  required = true,
+  sample = "",
+): Variable => ({
   key,
   label,
   type,
@@ -36,7 +46,11 @@ const VARIABLES: Variable[] = [
   v("promo_code", "text", "Promo code", false),
 ];
 
-const custom = (id: string, name: string, values: SampleSet["values"] = {}): SampleSet => ({ id, name, values });
+const custom = (
+  id: string,
+  name: string,
+  values: SampleSet["values"] = {},
+): SampleSet => ({ id, name, values });
 
 describe("findSet", () => {
   const sets = listSets([custom("a", "Alpha")], VARIABLES, TODAY);
@@ -50,11 +64,17 @@ describe("findSet", () => {
 });
 
 describe("resolveSetValues", () => {
-  const typical = (values: SampleSet["values"]): SampleSet => ({ id: "typical", name: "Typical customer", values });
+  const typical = (values: SampleSet["values"]): SampleSet => ({
+    id: "typical",
+    name: "Typical customer",
+    values,
+  });
 
   it("matches sampleSetValues when nothing was emptied", () => {
     const set = typical({ first_name: "Zed" });
-    expect(resolveSetValues(set, VARIABLES, TODAY)).toEqual(sampleSetValues(set, VARIABLES, TODAY));
+    expect(resolveSetValues(set, VARIABLES, TODAY)).toEqual(
+      sampleSetValues(set, VARIABLES, TODAY),
+    );
   });
 
   it("fills a variable the set has no value for", () => {
@@ -78,7 +98,9 @@ describe("resolveSetValues", () => {
 
   it("drops keys that aren't variables", () => {
     const resolved = resolveSetValues(typical({ gone: "x" }), VARIABLES, TODAY);
-    expect(Object.keys(resolved)).toEqual(VARIABLES.map((variable) => variable.key));
+    expect(Object.keys(resolved)).toEqual(
+      VARIABLES.map((variable) => variable.key),
+    );
   });
 });
 
@@ -86,34 +108,75 @@ describe("commitInput", () => {
   const type = (t: Variable["type"]) => ({ type: t });
 
   it("normalizes friendly input to canonical", () => {
-    expect(commitInput(type("currency"), "$1,000")).toEqual({ ok: true, value: "1000" });
-    expect(commitInput(type("percent"), "21.99%")).toEqual({ ok: true, value: "21.99" });
-    expect(commitInput(type("date"), "3/4/2027")).toEqual({ ok: true, value: "2027-03-04" });
-    expect(commitInput(type("us_state"), "new jersey")).toEqual({ ok: true, value: "NJ" });
-    expect(commitInput(type("number"), "20,000")).toEqual({ ok: true, value: "20000" });
+    expect(commitInput(type("currency"), "$1,000")).toEqual({
+      ok: true,
+      value: "1000",
+    });
+    expect(commitInput(type("percent"), "21.99%")).toEqual({
+      ok: true,
+      value: "21.99",
+    });
+    expect(commitInput(type("date"), "3/4/2027")).toEqual({
+      ok: true,
+      value: "2027-03-04",
+    });
+    expect(commitInput(type("us_state"), "new jersey")).toEqual({
+      ok: true,
+      value: "NJ",
+    });
+    expect(commitInput(type("number"), "20,000")).toEqual({
+      ok: true,
+      value: "20000",
+    });
   });
 
   it("keeps the digits as typed: trailing zeros, huge and tiny values, no exponent", () => {
-    expect(commitInput(type("percent"), "21.90")).toEqual({ ok: true, value: "21.90" });
-    expect(commitInput(type("currency"), "1,000,000,000,000,000,000,000")).toEqual({ ok: true, value: "1000000000000000000000" });
-    expect(commitInput(type("number"), "0.0000001")).toEqual({ ok: true, value: "0.0000001" });
-    expect(commitInput(type("currency"), "1,00")).toEqual({ ok: false, message: "Put commas only between groups of three digits, like 1,000,000" });
+    expect(commitInput(type("percent"), "21.90")).toEqual({
+      ok: true,
+      value: "21.90",
+    });
+    expect(
+      commitInput(type("currency"), "1,000,000,000,000,000,000,000"),
+    ).toEqual({ ok: true, value: "1000000000000000000000" });
+    expect(commitInput(type("number"), "0.0000001")).toEqual({
+      ok: true,
+      value: "0.0000001",
+    });
+    expect(commitInput(type("currency"), "1,00")).toEqual({
+      ok: false,
+      message: "Put commas only between groups of three digits, like 1,000,000",
+    });
   });
 
   it("trims text", () => {
-    expect(commitInput(type("text"), "  Maya  ")).toEqual({ ok: true, value: "Maya" });
+    expect(commitInput(type("text"), "  Maya  ")).toEqual({
+      ok: true,
+      value: "Maya",
+    });
   });
 
   it("allows an emptied value, whatever the type", () => {
     expect(commitInput(type("text"), "")).toEqual({ ok: true, value: "" });
-    expect(commitInput(type("currency"), "   ")).toEqual({ ok: true, value: "" });
+    expect(commitInput(type("currency"), "   ")).toEqual({
+      ok: true,
+      value: "",
+    });
     expect(commitInput(type("date"), "")).toEqual({ ok: true, value: "" });
   });
 
   it("refuses what the type can't read, with validateValue's message", () => {
-    expect(commitInput(type("currency"), "lots")).toEqual({ ok: false, message: "Enter an amount, like 1000 or 1000.50" });
-    expect(commitInput(type("date"), "2027-02-30")).toEqual({ ok: false, message: "Enter a date, like 2027-03-04" });
-    expect(commitInput(type("us_state"), "Narnia")).toEqual({ ok: false, message: "Enter a US state, like NJ" });
+    expect(commitInput(type("currency"), "lots")).toEqual({
+      ok: false,
+      message: "Enter an amount, like 1000 or 1000.50",
+    });
+    expect(commitInput(type("date"), "2027-02-30")).toEqual({
+      ok: false,
+      message: "Enter a date, like 2027-03-04",
+    });
+    expect(commitInput(type("us_state"), "Narnia")).toEqual({
+      ok: false,
+      message: "Enter a US state, like NJ",
+    });
   });
 });
 
@@ -129,12 +192,24 @@ describe("isEdited", () => {
     const copy = createSet(sets, sets[0], VARIABLES, TODAY);
     const changed = { ...copy, values: { ...copy.values, first_name: "Zed" } };
     expect(isEdited(changed, VARIABLES, TODAY)).toBe(true);
-    expect(isEdited({ ...changed, values: { ...changed.values, first_name: "Maya" } }, VARIABLES, TODAY)).toBe(false);
+    expect(
+      isEdited(
+        { ...changed, values: { ...changed.values, first_name: "Maya" } },
+        VARIABLES,
+        TODAY,
+      ),
+    ).toBe(false);
   });
 
   it("counts an emptied value as an edit", () => {
     const copy = createSet(sets, sets[0], VARIABLES, TODAY);
-    expect(isEdited({ ...copy, values: { ...copy.values, promo_code: "" } }, VARIABLES, TODAY)).toBe(true);
+    expect(
+      isEdited(
+        { ...copy, values: { ...copy.values, promo_code: "" } },
+        VARIABLES,
+        TODAY,
+      ),
+    ).toBe(true);
   });
 });
 
@@ -144,14 +219,25 @@ describe("nextSetName", () => {
   });
 
   it("follows the highest number in use", () => {
-    const sets = listSets([custom("a", "Sample set 4"), custom("b", "Sample set 7")], VARIABLES, TODAY);
+    const sets = listSets(
+      [custom("a", "Sample set 4"), custom("b", "Sample set 7")],
+      VARIABLES,
+      TODAY,
+    );
     expect(nextSetName(sets)).toBe("Sample set 8");
   });
 
   it("doesn't reuse a number when a set was renamed or deleted", () => {
     const renamed = listSets([custom("a", "Holiday")], VARIABLES, TODAY);
     expect(nextSetName(renamed)).toBe("Sample set 5");
-    const deleted = removeSet(listSets([custom("a", "Sample set 4"), custom("b", "Sample set 5")], VARIABLES, TODAY), "a");
+    const deleted = removeSet(
+      listSets(
+        [custom("a", "Sample set 4"), custom("b", "Sample set 5")],
+        VARIABLES,
+        TODAY,
+      ),
+      "a",
+    );
     expect(nextSetName(deleted)).toBe("Sample set 6");
   });
 });
@@ -173,16 +259,24 @@ describe("newSetId", () => {
 });
 
 describe("createSet and addSet", () => {
-  const sets = listSets([custom("a", "Alpha", { first_name: "Zed" })], VARIABLES, TODAY);
+  const sets = listSets(
+    [custom("a", "Alpha", { first_name: "Zed" })],
+    VARIABLES,
+    TODAY,
+  );
 
   it("copies the source's resolved values into a new custom set", () => {
     const made = createSet(sets, findSet(sets, "a")!, VARIABLES, TODAY);
     expect(made.name).toBe("Sample set 5");
     expect(made.id).not.toBe("a");
     expect(isDefaultSet(made.id)).toBe(false);
-    expect(made.values).toEqual(resolveSetValues(findSet(sets, "a")!, VARIABLES, TODAY));
+    expect(made.values).toEqual(
+      resolveSetValues(findSet(sets, "a")!, VARIABLES, TODAY),
+    );
     expect(made.values.first_name).toBe("Zed");
-    expect(Object.keys(made.values)).toEqual(VARIABLES.map((variable) => variable.key));
+    expect(Object.keys(made.values)).toEqual(
+      VARIABLES.map((variable) => variable.key),
+    );
   });
 
   it("adds the set at the end without changing the rest", () => {
@@ -215,29 +309,57 @@ describe("setValue", () => {
 });
 
 describe("validateSetName and renameSet", () => {
-  const sets = listSets([custom("a", "Alpha"), custom("b", "Beta")], VARIABLES, TODAY);
+  const sets = listSets(
+    [custom("a", "Alpha"), custom("b", "Beta")],
+    VARIABLES,
+    TODAY,
+  );
 
   it("trims and collapses spaces", () => {
-    expect(validateSetName(sets, "a", "  Holiday   promo ")).toEqual({ ok: true, name: "Holiday promo" });
+    expect(validateSetName(sets, "a", "  Holiday   promo ")).toEqual({
+      ok: true,
+      name: "Holiday promo",
+    });
   });
 
   it("refuses an empty name", () => {
-    expect(validateSetName(sets, "a", "   ")).toEqual({ ok: false, message: "Enter a name" });
+    expect(validateSetName(sets, "a", "   ")).toEqual({
+      ok: false,
+      message: "Enter a name",
+    });
   });
 
   it("allows a name of exactly 40 characters and refuses one of 41", () => {
     expect(MAX_SET_NAME_LENGTH).toBe(40);
     const forty = "x".repeat(40);
-    expect(validateSetName(sets, "a", forty)).toEqual({ ok: true, name: forty });
-    expect(validateSetName(sets, "a", `${forty}x`)).toEqual({ ok: false, message: "Use 40 characters or fewer" });
+    expect(validateSetName(sets, "a", forty)).toEqual({
+      ok: true,
+      name: forty,
+    });
+    expect(validateSetName(sets, "a", `${forty}x`)).toEqual({
+      ok: false,
+      message: "Use 40 characters or fewer",
+    });
     // Counted after the spaces are tidied: the padding doesn't use any of the 40.
-    expect(validateSetName(sets, "a", `  ${forty}  `)).toEqual({ ok: true, name: forty });
+    expect(validateSetName(sets, "a", `  ${forty}  `)).toEqual({
+      ok: true,
+      name: forty,
+    });
   });
 
   it("refuses another set's name, case aside, but not its own", () => {
-    expect(validateSetName(sets, "a", "beta")).toEqual({ ok: false, message: "Another set has this name" });
-    expect(validateSetName(sets, "a", "Typical customer")).toEqual({ ok: false, message: "Another set has this name" });
-    expect(validateSetName(sets, "a", "ALPHA")).toEqual({ ok: true, name: "ALPHA" });
+    expect(validateSetName(sets, "a", "beta")).toEqual({
+      ok: false,
+      message: "Another set has this name",
+    });
+    expect(validateSetName(sets, "a", "Typical customer")).toEqual({
+      ok: false,
+      message: "Another set has this name",
+    });
+    expect(validateSetName(sets, "a", "ALPHA")).toEqual({
+      ok: true,
+      name: "ALPHA",
+    });
   });
 
   it("renames a custom set", () => {
@@ -255,10 +377,19 @@ describe("validateSetName and renameSet", () => {
 });
 
 describe("removeSet", () => {
-  const sets = listSets([custom("a", "Alpha"), custom("b", "Beta")], VARIABLES, TODAY);
+  const sets = listSets(
+    [custom("a", "Alpha"), custom("b", "Beta")],
+    VARIABLES,
+    TODAY,
+  );
 
   it("removes a custom set", () => {
-    expect(removeSet(sets, "a").map((s) => s.id)).toEqual(["typical", "long", "minimum", "b"]);
+    expect(removeSet(sets, "a").map((s) => s.id)).toEqual([
+      "typical",
+      "long",
+      "minimum",
+      "b",
+    ]);
   });
 
   it("never removes a default set", () => {

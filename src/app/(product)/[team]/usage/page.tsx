@@ -6,7 +6,10 @@ import { UsageEyebrow } from "@/components/usage/usage-eyebrow";
 import { UsageSkeleton } from "@/components/usage/usage-skeleton";
 
 // Usage: how the team's templates are rendered by the systems that use them. Overview and Consumers.
-export default function UsagePage({ params, searchParams }: PageProps<"/[team]/usage">) {
+export default function UsagePage({
+  params,
+  searchParams,
+}: PageProps<"/[team]/usage">) {
   return (
     <div>
       <PageHeader

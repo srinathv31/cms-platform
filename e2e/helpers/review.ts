@@ -6,14 +6,18 @@ import { expect } from "./scenario";
 // Every spec that approves on the review screen calls `viewEveryOutput` first.
 
 /** The review screen's view tabs: Document and Preview. */
-export const reviewTabs = (page: Page): Locator => page.getByRole("tablist", { name: "View" });
+export const reviewTabs = (page: Page): Locator =>
+  page.getByRole("tablist", { name: "View" });
 
 /** The Preview's panel, while it is the view showing. */
-export const reviewPreview = (page: Page): Locator => page.locator("#review-panel-preview").filter({ visible: true });
+export const reviewPreview = (page: Page): Locator =>
+  page.locator("#review-panel-preview").filter({ visible: true });
 
 /** The Preview's channel control, and its phone control (on Push and SMS). */
-export const channelControl = (page: Page): Locator => reviewPreview(page).getByRole("group", { name: "Channel", exact: true });
-export const phoneControl = (page: Page): Locator => reviewPreview(page).getByRole("group", { name: "Phone", exact: true });
+export const channelControl = (page: Page): Locator =>
+  reviewPreview(page).getByRole("group", { name: "Channel", exact: true });
+export const phoneControl = (page: Page): Locator =>
+  reviewPreview(page).getByRole("group", { name: "Phone", exact: true });
 
 /** A segment the approver has viewed carries a quiet check (`data-done`). */
 export async function expectViewed(segment: Locator, timeout = 30_000) {
@@ -27,7 +31,10 @@ export async function expectViewed(segment: Locator, timeout = 30_000) {
  */
 export async function viewEveryOutput(page: Page) {
   const tabs = reviewTabs(page);
-  const startedOn = ((await tabs.getByRole("tab", { selected: true }).textContent()) ?? "Document").trim();
+  const startedOn = (
+    (await tabs.getByRole("tab", { selected: true }).textContent()) ??
+    "Document"
+  ).trim();
   await tabs.getByRole("tab", { name: "Preview", exact: true }).click();
 
   const channels = channelControl(page).getByRole("button");
@@ -48,5 +55,6 @@ export async function viewEveryOutput(page: Page) {
     await expectViewed(channel);
   }
 
-  if (startedOn !== "Preview") await tabs.getByRole("tab", { name: startedOn, exact: true }).click();
+  if (startedOn !== "Preview")
+    await tabs.getByRole("tab", { name: startedOn, exact: true }).click();
 }

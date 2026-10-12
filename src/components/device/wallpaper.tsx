@@ -22,7 +22,10 @@ export function Wallpaper({ className }: { className?: string }) {
       data-slot="wallpaper"
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="xMidYMin slice"
-      className={cn("pointer-events-none absolute inset-0 size-full", className)}
+      className={cn(
+        "pointer-events-none absolute inset-0 size-full",
+        className,
+      )}
     >
       <defs>
         <linearGradient id={ref("field")} x1="0" y1="0" x2="0.35" y2="1">
@@ -31,31 +34,76 @@ export function Wallpaper({ className }: { className?: string }) {
           <stop offset="1" style={{ stopColor: "var(--device-wall-low)" }} />
         </linearGradient>
         <radialGradient id={ref("bloom")}>
-          <stop offset="0" style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0.95 }} />
-          <stop offset="0.45" style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0.45 }} />
-          <stop offset="1" style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0 }} />
+          <stop
+            offset="0"
+            style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0.95 }}
+          />
+          <stop
+            offset="0.45"
+            style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0.45 }}
+          />
+          <stop
+            offset="1"
+            style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0 }}
+          />
         </radialGradient>
         <radialGradient id={ref("glow")}>
-          <stop offset="0" style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0.9 }} />
-          <stop offset="1" style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0 }} />
+          <stop
+            offset="0"
+            style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0.9 }}
+          />
+          <stop
+            offset="1"
+            style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0 }}
+          />
         </radialGradient>
         <radialGradient id={ref("mint")}>
-          <stop offset="0" style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0.7 }} />
-          <stop offset="1" style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0 }} />
+          <stop
+            offset="0"
+            style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0.7 }}
+          />
+          <stop
+            offset="1"
+            style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0 }}
+          />
         </radialGradient>
         <radialGradient id={ref("shade")}>
-          <stop offset="0" style={{ stopColor: "var(--device-wall-shade)", stopOpacity: 0.85 }} />
-          <stop offset="1" style={{ stopColor: "var(--device-wall-shade)", stopOpacity: 0 }} />
+          <stop
+            offset="0"
+            style={{ stopColor: "var(--device-wall-shade)", stopOpacity: 0.85 }}
+          />
+          <stop
+            offset="1"
+            style={{ stopColor: "var(--device-wall-shade)", stopOpacity: 0 }}
+          />
         </radialGradient>
         <linearGradient id={ref("ribbon")} x1="0" y1="0" x2="1" y2="0.4">
-          <stop offset="0" style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0 }} />
-          <stop offset="0.5" style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0.5 }} />
-          <stop offset="1" style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0.1 }} />
+          <stop
+            offset="0"
+            style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0 }}
+          />
+          <stop
+            offset="0.5"
+            style={{ stopColor: "var(--device-wall-glow)", stopOpacity: 0.5 }}
+          />
+          <stop
+            offset="1"
+            style={{ stopColor: "var(--device-wall-bloom)", stopOpacity: 0.1 }}
+          />
         </linearGradient>
         <linearGradient id={ref("ribbon-low")} x1="1" y1="0" x2="0" y2="0.5">
-          <stop offset="0" style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0 }} />
-          <stop offset="0.6" style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0.35 }} />
-          <stop offset="1" style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0 }} />
+          <stop
+            offset="0"
+            style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0 }}
+          />
+          <stop
+            offset="0.6"
+            style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0.35 }}
+          />
+          <stop
+            offset="1"
+            style={{ stopColor: "var(--device-wall-mint)", stopOpacity: 0 }}
+          />
         </linearGradient>
       </defs>
       <rect width={W} height={H} fill={url("field")} />
@@ -67,7 +115,10 @@ export function Wallpaper({ className }: { className?: string }) {
         d="M-60 430C40 330 150 520 260 430S420 300 470 340L470 430C400 410 340 520 240 560S60 520-60 560Z"
         fill={url("ribbon")}
       />
-      <path d="M470 610C360 560 260 720 140 690S-30 640-80 700L-80 780C20 740 120 800 240 790S400 690 470 700Z" fill={url("ribbon-low")} />
+      <path
+        d="M470 610C360 560 260 720 140 690S-30 640-80 700L-80 780C20 740 120 800 240 790S400 690 470 700Z"
+        fill={url("ribbon-low")}
+      />
     </svg>
   );
 }

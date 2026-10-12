@@ -20,7 +20,11 @@ function page() {
   return { toggle, inRail, inDocument, focusTargets };
 }
 
-const fakeSession = (focusTargets = createFocusTargets()) => ({ closePreview: vi.fn(), setRailOpen: vi.fn(), focusTargets });
+const fakeSession = (focusTargets = createFocusTargets()) => ({
+  closePreview: vi.fn(),
+  setRailOpen: vi.fn(),
+  focusTargets,
+});
 
 describe("closePreview", () => {
   it("puts the preview and the overlay away, and returns focus to the Preview toggle", () => {

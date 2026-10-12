@@ -41,7 +41,8 @@ const HEADER = "grid grid-cols-[minmax(0,1fr)_auto] gap-y-1.5";
  * (the status row would wrap, and the tab bar below it would move). Reserved or not, it is the same for
  * every state at the same width.
  */
-const RING_SLOT = "col-start-2 row-span-2 row-start-1 ml-6 hidden size-19 shrink-0 items-center justify-center self-start @min-[32.25rem]/ws:flex";
+const RING_SLOT =
+  "col-start-2 row-span-2 row-start-1 ml-6 hidden size-19 shrink-0 items-center justify-center self-start @min-[32.25rem]/ws:flex";
 const BACK =
   "caps-label -ml-1 inline-flex h-5 w-fit items-center gap-0.5 rounded-md pr-1 outline-none hover:text-text focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -88,7 +89,10 @@ export function ReviewHeader({
           <ChevronLeft aria-hidden strokeWidth={1.75} className="size-3.5" />
           Review
         </Link>
-        <h1 className="display-lg min-w-0 max-w-full truncate narrow:overflow-visible narrow:text-clip narrow:break-words narrow:whitespace-normal text-text" title={templateName}>
+        <h1
+          className="display-lg min-w-0 max-w-full truncate narrow:overflow-visible narrow:text-clip narrow:break-words narrow:whitespace-normal text-text"
+          title={templateName}
+        >
           {templateName}
         </h1>
       </div>
@@ -100,22 +104,30 @@ export function ReviewHeader({
           animate={{ opacity: 1 }}
           transition={{ duration: duration.slow, ease: ease.outSoft }}
         >
-          <StatusBadge state={state} sunsetDay={sunsetDay} sunsetPassed={sunsetPassed} now={nowIso} />
+          <StatusBadge
+            state={state}
+            sunsetDay={sunsetDay}
+            sunsetPassed={sunsetPassed}
+            now={nowIso}
+          />
         </m.span>
         <span
           data-slot="byline"
           className="min-w-0 truncate narrow:overflow-visible narrow:text-clip narrow:break-words narrow:whitespace-normal text-[14px] leading-6 text-text-muted"
         >
-          {versionLabel(shown)} by {author.name} · {formatAgo(submittedAt, nowIso)}
+          {versionLabel(shown)} by {author.name} ·{" "}
+          {formatAgo(submittedAt, nowIso)}
           {approvedOn ? ` · ${approvedOn}` : null}
         </span>
       </div>
-      <div
-        ref={slotRef}
-        data-slot="share"
-        className={RING_SLOT}
-      >
-        {ring ? <WorkspaceShare templateId={templateId} templateName={templateName} activeVersion={versionNumber} /> : null}
+      <div ref={slotRef} data-slot="share" className={RING_SLOT}>
+        {ring ? (
+          <WorkspaceShare
+            templateId={templateId}
+            templateName={templateName}
+            activeVersion={versionNumber}
+          />
+        ) : null}
       </div>
     </header>
   );

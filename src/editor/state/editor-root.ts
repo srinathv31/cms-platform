@@ -16,7 +16,12 @@
 // while reading one part of the document shouldn't carry the page off to wherever the change was.
 
 import type { Editor } from "@tiptap/core";
-import { redoDepth, redoNoScroll, undoDepth, undoNoScroll } from "@tiptap/pm/history";
+import {
+  redoDepth,
+  redoNoScroll,
+  undoDepth,
+  undoNoScroll,
+} from "@tiptap/pm/history";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { DEFAULT_REQUIRED_NOTE } from "../extensions/required-sections";
@@ -31,7 +36,11 @@ import {
   type FieldUsage,
   type VariableUsage,
 } from "../model/usage";
-import { createVariableStore, type VariableResult, type VariableStore } from "./variable-store";
+import {
+  createVariableStore,
+  type VariableResult,
+  type VariableStore,
+} from "./variable-store";
 
 export type FieldKind = "body" | "inline";
 
@@ -105,7 +114,10 @@ export interface EditorRootRuntime {
   /** Any change, including the key: chips are re-pointed in every field, one transaction each. */
   updateVariable: (key: string, patch: Partial<Variable>) => VariableResult;
   /** Deletes a variable. `removeChips` removes its chips too: one undoable transaction per field. */
-  deleteVariable: (key: string, options?: { removeChips?: boolean }) => VariableResult;
+  deleteVariable: (
+    key: string,
+    options?: { removeChips?: boolean },
+  ) => VariableResult;
   restoreVariable: (key: string) => VariableResult;
   /**
    * Inserts a chip where the caret last was in the last-focused field (or `fieldId`), and returns
@@ -140,7 +152,10 @@ const NO_HISTORY: HistoryAvailability = { canUndo: false, canRedo: false };
 
 export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
   const variables = createVariableStore(init.variables);
-  const usage = createStore<UsageState>()(() => ({ byKey: new Map(), ready: false }));
+  const usage = createStore<UsageState>()(() => ({
+    byKey: new Map(),
+    ready: false,
+  }));
   const config = createStore<RootConfig>()(() => ({
     readOnly: (init.readOnly ?? false) || (init.held ?? false),
     held: (init.held ?? false) && !init.readOnly,
@@ -162,14 +177,19 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
 
   /** Body first, then inline fields in the order they appeared. */
   const ordered = () =>
-    [...fields.values()].sort((a, b) => (a.kind === b.kind ? a.seq - b.seq : a.kind === "body" ? -1 : 1));
+    [...fields.values()].sort((a, b) =>
+      a.kind === b.kind ? a.seq - b.seq : a.kind === "body" ? -1 : 1,
+    );
 
   const publish = () => {
-    const merged = mergeUsage(ordered().map((f) => ({ label: f.label, usage: f.usage })));
+    const merged = mergeUsage(
+      ordered().map((f) => ({ label: f.label, usage: f.usage })),
+    );
     const { byKey: prev, ready: wasReady } = usage.getState();
     const next = reconcileUsage(prev, merged);
     const ready = fields.size > 0;
-    if (next !== prev || ready !== wasReady) usage.setState({ byKey: next, ready });
+    if (next !== prev || ready !== wasReady)
+      usage.setState({ byKey: next, ready });
   };
 
   const flushUsage = () => {
@@ -177,7 +197,9 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     let changed = false;
     for (const field of fields.values()) {
       if (!field.pendingDoc) continue;
-      const next = usageFromDoc(field.pendingDoc, { sections: field.kind === "body" });
+      const next = usageFromDoc(field.pendingDoc, {
+        sections: field.kind === "body",
+      });
       field.pendingDoc = null;
       if (next !== field.usage) {
         field.usage = next;
@@ -224,7 +246,12 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
   /** The live, editable editor undo and redo act on. */
   const historyEditor = (): Editor | null => {
     const editor = pickField()?.editor;
-    return editor && !editor.isDestroyed && editor.isEditable && !config.getState().readOnly ? editor : null;
+    return editor &&
+      !editor.isDestroyed &&
+      editor.isEditable &&
+      !config.getState().readOnly
+      ? editor
+      : null;
   };
 
   const publishHistory = () => {
@@ -232,7 +259,8 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     const canUndo = !!editor && undoDepth(editor.state) > 0;
     const canRedo = !!editor && redoDepth(editor.state) > 0;
     const prev = history.getState();
-    if (prev.canUndo !== canUndo || prev.canRedo !== canRedo) history.setState({ canUndo, canRedo });
+    if (prev.canUndo !== canUndo || prev.canRedo !== canRedo)
+      history.setState({ canUndo, canRedo });
   };
 
   config.subscribe((state, prev) => {
@@ -243,7 +271,10 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
     const editor = historyEditor();
     if (!editor) return false;
     const { view } = editor;
-    const done = (which === "undo" ? undoNoScroll : redoNoScroll)(view.state, view.dispatch);
+    const done = (which === "undo" ? undoNoScroll : redoNoScroll)(
+      view.state,
+      view.dispatch,
+    );
     publishHistory();
     return done;
   };
@@ -270,7 +301,9 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
         seq: seq++,
         hidden: false,
         editor: null,
-        usage: content ? usageFromJSON(content, { sections: info.kind === "body" }) : EMPTY_USAGE,
+        usage: content
+          ? usageFromJSON(content, { sections: info.kind === "body" })
+          : EMPTY_USAGE,
         pendingDoc: null,
       });
       publish();
@@ -326,7 +359,8 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
 
     flushUsage,
 
-    createVariable: (variable, index) => variables.getState().create(variable, index),
+    createVariable: (variable, index) =>
+      variables.getState().create(variable, index),
 
     updateVariable(key, patch) {
       const result = variables.getState().update(key, patch);
@@ -357,19 +391,32 @@ export function createEditorRootRuntime(init: RootInit): EditorRootRuntime {
       if (config.getState().readOnly) return false;
       const field = pickField(fieldId);
       const editor = field?.editor;
-      if (!field || !editor || editor.isDestroyed || !editor.isEditable) return false;
+      if (!field || !editor || editor.isDestroyed || !editor.isEditable)
+        return false;
 
       if (lastFocused === null && !fieldId && field.kind === "body") {
         const section = firstRequiredSection(editor.state.doc);
         if (section) {
           const at = section.headingEnd + 1;
           const chain = editor.chain();
-          if (!section.hasBody) chain.insertContentAt(section.headingEnd, { type: "paragraph" }, { updateSelection: false });
-          return chain.insertVariable(key, { from: at, to: at }).focus(undefined, { scrollIntoView: true }).run();
+          if (!section.hasBody)
+            chain.insertContentAt(
+              section.headingEnd,
+              { type: "paragraph" },
+              { updateSelection: false },
+            );
+          return chain
+            .insertVariable(key, { from: at, to: at })
+            .focus(undefined, { scrollIntoView: true })
+            .run();
         }
         return editor.chain().focus("start").insertVariable(key).run();
       }
-      return editor.chain().insertVariable(key).focus(undefined, { scrollIntoView: true }).run();
+      return editor
+        .chain()
+        .insertVariable(key)
+        .focus(undefined, { scrollIntoView: true })
+        .run();
     },
 
     undo: () => step("undo"),

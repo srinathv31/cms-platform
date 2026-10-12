@@ -4,7 +4,11 @@ import { refresh, revalidatePath } from "next/cache";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { ActionResult, ApproverFacts } from "@/domain/access-types";
-import { approvedThisRound, currentStageOf, stageRecipients } from "@/domain/approval-chain";
+import {
+  approvedThisRound,
+  currentStageOf,
+  stageRecipients,
+} from "@/domain/approval-chain";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { asNumbered, reviewLink, versionLabel } from "@/domain/rounds";
 import { PLATFORM_REFUSALS } from "@/domain/platform-config/refusals";
@@ -13,9 +17,22 @@ import { saveApprovalChain as saveApprovalChainRule } from "@/domain/platform-co
 import { setBusinessZone as setBusinessZoneRule } from "@/domain/platform-config/time-zone";
 import { setChannelRule as setChannelRuleRule } from "@/domain/platform-config/channels";
 import { updateRequiredSections } from "@/domain/platform-config/sections";
-import { CHANNELS, type ApproverRule, type Channel, type RequiredSection, type Viewer } from "@/domain/types";
-import { applyMembershipChange, writeAccessEffects } from "@/server/access-effects";
-import { BUSINESS_ZONE_KEY, countPendingSunsets, readBusinessZone } from "@/server/business-zone";
+import {
+  CHANNELS,
+  type ApproverRule,
+  type Channel,
+  type RequiredSection,
+  type Viewer,
+} from "@/domain/types";
+import {
+  applyMembershipChange,
+  writeAccessEffects,
+} from "@/server/access-effects";
+import {
+  BUSINESS_ZONE_KEY,
+  countPendingSunsets,
+  readBusinessZone,
+} from "@/server/business-zone";
 import {
   approvalStages,
   contentTypes,
@@ -54,7 +71,9 @@ function refreshAll() {
 const actorOf = (viewer: Viewer) => ({ id: viewer.userId, name: viewer.name });
 
 async function contentTypeRow(tx: Tx, id: string) {
-  const row = await tx.query.contentTypes.findFirst({ where: eq(contentTypes.id, id) });
+  const row = await tx.query.contentTypes.findFirst({
+    where: eq(contentTypes.id, id),
+  });
   if (!row) refuse(REQUEST_REFUSALS.contentTypeGone);
   return row;
 }
@@ -79,14 +98,22 @@ export async function createTeam(input: {
     input: CreateTeamInput,
     authorize: manage,
     transaction: async (tx, { viewer, input, now: at }) => {
-      const admin = await tx.query.users.findFirst({ where: eq(users.id, input.adminUserId) });
+      const admin = await tx.query.users.findFirst({
+        where: eq(users.id, input.adminUserId),
+      });
       if (!admin) refuse(PLATFORM_REFUSALS.pickPerson);
-      const existing = await tx.select({ slug: teams.slug, name: teams.name }).from(teams);
+      const existing = await tx
+        .select({ slug: teams.slug, name: teams.name })
+        .from(teams);
       const outcome = createTeamRule({
         name: input.name,
         description: input.description,
         icon: input.icon,
-        admin: { id: admin.id, name: admin.name, platformRole: admin.platformRole },
+        admin: {
+          id: admin.id,
+          name: admin.name,
+          platformRole: admin.platformRole,
+        },
         actor: actorOf(viewer),
         now: at,
         existing,
@@ -95,7 +122,10 @@ export async function createTeam(input: {
 
       await tx.insert(teams).values(outcome.team);
       await applyMembershipChange(tx, outcome.membership);
-      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      await writeAccessEffects(tx, outcome.effects, {
+        now: at,
+        actorId: viewer.userId,
+      });
       return { ok: true, slug: outcome.team.slug };
     },
     after: refreshAll,
@@ -106,7 +136,9 @@ export async function createTeam(input: {
 
 const SectionsInput = z.object({
   contentTypeId: z.string().min(1).max(64),
-  requiredSections: z.array(z.object({ key: z.string().max(64), title: z.string().max(500) })).max(30),
+  requiredSections: z
+    .array(z.object({ key: z.string().max(64), title: z.string().max(500) }))
+    .max(30),
 });
 
 /**
@@ -132,8 +164,14 @@ export async function updateContentType(input: {
       if (!outcome.ok) refuse(outcome);
       if (outcome.effects.length === 0) return { ok: true };
 
-      await tx.update(contentTypes).set({ requiredSections: outcome.requiredSections }).where(eq(contentTypes.id, type.id));
-      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      await tx
+        .update(contentTypes)
+        .set({ requiredSections: outcome.requiredSections })
+        .where(eq(contentTypes.id, type.id));
+      await writeAccessEffects(tx, outcome.effects, {
+        now: at,
+        actorId: viewer.userId,
+      });
       wrote = true;
       return { ok: true };
     },
@@ -152,12 +190,21 @@ const ChannelInput = z.object({
 });
 
 /** Active versions of the content type's templates that render to the channel. */
-async function activeUsing(tx: Tx, contentTypeId: string, channel: Channel): Promise<number> {
+async function activeUsing(
+  tx: Tx,
+  contentTypeId: string,
+  channel: Channel,
+): Promise<number> {
   const rows = await tx
     .select({ channels: versions.channels })
     .from(versions)
     .innerJoin(templates, eq(templates.id, versions.templateId))
-    .where(and(eq(templates.contentTypeId, contentTypeId), eq(versions.state, "active")));
+    .where(
+      and(
+        eq(templates.contentTypeId, contentTypeId),
+        eq(versions.state, "active"),
+      ),
+    );
   return rows.filter((r) => r.channels.includes(channel)).length;
 }
 
@@ -183,15 +230,26 @@ export async function setChannelRule(input: {
         allowed: input.allowed,
         activeUsing: await activeUsing(tx, type.id, input.channel),
         // To name, in a refusal, the content types a channel of the other family goes on.
-        contentTypes: await tx.select({ name: contentTypes.name, allowedChannels: contentTypes.allowedChannels }).from(contentTypes),
+        contentTypes: await tx
+          .select({
+            name: contentTypes.name,
+            allowedChannels: contentTypes.allowedChannels,
+          })
+          .from(contentTypes),
         actor: actorOf(viewer),
         now: at,
       });
       if (!outcome.ok) refuse(outcome);
       if (outcome.effects.length === 0) return { ok: true };
 
-      await tx.update(contentTypes).set({ allowedChannels: outcome.allowedChannels }).where(eq(contentTypes.id, type.id));
-      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      await tx
+        .update(contentTypes)
+        .set({ allowedChannels: outcome.allowedChannels })
+        .where(eq(contentTypes.id, type.id));
+      await writeAccessEffects(tx, outcome.effects, {
+        now: at,
+        actorId: viewer.userId,
+      });
       wrote = true;
       return { ok: true };
     },
@@ -212,20 +270,37 @@ const RuleInput: z.ZodType<ApproverRule> = z.union([
 const ChainInput = z.object({
   contentTypeId: z.string().min(1).max(64),
   stages: z
-    .array(z.object({ id: z.string().min(1).max(64).optional(), name: z.string().max(500), rule: RuleInput }))
+    .array(
+      z.object({
+        id: z.string().min(1).max(64).optional(),
+        name: z.string().max(500),
+        rule: RuleInput,
+      }),
+    )
     .max(20),
 });
 
 const sameRule = (a: ApproverRule, b: ApproverRule) =>
-  a.kind === "user" ? b.kind === "user" && a.userId === b.userId : b.kind === "team_role" && a.role === b.role;
+  a.kind === "user"
+    ? b.kind === "user" && a.userId === b.userId
+    : b.kind === "team_role" && a.role === b.role;
 
 /** Everyone, with what the domain's validateChain checks: their platform role and whether they hold an active team role. */
 async function approverFacts(tx: Tx): Promise<ApproverFacts[]> {
-  const people = await tx.select({ id: users.id, name: users.name, platformRole: users.platformRole }).from(users);
+  const people = await tx
+    .select({
+      id: users.id,
+      name: users.name,
+      platformRole: users.platformRole,
+    })
+    .from(users);
   const active = await tx
     .selectDistinct({ userId: memberships.userId })
     .from(memberships)
-    .innerJoin(membershipRoles, eq(membershipRoles.membershipId, memberships.id))
+    .innerJoin(
+      membershipRoles,
+      eq(membershipRoles.membershipId, memberships.id),
+    )
     .where(eq(memberships.status, "active"));
   const withRole = new Set(active.map((a) => a.userId));
   return people.map((p) => ({ ...p, activeTeamRole: withRole.has(p.id) }));
@@ -275,14 +350,23 @@ export async function saveApprovalChain(input: {
         })
         .from(versions)
         .innerJoin(templates, eq(templates.id, versions.templateId))
-        .where(and(eq(templates.contentTypeId, type.id), eq(versions.state, "in_review")));
+        .where(
+          and(
+            eq(templates.contentTypeId, type.id),
+            eq(versions.state, "in_review"),
+          ),
+        );
       const people = await approverFacts(tx);
 
       const outcome = saveApprovalChainRule({
         contentType: { id: type.id, name: type.name },
         current,
         next: input.stages,
-        inReview: inReview.map(({ versionId, stages, currentStage }) => ({ versionId, stages, currentStage })),
+        inReview: inReview.map(({ versionId, stages, currentStage }) => ({
+          versionId,
+          stages,
+          currentStage,
+        })),
         people,
         actor: actorOf(viewer),
         now: at,
@@ -292,22 +376,49 @@ export async function saveApprovalChain(input: {
 
       const keep = new Set(outcome.stages.flatMap((s) => (s.id ? [s.id] : [])));
       const removed = current.filter((s) => !keep.has(s.id)).map((s) => s.id);
-      if (removed.length) await tx.delete(approvalStages).where(inArray(approvalStages.id, removed));
+      if (removed.length)
+        await tx
+          .delete(approvalStages)
+          .where(inArray(approvalStages.id, removed));
       for (const stage of outcome.stages) {
-        const row = { position: stage.position, name: stage.name, approverRule: stage.rule };
-        if (stage.id) await tx.update(approvalStages).set(row).where(eq(approvalStages.id, stage.id));
-        else await tx.insert(approvalStages).values({ id: newId("stage"), contentTypeId: type.id, ...row });
+        const row = {
+          position: stage.position,
+          name: stage.name,
+          approverRule: stage.rule,
+        };
+        if (stage.id)
+          await tx
+            .update(approvalStages)
+            .set(row)
+            .where(eq(approvalStages.id, stage.id));
+        else
+          await tx
+            .insert(approvalStages)
+            .values({ id: newId("stage"), contentTypeId: type.id, ...row });
       }
       // A stage that now names someone else (same stage, new rule): whoever it names now is told
       // about the versions already waiting on it, as if those had just arrived, unless they approved a
       // stage of that version already and so can't take this one. The version's own name for the
       // stage, as its stepper shows it.
-      const decisions = await loadDecisions(tx, inReview.map((v) => v.versionId));
+      const decisions = await loadDecisions(
+        tx,
+        inReview.map((v) => v.versionId),
+      );
       for (const v of inReview) {
         const before = currentStageOf(v, current);
         const after = before && outcome.stages.find((s) => s.id === before.id);
-        if (!before || !after || sameRule(before.rule, after.rule) || v.number === null) continue;
-        const asked = stageRecipients({ ...before, rule: after.rule }, v.writers, approvedThisRound(decisions.get(v.versionId) ?? []));
+        if (
+          !before ||
+          !after ||
+          sameRule(before.rule, after.rule) ||
+          v.number === null
+        )
+          continue;
+        const asked = stageRecipients(
+          { ...before, rule: after.rule },
+          v.writers,
+          approvedThisRound(decisions.get(v.versionId) ?? []),
+        );
         if (!asked) continue;
         const round = asNumbered(v);
         await writeEffects(
@@ -321,10 +432,19 @@ export async function saveApprovalChain(input: {
               link: reviewLink(v.templateId, round),
             },
           ],
-          { at, actorId: viewer.userId, teamId: v.teamId, templateId: v.templateId, versionId: v.versionId },
+          {
+            at,
+            actorId: viewer.userId,
+            teamId: v.teamId,
+            templateId: v.templateId,
+            versionId: v.versionId,
+          },
         );
       }
-      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+      await writeAccessEffects(tx, outcome.effects, {
+        now: at,
+        actorId: viewer.userId,
+      });
       wrote = true;
       return { ok: true };
     },
@@ -343,7 +463,9 @@ const ZoneInput = z.object({ zone: z.string().min(1).max(64) });
  * dates picked afterwards follow it; every sunset already set keeps its instant, since its consumers
  * have been told when it ends. The same zone again writes nothing.
  */
-export async function setBusinessZone(input: { zone: string }): Promise<ActionResult> {
+export async function setBusinessZone(input: {
+  zone: string;
+}): Promise<ActionResult> {
   let wrote = false;
   return serverAction(input, {
     input: ZoneInput,
@@ -362,8 +484,14 @@ export async function setBusinessZone(input: { zone: string }): Promise<ActionRe
       await tx
         .insert(settings)
         .values({ key: BUSINESS_ZONE_KEY, value: outcome.zone })
-        .onConflictDoUpdate({ target: settings.key, set: { value: outcome.zone } });
-      await writeAccessEffects(tx, outcome.effects, { now: at, actorId: viewer.userId });
+        .onConflictDoUpdate({
+          target: settings.key,
+          set: { value: outcome.zone },
+        });
+      await writeAccessEffects(tx, outcome.effects, {
+        now: at,
+        actorId: viewer.userId,
+      });
       wrote = true;
       return { ok: true };
     },

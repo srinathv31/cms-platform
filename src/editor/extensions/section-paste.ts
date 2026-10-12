@@ -19,7 +19,14 @@
 import { Extension } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode } from "@tiptap/pm/model";
 import { closeHistory } from "@tiptap/pm/history";
-import { Plugin, PluginKey, Selection, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
+import {
+  Plugin,
+  PluginKey,
+  Selection,
+  TextSelection,
+  type EditorState,
+  type Transaction,
+} from "@tiptap/pm/state";
 import { matchesSectionTitle } from "../model/section-title";
 import { NODE } from "../model/types";
 import {
@@ -49,7 +56,11 @@ interface SplitPaste {
  * Splits a pasted slice at its top-level headings that match a required heading of `doc`. `copies`
  * are the indexes of top-level blocks that were required headings where they were copied from.
  */
-function splitBySections(doc: PMNode, slice: Slice, copies: ReadonlySet<number>): SplitPaste | null {
+function splitBySections(
+  doc: PMNode,
+  slice: Slice,
+  copies: ReadonlySet<number>,
+): SplitPaste | null {
   const required = requiredHeadings(doc);
   if (!required.length) return null;
   const lead: PMNode[] = [];
@@ -57,7 +68,9 @@ function splitBySections(doc: PMNode, slice: Slice, copies: ReadonlySet<number>)
   slice.content.forEach((node, _offset, index) => {
     const match =
       node.type.name === NODE.heading && !copies.has(index)
-        ? required.find((heading) => matchesSectionTitle(node.textContent, heading.node.textContent))
+        ? required.find((heading) =>
+            matchesSectionTitle(node.textContent, heading.node.textContent),
+          )
         : undefined;
     if (match) parts.push({ key: match.key, blocks: [] });
     else (parts.at(-1)?.blocks ?? lead).push(node);
@@ -65,20 +78,25 @@ function splitBySections(doc: PMNode, slice: Slice, copies: ReadonlySet<number>)
   return parts.length ? { lead, parts } : null;
 }
 
-const isEmptyLine = (node: PMNode) => node.type.name === "paragraph" && node.content.size === 0;
+const isEmptyLine = (node: PMNode) =>
+  node.type.name === "paragraph" && node.content.size === 0;
 
 /**
  * Where a section's pasted blocks go: after its last block with something in it, or over the whole
  * body when it holds only empty lines (or nothing). Null when the heading isn't in the document.
  */
-function sectionTarget(doc: PMNode, key: string): { from: number; to: number } | null {
+function sectionTarget(
+  doc: PMNode,
+  key: string,
+): { from: number; to: number } | null {
   let headingEnd = -1;
   let contentEnd = -1;
   let sectionEnd = doc.content.size;
   doc.forEach((node, offset) => {
     if (sectionEnd !== doc.content.size) return;
     if (headingEnd < 0) {
-      if (node.attrs.requiredKey === key && isRequiredHeading(node)) headingEnd = contentEnd = offset + node.nodeSize;
+      if (node.attrs.requiredKey === key && isRequiredHeading(node))
+        headingEnd = contentEnd = offset + node.nodeSize;
       return;
     }
     if (node.type.name === NODE.heading && Number(node.attrs.level) <= 2) {
@@ -88,7 +106,9 @@ function sectionTarget(doc: PMNode, key: string): { from: number; to: number } |
     if (!isEmptyLine(node)) contentEnd = offset + node.nodeSize;
   });
   if (headingEnd < 0) return null;
-  return contentEnd === headingEnd ? { from: headingEnd, to: sectionEnd } : { from: contentEnd, to: contentEnd };
+  return contentEnd === headingEnd
+    ? { from: headingEnd, to: sectionEnd }
+    : { from: contentEnd, to: contentEnd };
 }
 
 /**
@@ -109,7 +129,9 @@ export function sectionPasteTransaction(
   const { selection } = state;
   let tr: Transaction = state.tr;
   if (!selection.empty) {
-    if (headingsIn(state.doc, selection.from, selection.to).length) tr = replaceAroundRequired(state, selection.from, selection.to, null) ?? tr;
+    if (headingsIn(state.doc, selection.from, selection.to).length)
+      tr =
+        replaceAroundRequired(state, selection.from, selection.to, null) ?? tr;
     else tr.deleteSelection();
   }
   // A paste is its own undo step, never merged into the typing just before it.
@@ -129,7 +151,9 @@ export function sectionPasteTransaction(
       tr.insert(below, Fragment.from(split.lead));
     } else if ($at.parent.inlineContent) {
       tr.setSelection(TextSelection.create(tr.doc, at));
-      tr.replaceSelection(new Slice(Fragment.from(split.lead), slice.openStart, 0));
+      tr.replaceSelection(
+        new Slice(Fragment.from(split.lead), slice.openStart, 0),
+      );
       caret = { pos: tr.selection.to, step: tr.steps.length };
     } else {
       // Between blocks: as blocks.

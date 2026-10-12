@@ -11,11 +11,21 @@
 // simulator (POST /api/v1/templates/{id}/render) go through the same engine, so what an approver sees is
 // exactly what a customer gets. render_log NEVER holds variable values.
 
-import type { BulletStyle, MarkerDelimiter, MarkerFormat } from "@/editor/model/list-markers";
+import type {
+  BulletStyle,
+  MarkerDelimiter,
+  MarkerFormat,
+} from "@/editor/model/list-markers";
 import type { ChannelFieldKey } from "../channel-fields";
 import type { SmsEncoding } from "../messages/gsm7";
 import type { PushPlatform } from "../messages/push";
-import type { Channel, DocumentChannel, MessageChannel, Variable, VariableType } from "../types";
+import type {
+  Channel,
+  DocumentChannel,
+  MessageChannel,
+  Variable,
+  VariableType,
+} from "../types";
 
 export type { BulletStyle, MarkerDelimiter, MarkerFormat };
 
@@ -168,7 +178,13 @@ export interface RenderRule {
 }
 
 /** Block ids are the document's stable block ids (`attrs.id`); null only for nested blocks without one. */
-export type RenderBlock = RenderParagraph | RenderHeading | RenderList | RenderTable | RenderCallout | RenderRule;
+export type RenderBlock =
+  | RenderParagraph
+  | RenderHeading
+  | RenderList
+  | RenderTable
+  | RenderCallout
+  | RenderRule;
 
 /**
  * What every channel adapter receives. `templateName` is the rendered version's name, used only as
@@ -412,7 +428,8 @@ export interface ValueErrorDetails {
  * document failed the document check, or the PDF font can't draw some characters ("U+1EA1", in the
  * order they first appear). An unexpected failure has no details.
  */
-export type RenderFailedDetails = { reason: "document" } | { reason: "glyphs"; characters: string[] };
+export type RenderFailedDetails =
+  { reason: "document" } | { reason: "glyphs"; characters: string[] };
 
 /** push_payload_too_large: the platform, the payload's size and the limit. */
 export interface PushTooLargeDetails {

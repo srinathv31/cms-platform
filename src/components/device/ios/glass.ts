@@ -16,10 +16,17 @@ const FILL: Record<GlassKind, string> = {
 };
 
 /** A glass surface: a frosted fill, the blur behind it, a hairline rim and a specular top edge. */
-export function glass(kind: GlassKind, { blur = 30, shadow = false }: { blur?: number; shadow?: boolean } = {}): CSSProperties {
+export function glass(
+  kind: GlassKind,
+  { blur = 30, shadow = false }: { blur?: number; shadow?: boolean } = {},
+): CSSProperties {
   const filter = `blur(${pt(blur)}) saturate(1.8)`;
-  const edges = [`inset 0 0 0 ${pt(0.5)} var(--device-glass-rim)`, `inset 0 ${pt(1)} 0 0 var(--device-glass-specular)`];
-  if (shadow) edges.push(`0 ${pt(10)} ${pt(30)} ${pt(-6)} var(--device-glass-shadow)`);
+  const edges = [
+    `inset 0 0 0 ${pt(0.5)} var(--device-glass-rim)`,
+    `inset 0 ${pt(1)} 0 0 var(--device-glass-specular)`,
+  ];
+  if (shadow)
+    edges.push(`0 ${pt(10)} ${pt(30)} ${pt(-6)} var(--device-glass-shadow)`);
   return {
     background: FILL[kind],
     backdropFilter: filter,

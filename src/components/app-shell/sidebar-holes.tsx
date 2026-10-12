@@ -21,5 +21,11 @@ export async function SidebarBodyHole() {
       await getReviewBadgeCount(space.slug).catch(() => 0),
     ]),
   ).then((entries) => Object.fromEntries(entries) as Record<string, number>);
-  return <SidebarBody spaces={spaces} homeCard={homeCard} reviewCounts={reviewCounts} />;
+  return (
+    <SidebarBody
+      spaces={spaces}
+      homeCard={homeCard}
+      reviewCounts={reviewCounts}
+    />
+  );
 }

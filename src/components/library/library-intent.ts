@@ -12,7 +12,10 @@ let pending: { intent: LibraryIntent; space: string; at: number } | null = null;
 const listeners = new Set<() => void>();
 
 /** Asks the Library of `space` to open New template (`import`: and focus its Import row). */
-export function requestLibraryIntent(intent: LibraryIntent, space: string): void {
+export function requestLibraryIntent(
+  intent: LibraryIntent,
+  space: string,
+): void {
   pending = { intent, space, at: Date.now() };
   for (const listener of listeners) listener();
 }

@@ -20,7 +20,12 @@ export function PanelHead({
   className?: string;
 }) {
   return (
-    <div className={cn("flex min-h-9 items-baseline justify-between gap-4", className)}>
+    <div
+      className={cn(
+        "flex min-h-9 items-baseline justify-between gap-4",
+        className,
+      )}
+    >
       <h2
         className={cn(
           "m-0 font-normal tracking-tight text-text",
@@ -29,7 +34,9 @@ export function PanelHead({
       >
         {title}
       </h2>
-      {aside ? <span className="caps-label shrink-0 text-right">{aside}</span> : null}
+      {aside ? (
+        <span className="caps-label shrink-0 text-right">{aside}</span>
+      ) : null}
     </div>
   );
 }

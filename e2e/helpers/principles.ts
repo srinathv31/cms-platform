@@ -29,7 +29,15 @@ import { settled } from "./settled";
 
 const PERSONA_COOKIE = "ucomp_persona";
 export const ALLOWED_PLACEHOLDER = "Type / for blocks";
-export const STATUS_WORDS = ["Draft", "In review", "Changes requested", "Active", "Superseded", "Sunset", "Revoked"];
+export const STATUS_WORDS = [
+  "Draft",
+  "In review",
+  "Changes requested",
+  "Active",
+  "Superseded",
+  "Sunset",
+  "Revoked",
+];
 
 // ── What the page reports about itself ───────────────────────────────────────
 
@@ -45,16 +53,26 @@ interface PageFindings {
 }
 
 /** Runs in the page. Everything it looks at is visible: hidden (kept-mounted) routes do not count. */
-export function inspectPage(args: { foreign: boolean; allowed: string; words: string[] }): PageFindings {
+export function inspectPage(args: {
+  foreign: boolean;
+  allowed: string;
+  words: string[];
+}): PageFindings {
   const { foreign, allowed, words } = args;
   const visible = (el: Element): boolean => {
     const html = el as HTMLElement;
-    if (!html.checkVisibility({ checkVisibilityCSS: true, checkOpacity: false })) return false;
+    if (
+      !html.checkVisibility({ checkVisibilityCSS: true, checkOpacity: false })
+    )
+      return false;
     const r = html.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   };
   const describe = (el: Element): string => {
-    const label = (el.getAttribute("aria-label") ?? el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+    const label = (el.getAttribute("aria-label") ?? el.textContent ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 40);
     const slot = el.getAttribute("data-slot");
     return `${el.tagName.toLowerCase()}${slot ? `[${slot}]` : ""} "${label}"`;
   };
@@ -66,13 +84,17 @@ export function inspectPage(args: { foreign: boolean; allowed: string; words: st
   const primaryColor = getComputedStyle(probe).backgroundColor;
   probe.remove();
 
-  const NOT_BUTTONS = '[role="switch"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitemradio"],[role="option"]';
+  const NOT_BUTTONS =
+    '[role="switch"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitemradio"],[role="option"]';
   const isPrimary = (el: Element) => {
     if (el.matches(NOT_BUTTONS) || !visible(el)) return false;
     return getComputedStyle(el).backgroundColor === primaryColor;
   };
-  const candidates = [...document.querySelectorAll('button, a[href], [role="button"]')];
-  const LAYER = '[role="dialog"], [role="alertdialog"], [role="menu"], [data-slot="popover-content"]';
+  const candidates = [
+    ...document.querySelectorAll('button, a[href], [role="button"]'),
+  ];
+  const LAYER =
+    '[role="dialog"], [role="alertdialog"], [role="menu"], [data-slot="popover-content"]';
   const dialogs = [...document.querySelectorAll(LAYER)].filter(visible);
 
   const inDialog = (el: Element) => !!el.closest(LAYER);
@@ -86,7 +108,9 @@ export function inspectPage(args: { foreign: boolean; allowed: string; words: st
       if (canvas?.contains(el)) canvasPrimary.push(describe(el));
     }
     for (const dialog of dialogs) {
-      const buttons = candidates.filter((el) => dialog.contains(el) && isPrimary(el)).map(describe);
+      const buttons = candidates
+        .filter((el) => dialog.contains(el) && isPrimary(el))
+        .map(describe);
       dialogPrimary.push({ dialog: describe(dialog).slice(0, 60), buttons });
     }
   }
@@ -97,7 +121,10 @@ export function inspectPage(args: { foreign: boolean; allowed: string; words: st
     // A status word on its own, or "Sunset Mar 1": the label of something that is, or shows, a state. Event lines
     // such as "Superseded Jul 11" in a version's history ("Submitted Mar 14 · Activated Mar 20 · …") and
     // "Revoked Oct 20: reason" say when something happened; they are log entries, not a status.
-    const exact = new RegExp(`^(${words.join("|")}|Sunset( \\w{3} \\d{1,2})?)$`, "i");
+    const exact = new RegExp(
+      `^(${words.join("|")}|Sunset( \\w{3} \\d{1,2})?)$`,
+      "i",
+    );
     // Not looked at: the document itself, the audit Action column, notification sentences.
     const SKIP = [
       ".ProseMirror",
@@ -116,7 +143,10 @@ export function inspectPage(args: { foreign: boolean; allowed: string; words: st
       "[data-status]",
     ].join(",");
     const seen = new Set<Element>();
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const el = node.parentElement;
       // The whole element's text, not one text node of it: "Revoked <time>Oct 20</time>: reason" is a sentence.
@@ -125,16 +155,29 @@ export function inspectPage(args: { foreign: boolean; allowed: string; words: st
       seen.add(el);
       if (el.closest(SKIP) || !visible(el)) continue;
       // The audit table's Action cell is a sentence about what happened, in a cell of its own.
-      if (el.closest("td, [role=cell]")?.closest("[data-slot=audit-table], [aria-label*=Audit i]")) continue;
-      strayStatus.push(`${describe(el)} in ${el.parentElement ? describe(el.parentElement) : "?"}`);
+      if (
+        el
+          .closest("td, [role=cell]")
+          ?.closest("[data-slot=audit-table], [aria-label*=Audit i]")
+      )
+        continue;
+      strayStatus.push(
+        `${describe(el)} in ${el.parentElement ? describe(el.parentElement) : "?"}`,
+      );
     }
   }
 
   // ── 3. placeholders ──
   const placeholders: string[] = [];
-  for (const el of document.querySelectorAll("[placeholder], [aria-placeholder], [data-placeholder]")) {
+  for (const el of document.querySelectorAll(
+    "[placeholder], [aria-placeholder], [data-placeholder]",
+  )) {
     if (!visible(el) && !(el as HTMLElement).closest(".ProseMirror")) continue;
-    for (const attr of ["placeholder", "aria-placeholder", "data-placeholder"]) {
+    for (const attr of [
+      "placeholder",
+      "aria-placeholder",
+      "data-placeholder",
+    ]) {
       const value = el.getAttribute(attr);
       // A bare data-placeholder (Base UI's Select marks an unfilled trigger with it) has no text of its own.
       if (value === null || value === "" || value === allowed) continue;
@@ -142,8 +185,13 @@ export function inspectPage(args: { foreign: boolean; allowed: string; words: st
     }
   }
   // Base UI Select shows its placeholder as the trigger's text; report an unfilled Select too.
-  for (const el of document.querySelectorAll('[data-slot="select-value"][data-placeholder]')) {
-    if (visible(el)) placeholders.push(`${describe(el)} (unfilled select shows placeholder text)`);
+  for (const el of document.querySelectorAll(
+    '[data-slot="select-value"][data-placeholder]',
+  )) {
+    if (visible(el))
+      placeholders.push(
+        `${describe(el)} (unfilled select shows placeholder text)`,
+      );
   }
   return { canvasPrimary, dialogPrimary, strayStatus, placeholders };
 }
@@ -165,9 +213,23 @@ export function installCls() {
         if (entry.hadRecentInput) continue;
         w.__cls.value += entry.value;
         const where = (entry.sources ?? [])
-          .map((s) => (s.node ? `${s.node.nodeName.toLowerCase()}${(s.node as HTMLElement).className ? "." + String((s.node as HTMLElement).className).split(" ").slice(0, 3).join(".") : ""}` : "?"))
+          .map((s) =>
+            s.node
+              ? `${s.node.nodeName.toLowerCase()}${
+                  (s.node as HTMLElement).className
+                    ? "." +
+                      String((s.node as HTMLElement).className)
+                        .split(" ")
+                        .slice(0, 3)
+                        .join(".")
+                    : ""
+                }`
+              : "?",
+          )
           .join(", ");
-        w.__cls.shifts.push(`${entry.value.toFixed(6)} at ${Math.round(entry.startTime)}ms (${where})`);
+        w.__cls.shifts.push(
+          `${entry.value.toFixed(6)} at ${Math.round(entry.startTime)}ms (${where})`,
+        );
       }
     }).observe({ type: "layout-shift", buffered: true });
   } catch {
@@ -175,38 +237,60 @@ export function installCls() {
   }
 }
 
-export const profileButton = (page: Page) => page.getByRole("button", { name: /profile and persona/ });
+export const profileButton = (page: Page) =>
+  page.getByRole("button", { name: /profile and persona/ });
 
 async function asPersona(page: Page, id: string) {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:3000";
-  await page.context().addCookies([{ name: PERSONA_COOKIE, value: id, url: baseURL }]);
+  await page
+    .context()
+    .addCookies([{ name: PERSONA_COOKIE, value: id, url: baseURL }]);
 }
 
 /** The page has stopped moving: hydrated, streams resolved, skeletons gone, the live editor mounted if there is one. */
 export async function settle(page: Page, opts: { shell?: boolean } = {}) {
   if (opts.shell !== false) {
     await page.waitForFunction(() => {
-      const el = document.querySelector("button[aria-label$='profile and persona']");
+      const el = document.querySelector(
+        "button[aria-label$='profile and persona']",
+      );
       return !!el && Object.keys(el).some((k) => k.startsWith("__reactProps"));
     });
   } else {
     await page.waitForLoadState("load");
   }
   await page
-    .waitForFunction(() => {
-      const shown = (el: Element) => (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true }) && el.getClientRects().length > 0;
-      const loading = [...document.querySelectorAll('[data-slot="skeleton"], [aria-busy="true"]')].some(shown);
-      const hasEditor = [...document.querySelectorAll(".ProseMirror")].filter(shown);
-      const live = hasEditor.every((el) => "pmViewDesc" in el);
-      return !loading && live;
-    }, undefined, { timeout: 20_000 })
+    .waitForFunction(
+      () => {
+        const shown = (el: Element) =>
+          (el as HTMLElement).checkVisibility({ checkVisibilityCSS: true }) &&
+          el.getClientRects().length > 0;
+        const loading = [
+          ...document.querySelectorAll(
+            '[data-slot="skeleton"], [aria-busy="true"]',
+          ),
+        ].some(shown);
+        const hasEditor = [...document.querySelectorAll(".ProseMirror")].filter(
+          shown,
+        );
+        const live = hasEditor.every((el) => "pmViewDesc" in el);
+        return !loading && live;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
     .catch(() => undefined);
   // Let view transitions, fonts and the editor's server-to-live handover finish.
   await settled(page);
 }
 
 /** Opens a route as a persona and fails on a server error: another agent may be mid-edit, so wait and go again. */
-export async function open(page: Page, url: string, persona: string, opts: { shell?: boolean } = {}) {
+export async function open(
+  page: Page,
+  url: string,
+  persona: string,
+  opts: { shell?: boolean } = {},
+) {
   await asPersona(page, persona);
   // Four tries, 4, 8 and 12 seconds apart.
   await expect(async () => {
@@ -226,7 +310,10 @@ export async function runAxe(page: Page): Promise<Axe> {
   // Base UI's focus guards (visually hidden, aria-hidden, tabindex 0) only pass focus on. axe lets them through
   // only when it decides a modal is open, by probing five fixed points for a full-screen layer, and a menu's
   // backdrop has a hole over its trigger: the team switcher's trigger sits on one probe at 1440×900.
-  const results = await new AxeBuilder({ page }).exclude("nextjs-portal").exclude("[data-base-ui-focus-guard]").analyze();
+  const results = await new AxeBuilder({ page })
+    .exclude("nextjs-portal")
+    .exclude("[data-base-ui-focus-guard]")
+    .analyze();
   const line = (v: (typeof results.violations)[number]) =>
     `${v.id} (${v.impact}) x${v.nodes.length}: ${v.help} — ${v.nodes
       .slice(0, 3)
@@ -234,37 +321,82 @@ export async function runAxe(page: Page): Promise<Axe> {
       .join(" | ")}`;
   return {
     passes: results.passes.length,
-    serious: results.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map(line),
-    other: results.violations.filter((v) => v.impact !== "serious" && v.impact !== "critical").map(line),
+    serious: results.violations
+      .filter((v) => v.impact === "serious" || v.impact === "critical")
+      .map(line),
+    other: results.violations
+      .filter((v) => v.impact !== "serious" && v.impact !== "critical")
+      .map(line),
   };
 }
 
 async function cls(page: Page) {
-  return page.evaluate(() => (window as unknown as { __cls?: { value: number; shifts: string[] } }).__cls ?? null);
+  return page.evaluate(
+    () =>
+      (window as unknown as { __cls?: { value: number; shifts: string[] } })
+        .__cls ?? null,
+  );
 }
 
 /** The five checks, softly, so one run reports everything a screen gets wrong. */
-export async function checkScreen(page: Page, label: string, opts: { foreign?: boolean } = {}) {
+export async function checkScreen(
+  page: Page,
+  label: string,
+  opts: { foreign?: boolean } = {},
+) {
   const foreign = !!opts.foreign;
-  const found = await page.evaluate(inspectPage, { foreign, allowed: ALLOWED_PLACEHOLDER, words: STATUS_WORDS });
+  const found = await page.evaluate(inspectPage, {
+    foreign,
+    allowed: ALLOWED_PLACEHOLDER,
+    words: STATUS_WORDS,
+  });
 
   if (!foreign) {
-    expect.soft(found.canvasPrimary.length <= 1, `${label}: at most one primary button in the canvas, found ${JSON.stringify(found.canvasPrimary)}`).toBe(true);
+    expect
+      .soft(
+        found.canvasPrimary.length <= 1,
+        `${label}: at most one primary button in the canvas, found ${JSON.stringify(found.canvasPrimary)}`,
+      )
+      .toBe(true);
     for (const d of found.dialogPrimary) {
-      expect.soft(d.buttons.length <= 1, `${label}: at most one primary button in the dialog ${d.dialog}, found ${JSON.stringify(d.buttons)}`).toBe(true);
+      expect
+        .soft(
+          d.buttons.length <= 1,
+          `${label}: at most one primary button in the dialog ${d.dialog}, found ${JSON.stringify(d.buttons)}`,
+        )
+        .toBe(true);
     }
-    expect.soft(found.strayStatus, `${label}: status words only inside <StatusBadge>`).toEqual([]);
+    expect
+      .soft(
+        found.strayStatus,
+        `${label}: status words only inside <StatusBadge>`,
+      )
+      .toEqual([]);
   }
-  expect.soft(found.placeholders, `${label}: no placeholder other than "${ALLOWED_PLACEHOLDER}"`).toEqual([]);
+  expect
+    .soft(
+      found.placeholders,
+      `${label}: no placeholder other than "${ALLOWED_PLACEHOLDER}"`,
+    )
+    .toEqual([]);
 
   const axe = await runAxe(page);
-  expect.soft(axe.passes, `${label}: axe ran (it checked something)`).toBeGreaterThan(0);
-  if (axe.other.length) console.log(`[axe moderate/minor] ${label}\n  ${axe.other.join("\n  ")}`);
-  expect.soft(axe.serious, `${label}: axe serious/critical violations`).toEqual([]);
+  expect
+    .soft(axe.passes, `${label}: axe ran (it checked something)`)
+    .toBeGreaterThan(0);
+  if (axe.other.length)
+    console.log(`[axe moderate/minor] ${label}\n  ${axe.other.join("\n  ")}`);
+  expect
+    .soft(axe.serious, `${label}: axe serious/critical violations`)
+    .toEqual([]);
 
   const shift = await cls(page);
-  expect.soft(shift, `${label}: layout-shift observer installed`).not.toBeNull();
-  expect.soft(shift?.shifts ?? [], `${label}: CLS 0 (excluding shifts after input)`).toEqual([]);
+  expect
+    .soft(shift, `${label}: layout-shift observer installed`)
+    .not.toBeNull();
+  expect
+    .soft(shift?.shifts ?? [], `${label}: CLS 0 (excluding shifts after input)`)
+    .toEqual([]);
 }
 
 // ── The routes ───────────────────────────────────────────────────────────────
@@ -292,7 +424,10 @@ export interface Route {
 }
 
 export const LIBRARY: Route[] = [
-  { url: "/coral-offers/library", personas: ["maya", "jordan", "alex", "dana", "riley", "taylor"] },
+  {
+    url: "/coral-offers/library",
+    personas: ["maya", "jordan", "alex", "dana", "riley", "taylor"],
+  },
   { url: "/deposits/library", personas: ["priya", "riley"] },
   { url: "/card-statements/library", personas: ["riley", "taylor"] },
   { url: "/all/library", personas: ["riley", "taylor"] },
@@ -301,12 +436,21 @@ export const LIBRARY: Route[] = [
 export const WORKSPACE_TABS = ["", "/versions", "/usage", "/activity"];
 export const WORKSPACE: Route[] = [
   // All four tabs on the template with every kind of version, as the author, an approver and an observer.
-  ...WORKSPACE_TABS.map((tab) => ({ url: `/coral-offers/templates/${COLLECT}${tab}`, personas: ["maya", "jordan", "taylor"] })),
+  ...WORKSPACE_TABS.map((tab) => ({
+    url: `/coral-offers/templates/${COLLECT}${tab}`,
+    personas: ["maya", "jordan", "taylor"],
+  })),
   // And every tab on a second template, with a superseded and a sunset history.
-  ...WORKSPACE_TABS.map((tab) => ({ url: `/coral-offers/templates/${BALANCE}${tab}`, personas: ["maya"] })),
+  ...WORKSPACE_TABS.map((tab) => ({
+    url: `/coral-offers/templates/${BALANCE}${tab}`,
+    personas: ["maya"],
+  })),
   // The other lifecycle states, on the Content tab and Versions.
   ...["", "/versions"].flatMap((tab) =>
-    [FEE_WAIVER, HOLIDAY, RATE_CHANGE].map((id) => ({ url: `/coral-offers/templates/${id}${tab}`, personas: ["maya"] })),
+    [FEE_WAIVER, HOLIDAY, RATE_CHANGE].map((id) => ({
+      url: `/coral-offers/templates/${id}${tab}`,
+      personas: ["maya"],
+    })),
   ),
   // Read-only viewers and other teams.
   { url: `/coral-offers/templates/${RATE_CHANGE}`, personas: ["dana"] },
@@ -317,7 +461,10 @@ export const WORKSPACE: Route[] = [
   { url: `/card-statements/templates/${STATEMENT}`, personas: ["riley"] },
   { url: `/card-statements/templates/${STATEMENT}/usage`, personas: ["riley"] },
   // An alert's every tab; a draft alert in its composer; one in review, as its author.
-  ...WORKSPACE_TABS.map((tab) => ({ url: `/coral-offers/templates/${PAYMENT_DUE}${tab}`, personas: ["maya"] })),
+  ...WORKSPACE_TABS.map((tab) => ({
+    url: `/coral-offers/templates/${PAYMENT_DUE}${tab}`,
+    personas: ["maya"],
+  })),
   { url: `/coral-offers/templates/${HEADS_UP}`, personas: ["maya", "jordan"] },
   { url: `/coral-offers/templates/${CARD_ABROAD}`, personas: ["priya"] },
 ];
@@ -328,12 +475,21 @@ export const REVIEW: Route[] = [
   { url: "/coral-offers/review?tab=decided", personas: ["jordan"] },
   { url: "/all/review", personas: ["riley", "taylor"] },
   // The review screen for the version in review (v3, round 2): the approver, the author who submitted it, Legal, an observer.
-  { url: `/coral-offers/review/${COLLECT}/3`, personas: ["jordan", "maya", "dana", "taylor"] },
+  {
+    url: `/coral-offers/review/${COLLECT}/3`,
+    personas: ["jordan", "maya", "dana", "taylor"],
+  },
   // Its round 1, sent back: a read-only record.
-  { url: `/coral-offers/review/${COLLECT}/3?round=1`, personas: ["jordan", "taylor"] },
+  {
+    url: `/coral-offers/review/${COLLECT}/3?round=1`,
+    personas: ["jordan", "taylor"],
+  },
   { url: `/coral-offers/review/${COLLECT}/2`, personas: ["jordan"] },
   // An alert in review (its fields on the Document view), as the approver and its author, and an Active one.
-  { url: `/coral-offers/review/${CARD_ABROAD}/1`, personas: ["jordan", "priya"] },
+  {
+    url: `/coral-offers/review/${CARD_ABROAD}/1`,
+    personas: ["jordan", "priya"],
+  },
   { url: `/coral-offers/review/${PAYMENT_DUE}/1`, personas: ["jordan"] },
 ];
 
@@ -352,27 +508,54 @@ export const AUDIT: Route[] = [
 ];
 
 // The settings sections as hard navigations (reload or a shared link): the dialog over the library.
-export const TEAM_SECTIONS = ["members", "access-requests", "recertification", "inactivity"];
-export const PLATFORM_SECTIONS = ["teams", "content-types", "channel-rules", "approval-chains", "time-zone"];
+export const TEAM_SECTIONS = [
+  "members",
+  "access-requests",
+  "recertification",
+  "inactivity",
+];
+export const PLATFORM_SECTIONS = [
+  "teams",
+  "content-types",
+  "channel-rules",
+  "approval-chains",
+  "time-zone",
+];
 export const SETTINGS_HARD: Route[] = [
-  ...TEAM_SECTIONS.map((s) => ({ url: `/coral-offers/settings/${s}`, personas: ["alex"] })),
-  ...PLATFORM_SECTIONS.map((s) => ({ url: `/coral-offers/settings/${s}`, personas: ["riley"] })),
+  ...TEAM_SECTIONS.map((s) => ({
+    url: `/coral-offers/settings/${s}`,
+    personas: ["alex"],
+  })),
+  ...PLATFORM_SECTIONS.map((s) => ({
+    url: `/coral-offers/settings/${s}`,
+    personas: ["riley"],
+  })),
   { url: "/all/settings/teams", personas: ["riley"] },
 ];
 
-export const REQUEST_ACCESS: Route[] = [{ url: "/request-access", personas: ["morgan"] }];
+export const REQUEST_ACCESS: Route[] = [
+  { url: "/request-access", personas: ["morgan"] },
+];
 
 /** The `test` of the spec that calls it, so the tests are declared on whatever `test` that spec imports. */
-type Declares = Pick<typeof test, "describe"> & ((title: string, body: (args: { page: Page }) => Promise<void>) => void);
+type Declares = Pick<typeof test, "describe"> &
+  ((title: string, body: (args: { page: Page }) => Promise<void>) => void);
 
-export function describeRoutes(declare: Declares, group: string, routes: Route[]) {
+export function describeRoutes(
+  declare: Declares,
+  group: string,
+  routes: Route[],
+) {
   declare.describe(group, () => {
     for (const route of routes) {
       for (const persona of route.personas) {
         declare(`${route.url} as ${persona}`, async ({ page }) => {
           await open(page, route.url, persona);
           // The persona must actually be allowed here: a redirect elsewhere means this row of the matrix is wrong.
-          expect(new URL(page.url()).pathname, "the route shows for this persona (no redirect)").toBe(route.url.split("?")[0]);
+          expect(
+            new URL(page.url()).pathname,
+            "the route shows for this persona (no redirect)",
+          ).toBe(route.url.split("?")[0]);
           await checkScreen(page, `${route.url} as ${persona}`);
         });
       }

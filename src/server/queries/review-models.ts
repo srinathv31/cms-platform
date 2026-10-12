@@ -4,7 +4,10 @@
 // `ConsumerUsage`, …).
 
 import type { ChannelFields } from "@/domain/channel-fields";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
+import type {
+  MessageTypeRules,
+  TeamSenders,
+} from "@/domain/platform-config/limits";
 import type { ConsumerUsage, Person, StepView } from "@/domain/review-types";
 import type { NumberedRound } from "@/domain/rounds";
 import type {
@@ -54,7 +57,13 @@ export interface ReviewQueue {
 
 export interface ReviewScreenData {
   /** `family`: its content type's (`contentTypeFamily`), never read from a version's channels. */
-  template: { id: string; teamId: string; teamSlug: string; teamName: string; family: ChannelFamily };
+  template: {
+    id: string;
+    teamId: string;
+    teamSlug: string;
+    teamName: string;
+    family: ChannelFamily;
+  };
   version: {
     id: string;
     number: number;
@@ -116,7 +125,11 @@ export interface ReviewScreenData {
    * submit, which may be a version revoked during review): the breaking ones are what its consumers have
    * to map. Null when a version is Active, when nothing renders, and when it is this version's own number.
    */
-  stillRenders: { number: number; sunsetDay: string | null; contractChanges: ContractChange[] } | null;
+  stillRenders: {
+    number: number;
+    sunsetDay: string | null;
+    contractChanges: ContractChange[];
+  } | null;
   /**
    * Where this round's work went (`replacedBy`), when it is a sent-back round that was resubmitted: its
    * number's head, a later round or the release, with its label ("v3, round 2", or "v3" once released).
@@ -133,7 +146,11 @@ export interface ReviewScreenData {
   liveName: string | null;
   steps: StepView[];
   threads: ThreadView[];
-  can: { approve: PermissionResult; requestChanges: PermissionResult; comment: PermissionResult };
+  can: {
+    approve: PermissionResult;
+    requestChanges: PermissionResult;
+    comment: PermissionResult;
+  };
   /** For the approve dialog: computes consequences client-side as the sunset date changes. */
   consumerUsage: ConsumerUsage[];
   /** YYYY-MM-DD, demo clock (UTC): the sample sets' "today". */

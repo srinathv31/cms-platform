@@ -1,7 +1,29 @@
 import type { Page } from "@playwright/test";
-import { advanceClock, bell, click, openBell, openSettings, personRow, profileButton, resetDemoData, settingsDialog, strip, switchPersona, unreadCount } from "./helpers/access";
+import {
+  advanceClock,
+  bell,
+  click,
+  openBell,
+  openSettings,
+  personRow,
+  profileButton,
+  resetDemoData,
+  settingsDialog,
+  strip,
+  switchPersona,
+  unreadCount,
+} from "./helpers/access";
 import { reactReady } from "./helpers/golive";
-import { asPersona, beat, demoTimeout, expect, hydrated, shoot, test, typeSlowly } from "./helpers/scenario";
+import {
+  asPersona,
+  beat,
+  demoTimeout,
+  expect,
+  hydrated,
+  shoot,
+  test,
+  typeSlowly,
+} from "./helpers/scenario";
 import { settled } from "./helpers/settled";
 
 // Phase 6 gate: demo scenario 8 ("Access"), start to finish from a fresh reset, each person through the
@@ -24,7 +46,8 @@ import { settled } from "./helpers/settled";
 // puts the clock back). Console and page errors fail it.
 
 const TEAM = "coral-offers";
-const REASON = "I'm joining the spring campaign and need to draft its offer terms.";
+const REASON =
+  "I'm joining the spring campaign and need to draft its offer terms.";
 /** Everyone the seeded review asks about, except Sam. */
 const KEEP = ["jordan", "maya", "priya", "devon", "dana"] as const;
 
@@ -33,7 +56,8 @@ test.afterAll(() => {
   resetDemoData();
 });
 
-const card = (page: Page) => page.locator('[data-slot="sidebar-card"]').filter({ visible: true });
+const card = (page: Page) =>
+  page.locator('[data-slot="sidebar-card"]').filter({ visible: true });
 
 /**
  * The sidebar footer's Settings link, once a press on it opens the modal. The footer is drawn for the person who is
@@ -41,14 +65,18 @@ const card = (page: Page) => page.locator('[data-slot="sidebar-card"]').filter({
  * before React has the link, or a release after the card above it has come or gone, misses it.
  */
 async function settingsLinkReady(page: Page) {
-  const link = page.locator('[data-slot="sidebar-footer"]').getByRole("link", { name: "Settings" });
+  const link = page
+    .locator('[data-slot="sidebar-footer"]')
+    .getByRole("link", { name: "Settings" });
   await expect(link).toBeVisible();
   await reactReady(link);
   await settled(page);
 }
 
 test.describe("scenario 8: access", () => {
-  test("Morgan requests Author and Alex approves; Alex recertifies leaving Sam out; 31 days later Sam has lapsed and Devon is suspended", async ({ page }) => {
+  test("Morgan requests Author and Alex approves; Alex recertifies leaving Sam out; 31 days later Sam has lapsed and Devon is suspended", async ({
+    page,
+  }) => {
     test.setTimeout(demoTimeout(300_000));
 
     let unreadBefore = 0;
@@ -58,7 +86,9 @@ test.describe("scenario 8: access", () => {
     await asPersona(page, "morgan");
     await page.goto("/");
     await expect(page).toHaveURL(/\/request-access$/);
-    await expect(page.getByRole("heading", { level: 1, name: /Request access/ })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Request access/ }),
+    ).toBeVisible();
     await hydrated(page);
     await beat(page, 900);
 
@@ -69,28 +99,46 @@ test.describe("scenario 8: access", () => {
       await expect(page.locator("section[data-team]")).toHaveCount(3);
       await shoot(page, "morgan-request-access");
 
-      const form = coral.getByRole("form", { name: "Request access to Coral Offers" });
+      const form = coral.getByRole("form", {
+        name: "Request access to Coral Offers",
+      });
       // The cards hydrate a moment after the shell does, and a press before that does nothing: press again.
       await expect(async () => {
-        if (!(await form.isVisible())) await click(coral.getByRole("button", { name: "Request access", exact: true }));
+        if (!(await form.isVisible()))
+          await click(
+            coral.getByRole("button", { name: "Request access", exact: true }),
+          );
         await expect(form).toBeVisible({ timeout: 2_000 });
       }).toPass({ timeout: 20_000 });
       await click(form.getByRole("radio", { name: "Author", exact: true }));
-      await expect(form.getByRole("radio", { name: "Author", exact: true })).toBeChecked();
-      const send = form.getByRole("button", { name: "Send request", exact: true });
+      await expect(
+        form.getByRole("radio", { name: "Author", exact: true }),
+      ).toBeChecked();
+      const send = form.getByRole("button", {
+        name: "Send request",
+        exact: true,
+      });
       await click(form.getByRole("textbox", { name: "Reason" }));
       await typeSlowly(page, REASON);
-      await expect(form.getByRole("textbox", { name: "Reason" })).toHaveValue(REASON);
-      await expect(form).toContainText("Alex Kim, Team Admin of Coral Offers, will decide.");
+      await expect(form.getByRole("textbox", { name: "Reason" })).toHaveValue(
+        REASON,
+      );
+      await expect(form).toContainText(
+        "Alex Kim, Team Admin of Coral Offers, will decide.",
+      );
       await beat(page, 900);
       await shoot(page, "morgan-request-form");
 
       await click(send);
       const status = coral.locator('[data-slot="request-status"]');
       await expect(status).toBeVisible({ timeout: 20_000 });
-      await expect(status).toContainText("Your request for Author access is waiting on Alex Kim.");
+      await expect(status).toContainText(
+        "Your request for Author access is waiting on Alex Kim.",
+      );
       await expect(form, "the pending note replaces the form").toBeHidden();
-      await expect(coral.getByRole("button", { name: "Request access", exact: true })).toHaveCount(0);
+      await expect(
+        coral.getByRole("button", { name: "Request access", exact: true }),
+      ).toHaveCount(0);
       await expect(card(page)).toContainText("Your request is waiting");
       await beat(page, 900);
       await shoot(page, "morgan-request-waiting");
@@ -104,24 +152,35 @@ test.describe("scenario 8: access", () => {
       await hydrated(page);
       await expect(card(page)).toContainText(/Access requests? pending/);
       // Its Review action is a link (Base UI gives such a link role "button"), to where requests are decided.
-      await expect(card(page).locator(`a[href="/${TEAM}/settings/access-requests"]`)).toHaveText("Review");
-      expect(await unreadCount(page), "Morgan's request is unread").toBeGreaterThanOrEqual(1);
+      await expect(
+        card(page).locator(`a[href="/${TEAM}/settings/access-requests"]`),
+      ).toHaveText("Review");
+      expect(
+        await unreadCount(page),
+        "Morgan's request is unread",
+      ).toBeGreaterThanOrEqual(1);
       await expect(page.locator('[data-slot="unread-dot"]')).toBeVisible();
       await beat(page, 900);
       await shoot(page, "alex-card-and-bell");
 
       const popover = await openBell(page);
-      const item = popover.getByRole("link", { name: /Morgan Lee asked for Author access to Coral Offers\./ });
+      const item = popover.getByRole("link", {
+        name: /Morgan Lee asked for Author access to Coral Offers\./,
+      });
       await expect(item).toBeVisible();
       await expect(item).toHaveAttribute("data-unread", "true");
-      await expect(popover.getByRole("button", { name: "Mark all as read" })).toBeVisible();
+      await expect(
+        popover.getByRole("button", { name: "Mark all as read" }),
+      ).toBeVisible();
       await beat(page, 900);
       await shoot(page, "alex-bell-open");
 
       // The item opens the request where it is decided, and counts as read.
       unreadBefore = await unreadCount(page);
       await click(item);
-      await expect(page).toHaveURL(new RegExp(`/${TEAM}/settings/access-requests$`));
+      await expect(page).toHaveURL(
+        new RegExp(`/${TEAM}/settings/access-requests$`),
+      );
       await expect(settingsDialog(page)).toBeVisible();
     });
 
@@ -131,28 +190,49 @@ test.describe("scenario 8: access", () => {
       await expect(row).toBeVisible();
       await expect(row).toContainText("Author");
       await expect(row).toContainText(REASON);
-      await expect(personRow(dialog, "chris"), "the seeded request is still waiting").toBeVisible();
+      await expect(
+        personRow(dialog, "chris"),
+        "the seeded request is still waiting",
+      ).toBeVisible();
       await beat(page, 900);
 
       await click(row.getByRole("button", { name: "Approve", exact: true }));
       const consequence = strip(dialog);
-      await expect(consequence).toContainText("Morgan Lee gets Author access to Coral Offers");
+      await expect(consequence).toContainText(
+        "Morgan Lee gets Author access to Coral Offers",
+      );
       await beat(page, 900);
       await shoot(page, "alex-approve-strip");
-      await click(consequence.getByRole("button", { name: "Approve as Author", exact: true }));
+      await click(
+        consequence.getByRole("button", {
+          name: "Approve as Author",
+          exact: true,
+        }),
+      );
       await expect(consequence).toBeHidden({ timeout: 20_000 });
 
       const decided = dialog.getByRole("table", { name: "Decided requests" });
       await expect(decided).toBeVisible({ timeout: 20_000 });
-      await expect(decided.getByRole("row").filter({ hasText: "Morgan Lee" })).toContainText("Approved by Alex Kim");
-      await expect(dialog.getByRole("table", { name: "Requester" }).getByRole("row").filter({ hasText: "Morgan Lee" })).toHaveCount(0);
+      await expect(
+        decided.getByRole("row").filter({ hasText: "Morgan Lee" }),
+      ).toContainText("Approved by Alex Kim");
+      await expect(
+        dialog
+          .getByRole("table", { name: "Requester" })
+          .getByRole("row")
+          .filter({ hasText: "Morgan Lee" }),
+      ).toHaveCount(0);
       await beat(page, 900);
       await shoot(page, "alex-approved");
 
       // Behind the modal the bell has one fewer unread: the item he opened is read.
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
-      await expect.poll(() => unreadCount(page), { message: "opening the bell item marked it read" }).toBe(unreadBefore - 1);
+      await expect
+        .poll(() => unreadCount(page), {
+          message: "opening the bell item marked it read",
+        })
+        .toBe(unreadBefore - 1);
     });
 
     // ── 3. Morgan sees the Library ───────────────────────────────────────────
@@ -160,13 +240,24 @@ test.describe("scenario 8: access", () => {
     await test.step("3. Morgan now lands on the Coral Offers Library, and the bell says he was approved", async () => {
       await switchPersona(page, "Morgan Lee");
       await expect(page).toHaveURL(new RegExp(`/${TEAM}/library$`));
-      await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Switch team" })).toContainText("Coral Offers");
-      await expect(page.getByRole("button", { name: "New template" }), "an Author can start a template").toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Library" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Switch team" }),
+      ).toContainText("Coral Offers");
+      await expect(
+        page.getByRole("button", { name: "New template" }),
+        "an Author can start a template",
+      ).toBeVisible();
       await hydrated(page);
       await beat(page, 900);
       const popover = await openBell(page);
-      await expect(popover.getByRole("link", { name: /Alex Kim approved your Author access to Coral Offers\./ })).toBeVisible();
+      await expect(
+        popover.getByRole("link", {
+          name: /Alex Kim approved your Author access to Coral Offers\./,
+        }),
+      ).toBeVisible();
       await beat(page, 900);
       await shoot(page, "morgan-library");
       await page.keyboard.press("Escape");
@@ -177,16 +268,29 @@ test.describe("scenario 8: access", () => {
 
     await test.step("4. Alex keeps everyone in the access review but Sam", async () => {
       await switchPersona(page, "Alex Kim");
-      await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
-      await expect(page.locator("main ul > li > a[href*='/templates/']").filter({ visible: true }).first()).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Library" }),
+      ).toBeVisible();
+      await expect(
+        page
+          .locator("main ul > li > a[href*='/templates/']")
+          .filter({ visible: true })
+          .first(),
+      ).toBeVisible();
       await hydrated(page);
       await settingsLinkReady(page);
       const dialog = await openSettings(page, /^Recertification/);
-      await expect(page).toHaveURL(new RegExp(`/${TEAM}/settings/recertification$`));
+      await expect(page).toHaveURL(
+        new RegExp(`/${TEAM}/settings/recertification$`),
+      );
       const summary = dialog.locator('[data-slot="recert-summary"]');
       await expect(summary).toContainText("0 of 6");
       await expect(summary).toContainText("Anyone not confirmed by");
-      await expect(dialog.getByRole("table", { name: "Member" }).locator("[role=row][data-person]")).toHaveCount(6);
+      await expect(
+        dialog
+          .getByRole("table", { name: "Member" })
+          .locator("[role=row][data-person]"),
+      ).toHaveCount(6);
       await beat(page, 900);
       await shoot(page, "alex-recert-start");
 
@@ -195,12 +299,19 @@ test.describe("scenario 8: access", () => {
         const row = personRow(dialog, id);
         await click(row.getByRole("button", { name: "Keep", exact: true }));
         kept++;
-        await expect(summary).toContainText(`${kept} of 6`, { timeout: 20_000 });
+        await expect(summary).toContainText(`${kept} of 6`, {
+          timeout: 20_000,
+        });
         await expect(row).toContainText("Kept");
       }
       const sam = personRow(dialog, "sam");
-      await expect(sam.getByRole("button", { name: "Keep", exact: true }), "Sam is still undecided").toBeVisible();
-      await expect(sam.getByRole("button", { name: "Remove", exact: true })).toBeVisible();
+      await expect(
+        sam.getByRole("button", { name: "Keep", exact: true }),
+        "Sam is still undecided",
+      ).toBeVisible();
+      await expect(
+        sam.getByRole("button", { name: "Remove", exact: true }),
+      ).toBeVisible();
       await expect(summary).toContainText("5 of 6");
       await beat(page, 900);
       await shoot(page, "alex-recert-sam-undecided");
@@ -222,14 +333,24 @@ test.describe("scenario 8: access", () => {
     await test.step("6. Sam loses access: he lands on Request access, and it says why", async () => {
       await switchPersona(page, "Sam Ortiz");
       await expect(page).toHaveURL(/\/request-access$/);
-      await expect(page.getByText(/^Your access to Coral Offers lapsed on .+: it wasn't confirmed in the access review\.$/)).toBeVisible();
+      await expect(
+        page.getByText(
+          /^Your access to Coral Offers lapsed on .+: it wasn't confirmed in the access review\.$/,
+        ),
+      ).toBeVisible();
       // He can ask again.
-      await expect(page.locator(`section[data-team="${TEAM}"]`).getByRole("button", { name: "Request access", exact: true })).toBeVisible();
+      await expect(
+        page
+          .locator(`section[data-team="${TEAM}"]`)
+          .getByRole("button", { name: "Request access", exact: true }),
+      ).toBeVisible();
       await expect(page.locator("section[data-team]").first()).toBeVisible();
       await beat(page, 900);
       await shoot(page, "sam-lapsed");
       await click(profileButton(page));
-      await expect(page.getByRole("menuitem", { name: "Request access" })).toBeVisible();
+      await expect(
+        page.getByRole("menuitem", { name: "Request access" }),
+      ).toBeVisible();
       await page.keyboard.press("Escape");
     });
 
@@ -246,31 +367,59 @@ test.describe("scenario 8: access", () => {
       const sam = personRow(dialog, "sam");
       await expect(sam).toContainText("Sam Ortiz");
       await expect(sam).toContainText(/Access lapsed/);
-      await expect(sam.getByRole("button", { name: "Restore", exact: true })).toBeVisible();
+      await expect(
+        sam.getByRole("button", { name: "Restore", exact: true }),
+      ).toBeVisible();
       const devon = personRow(dialog, "devon");
       await expect(devon).toContainText(/Auto-suspended/);
-      await expect(devon.getByRole("button", { name: "Restore", exact: true })).toBeVisible();
+      await expect(
+        devon.getByRole("button", { name: "Restore", exact: true }),
+      ).toBeVisible();
       // Everyone he kept, and Morgan, is still active.
       for (const id of [...KEEP.filter((id) => id !== "devon"), "morgan"]) {
-        await expect(personRow(dialog, id).getByRole("button", { name: "Edit roles", exact: true }), `${id} is still active`).toBeVisible();
+        await expect(
+          personRow(dialog, id).getByRole("button", {
+            name: "Edit roles",
+            exact: true,
+          }),
+          `${id} is still active`,
+        ).toBeVisible();
       }
       // Alex's own row is active too (and says he can't change his own access).
-      await expect(personRow(dialog, "alex")).toContainText("You can't change your own access.");
-      await expect(personRow(dialog, "alex")).not.toContainText(/lapsed|suspended/i);
+      await expect(personRow(dialog, "alex")).toContainText(
+        "You can't change your own access.",
+      );
+      await expect(personRow(dialog, "alex")).not.toContainText(
+        /lapsed|suspended/i,
+      );
       await beat(page, 900);
       await shoot(page, "alex-members-after");
 
-      await click(dialog.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: /^Recertification/ }));
+      await click(
+        dialog
+          .getByRole("navigation", { name: "Settings sections" })
+          .getByRole("link", { name: /^Recertification/ }),
+      );
       const summary = dialog.locator('[data-slot="recert-summary"]');
-      await expect(summary).toContainText(/Access lapsed on .+ for Sam Ortiz\./);
+      await expect(summary).toContainText(
+        /Access lapsed on .+ for Sam Ortiz\./,
+      );
       await expect(personRow(dialog, "sam")).toContainText(/Access lapsed/);
       await beat(page, 900);
       await shoot(page, "alex-recert-closed");
 
-      await click(dialog.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: /^Inactivity/ }));
-      const suspended = dialog.getByRole("table", { name: "Suspended members" });
+      await click(
+        dialog
+          .getByRole("navigation", { name: "Settings sections" })
+          .getByRole("link", { name: /^Inactivity/ }),
+      );
+      const suspended = dialog.getByRole("table", {
+        name: "Suspended members",
+      });
       await expect(suspended).toBeVisible();
-      await expect(personRow(suspended, "devon")).toContainText("Automatically");
+      await expect(personRow(suspended, "devon")).toContainText(
+        "Automatically",
+      );
       await beat(page, 900);
       await shoot(page, "alex-inactivity-suspended");
 

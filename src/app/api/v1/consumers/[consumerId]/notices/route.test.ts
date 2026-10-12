@@ -3,7 +3,11 @@ import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 import { sunsetDay } from "@/domain/business-zone";
 import { formatLongDate } from "@/domain/dates";
-import type { ApiErrorBody, ApiNoticeList, ApiTemplateSearch } from "@/domain/golive-types";
+import type {
+  ApiErrorBody,
+  ApiNoticeList,
+  ApiTemplateSearch,
+} from "@/domain/golive-types";
 import { consumerNotices, settings, versions } from "@/server/db/schema/ucomp";
 import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { GET as searchGET } from "@/app/api/v1/templates/route";
@@ -23,30 +27,47 @@ vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
 const ids = seededDatabasePerTest({ base: env.now });
 
-
 const CORAL = { "X-Consumer-Id": "coral" };
 
-function get(consumerId: string, query = "", headers: Record<string, string> = CORAL) {
-  const request = new NextRequest(`http://localhost/api/v1/consumers/${consumerId}/notices${query}`, { headers });
+function get(
+  consumerId: string,
+  query = "",
+  headers: Record<string, string> = CORAL,
+) {
+  const request = new NextRequest(
+    `http://localhost/api/v1/consumers/${consumerId}/notices${query}`,
+    { headers },
+  );
   return GET(request, { params: Promise.resolve({ consumerId }) });
 }
 
-async function expectError(res: Response, status: number, code: string, message: string) {
+async function expectError(
+  res: Response,
+  status: number,
+  code: string,
+  message: string,
+) {
   expect(res.status).toBe(status);
   expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
   expect(res.headers.get("Cache-Control")).toBe("no-store");
   expect(res.headers.get("X-Correlation-Id")).toBeTruthy();
-  expect((await res.json()) as ApiErrorBody).toEqual({ error: { code, message } });
+  expect((await res.json()) as ApiErrorBody).toEqual({
+    error: { code, message },
+  });
 }
 
-const list = async (consumerId: string, query = "") => (await (await get(consumerId, query)).json()) as ApiNoticeList;
+const list = async (consumerId: string, query = "") =>
+  (await (await get(consumerId, query)).json()) as ApiNoticeList;
 
 /** Every page from `after` (a nextCursor, or none for the start), following nextCursor until hasMore is false. */
 async function pages(query: string, after?: string): Promise<ApiNoticeList[]> {
   const out: ApiNoticeList[] = [];
   // A loop this long is a paging bug: fail rather than hang.
   while (out.length < 100) {
-    const page = await list("coral", `?${query}${after ? `&after=${after}` : ""}`);
+    const page = await list(
+      "coral",
+      `?${query}${after ? `&after=${after}` : ""}`,
+    );
     out.push(page);
     if (!page.hasMore) return out;
     after = page.nextCursor;
@@ -56,14 +77,27 @@ async function pages(query: string, after?: string): Promise<ApiNoticeList[]> {
 
 describe("GET /api/v1/consumers/[consumerId]/notices: 200", () => {
   it("the consumer's notices, oldest first in the order written, with a cursor and the API headers", async () => {
-    const res = await get("coral", "", { ...CORAL, "X-Correlation-Id": "notices-1" });
+    const res = await get("coral", "", {
+      ...CORAL,
+      "X-Correlation-Id": "notices-1",
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("X-Correlation-Id")).toBe("notices-1");
     const body = (await res.json()) as ApiNoticeList;
-    expect(body).toEqual({ consumerId: "coral", asOf: env.now.toISOString(), notices: expect.any(Array), hasMore: false, nextCursor: expect.stringMatching(/^[A-Za-z0-9_-]+$/) });
+    expect(body).toEqual({
+      consumerId: "coral",
+      asOf: env.now.toISOString(),
+      notices: expect.any(Array),
+      hasMore: false,
+      nextCursor: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+    });
     const { db } = await import("@/server/db/client");
-    const rows = await db.select().from(consumerNotices).where(eq(consumerNotices.consumerId, "coral")).orderBy(asc(consumerNotices.seq));
+    const rows = await db
+      .select()
+      .from(consumerNotices)
+      .where(eq(consumerNotices.consumerId, "coral"))
+      .orderBy(asc(consumerNotices.seq));
     expect(body.notices.map((n) => n.id)).toEqual(rows.map((r) => r.id));
     expect(rows.length).toBeGreaterThan(2);
   });
@@ -81,7 +115,11 @@ describe("GET /api/v1/consumers/[consumerId]/notices: 200", () => {
     // The last cursor is the end: polling with it returns nothing new, and the same cursor again.
     const end = byOne.at(-1)!.nextCursor;
     const empty = await list("coral", `?after=${end}`);
-    expect(empty).toMatchObject({ notices: [], hasMore: false, nextCursor: end });
+    expect(empty).toMatchObject({
+      notices: [],
+      hasMore: false,
+      nextCursor: end,
+    });
   });
 
   it("templateId filters, and its cursor pages that filter", async () => {
@@ -90,38 +128,82 @@ describe("GET /api/v1/consumers/[consumerId]/notices: 200", () => {
     const notices = one.flatMap((p) => p.notices);
     expect(notices.length).toBeGreaterThan(1);
     expect(notices.every((n) => n.template.id === holiday)).toBe(true);
-    expect(notices.map((n) => n.id)).toEqual((await list("coral", `?templateId=${holiday}`)).notices.map((n) => n.id));
+    expect(notices.map((n) => n.id)).toEqual(
+      (await list("coral", `?templateId=${holiday}`)).notices.map((n) => n.id),
+    );
   });
 });
 
 describe("GET /api/v1/consumers/[consumerId]/notices: errors", () => {
   it("400 consumer_required", async () => {
-    await expectError(await get("coral", "", {}), 400, "consumer_required", "X-Consumer-Id is required.");
+    await expectError(
+      await get("coral", "", {}),
+      400,
+      "consumer_required",
+      "X-Consumer-Id is required.",
+    );
   });
 
   it("403 unknown_consumer", async () => {
-    await expectError(await get("coral", "", { "X-Consumer-Id": "acme" }), 403, "unknown_consumer", 'Consumer "acme" isn\'t registered.');
+    await expectError(
+      await get("coral", "", { "X-Consumer-Id": "acme" }),
+      403,
+      "unknown_consumer",
+      'Consumer "acme" isn\'t registered.',
+    );
   });
 
   it("404 consumer_not_found: the path names an unregistered consumer", async () => {
-    await expectError(await get("acme"), 404, "consumer_not_found", "Consumer acme doesn't exist.");
+    await expectError(
+      await get("acme"),
+      404,
+      "consumer_not_found",
+      "Consumer acme doesn't exist.",
+    );
   });
 
   it("403 consumer_mismatch: X-Consumer-Id is another consumer", async () => {
-    await expectError(await get("deposits-online"), 403, "consumer_mismatch", "X-Consumer-Id doesn't match consumer deposits-online.");
+    await expectError(
+      await get("deposits-online"),
+      403,
+      "consumer_mismatch",
+      "X-Consumer-Id doesn't match consumer deposits-online.",
+    );
   });
 
   it("400 bad_request for limit", async () => {
-    await expectError(await get("coral", "?limit=201"), 400, "bad_request", "limit must be a number from 1 to 200.");
-    await expectError(await get("coral", "?limit=0"), 400, "bad_request", "limit must be a number from 1 to 200.");
+    await expectError(
+      await get("coral", "?limit=201"),
+      400,
+      "bad_request",
+      "limit must be a number from 1 to 200.",
+    );
+    await expectError(
+      await get("coral", "?limit=0"),
+      400,
+      "bad_request",
+      "limit must be a number from 1 to 200.",
+    );
   });
 
   it("400 bad_request for an after that isn't a cursor of this list", async () => {
-    const message = "after must be the nextCursor of an earlier page of this list.";
+    const message =
+      "after must be the nextCursor of an earlier page of this list.";
     const holiday = ids["holiday-points"]!;
-    const filtered = (await list("coral", `?templateId=${holiday}&limit=1`)).nextCursor;
-    const deposits = ((await (await get("deposits-online", "", { "X-Consumer-Id": "deposits-online" })).json()) as ApiNoticeList).nextCursor;
-    const search = (await (await searchGET(new NextRequest("http://localhost/api/v1/templates?limit=1", { headers: CORAL }))).json()) as ApiTemplateSearch;
+    const filtered = (await list("coral", `?templateId=${holiday}&limit=1`))
+      .nextCursor;
+    const deposits = (
+      (await (
+        await get("deposits-online", "", { "X-Consumer-Id": "deposits-online" })
+      ).json()) as ApiNoticeList
+    ).nextCursor;
+    const search = (await (
+      await searchGET(
+        new NextRequest("http://localhost/api/v1/templates?limit=1", {
+          headers: CORAL,
+        }),
+      )
+    ).json()) as ApiTemplateSearch;
     for (const after of [
       "yesterday", // not a cursor at all
       encodeURIComponent("2026-10-05T12:00:00Z"), // the old `since`
@@ -130,25 +212,51 @@ describe("GET /api/v1/consumers/[consumerId]/notices: errors", () => {
       filtered, // another filter's (this call has no templateId)
       search.nextCursor, // the search list's
     ]) {
-      await expectError(await get("coral", `?after=${after}`), 400, "bad_request", message);
+      await expectError(
+        await get("coral", `?after=${after}`),
+        400,
+        "bad_request",
+        message,
+      );
     }
     // And the other way round: an unfiltered cursor on the filtered list.
     const unfiltered = (await list("coral", "?limit=1")).nextCursor;
-    await expectError(await get("coral", `?templateId=${holiday}&after=${unfiltered}`), 400, "bad_request", message);
+    await expectError(
+      await get("coral", `?templateId=${holiday}&after=${unfiltered}`),
+      400,
+      "bad_request",
+      message,
+    );
   });
 
   it("400 bad_request for a cursor from before a reset: the numbers started again, so it would skip notices", async () => {
     const before = (await list("coral", "?limit=1")).nextCursor;
     // A reset reseeds, which writes a new seeded_at.
     const { db } = await import("@/server/db/client");
-    const [seeded] = await db.select().from(settings).where(eq(settings.key, "seeded_at"));
-    await db.update(settings).set({ value: "2026-10-05T08:00:00.000Z" }).where(eq(settings.key, "seeded_at"));
+    const [seeded] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "seeded_at"));
+    await db
+      .update(settings)
+      .set({ value: "2026-10-05T08:00:00.000Z" })
+      .where(eq(settings.key, "seeded_at"));
     try {
-      await expectError(await get("coral", `?after=${before}`), 400, "bad_request", "after is from before the notices were reset. Start again without after.");
+      await expectError(
+        await get("coral", `?after=${before}`),
+        400,
+        "bad_request",
+        "after is from before the notices were reset. Start again without after.",
+      );
       const fresh = await list("coral", "?limit=1");
-      expect((await list("coral", `?after=${fresh.nextCursor}`)).notices.length).toBeGreaterThan(0);
+      expect(
+        (await list("coral", `?after=${fresh.nextCursor}`)).notices.length,
+      ).toBeGreaterThan(0);
     } finally {
-      await db.update(settings).set({ value: seeded!.value }).where(eq(settings.key, "seeded_at"));
+      await db
+        .update(settings)
+        .set({ value: seeded!.value })
+        .where(eq(settings.key, "seeded_at"));
     }
   });
 });
@@ -161,7 +269,12 @@ describe("GET /api/v1/consumers/[consumerId]/notices: a sunset that passed", () 
     const { db } = await import("@/server/db/client");
     const { runSunsetSweep } = await import("@/server/sunset-sweep");
     const balance = ids["balance-transfer"]!;
-    const [v1] = await db.select().from(versions).where(eq(versions.templateId, balance)).orderBy(asc(versions.number)).limit(1);
+    const [v1] = await db
+      .select()
+      .from(versions)
+      .where(eq(versions.templateId, balance))
+      .orderBy(asc(versions.number))
+      .limit(1);
     const sunsetAt = v1!.sunsetAt!;
     const day = sunsetDay(sunsetAt, "America/New_York");
 
@@ -170,7 +283,9 @@ describe("GET /api/v1/consumers/[consumerId]/notices: a sunset that passed", () 
     const was = env.now;
     env.now = new Date(sunsetAt.getTime() + 3 * 86_400_000);
     try {
-      expect((await runSunsetSweep()).map((p) => p.versionId)).toEqual([v1!.id]);
+      expect((await runSunsetSweep()).map((p) => p.versionId)).toEqual([
+        v1!.id,
+      ]);
 
       // A poll from the kept cursor gets exactly the new notice.
       const fresh = await list("coral", `?after=${polled}`);
@@ -194,17 +309,36 @@ describe("GET /api/v1/consumers/[consumerId]/notices: a sunset that passed", () 
       ]);
 
       // Paging from the start, one at a time, still reads every notice once, in order, the new one last.
-      const all = (await pages("limit=1")).flatMap((p) => p.notices.map((n) => n.id));
-      expect(all).toEqual([...before.flatMap((p) => p.notices.map((n) => n.id)), fresh.notices[0]!.id]);
+      const all = (await pages("limit=1")).flatMap((p) =>
+        p.notices.map((n) => n.id),
+      );
+      expect(all).toEqual([
+        ...before.flatMap((p) => p.notices.map((n) => n.id)),
+        fresh.notices[0]!.id,
+      ]);
       const forBalance = await pages(`templateId=${balance}&limit=1`);
-      expect(forBalance.flatMap((p) => p.notices.map((n) => n.kind))).toEqual(["new_version", "sunset_scheduled", "sunset_passed"]);
+      expect(forBalance.flatMap((p) => p.notices.map((n) => n.kind))).toEqual([
+        "new_version",
+        "sunset_scheduled",
+        "sunset_passed",
+      ]);
 
       // Another sweep writes nothing: the poll stays empty.
       expect(await runSunsetSweep()).toEqual([]);
-      expect(await list("coral", `?after=${fresh.nextCursor}`)).toMatchObject({ notices: [], hasMore: false, nextCursor: fresh.nextCursor });
+      expect(await list("coral", `?after=${fresh.nextCursor}`)).toMatchObject({
+        notices: [],
+        hasMore: false,
+        nextCursor: fresh.nextCursor,
+      });
       // Deposits Online never rendered Balance Transfer, so it isn't told.
-      const deposits = (await (await get("deposits-online", "?limit=200", { "X-Consumer-Id": "deposits-online" })).json()) as ApiNoticeList;
-      expect(deposits.notices.some((n) => n.kind === "sunset_passed")).toBe(false);
+      const deposits = (await (
+        await get("deposits-online", "?limit=200", {
+          "X-Consumer-Id": "deposits-online",
+        })
+      ).json()) as ApiNoticeList;
+      expect(deposits.notices.some((n) => n.kind === "sunset_passed")).toBe(
+        false,
+      );
     } finally {
       env.now = was;
     }

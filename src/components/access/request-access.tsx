@@ -32,7 +32,8 @@ type Ended = RequestAccessData["ended"][number];
 
 function endedSentence(e: Ended): string {
   const when = formatShortDate(e.at);
-  if (e.status === "lapsed") return `Your access to ${e.teamName} lapsed on ${when}: it wasn't confirmed in the access review.`;
+  if (e.status === "lapsed")
+    return `Your access to ${e.teamName} lapsed on ${when}: it wasn't confirmed in the access review.`;
   if (e.reason === "inactivity_auto")
     return `Your access to ${e.teamName} was suspended on ${when} after a long time without a sign-in.`;
   return `Your access to ${e.teamName} was suspended on ${when} for inactivity.`;
@@ -43,8 +44,15 @@ function EndedLines({ ended }: { ended: Ended[] }) {
   return (
     <ul className="flex flex-col gap-2">
       {ended.map((e) => (
-        <li key={e.teamId} className="flex items-start gap-2.5 text-[14px] leading-5 text-text-muted">
-          <Hourglass aria-hidden strokeWidth={1.75} className="mt-0.5 size-4 shrink-0" />
+        <li
+          key={e.teamId}
+          className="flex items-start gap-2.5 text-[14px] leading-5 text-text-muted"
+        >
+          <Hourglass
+            aria-hidden
+            strokeWidth={1.75}
+            className="mt-0.5 size-4 shrink-0"
+          />
           <span>{endedSentence(e)}</span>
         </li>
       ))}
@@ -66,23 +74,44 @@ function RequestStatus({
   if (request.status === "pending") {
     const admins = orList(team.admins.map((a) => a.name));
     return (
-      <div ref={focusRef} tabIndex={-1} className="mt-5 rounded-lg bg-surface-sunken p-4 outline-none" data-slot="request-status">
+      <div
+        ref={focusRef}
+        tabIndex={-1}
+        className="mt-5 rounded-lg bg-surface-sunken p-4 outline-none"
+        data-slot="request-status"
+      >
         <p className="text-[14px] leading-5 font-medium">
-          {admins ? `Your request for ${role} access is waiting on ${admins}.` : `Your request for ${role} access is waiting.`}
+          {admins
+            ? `Your request for ${role} access is waiting on ${admins}.`
+            : `Your request for ${role} access is waiting.`}
         </p>
-        <p className="mt-1 text-[13px] leading-5 text-text-muted">Asked {formatShortDate(request.createdAt)}</p>
-        <p className="mt-2 text-[14px] leading-5 break-words text-text-muted">{request.reason}</p>
+        <p className="mt-1 text-[13px] leading-5 text-text-muted">
+          Asked {formatShortDate(request.createdAt)}
+        </p>
+        <p className="mt-2 text-[14px] leading-5 break-words text-text-muted">
+          {request.reason}
+        </p>
       </div>
     );
   }
   if (request.status === "denied") {
     const by = request.decidedBy?.name ?? "A Team Admin";
     return (
-      <div tabIndex={-1} className="mt-5 rounded-lg bg-surface-sunken p-4 outline-none" data-slot="request-status">
+      <div
+        tabIndex={-1}
+        className="mt-5 rounded-lg bg-surface-sunken p-4 outline-none"
+        data-slot="request-status"
+      >
         <p className="text-[14px] leading-5 font-medium">
-          {by} declined your request for {role} access{request.decidedAt ? ` on ${formatShortDate(request.decidedAt)}` : ""}.
+          {by} declined your request for {role} access
+          {request.decidedAt ? ` on ${formatShortDate(request.decidedAt)}` : ""}
+          .
         </p>
-        {request.note ? <p className="mt-2 text-[14px] leading-5 break-words text-text">&ldquo;{request.note}&rdquo;</p> : null}
+        {request.note ? (
+          <p className="mt-2 text-[14px] leading-5 break-words text-text">
+            &ldquo;{request.note}&rdquo;
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -111,7 +140,9 @@ function RequestForm({
 
   // Focus goes to the chosen role: the first thing to decide.
   useEffect(() => {
-    root.current?.querySelector<HTMLElement>("[aria-pressed='true']")?.focus({ preventScroll: true });
+    root.current
+      ?.querySelector<HTMLElement>("[aria-pressed='true']")
+      ?.focus({ preventScroll: true });
     root.current?.scrollIntoView({ block: "nearest" });
   }, []);
 
@@ -157,7 +188,12 @@ function RequestForm({
         <span id={roleLabelId} className={LABEL}>
           Role
         </span>
-        <RolePicker roles={roles} value={role} onChange={setRole} labelledBy={roleLabelId} />
+        <RolePicker
+          roles={roles}
+          value={role}
+          onChange={setRole}
+          labelledBy={roleLabelId}
+        />
       </div>
       <div className="flex flex-col gap-2">
         <label htmlFor={reasonId} className={LABEL}>
@@ -185,10 +221,19 @@ function RequestForm({
             {shown}
           </p>
         ) : null}
-        <Button type="button" variant="ghost" aria-disabled={pending} onClick={() => (pending ? undefined : onClose())}>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-disabled={pending}
+          onClick={() => (pending ? undefined : onClose())}
+        >
           Cancel
         </Button>
-        <Button type="submit" aria-disabled={pending || noAdmin} className="aria-disabled:opacity-50">
+        <Button
+          type="submit"
+          aria-disabled={pending || noAdmin}
+          className="aria-disabled:opacity-50"
+        >
           Send request
         </Button>
       </div>
@@ -218,13 +263,17 @@ function TeamCard({
   const wasOpen = useRef(false);
 
   const pending = request?.status === "pending";
-  const available = team.myRoles.length === 0 ? roles : roles.filter((r) => !team.myRoles.includes(r));
+  const available =
+    team.myRoles.length === 0
+      ? roles
+      : roles.filter((r) => !team.myRoles.includes(r));
   const canAsk = !pending && available.length > 0;
 
   // When the form closes without sending, focus returns to the button that opened it. After a send, the
   // pending note takes focus once it appears.
   useEffect(() => {
-    if (wasOpen.current && !open && !justSent.current) triggerRef.current?.focus();
+    if (wasOpen.current && !open && !justSent.current)
+      triggerRef.current?.focus();
     wasOpen.current = open;
   }, [open]);
   useEffect(() => {
@@ -244,19 +293,25 @@ function TeamCard({
           <h2 id={headingId} className="text-[17px] leading-6 font-medium">
             {team.name}
           </h2>
-          <p className="mt-0.5 text-sm leading-5 text-text-muted">{team.description}</p>
+          <p className="mt-0.5 text-sm leading-5 text-text-muted">
+            {team.description}
+          </p>
           <p className="mt-2 text-[13px] leading-5 text-text-muted">
             {team.admins.length === 0
               ? "No Team Admin yet"
               : `${pluralWord(team.admins.length, "Team Admin")}: ${team.admins.map((a) => a.name).join(", ")}`}
           </p>
           {team.myRoles.length > 0 ? (
-            <p className="text-[13px] leading-5 text-text">Your access: {rolesLabel(team.myRoles)}</p>
+            <p className="text-[13px] leading-5 text-text">
+              Your access: {rolesLabel(team.myRoles)}
+            </p>
           ) : null}
         </div>
         {canAsk && !open ? (
           <Button ref={triggerRef} variant="outline" onClick={onOpen}>
-            {team.myRoles.length > 0 ? "Request another role" : "Request access"}
+            {team.myRoles.length > 0
+              ? "Request another role"
+              : "Request access"}
           </Button>
         ) : null}
       </div>

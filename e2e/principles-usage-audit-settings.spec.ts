@@ -36,12 +36,21 @@ test.describe("Settings modal", () => {
   for (const { persona, space, sections } of cases) {
     test(`modal sections as ${persona}`, async ({ page }) => {
       await open(page, `/${space}/library`, persona);
-      await page.locator('[data-slot="sidebar-footer"]').getByRole("link", { name: "Settings" }).click({ delay: 90 });
-      const dialog = page.getByRole("dialog").filter({ has: page.getByRole("navigation", { name: "Settings sections" }) });
+      await page
+        .locator('[data-slot="sidebar-footer"]')
+        .getByRole("link", { name: "Settings" })
+        .click({ delay: 90 });
+      const dialog = page.getByRole("dialog").filter({
+        has: page.getByRole("navigation", { name: "Settings sections" }),
+      });
       await expect(dialog).toBeVisible();
       await settle(page);
       for (const section of sections) {
-        const link = dialog.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: new RegExp(`^${section.replace("-", "[ -]")}`, "i") });
+        const link = dialog
+          .getByRole("navigation", { name: "Settings sections" })
+          .getByRole("link", {
+            name: new RegExp(`^${section.replace("-", "[ -]")}`, "i"),
+          });
         await link.click({ delay: 90 });
         await expect(link).toHaveAttribute("aria-current", /page|true/);
         await settle(page);

@@ -12,7 +12,9 @@
 // digits the sender didn't send.
 
 /** Stands in for a JSON number whose source text the runtime didn't give. Never a valid value. */
-export const UNREADABLE_NUMBER: unique symbol = Symbol("unreadable JSON number");
+export const UNREADABLE_NUMBER: unique symbol = Symbol(
+  "unreadable JSON number",
+);
 
 export interface JsonWithNumberText {
   /** What JSON.parse returns (numbers are JS numbers here). */
@@ -22,10 +24,17 @@ export interface JsonWithNumberText {
    * text: {"apr": 21.90} gives { apr: "21.90" }. Other properties are kept as
    * they are (nested objects too: only the object's own number properties change).
    */
-  numbersAsText(object: Readonly<Record<string, unknown>>): Record<string, unknown>;
+  numbersAsText(
+    object: Readonly<Record<string, unknown>>,
+  ): Record<string, unknown>;
 }
 
-type SourceReviver = (this: unknown, key: string, value: unknown, context?: { source?: unknown }) => unknown;
+type SourceReviver = (
+  this: unknown,
+  key: string,
+  value: unknown,
+  context?: { source?: unknown },
+) => unknown;
 
 /** JSON.parse (throws the same SyntaxError) that remembers every number's source text. */
 export function parseJsonWithNumberText(text: string): JsonWithNumberText {
@@ -33,14 +42,24 @@ export function parseJsonWithNumberText(text: string): JsonWithNumberText {
   const sources = new WeakMap<object, Map<string, string | undefined>>();
 
   const reviver: SourceReviver = function (key, value, context) {
-    if (typeof value === "number" && typeof this === "object" && this !== null) {
+    if (
+      typeof value === "number" &&
+      typeof this === "object" &&
+      this !== null
+    ) {
       let byKey = sources.get(this);
       if (!byKey) sources.set(this, (byKey = new Map()));
-      byKey.set(key, typeof context?.source === "string" ? context.source : undefined);
+      byKey.set(
+        key,
+        typeof context?.source === "string" ? context.source : undefined,
+      );
     }
     return value;
   };
-  const json: unknown = JSON.parse(text, reviver as (this: unknown, key: string, value: unknown) => unknown);
+  const json: unknown = JSON.parse(
+    text,
+    reviver as (this: unknown, key: string, value: unknown) => unknown,
+  );
 
   return {
     json,
@@ -49,7 +68,9 @@ export function parseJsonWithNumberText(text: string): JsonWithNumberText {
       return Object.fromEntries(
         Object.entries(object).map(([key, value]) => [
           key,
-          typeof value === "number" ? (byKey?.get(key) ?? UNREADABLE_NUMBER) : value,
+          typeof value === "number"
+            ? (byKey?.get(key) ?? UNREADABLE_NUMBER)
+            : value,
         ]),
       );
     },

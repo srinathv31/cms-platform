@@ -1,7 +1,13 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { finishImport, refusalForUnreadableKind } from "@/domain/import";
-import { IMPORT_LIMITS, IMPORT_MIME, IMPORT_REFUSALS, type ImportRefusalName, type ImportResponse } from "@/domain/import-types";
+import {
+  IMPORT_LIMITS,
+  IMPORT_MIME,
+  IMPORT_REFUSALS,
+  type ImportRefusalName,
+  type ImportResponse,
+} from "@/domain/import-types";
 import { createDraft } from "@/domain/lifecycle/drafts";
 import { REASONS, can } from "@/domain/permissions";
 import { refuse, type Refused, type RefusalCode } from "@/domain/refusals";
@@ -12,7 +18,12 @@ import { db } from "@/server/db/client";
 import { teams, uploads } from "@/server/db/schema/ucomp";
 import { prepareBody } from "@/server/documents/prepare";
 import { newId } from "@/server/ids";
-import { conformToContentType, freshTemplateId, insertNewTemplate, newTemplateType } from "@/server/templates/create";
+import {
+  conformToContentType,
+  freshTemplateId,
+  insertNewTemplate,
+  newTemplateType,
+} from "@/server/templates/create";
 import { convertFile } from "./convert";
 import { sniffKind } from "./sniff";
 import { defaultUploadsRoot, removeUpload, writeUpload } from "./store";
@@ -36,7 +47,8 @@ export interface ImportOptions {
   uploadsRoot?: string;
 }
 
-const refuseFile = (name: ImportRefusalName): ImportResponse => refuse(IMPORT_REFUSALS[name]);
+const refuseFile = (name: ImportRefusalName): ImportResponse =>
+  refuse(IMPORT_REFUSALS[name]);
 
 /** The statuses of the refusals that aren't a plain 400: the file is too large, or not a kind we take. */
 const IMPORT_STATUS: Partial<Record<RefusalCode, number>> = {
@@ -46,7 +58,9 @@ const IMPORT_STATUS: Partial<Record<RefusalCode, number>> = {
   [IMPORT_REFUSALS.notPdf.code]: 415,
   [IMPORT_REFUSALS.notWord.code]: 415,
 };
-const IMPORT_CODES: ReadonlySet<string> = new Set(Object.values(IMPORT_REFUSALS).map((entry) => entry.code));
+const IMPORT_CODES: ReadonlySet<string> = new Set(
+  Object.values(IMPORT_REFUSALS).map((entry) => entry.code),
+);
 
 /**
  * The HTTP status for an import's answer: 200 · 400 the file is refused · 403 the viewer may not
@@ -54,7 +68,10 @@ const IMPORT_CODES: ReadonlySet<string> = new Set(Object.values(IMPORT_REFUSALS)
  */
 export function importStatus(response: ImportResponse): number {
   if (response.ok) return 200;
-  return IMPORT_STATUS[response.code] ?? (IMPORT_CODES.has(response.code) ? 400 : 403);
+  return (
+    IMPORT_STATUS[response.code] ??
+    (IMPORT_CODES.has(response.code) ? 400 : 403)
+  );
 }
 
 /**
@@ -65,7 +82,9 @@ export async function importPermission(
   viewer: Viewer,
   teamSlug: string,
 ): Promise<{ ok: true; team: typeof teams.$inferSelect } | Refused> {
-  const team = teamSlug ? await db.query.teams.findFirst({ where: eq(teams.slug, teamSlug) }) : undefined;
+  const team = teamSlug
+    ? await db.query.teams.findFirst({ where: eq(teams.slug, teamSlug) })
+    : undefined;
   const allowed = can(viewer, "template.create", { teamId: team?.id ?? null });
   if (!allowed.ok) return allowed;
   if (!team) return refuse(REASONS.generic);
@@ -118,7 +137,10 @@ export async function importTemplate(
         name: finished.name,
         body: body.doc,
         variables: finished.variables,
-        sampleSets: defaultSampleSets(finished.variables, at.toISOString().slice(0, 10)),
+        sampleSets: defaultSampleSets(
+          finished.variables,
+          at.toISOString().slice(0, 10),
+        ),
       },
       contentType,
       { sectionsFitted: true },
@@ -130,14 +152,27 @@ export async function importTemplate(
   created.changes.template.starterKey = null;
   created.effects = created.effects.map((effect) =>
     effect.kind === "audit" && effect.action === "template.created"
-      ? { ...effect, details: { name: finished.name, source: `import:${kind}`, filename: finished.report.filename } }
+      ? {
+          ...effect,
+          details: {
+            name: finished.name,
+            source: `import:${kind}`,
+            filename: finished.report.filename,
+          },
+        }
       : effect,
   );
 
   const root = options.uploadsRoot ?? defaultUploadsRoot();
   try {
     const path = await writeUpload(
-      { uploadId, kind, bytes: file.bytes, compareHtml: converted.file.compareHtml, report: finished.report },
+      {
+        uploadId,
+        kind,
+        bytes: file.bytes,
+        compareHtml: converted.file.compareHtml,
+        report: finished.report,
+      },
       root,
     );
     await db.transaction(async (tx) => {
@@ -167,5 +202,9 @@ export async function importTemplate(
     throw error;
   }
 
-  return { ok: true, templateId, href: `/${team.slug}/templates/${templateId}` };
+  return {
+    ok: true,
+    templateId,
+    href: `/${team.slug}/templates/${templateId}`,
+  };
 }

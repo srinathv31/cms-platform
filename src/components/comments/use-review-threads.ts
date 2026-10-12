@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+} from "react";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { JSONContent } from "@/domain/types";
 import type { ThreadView } from "@/server/queries/threads";
@@ -78,12 +85,16 @@ export interface ReviewThreads {
 
 const NO_PRESENCE: ReadonlyMap<string, boolean> = new Map();
 
-const anchorKey = (anchor: ComposerAnchor) => `${anchor.blockId}\u0000${anchor.quote ?? ""}`;
+const anchorKey = (anchor: ComposerAnchor) =>
+  `${anchor.blockId}\u0000${anchor.quote ?? ""}`;
 
 /** The element with focus, or null when nothing in the page has it. */
 function focusedElement(): HTMLElement | null {
-  const active = typeof document === "undefined" ? null : document.activeElement;
-  return active instanceof HTMLElement && active !== document.body ? active : null;
+  const active =
+    typeof document === "undefined" ? null : document.activeElement;
+  return active instanceof HTMLElement && active !== document.body
+    ? active
+    : null;
 }
 
 /**
@@ -97,35 +108,51 @@ function focusedElement(): HTMLElement | null {
  */
 export function useReviewThreads(initial: ThreadView[]): ReviewThreads {
   const [optimistic, mutate] = useOptimistic(initial, reduceThreads);
-  const [presence, setPresence] = useState<ReadonlyMap<string, boolean>>(NO_PRESENCE);
+  const [presence, setPresence] =
+    useState<ReadonlyMap<string, boolean>>(NO_PRESENCE);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [composer, setComposer] = useState<ComposerState | null>(null);
   const drafts = useRef(new Map<string, string>());
 
-  const threads = useMemo(() => withBlockPresence(optimistic, presence), [optimistic, presence]);
+  const threads = useMemo(
+    () => withBlockPresence(optimistic, presence),
+    [optimistic, presence],
+  );
 
-  const setActive = useCallback((id: string | null) => setActiveThreadId(id), []);
-  const openComposer = useCallback((anchor: ComposerAnchor, opener?: HTMLElement | null) => {
-    const key = anchorKey(anchor);
-    setComposer({
-      blockId: anchor.blockId,
-      ...(anchor.quote !== undefined ? { quote: anchor.quote } : {}),
-      draft: drafts.current.get(key) ?? "",
-      onDraftChange: (text) => {
-        if (text.trim() === "") drafts.current.delete(key);
-        else drafts.current.set(key, text);
-      },
-      opener: opener !== undefined ? opener : focusedElement(),
-    });
-    setActiveThreadId(null);
-  }, []);
+  const setActive = useCallback(
+    (id: string | null) => setActiveThreadId(id),
+    [],
+  );
+  const openComposer = useCallback(
+    (anchor: ComposerAnchor, opener?: HTMLElement | null) => {
+      const key = anchorKey(anchor);
+      setComposer({
+        blockId: anchor.blockId,
+        ...(anchor.quote !== undefined ? { quote: anchor.quote } : {}),
+        draft: drafts.current.get(key) ?? "",
+        onDraftChange: (text) => {
+          if (text.trim() === "") drafts.current.delete(key);
+          else drafts.current.set(key, text);
+        },
+        opener: opener !== undefined ? opener : focusedElement(),
+      });
+      setActiveThreadId(null);
+    },
+    [],
+  );
   const closeComposer = useCallback(() => setComposer(null), []);
 
   // The blocks that have a thread (the document's own thread has none), for `trackDocument` to look for.
   const watched = useRef<string[]>([]);
   const seen = useRef<ReadonlyMap<string, boolean>>(NO_PRESENCE);
   useEffect(() => {
-    watched.current = [...new Set(threads.filter((t) => t.blockId !== DOCUMENT_THREAD).map((t) => t.blockId))];
+    watched.current = [
+      ...new Set(
+        threads
+          .filter((t) => t.blockId !== DOCUMENT_THREAD)
+          .map((t) => t.blockId),
+      ),
+    ];
   });
   const trackDocument = useCallback((doc: JSONContent) => {
     if (watched.current.length === 0) return;

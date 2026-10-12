@@ -9,11 +9,15 @@ import { getViewer } from "@/server/viewer";
 // 404 (`{ ok: false, code, reason }`, like every other refusal) when the upload doesn't exist or the
 // viewer can't see the template's space. Request-time only: it reads the persona cookie first.
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ uploadId: string }> }) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ uploadId: string }> },
+) {
   const viewer = await getViewer();
   const { uploadId } = await params;
   const found = await getImportOriginalFile(viewer, uploadId);
-  if (!found) return readResponse(refusal(404, REQUEST_REFUSALS.uploadUnavailable));
+  if (!found)
+    return readResponse(refusal(404, REQUEST_REFUSALS.uploadUnavailable));
 
   return new Response(found.bytes.slice().buffer, {
     status: 200,
@@ -29,5 +33,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
 /** RFC 5987 value: percent-encoded UTF-8, with the characters encodeURIComponent leaves alone that the RFC doesn't allow. */
 function encodeRfc5987(value: string): string {
-  return encodeURIComponent(value).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
 }

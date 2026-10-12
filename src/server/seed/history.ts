@@ -23,36 +23,165 @@ interface Stream {
 
 const STREAMS: Stream[] = [
   // Coral still renders Balance Transfer v1 (pinned) and v2. v1 fades but never stops.
-  { tpl: "balance-transfer", ver: "v1", consumer: "coral", from: 90, to: 47.5, perDay: 70, ramp: [1, 0.9] },
-  { tpl: "balance-transfer", ver: "v1", consumer: "coral", from: 47.5, to: 0, perDay: 70, ramp: [0.35, 0.12] },
-  { tpl: "balance-transfer", ver: "v2", consumer: "coral", from: 47.5, to: 0, perDay: 55, ramp: [0.3, 1] },
+  {
+    tpl: "balance-transfer",
+    ver: "v1",
+    consumer: "coral",
+    from: 90,
+    to: 47.5,
+    perDay: 70,
+    ramp: [1, 0.9],
+  },
+  {
+    tpl: "balance-transfer",
+    ver: "v1",
+    consumer: "coral",
+    from: 47.5,
+    to: 0,
+    perDay: 70,
+    ramp: [0.35, 0.12],
+  },
+  {
+    tpl: "balance-transfer",
+    ver: "v2",
+    consumer: "coral",
+    from: 47.5,
+    to: 0,
+    perDay: 55,
+    ramp: [0.3, 1],
+  },
 
-  { tpl: "cash-back", ver: "v1", consumer: "coral", from: 90, to: 86.5, perDay: 80 },
-  { tpl: "cash-back", ver: "v1", consumer: "coral", from: 86.5, to: 70, perDay: 80, ramp: [0.15, 0.02] },
-  { tpl: "cash-back", ver: "v2", consumer: "coral", from: 86.5, to: 0, perDay: 110, ramp: [0.6, 1] },
+  {
+    tpl: "cash-back",
+    ver: "v1",
+    consumer: "coral",
+    from: 90,
+    to: 86.5,
+    perDay: 80,
+  },
+  {
+    tpl: "cash-back",
+    ver: "v1",
+    consumer: "coral",
+    from: 86.5,
+    to: 70,
+    perDay: 80,
+    ramp: [0.15, 0.02],
+  },
+  {
+    tpl: "cash-back",
+    ver: "v2",
+    consumer: "coral",
+    from: 86.5,
+    to: 0,
+    perDay: 110,
+    ramp: [0.6, 1],
+  },
 
   // Holiday Points v1 stops at the revoke; v2 carries on.
-  { tpl: "holiday-points", ver: "v1", consumer: "coral", from: 90, to: 34.3, perDay: 60 },
-  { tpl: "holiday-points", ver: "v2", consumer: "coral", from: 35, to: 0, perDay: 70, ramp: [1, 0.7] },
+  {
+    tpl: "holiday-points",
+    ver: "v1",
+    consumer: "coral",
+    from: 90,
+    to: 34.3,
+    perDay: 60,
+  },
+  {
+    tpl: "holiday-points",
+    ver: "v2",
+    consumer: "coral",
+    from: 35,
+    to: 0,
+    perDay: 70,
+    ramp: [1, 0.7],
+  },
 
-  { tpl: "rate-change-notice", ver: "v1", consumer: "coral", from: 90, to: 0, perDay: 20 },
+  {
+    tpl: "rate-change-notice",
+    ver: "v1",
+    consumer: "coral",
+    from: 90,
+    to: 0,
+    perDay: 20,
+  },
 
-  { tpl: "high-yield-savings", ver: "v1", consumer: "deposits-online", from: 90, to: 70, perDay: 40, ramp: [1, 0.8] },
-  { tpl: "high-yield-savings", ver: "v1", consumer: "deposits-online", from: 70, to: 50, perDay: 40, ramp: [0.4, 0.05] },
-  { tpl: "high-yield-savings", ver: "v2", consumer: "deposits-online", from: 70, to: 0, perDay: 55, ramp: [0.5, 1] },
-  { tpl: "checking-fees", ver: "v1", consumer: "deposits-online", from: 90, to: 0, perDay: 35 },
+  {
+    tpl: "high-yield-savings",
+    ver: "v1",
+    consumer: "deposits-online",
+    from: 90,
+    to: 70,
+    perDay: 40,
+    ramp: [1, 0.8],
+  },
+  {
+    tpl: "high-yield-savings",
+    ver: "v1",
+    consumer: "deposits-online",
+    from: 70,
+    to: 50,
+    perDay: 40,
+    ramp: [0.4, 0.05],
+  },
+  {
+    tpl: "high-yield-savings",
+    ver: "v2",
+    consumer: "deposits-online",
+    from: 70,
+    to: 0,
+    perDay: 55,
+    ramp: [0.5, 1],
+  },
+  {
+    tpl: "checking-fees",
+    ver: "v1",
+    consumer: "deposits-online",
+    from: 90,
+    to: 0,
+    perDay: 35,
+  },
 
   // Statement inserts reach customers through digital banking.
-  { tpl: "statement-rate-change", ver: "v1", consumer: "deposits-online", from: 90, to: 0, perDay: 25 },
-  { tpl: "statement-paperless", ver: "v1", consumer: "deposits-online", from: 90, to: 0, perDay: 40, ramp: [0.5, 1] },
+  {
+    tpl: "statement-rate-change",
+    ver: "v1",
+    consumer: "deposits-online",
+    from: 90,
+    to: 0,
+    perDay: 25,
+  },
+  {
+    tpl: "statement-paperless",
+    ver: "v1",
+    consumer: "deposits-online",
+    from: 90,
+    to: 0,
+    perDay: 40,
+    ramp: [0.5, 1],
+  },
 
   // Coral sends the payment reminder as a push and a text (CHANNEL_WEIGHT splits them), more each week
   // as cards move over to it.
-  { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", from: 51.5, to: 0, perDay: 110, ramp: [0.45, 1] },
+  {
+    tpl: "payment-due-reminder",
+    ver: "v1",
+    consumer: "coral",
+    from: 51.5,
+    to: 0,
+    perDay: 110,
+    ramp: [0.45, 1],
+  },
 ];
 
 /** Previews are authors and reviewers looking at drafts; no consumer, no customer. */
-const PREVIEWS: { tpl: string; ver: string; from: number; to: number; count: number }[] = [
+const PREVIEWS: {
+  tpl: string;
+  ver: string;
+  from: number;
+  to: number;
+  count: number;
+}[] = [
   { tpl: "cash-back", ver: "v3r1", from: 5, to: 3.2, count: 8 },
   { tpl: "cash-back", ver: "v3", from: 2.6, to: 0.9, count: 6 },
   { tpl: "annual-fee-waiver", ver: "draft", from: 3.9, to: 0.8, count: 9 },
@@ -79,18 +208,80 @@ const ERRORS: {
   /** A push failure names the phone it was for; left out, it takes the one its row number gives. */
   platform?: PushPlatform;
 }[] = [
-  { tpl: "cash-back", ver: "v2", consumer: "coral", at: 22.3, count: 6, code: "missing_variables", channel: "pdf" },
-  { tpl: "balance-transfer", ver: "v1", consumer: "coral", at: 31.1, count: 2, code: "invalid_values", channel: "web" },
-  { tpl: "cash-back", ver: "v2", consumer: "coral", at: 14.6, count: 1, code: "channel_not_enabled", channel: "email" },
-  { tpl: "rate-change-notice", ver: "v1", consumer: "coral", at: 9.4, count: 1, code: "render_failed", channel: "pdf" },
-  { tpl: "high-yield-savings", ver: "v2", consumer: "deposits-online", at: 18.2, count: 2, code: "missing_variables", channel: "web" },
-  { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", at: 12.4, count: 3, code: "missing_variables", channel: "sms" },
+  {
+    tpl: "cash-back",
+    ver: "v2",
+    consumer: "coral",
+    at: 22.3,
+    count: 6,
+    code: "missing_variables",
+    channel: "pdf",
+  },
+  {
+    tpl: "balance-transfer",
+    ver: "v1",
+    consumer: "coral",
+    at: 31.1,
+    count: 2,
+    code: "invalid_values",
+    channel: "web",
+  },
+  {
+    tpl: "cash-back",
+    ver: "v2",
+    consumer: "coral",
+    at: 14.6,
+    count: 1,
+    code: "channel_not_enabled",
+    channel: "email",
+  },
+  {
+    tpl: "rate-change-notice",
+    ver: "v1",
+    consumer: "coral",
+    at: 9.4,
+    count: 1,
+    code: "render_failed",
+    channel: "pdf",
+  },
+  {
+    tpl: "high-yield-savings",
+    ver: "v2",
+    consumer: "deposits-online",
+    at: 18.2,
+    count: 2,
+    code: "missing_variables",
+    channel: "web",
+  },
+  {
+    tpl: "payment-due-reminder",
+    ver: "v1",
+    consumer: "coral",
+    at: 12.4,
+    count: 3,
+    code: "missing_variables",
+    channel: "sms",
+  },
   // Last, so every random draw of the history before it is the same as without it.
-  { tpl: "payment-due-reminder", ver: "v1", consumer: "coral", at: 5.2, count: 2, code: "missing_variables", channel: "push", platform: "android" },
+  {
+    tpl: "payment-due-reminder",
+    ver: "v1",
+    consumer: "coral",
+    at: 5.2,
+    count: 2,
+    code: "missing_variables",
+    channel: "push",
+    platform: "android",
+  },
 ];
 
 /** The latest render of each Active/Superseded version that Coral or Deposits Online still uses. */
-const LATEST: { tpl: string; ver: string; consumer: ConsumerId; minutesAgo: number }[] = [
+const LATEST: {
+  tpl: string;
+  ver: string;
+  consumer: ConsumerId;
+  minutesAgo: number;
+}[] = [
   { tpl: "balance-transfer", ver: "v1", consumer: "coral", minutesAgo: 37 },
   { tpl: "balance-transfer", ver: "v2", consumer: "coral", minutesAgo: 12 },
   { tpl: "cash-back", ver: "v2", consumer: "coral", minutesAgo: 4 },
@@ -99,7 +290,13 @@ const LATEST: { tpl: string; ver: string; consumer: ConsumerId; minutesAgo: numb
 ];
 
 /** How often each channel is asked for, among a version's channels (a version is one family). */
-const CHANNEL_WEIGHT: Record<Channel, number> = { pdf: 0.5, web: 0.35, email: 0.15, push: 0.6, sms: 0.4 };
+const CHANNEL_WEIGHT: Record<Channel, number> = {
+  pdf: 0.5,
+  web: 0.35,
+  email: 0.15,
+  push: 0.6,
+  sms: 0.4,
+};
 
 function pickChannel(rng: Rng, channels: Channel[]): Channel {
   const total = channels.reduce((sum, c) => sum + CHANNEL_WEIGHT[c], 0);
@@ -124,7 +321,10 @@ function pushPlatformOf(n: number): PushPlatform {
 }
 
 /** How long a render takes, in ms: at least `min`, plus up to `spread`. */
-const CHANNEL_DURATION: Record<Channel, readonly [min: number, spread: number]> = {
+const CHANNEL_DURATION: Record<
+  Channel,
+  readonly [min: number, spread: number]
+> = {
   pdf: [180, 420],
   web: [35, 90],
   email: [55, 110],
@@ -187,11 +387,16 @@ export function seedHistory(ctx: SeedCtx) {
   }) => {
     const t = ctx.template(o.tpl);
     const v: VersionRef | undefined = t.versions[o.ver];
-    if (!v) throw new Error(`Seed: history references unknown version ${o.tpl}/${o.ver}`);
+    if (!v)
+      throw new Error(
+        `Seed: history references unknown version ${o.tpl}/${o.ver}`,
+      );
     counter += 1;
     // A preview made before the version was submitted had no number yet.
     const daysAgo = (base - o.at) / DAY;
-    const numbered = v.number !== null && (v.submittedDaysAgo === undefined || daysAgo <= v.submittedDaysAgo);
+    const numbered =
+      v.number !== null &&
+      (v.submittedDaysAgo === undefined || daysAgo <= v.submittedDaysAgo);
     sink.renderLog.push({
       id: `rl_${counter.toString(36).padStart(5, "0")}`,
       at: new Date(o.at),
@@ -200,9 +405,12 @@ export function seedHistory(ctx: SeedCtx) {
       versionNumber: numbered ? v.number : null,
       consumerId: o.consumer,
       channel: o.channel,
-      platform: o.channel === "push" ? (o.platform ?? pushPlatformOf(counter)) : null,
+      platform:
+        o.channel === "push" ? (o.platform ?? pushPlatformOf(counter)) : null,
       isPreview: o.preview ?? false,
-      correlationId: `req_${Math.floor(rng() * 36 ** 6).toString(36).padStart(6, "0")}${Math.floor(rng() * 36 ** 6)
+      correlationId: `req_${Math.floor(rng() * 36 ** 6)
+        .toString(36)
+        .padStart(6, "0")}${Math.floor(rng() * 36 ** 6)
         .toString(36)
         .padStart(6, "0")}`,
       outcome: o.outcome ?? "ok",
@@ -213,7 +421,10 @@ export function seedHistory(ctx: SeedCtx) {
 
   for (const s of STREAMS) {
     const channels = ctx.template(s.tpl).versions[s.ver]?.channels;
-    if (!channels) throw new Error(`Seed: history references unknown version ${s.tpl}/${s.ver}`);
+    if (!channels)
+      throw new Error(
+        `Seed: history references unknown version ${s.tpl}/${s.ver}`,
+      );
     const [r0, r1] = s.ramp ?? [1, 1];
 
     // Walk rolling 24-hour windows back from the reset, so nothing lands in the future.
@@ -225,7 +436,10 @@ export function seedHistory(ctx: SeedCtx) {
       const progress = (s.from - (lo + hi) / 2) / (s.from - s.to);
       const ramp = r0 + (r1 - r0) * progress;
       const mean = s.perDay * ramp * weekdayFactor(mid) * (hi - lo);
-      const count = Math.max(0, Math.round(mean + (rng() - 0.5) * 2 * Math.sqrt(mean) * 0.8));
+      const count = Math.max(
+        0,
+        Math.round(mean + (rng() - 0.5) * 2 * Math.sqrt(mean) * 0.8),
+      );
       for (let i = 0; i < count; i++) {
         row({
           tpl: s.tpl,

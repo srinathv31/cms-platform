@@ -47,11 +47,26 @@ let approverAddedTo: string | null = null;
 
 test.beforeAll(async () => {
   db = openDb();
-  const [membership] = await rowsOf(db, "SELECT id FROM memberships WHERE user_id = 'priya' AND team_id = ?", [TEAM]);
+  const [membership] = await rowsOf(
+    db,
+    "SELECT id FROM memberships WHERE user_id = 'priya' AND team_id = ?",
+    [TEAM],
+  );
   const id = String(membership!.id);
-  const roles = await rowsOf(db, "SELECT role FROM membership_roles WHERE membership_id = ?", [id]);
-  expect(roles.map((r) => r.role), "the seed makes Priya an author on Coral Offers").toEqual(["author"]);
-  await rowsOf(db, "INSERT INTO membership_roles (membership_id, role) VALUES (?, 'approver')", [id]);
+  const roles = await rowsOf(
+    db,
+    "SELECT role FROM membership_roles WHERE membership_id = ?",
+    [id],
+  );
+  expect(
+    roles.map((r) => r.role),
+    "the seed makes Priya an author on Coral Offers",
+  ).toEqual(["author"]);
+  await rowsOf(
+    db,
+    "INSERT INTO membership_roles (membership_id, role) VALUES (?, 'approver')",
+    [id],
+  );
   approverAddedTo = id;
 });
 
@@ -59,7 +74,11 @@ test.afterAll(async () => {
   if (!db) return;
   try {
     if (approverAddedTo) {
-      await rowsOf(db, "DELETE FROM membership_roles WHERE membership_id = ? AND role = 'approver'", [approverAddedTo]);
+      await rowsOf(
+        db,
+        "DELETE FROM membership_roles WHERE membership_id = ? AND role = 'approver'",
+        [approverAddedTo],
+      );
     }
     if (templateId) await removeTemplate(db, templateId);
   } finally {
@@ -67,11 +86,18 @@ test.afterAll(async () => {
   }
 });
 
-const decision = (page: Page) => page.locator('aside[aria-label="Decision"]').filter({ visible: true });
-const approveButton = (page: Page) => decision(page).getByRole("button", { name: "Approve", exact: true });
-const requestButton = (page: Page) => decision(page).getByRole("button", { name: "Request changes", exact: true });
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
-const block = (page: Page, text: string): Locator => documentEditor(page).locator("p", { hasText: text });
+const decision = (page: Page) =>
+  page.locator('aside[aria-label="Decision"]').filter({ visible: true });
+const approveButton = (page: Page) =>
+  decision(page).getByRole("button", { name: "Approve", exact: true });
+const requestButton = (page: Page) =>
+  decision(page).getByRole("button", { name: "Request changes", exact: true });
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
+const block = (page: Page, text: string): Locator =>
+  documentEditor(page).locator("p", { hasText: text });
 
 async function openWorkspace(page: Page, person: string, id: string) {
   await asPersona(page, person);
@@ -83,7 +109,9 @@ async function openWorkspace(page: Page, person: string, id: string) {
 async function openReview(page: Page, person: string, id: string) {
   await asPersona(page, person);
   await page.goto(`/${TEAM}/review/${id}/1`);
-  await expect(page.getByRole("heading", { level: 1, name: NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: NAME }),
+  ).toBeVisible();
   await expect(decision(page)).toBeVisible();
   await liveEditor(page);
   await hydrated(page);
@@ -91,7 +119,9 @@ async function openReview(page: Page, person: string, id: string) {
 
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
-test("someone who edited a draft another author submitted can't approve it or send it back", async ({ page }) => {
+test("someone who edited a draft another author submitted can't approve it or send it back", async ({
+  page,
+}) => {
   test.setTimeout(120_000);
 
   await test.step("1. Maya makes a template", async () => {
@@ -124,12 +154,20 @@ test("someone who edited a draft another author submitted can't approve it or se
     await untilUncovered(paragraph, end);
     await tap(paragraph, { position: end });
     await page.keyboard.press("End");
-    await expect.poll(async () => (await caret(page)).block.startsWith(INTEREST_STARTS), { message: "the caret is in that paragraph" }).toBe(true);
+    await expect
+      .poll(async () => (await caret(page)).block.startsWith(INTEREST_STARTS), {
+        message: "the caret is in that paragraph",
+      })
+      .toBe(true);
     await typeSlowly(page, SENTENCE);
     await expect(paragraph).toContainText(SENTENCE.trim());
     await expectAutosaved(page);
 
-    const [draft] = await rowsOf(db, "SELECT created_by, writers FROM versions WHERE template_id = ? AND state = 'draft'", [id]);
+    const [draft] = await rowsOf(
+      db,
+      "SELECT created_by, writers FROM versions WHERE template_id = ? AND state = 'draft'",
+      [id],
+    );
     expect(draft).toMatchObject({ created_by: "maya" });
     expect(JSON.parse(String(draft!.writers))).toEqual(["maya", "priya"]);
   });
@@ -142,9 +180,15 @@ test("someone who edited a draft another author submitted can't approve it or se
     await expect(dialog).toBeVisible({ timeout: 20_000 });
     await tap(dialog.getByRole("button", { name: "Submit v1", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
-    await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
+    await expect(statusBadge(page)).toHaveText("In review", {
+      timeout: 20_000,
+    });
 
-    const [v1] = await rowsOf(db, "SELECT state, submitted_by, writers FROM versions WHERE template_id = ? AND number = 1", [id]);
+    const [v1] = await rowsOf(
+      db,
+      "SELECT state, submitted_by, writers FROM versions WHERE template_id = ? AND number = 1",
+      [id],
+    );
     expect(v1).toMatchObject({ state: "in_review", submitted_by: "maya" });
     expect(JSON.parse(String(v1!.writers))).toEqual(["maya", "priya"]);
   });
@@ -161,26 +205,54 @@ test("someone who edited a draft another author submitted can't approve it or se
     // the stepper's stage starts keyboard navigation there; Approve is the next stop.
     await decision(page).locator('[data-step="current"]').click();
     await page.keyboard.press("Tab");
-    await expect(approveButton(page), "Tab reaches the blocked Approve").toBeFocused();
-    await expect(approveButton(page)).toHaveAttribute("aria-describedby", "decision-blocked");
+    await expect(
+      approveButton(page),
+      "Tab reaches the blocked Approve",
+    ).toBeFocused();
+    await expect(approveButton(page)).toHaveAttribute(
+      "aria-describedby",
+      "decision-blocked",
+    );
     await expect(page.locator("#decision-blocked")).toHaveText(WROTE);
-    await expect(page.locator('[data-slot="tooltip-content"]').filter({ visible: true }), "and shows why").toHaveText(WROTE);
+    await expect(
+      page.locator('[data-slot="tooltip-content"]').filter({ visible: true }),
+      "and shows why",
+    ).toHaveText(WROTE);
     await page.keyboard.press("Tab");
     await expect(requestButton(page)).toBeFocused();
     await expect(requestButton(page)).toHaveAccessibleDescription(WROTE);
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("dialog"), "pressing it opens nothing").toHaveCount(0);
+    await expect(
+      page.getByRole("dialog"),
+      "pressing it opens nothing",
+    ).toHaveCount(0);
 
     await page.goto(`/${TEAM}/review`);
-    await expect(page.getByRole("heading", { level: 1, name: "Review" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Review" }),
+    ).toBeVisible();
     await hydrated(page);
     const waiting = page.getByRole("tab", { name: /^Waiting on me/ });
     await tap(waiting);
     await expect(waiting).toHaveAttribute("aria-selected", "true");
     const panel = page.getByRole("tabpanel").filter({ visible: true });
-    await expect(panel.locator("ul > li").first().or(panel.getByText("Nothing waiting on you."))).toBeVisible();
-    await expect(panel.locator(`a[href="/${TEAM}/review/${id}/1"]`), "v1 doesn't wait on Priya").toHaveCount(0);
-    expect(await rowsOf(db, "SELECT id FROM approvals WHERE version_id IN (SELECT id FROM versions WHERE template_id = ?)", [id])).toEqual([]);
+    await expect(
+      panel
+        .locator("ul > li")
+        .first()
+        .or(panel.getByText("Nothing waiting on you.")),
+    ).toBeVisible();
+    await expect(
+      panel.locator(`a[href="/${TEAM}/review/${id}/1"]`),
+      "v1 doesn't wait on Priya",
+    ).toHaveCount(0);
+    expect(
+      await rowsOf(
+        db,
+        "SELECT id FROM approvals WHERE version_id IN (SELECT id FROM versions WHERE template_id = ?)",
+        [id],
+      ),
+    ).toEqual([]);
   });
 
   await test.step("5. Jordan wrote none of it: Approve and Request changes are his to press", async () => {

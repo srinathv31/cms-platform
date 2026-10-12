@@ -23,7 +23,13 @@ function DocumentLines({ className }: { className?: string }) {
   );
 }
 
-export function WebSkeleton({ device, host }: { device: PreviewDevice; host?: string }) {
+export function WebSkeleton({
+  device,
+  host,
+}: {
+  device: PreviewDevice;
+  host?: string;
+}) {
   if (device === "mobile") {
     return (
       <div aria-hidden className={cn("h-full min-h-80", WELL_INSET)}>

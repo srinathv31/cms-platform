@@ -1,6 +1,10 @@
 import "server-only";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { sweepSunsets, type PassedSunset, type SunsetFacts } from "@/domain/lifecycle/sunset";
+import {
+  sweepSunsets,
+  type PassedSunset,
+  type SunsetFacts,
+} from "@/domain/lifecycle/sunset";
 import { now } from "@/server/clock";
 import { db, type Db } from "@/server/db/client";
 import { auditEvents, templates, versions } from "@/server/db/schema/ucomp";
@@ -45,11 +49,26 @@ export async function loadSunsetFacts(r: Reader): Promise<SunsetFacts[]> {
     r
       .select({ versionId: auditEvents.versionId })
       .from(auditEvents)
-      .where(and(eq(auditEvents.action, "version.sunset_passed"), inArray(auditEvents.versionId, rows.map((v) => v.id)))),
+      .where(
+        and(
+          eq(auditEvents.action, "version.sunset_passed"),
+          inArray(
+            auditEvents.versionId,
+            rows.map((v) => v.id),
+          ),
+        ),
+      ),
     r
       .select({ templateId: versions.templateId, number: versions.number })
       .from(versions)
-      .where(and(eq(versions.state, "active"), inArray(versions.templateId, [...new Set(rows.map((v) => v.templateId))]))),
+      .where(
+        and(
+          eq(versions.state, "active"),
+          inArray(versions.templateId, [
+            ...new Set(rows.map((v) => v.templateId)),
+          ]),
+        ),
+      ),
   ]);
   const passed = new Set(recorded.map((a) => a.versionId));
   const activeNumber = new Map(active.map((a) => [a.templateId, a.number]));
@@ -70,10 +89,18 @@ export async function loadSunsetFacts(r: Reader): Promise<SunsetFacts[]> {
  */
 export async function runSunsetSweep(): Promise<PassedSunset[]> {
   const at = await now();
-  const found = sweepSunsets({ versions: await loadSunsetFacts(db), now: at, zone: await readBusinessZone(db) });
+  const found = sweepSunsets({
+    versions: await loadSunsetFacts(db),
+    now: at,
+    zone: await readBusinessZone(db),
+  });
   if (found.length === 0) return [];
   return inTransaction(db, async (tx) => {
-    const passed = sweepSunsets({ versions: await loadSunsetFacts(tx), now: at, zone: await readBusinessZone(tx) });
+    const passed = sweepSunsets({
+      versions: await loadSunsetFacts(tx),
+      now: at,
+      zone: await readBusinessZone(tx),
+    });
     for (const p of passed) {
       await writeEffects(tx, p.effects, {
         at: p.at,

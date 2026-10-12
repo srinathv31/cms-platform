@@ -5,10 +5,19 @@ import { CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
-import { ActionDialog, useActionDialog } from "@/components/versions/action-dialog";
+import {
+  ActionDialog,
+  useActionDialog,
+} from "@/components/versions/action-dialog";
 import { formatLong } from "@/components/versions/format";
-import { SunsetCalendarContent, SunsetZone } from "@/components/versions/sunset-calendar";
-import { defaultSunsetDate, validateSunsetDate } from "@/components/versions/validation";
+import {
+  SunsetCalendarContent,
+  SunsetZone,
+} from "@/components/versions/sunset-calendar";
+import {
+  defaultSunsetDate,
+  validateSunsetDate,
+} from "@/components/versions/validation";
 import type { ConsumerUsage } from "@/domain/review-types";
 import { versionLabel } from "@/domain/rounds";
 import type { OutputKey } from "@/domain/review-outputs";
@@ -28,7 +37,10 @@ export interface Approved {
  */
 function ConsequenceList({ lines }: { lines: readonly string[] }) {
   return (
-    <ul data-slot="consequences" className="flex flex-col gap-2 rounded-xl bg-surface-tinted px-4 py-3.5 text-[14px] leading-[1.55] text-text">
+    <ul
+      data-slot="consequences"
+      className="flex flex-col gap-2 rounded-xl bg-surface-tinted px-4 py-3.5 text-[14px] leading-[1.55] text-text"
+    >
       {lines.map((line) => (
         <li key={line}>
           <WithKeys text={line} surface="bg-surface" />
@@ -85,7 +97,11 @@ export function ApproveDialog({
    * With nothing Active (after a revoke): the newest version that still renders, which consumers move from, and
    * this version's contract changes against it (the breaking ones are what they have to map).
    */
-  stillRenders: { number: number; sunsetDay: string | null; contractChanges: readonly ContractChange[] } | null;
+  stillRenders: {
+    number: number;
+    sunsetDay: string | null;
+    contractChanges: readonly ContractChange[];
+  } | null;
   /** The version's contract changes against the Active version it replaces: the breaking ones are what its consumers have to map. */
   contractChanges: readonly ContractChange[];
   stage: ApprovalStageInfo;
@@ -111,10 +127,15 @@ export function ApproveDialog({
   const [ymd, setYmd] = useState(() => defaultSunsetDate(null, today));
   const [pickerOpen, setPickerOpen] = useState(false);
   const check = useRef<HTMLButtonElement>(null);
-  const { pending, error, setError, submit } = useActionDialog(() => onOpenChange(false));
+  const { pending, error, setError, submit } = useActionDialog(() =>
+    onOpenChange(false),
+  );
 
   // The round being approved is in review: its label stays put while the dialog fades out after it goes Active.
-  const version = useMemo(() => ({ number: versionNumber, round, state: "in_review" as const }), [versionNumber, round]);
+  const version = useMemo(
+    () => ({ number: versionNumber, round, state: "in_review" as const }),
+    [versionNumber, round],
+  );
   const approve = `Approve ${versionLabel(version, { style: "sentence" })}`;
 
   // A sunset date applies to the previous version, when this approval is what makes this one Active.
@@ -123,8 +144,28 @@ export function ApproveDialog({
   const invalid = sunset ? validateSunsetDate(sunset, today) : null;
 
   const lines = useMemo(
-    () => approveLines({ version, previousNumber, stillRenders, stage, sunset: invalid ? null : sunset, contractChanges, usage, nowIso }),
-    [version, previousNumber, stillRenders, stage, sunset, invalid, contractChanges, usage, nowIso],
+    () =>
+      approveLines({
+        version,
+        previousNumber,
+        stillRenders,
+        stage,
+        sunset: invalid ? null : sunset,
+        contractChanges,
+        usage,
+        nowIso,
+      }),
+    [
+      version,
+      previousNumber,
+      stillRenders,
+      stage,
+      sunset,
+      invalid,
+      contractChanges,
+      usage,
+      nowIso,
+    ],
   );
   // What happens is the description; what follows from it (who is affected) is the box.
   const [lead = "", ...rest] = lines;
@@ -181,7 +222,10 @@ export function ApproveDialog({
           {canSunset ? (
             <div className="flex flex-col items-end gap-1.5 max-[26rem]:items-start">
               <div className="flex h-8 w-full items-center justify-between gap-3 max-[26rem]:h-auto max-[26rem]:flex-wrap max-[26rem]:gap-y-2">
-                <label id={labelId} className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text">
+                <label
+                  id={labelId}
+                  className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text"
+                >
                   <Checkbox
                     ref={check}
                     checked={on}
@@ -193,9 +237,16 @@ export function ApproveDialog({
                   />
                   Set a sunset date for v{previousNumber}
                 </label>
-                <Popover open={pickerOpen} onOpenChange={(next) => !pending && setPickerOpen(next)}>
+                <Popover
+                  open={pickerOpen}
+                  onOpenChange={(next) => !pending && setPickerOpen(next)}
+                >
                   <PopoverTrigger
-                    aria-label={on && ymd ? `Sunset date, ${formatLong(ymd)}` : "Sunset date"}
+                    aria-label={
+                      on && ymd
+                        ? `Sunset date, ${formatLong(ymd)}`
+                        : "Sunset date"
+                    }
                     aria-describedby={zoneId}
                     render={
                       <Button
@@ -205,7 +256,11 @@ export function ApproveDialog({
                       />
                     }
                   >
-                    <CalendarDays aria-hidden strokeWidth={1.75} className="text-text-muted" />
+                    <CalendarDays
+                      aria-hidden
+                      strokeWidth={1.75}
+                      className="text-text-muted"
+                    />
                     {on && ymd ? formatLong(ymd) : "Pick a date"}
                   </PopoverTrigger>
                   <SunsetCalendarContent

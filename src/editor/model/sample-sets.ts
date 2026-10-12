@@ -12,25 +12,39 @@
 // Text defaults follow what the variable is, judged from its key (then its label): a first name, a
 // last name, a full name, a company, an email, a city, a street address, or anything else.
 
-import type { SampleSet, Variable, VariableType, VariableValue, VariableValues } from "./types";
+import type {
+  SampleSet,
+  Variable,
+  VariableType,
+  VariableValue,
+  VariableValues,
+} from "./types";
 import { TYPE_META, US_STATES, toKey, validateValue } from "./variables";
 
 export type DefaultSampleSetId = "typical" | "long" | "minimum";
 
 /** The three sets every version starts with, in switcher order. */
-export const DEFAULT_SAMPLE_SETS: readonly { id: DefaultSampleSetId; name: string }[] = [
+export const DEFAULT_SAMPLE_SETS: readonly {
+  id: DefaultSampleSetId;
+  name: string;
+}[] = [
   { id: "typical", name: "Typical customer" },
   { id: "long", name: "Long name and maximum values" },
   { id: "minimum", name: "Minimum values" },
 ];
 
 /** The three default sets, with a value for every variable in the list. `today` is YYYY-MM-DD. */
-export function defaultSampleSets(variables: readonly Variable[], today: string): SampleSet[] {
+export function defaultSampleSets(
+  variables: readonly Variable[],
+  today: string,
+): SampleSet[] {
   const day = parseDay(today);
   return DEFAULT_SAMPLE_SETS.map(({ id, name }) => ({
     id,
     name,
-    values: Object.fromEntries(variables.map((v) => [v.key, defaultValue(id, v, day)])),
+    values: Object.fromEntries(
+      variables.map((v) => [v.key, defaultValue(id, v, day)]),
+    ),
   }));
 }
 
@@ -39,13 +53,21 @@ export function defaultSampleSets(variables: readonly Variable[], today: string)
  * default for the set's kind (custom sets fall back to typical). Keys not in the list are dropped.
  * Values are passed through as given; the render route validates them.
  */
-export function sampleSetValues(set: SampleSet, variables: readonly Variable[], today: string): VariableValues {
+export function sampleSetValues(
+  set: SampleSet,
+  variables: readonly Variable[],
+  today: string,
+): VariableValues {
   const kind: DefaultSampleSetId = isDefaultSet(set.id) ? set.id : "typical";
   let day: Day | null = null;
   const out: VariableValues = {};
   for (const v of variables) {
-    const given = Object.prototype.hasOwnProperty.call(set.values, v.key) ? set.values[v.key] : undefined;
-    out[v.key] = isPresent(given) ? given : defaultValue(kind, v, (day ??= parseDay(today)));
+    const given = Object.prototype.hasOwnProperty.call(set.values, v.key)
+      ? set.values[v.key]
+      : undefined;
+    out[v.key] = isPresent(given)
+      ? given
+      : defaultValue(kind, v, (day ??= parseDay(today)));
   }
   return out;
 }
@@ -60,16 +82,24 @@ export function isDefaultSet(id: string): id is DefaultSampleSetId {
  * The defaults come first, in order (typical, long, minimum); custom sets follow in stored order.
  * A stored default keeps its own values. `today` is YYYY-MM-DD.
  */
-export function listSets(stored: readonly SampleSet[], variables: readonly Variable[], today: string): SampleSet[] {
+export function listSets(
+  stored: readonly SampleSet[],
+  variables: readonly Variable[],
+  today: string,
+): SampleSet[] {
   const generated = defaultSampleSets(variables, today);
-  const defaults = generated.map((set) => stored.find((s) => s.id === set.id) ?? set);
+  const defaults = generated.map(
+    (set) => stored.find((s) => s.id === set.id) ?? set,
+  );
   const customs = stored.filter((s) => !isDefaultSet(s.id));
   return [...defaults, ...customs];
 }
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
-function isPresent(value: VariableValue | null | undefined): value is VariableValue {
+function isPresent(
+  value: VariableValue | null | undefined,
+): value is VariableValue {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
 
@@ -89,8 +119,12 @@ const LONGEST_STATE = stateBy((a, b) => b.length > a.length);
 const SHORTEST_STATE = stateBy((a, b) => b.length < a.length);
 
 /** Non-text defaults, canonical. */
-const OTHER: Record<DefaultSampleSetId, (type: Exclude<VariableType, "text">, day: Day) => string> = {
-  typical: (type, day) => (type === "date" ? addDays(day, 30) : TYPE_META[type].example),
+const OTHER: Record<
+  DefaultSampleSetId,
+  (type: Exclude<VariableType, "text">, day: Day) => string
+> = {
+  typical: (type, day) =>
+    type === "date" ? addDays(day, 30) : TYPE_META[type].example,
   long: (type, day) => {
     switch (type) {
       case "currency":
@@ -118,7 +152,9 @@ const OTHER: Record<DefaultSampleSetId, (type: Exclude<VariableType, "text">, da
   },
 };
 
-function stateBy(better: (current: string, candidate: string) => boolean): string {
+function stateBy(
+  better: (current: string, candidate: string) => boolean,
+): string {
   let best: [string, string] | null = null;
   for (const entry of Object.entries(US_STATES)) {
     if (!best || better(best[1], entry[1])) best = entry;
@@ -128,13 +164,24 @@ function stateBy(better: (current: string, candidate: string) => boolean): strin
 
 // ── Text ─────────────────────────────────────────────────────────────────────
 
-type TextKind = "first" | "last" | "full" | "company" | "email" | "city" | "address" | "other";
+type TextKind =
+  | "first"
+  | "last"
+  | "full"
+  | "company"
+  | "email"
+  | "city"
+  | "address"
+  | "other";
 
 /** In the order they're tried: specific names before the generic `…_name`. */
 const TEXT_KINDS: readonly [TextKind, RegExp][] = [
   ["first", /(^|_)(first|given|preferred|middle|f)_?name(_|$)/],
   ["last", /(^|_)(last|family|sur|l)_?name(_|$)/],
-  ["company", /(^|_)(company|business|employer|merchant|organization|organisation|firm)(_|$)/],
+  [
+    "company",
+    /(^|_)(company|business|employer|merchant|organization|organisation|firm)(_|$)/,
+  ],
   ["email", /(^|_)e_?mail(_|$)/],
   ["city", /(^|_)(city|town)(_|$)/],
   ["address", /(^|_)(address|street)(_|$)/],
@@ -195,7 +242,8 @@ interface Day {
 
 function parseDay(today: string): Day {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(today);
-  if (!match) throw new Error(`today must be a date like 2026-10-04, got "${today}"`);
+  if (!match)
+    throw new Error(`today must be a date like 2026-10-04, got "${today}"`);
   return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
 }
 
@@ -210,5 +258,9 @@ function addDays(day: Day, days: number): string {
 /** The next `month`/`date` on or after `day`. */
 function nextOnOrAfter(day: Day, month: number, date: number): string {
   const thisYear = Date.UTC(day.y, month - 1, date);
-  return iso(thisYear >= Date.UTC(day.y, day.m - 1, day.d) ? thisYear : Date.UTC(day.y + 1, month - 1, date));
+  return iso(
+    thisYear >= Date.UTC(day.y, day.m - 1, day.d)
+      ? thisYear
+      : Date.UTC(day.y + 1, month - 1, date),
+  );
 }

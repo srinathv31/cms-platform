@@ -2,23 +2,52 @@
 // The round trip through the editor's Markdown paste is in components/workspace/copilot.
 
 import { describe, expect, it } from "vitest";
-import { buildCopilotPrompt, copilotUnavailable, documentToMarkdown, promptSections } from "./copilot";
+import {
+  buildCopilotPrompt,
+  copilotUnavailable,
+  documentToMarkdown,
+  promptSections,
+} from "./copilot";
 import type { CopilotPromptInput } from "./import-types";
 import type { JSONContent, RequiredSection, Variable } from "./types";
 
 const text = (value: string, marks?: string[]): JSONContent =>
-  marks ? { type: "text", text: value, marks: marks.map((type) => ({ type })) } : { type: "text", text: value };
+  marks
+    ? { type: "text", text: value, marks: marks.map((type) => ({ type })) }
+    : { type: "text", text: value };
 const chip = (key: string, marks?: string[]): JSONContent =>
-  marks ? { type: "variable", attrs: { key }, marks: marks.map((type) => ({ type })) } : { type: "variable", attrs: { key } };
-const p = (...content: JSONContent[]): JSONContent => ({ type: "paragraph", content });
-const h = (level: number, title: string, requiredKey: string | null = null): JSONContent => ({
+  marks
+    ? {
+        type: "variable",
+        attrs: { key },
+        marks: marks.map((type) => ({ type })),
+      }
+    : { type: "variable", attrs: { key } };
+const p = (...content: JSONContent[]): JSONContent => ({
+  type: "paragraph",
+  content,
+});
+const h = (
+  level: number,
+  title: string,
+  requiredKey: string | null = null,
+): JSONContent => ({
   type: "heading",
   attrs: { id: `h-${title}`, level, requiredKey },
   content: [text(title)],
 });
-const li = (...content: JSONContent[]): JSONContent => ({ type: "listItem", content });
-const cell = (type: "tableHeader" | "tableCell", ...content: JSONContent[]): JSONContent => ({ type, content: [p(...content)] });
-const doc = (...content: JSONContent[]): JSONContent => ({ type: "doc", content });
+const li = (...content: JSONContent[]): JSONContent => ({
+  type: "listItem",
+  content,
+});
+const cell = (
+  type: "tableHeader" | "tableCell",
+  ...content: JSONContent[]
+): JSONContent => ({ type, content: [p(...content)] });
+const doc = (...content: JSONContent[]): JSONContent => ({
+  type: "doc",
+  content,
+});
 
 const SECTIONS: RequiredSection[] = [
   { key: "offer_details", title: "Offer details" },
@@ -27,19 +56,48 @@ const SECTIONS: RequiredSection[] = [
 ];
 
 const VARIABLES: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "purchase_apr", label: "Purchase APR", type: "percent", required: true, sample: "21.99" },
-  { key: "promo_code", label: "Promo code", type: "text", required: false, sample: "" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "purchase_apr",
+    label: "Purchase APR",
+    type: "percent",
+    required: true,
+    sample: "21.99",
+  },
+  {
+    key: "promo_code",
+    label: "Promo code",
+    type: "text",
+    required: false,
+    sample: "",
+  },
 ];
 
 const DRAFT = doc(
   h(2, "Offer details", "offer_details"),
-  p(text("Hi "), chip("first_name"), text(", earn a "), text("$200 ", ["bold"]), text("credit", ["bold", "italic"]), text(".")),
+  p(
+    text("Hi "),
+    chip("first_name"),
+    text(", earn a "),
+    text("$200 ", ["bold"]),
+    text("credit", ["bold", "italic"]),
+    text("."),
+  ),
   {
     type: "bulletList",
     content: [
       li(p(text("Spend $2,000 in 3 months"))),
-      li(p(text("Then more")), { type: "orderedList", attrs: { start: 1 }, content: [li(p(text("Nested")))] }),
+      li(p(text("Then more")), {
+        type: "orderedList",
+        attrs: { start: 1 },
+        content: [li(p(text("Nested")))],
+      }),
     ],
   },
   { type: "paragraph" },
@@ -47,18 +105,41 @@ const DRAFT = doc(
   {
     type: "table",
     content: [
-      { type: "tableRow", content: [cell("tableHeader", text("Rate")), cell("tableHeader", text("What you pay"))] },
-      { type: "tableRow", content: [cell("tableCell", text("Purchase APR")), cell("tableCell", chip("purchase_apr"))] },
+      {
+        type: "tableRow",
+        content: [
+          cell("tableHeader", text("Rate")),
+          cell("tableHeader", text("What you pay")),
+        ],
+      },
+      {
+        type: "tableRow",
+        content: [
+          cell("tableCell", text("Purchase APR")),
+          cell("tableCell", chip("purchase_apr")),
+        ],
+      },
     ],
   },
   h(3, "How interest works"),
-  p(text("See "), { type: "text", text: "the terms", marks: [{ type: "link", attrs: { href: "https://example.com/terms" } }] }, text(" [and *more*].")),
+  p(
+    text("See "),
+    {
+      type: "text",
+      text: "the terms",
+      marks: [{ type: "link", attrs: { href: "https://example.com/terms" } }],
+    },
+    text(" [and *more*]."),
+  ),
   { type: "horizontalRule" },
   h(2, "Legal notices", "legal_notices"),
   { type: "callout", content: [p(text("Terms apply."))] },
 );
 
-const input = (body: JSONContent, overrides: Partial<CopilotPromptInput> = {}): CopilotPromptInput => ({
+const input = (
+  body: JSONContent,
+  overrides: Partial<CopilotPromptInput> = {},
+): CopilotPromptInput => ({
   templateName: "Spring offer",
   teamName: "Coral Offers",
   contentTypeName: "Disclosure",
@@ -105,7 +186,9 @@ describe("documentToMarkdown", () => {
 describe("copilotUnavailable", () => {
   it("offers Copilot for a document, and says why not for an alert", () => {
     expect(copilotUnavailable("document")).toBeNull();
-    expect(copilotUnavailable("message")).toBe("Copilot drafts documents only.");
+    expect(copilotUnavailable("message")).toBe(
+      "Copilot drafts documents only.",
+    );
   });
 });
 
@@ -167,9 +250,16 @@ describe("buildCopilotPrompt", () => {
     `);
   });
 
-  it("without text outside the required headings: \"Write it\" (snapshot)", () => {
-    const blank = doc(h(2, "Offer details", "offer_details"), { type: "paragraph" }, h(2, "Rates and fees", "rates_and_fees"), h(2, "Legal notices", "legal_notices"));
-    const prompt = buildCopilotPrompt(input(blank, { variables: [], channels: ["pdf", "web", "email"] }));
+  it('without text outside the required headings: "Write it" (snapshot)', () => {
+    const blank = doc(
+      h(2, "Offer details", "offer_details"),
+      { type: "paragraph" },
+      h(2, "Rates and fees", "rates_and_fees"),
+      h(2, "Legal notices", "legal_notices"),
+    );
+    const prompt = buildCopilotPrompt(
+      input(blank, { variables: [], channels: ["pdf", "web", "email"] }),
+    );
     expect(prompt.includesDraft).toBe(false);
     expect(prompt.text).toMatchInlineSnapshot(`
       "Help me write the body of a disclosure for Coral Offers.
@@ -198,36 +288,64 @@ describe("buildCopilotPrompt", () => {
     `);
   });
 
-  it("doesn't send the placeholder name \"Untitled template\"", () => {
-    const text = buildCopilotPrompt(input(DRAFT, { templateName: "Untitled template" })).text;
+  it('doesn\'t send the placeholder name "Untitled template"', () => {
+    const text = buildCopilotPrompt(
+      input(DRAFT, { templateName: "Untitled template" }),
+    ).text;
     expect(text).not.toContain("Untitled");
     expect(text).not.toContain("Template:");
     expect(text).toContain("Team: Coral Offers");
   });
 
   it("a draft that opens with a greeting keeps its opening; one that opens with a heading starts at the first heading", () => {
-    const greeting = doc(p(text("Dear "), chip("first_name"), text(",")), h(2, "Offer details", "offer_details"), p(text("Earn $200.")));
+    const greeting = doc(
+      p(text("Dear "), chip("first_name"), text(",")),
+      h(2, "Offer details", "offer_details"),
+      p(text("Earn $200.")),
+    );
     const kept = buildCopilotPrompt(input(greeting)).text;
-    expect(kept).toContain("- No preamble and no closing remarks: keep the draft's opening as it is.");
+    expect(kept).toContain(
+      "- No preamble and no closing remarks: keep the draft's opening as it is.",
+    );
     expect(kept).not.toContain("start with the first heading");
-    expect(buildCopilotPrompt(input(DRAFT)).text).toContain("start with the first heading.");
+    expect(buildCopilotPrompt(input(DRAFT)).text).toContain(
+      "start with the first heading.",
+    );
   });
 
   it("tells Copilot to leave logic tags alone and not to invent terms", () => {
     const text = buildCopilotPrompt(input(DRAFT)).text;
     expect(text).toContain("{{#if …}} or {{/if}} tag exactly as written");
-    expect(text).toContain("Do not invent rates, fees or legal terms; use a {{placeholder}}.");
+    expect(text).toContain(
+      "Do not invent rates, fees or legal terms; use a {{placeholder}}.",
+    );
   });
 
   it("a chip alone counts as draft text", () => {
-    expect(buildCopilotPrompt(input(doc(h(2, "Offer details", "offer_details"), p(chip("first_name"))))).includesDraft).toBe(true);
+    expect(
+      buildCopilotPrompt(
+        input(
+          doc(h(2, "Offer details", "offer_details"), p(chip("first_name"))),
+        ),
+      ).includesDraft,
+    ).toBe(true);
   });
 
   it("titles the sections as the draft does, not as the content type was renamed since (snapshot)", () => {
     // The type renamed "Rates and fees" to "Fees and charges" and dropped "Legal notices" after the draft was made.
-    const renamed: RequiredSection[] = [SECTIONS[0]!, { key: "rates_and_fees", title: "Fees and charges" }];
-    const text = buildCopilotPrompt(input(DRAFT, { requiredSections: renamed })).text;
-    expect(text.slice(text.indexOf("Use these section headings"), text.indexOf("Placeholders"))).toMatchInlineSnapshot(`
+    const renamed: RequiredSection[] = [
+      SECTIONS[0]!,
+      { key: "rates_and_fees", title: "Fees and charges" },
+    ];
+    const text = buildCopilotPrompt(
+      input(DRAFT, { requiredSections: renamed }),
+    ).text;
+    expect(
+      text.slice(
+        text.indexOf("Use these section headings"),
+        text.indexOf("Placeholders"),
+      ),
+    ).toMatchInlineSnapshot(`
       "Use these section headings, exactly as written and in this order:
       ## Offer details
       ## Rates and fees
@@ -239,20 +357,41 @@ describe("buildCopilotPrompt", () => {
   });
 
   it("promptSections: the draft's own headings in its order; the type fills in only what the draft lacks", () => {
-    const partial = doc(h(2, "Rates and fees", "rates_and_fees"), p(text("x")), h(2, "  ", "legal_notices"), h(2, "Extra", null));
+    const partial = doc(
+      h(2, "Rates and fees", "rates_and_fees"),
+      p(text("x")),
+      h(2, "  ", "legal_notices"),
+      h(2, "Extra", null),
+    );
     expect(promptSections(partial, SECTIONS)).toEqual([
       { key: "offer_details", title: "Offer details" },
       { key: "rates_and_fees", title: "Rates and fees" },
       { key: "legal_notices", title: "Legal notices" },
     ]);
-    const reordered = doc(h(2, "Legal", "legal_notices"), h(2, "Offer", "offer_details"));
-    expect(promptSections(reordered, SECTIONS).map((s) => s.title)).toEqual(["Legal", "Offer", "Rates and fees"]);
-    expect(promptSections(doc(p(text("no headings"))), SECTIONS)).toEqual(SECTIONS);
-    expect(promptSections(doc(h(2, "Old", "gone")), [])).toEqual([{ key: "gone", title: "Old" }]);
+    const reordered = doc(
+      h(2, "Legal", "legal_notices"),
+      h(2, "Offer", "offer_details"),
+    );
+    expect(promptSections(reordered, SECTIONS).map((s) => s.title)).toEqual([
+      "Legal",
+      "Offer",
+      "Rates and fees",
+    ]);
+    expect(promptSections(doc(p(text("no headings"))), SECTIONS)).toEqual(
+      SECTIONS,
+    );
+    expect(promptSections(doc(h(2, "Old", "gone")), [])).toEqual([
+      { key: "gone", title: "Old" },
+    ]);
   });
 
   it("is deterministic, and channels follow the product's order", () => {
-    expect(buildCopilotPrompt(input(DRAFT)).text).toBe(buildCopilotPrompt(input(DRAFT)).text);
-    expect(buildCopilotPrompt(input(DRAFT, { channels: ["email", "web", "pdf"] })).text).toContain("Published as: PDF, web page and email");
+    expect(buildCopilotPrompt(input(DRAFT)).text).toBe(
+      buildCopilotPrompt(input(DRAFT)).text,
+    );
+    expect(
+      buildCopilotPrompt(input(DRAFT, { channels: ["email", "web", "pdf"] }))
+        .text,
+    ).toContain("Published as: PDF, web page and email");
   });
 });

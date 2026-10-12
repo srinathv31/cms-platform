@@ -45,22 +45,39 @@ export const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 export function parseRenderFixture(text: string): RenderFixture {
   const parsed = parseJsonWithNumberText(text);
   const raw = parsed.json as Partial<RenderFixture> | null;
-  if (!raw || typeof raw !== "object") throw new Error("A render fixture must be a JSON object.");
+  if (!raw || typeof raw !== "object")
+    throw new Error("A render fixture must be a JSON object.");
   for (const key of ["templateId", "templateName", "at"] as const) {
-    if (typeof raw[key] !== "string") throw new Error(`Render fixture: "${key}" must be a string.`);
+    if (typeof raw[key] !== "string")
+      throw new Error(`Render fixture: "${key}" must be a string.`);
   }
-  if (Number.isNaN(Date.parse(raw.at!))) throw new Error('Render fixture: "at" must be an ISO date-time.');
-  if (!Array.isArray(raw.variables)) throw new Error('Render fixture: "variables" must be an array.');
-  if (!raw.values || typeof raw.values !== "object") throw new Error('Render fixture: "values" must be an object.');
-  if (raw.body?.type !== "doc") throw new Error('Render fixture: "body" must be a doc.');
-  if (!raw.channelFields || typeof raw.channelFields !== "object" || Array.isArray(raw.channelFields)) {
+  if (Number.isNaN(Date.parse(raw.at!)))
+    throw new Error('Render fixture: "at" must be an ISO date-time.');
+  if (!Array.isArray(raw.variables))
+    throw new Error('Render fixture: "variables" must be an array.');
+  if (!raw.values || typeof raw.values !== "object")
+    throw new Error('Render fixture: "values" must be an object.');
+  if (raw.body?.type !== "doc")
+    throw new Error('Render fixture: "body" must be a doc.');
+  if (
+    !raw.channelFields ||
+    typeof raw.channelFields !== "object" ||
+    Array.isArray(raw.channelFields)
+  ) {
     throw new Error('Render fixture: "channelFields" must be an object.');
   }
   const channels = raw.channels;
-  if (!Array.isArray(channels) || channels.length === 0 || !channels.every((c) => (CHANNELS as readonly unknown[]).includes(c))) {
-    throw new Error(`Render fixture: "channels" must list some of ${CHANNELS.join(", ")}.`);
+  if (
+    !Array.isArray(channels) ||
+    channels.length === 0 ||
+    !channels.every((c) => (CHANNELS as readonly unknown[]).includes(c))
+  ) {
+    throw new Error(
+      `Render fixture: "channels" must list some of ${CHANNELS.join(", ")}.`,
+    );
   }
-  if (raw.smsFooter !== undefined && typeof raw.smsFooter !== "string") throw new Error('Render fixture: "smsFooter" must be a string.');
+  if (raw.smsFooter !== undefined && typeof raw.smsFooter !== "string")
+    throw new Error('Render fixture: "smsFooter" must be a string.');
   return {
     templateId: raw.templateId!,
     templateName: raw.templateName!,

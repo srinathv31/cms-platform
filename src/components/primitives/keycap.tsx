@@ -2,7 +2,10 @@ import { cn } from "@/lib/utils";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
 /** Keycap chip (⌥ Opt, ⌘, K). Hairline border on a sunken fill. */
-export function Keycap({ className, ...props }: React.ComponentProps<typeof Kbd>) {
+export function Keycap({
+  className,
+  ...props
+}: React.ComponentProps<typeof Kbd>) {
   return (
     <Kbd
       className={cn(
@@ -15,7 +18,13 @@ export function Keycap({ className, ...props }: React.ComponentProps<typeof Kbd>
 }
 
 /** Renders a shortcut like ["⌘", "K"] as keycaps. */
-export function Shortcut({ keys, className }: { keys: string[]; className?: string }) {
+export function Shortcut({
+  keys,
+  className,
+}: {
+  keys: string[];
+  className?: string;
+}) {
   return (
     <KbdGroup className={className}>
       {keys.map((k) => (

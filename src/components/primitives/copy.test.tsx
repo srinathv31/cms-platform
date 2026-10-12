@@ -7,7 +7,9 @@ import { copyText, useCopy } from "./copy";
 // Copying text: the async Clipboard API, then a hidden textarea where that is unavailable; and the
 // confirmation that shows for a moment after a copy that got there.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const writeText = vi.fn<(text: string) => Promise<void>>();
 const execCommand = vi.fn<(command: string) => boolean>();
@@ -15,8 +17,14 @@ const execCommand = vi.fn<(command: string) => boolean>();
 beforeEach(() => {
   writeText.mockReset().mockResolvedValue(undefined);
   execCommand.mockReset().mockReturnValue(true);
-  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-  Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+  });
+  Object.defineProperty(document, "execCommand", {
+    value: execCommand,
+    configurable: true,
+  });
 });
 
 afterEach(() => {
@@ -50,7 +58,10 @@ describe("copyText", () => {
   });
 
   it("falls back where there is no async clipboard at all (an insecure context)", async () => {
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+    });
     expect(await copyText("x")).toBe(true);
     expect(execCommand).toHaveBeenCalledWith("copy");
   });
@@ -76,7 +87,8 @@ describe("useCopy", () => {
     api = useCopy(ms);
     return <span data-copied={api.copied} />;
   }
-  const copied = () => container.querySelector("span")?.getAttribute("data-copied");
+  const copied = () =>
+    container.querySelector("span")?.getAttribute("data-copied");
 
   beforeEach(async () => {
     container = document.createElement("div");

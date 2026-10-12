@@ -22,7 +22,8 @@ import type { SimApiError } from "./types";
 
 export const CONSUMER_ID = "coral";
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: SimApiError };
+export type ApiResult<T> =
+  { ok: true; data: T } | { ok: false; error: SimApiError };
 
 /** What Coral keeps from a successful render (sim_deliveries.output) and the upgrade hint. */
 export interface RenderOutput {
@@ -42,10 +43,21 @@ export interface EmailOutput {
 export interface UcompApi {
   readonly origin: string;
   /** One page of search results; `after` is an earlier page's `nextCursor` for the same `q`. */
-  searchTemplates(input?: { q?: string; limit?: number; after?: string }): Promise<ApiResult<ApiTemplateSearch>>;
-  getTemplate(templateId: string, input?: { version?: number; since?: number }): Promise<ApiResult<ApiTemplateDetail>>;
+  searchTemplates(input?: {
+    q?: string;
+    limit?: number;
+    after?: string;
+  }): Promise<ApiResult<ApiTemplateSearch>>;
+  getTemplate(
+    templateId: string,
+    input?: { version?: number; since?: number },
+  ): Promise<ApiResult<ApiTemplateDetail>>;
   /** One page of Coral's notices, oldest first; `after` is an earlier page's `nextCursor`. */
-  listNotices(input?: { after?: string; templateId?: string; limit?: number }): Promise<ApiResult<ApiNoticeList>>;
+  listNotices(input?: {
+    after?: string;
+    templateId?: string;
+    limit?: number;
+  }): Promise<ApiResult<ApiNoticeList>>;
   /**
    * POST …/render. PDF is always asked for as base64 (JSON); web comes back as the HTML document.
    * `at` is when UCOMP answered, by its HTTP `Date` header (`answeredAt`).
@@ -70,13 +82,25 @@ async function errorOf(response: Response): Promise<SimApiError> {
   try {
     const body = (await response.json()) as Partial<ApiErrorBody>;
     const error = body?.error;
-    if (error && typeof error.code === "string" && typeof error.message === "string") {
-      return { status: response.status, code: error.code, message: error.message };
+    if (
+      error &&
+      typeof error.code === "string" &&
+      typeof error.message === "string"
+    ) {
+      return {
+        status: response.status,
+        code: error.code,
+        message: error.message,
+      };
     }
   } catch {
     // fall through
   }
-  return { status: response.status, code: "bad_response", message: `Stencil answered ${response.status} without an error body.` };
+  return {
+    status: response.status,
+    code: "bad_response",
+    message: `Stencil answered ${response.status} without an error body.`,
+  };
 }
 
 function query(params: Record<string, string | number | undefined>): string {
@@ -117,30 +141,50 @@ function asBase64(channel: ApiChannel): boolean {
   }
 }
 
-function newerVersionOf(response: Response, fromBody?: number | null): number | null {
+function newerVersionOf(
+  response: Response,
+  fromBody?: number | null,
+): number | null {
   const header = response.headers.get(API_HEADERS.newerVersion);
   const parsed = header === null ? NaN : Number.parseInt(header, 10);
   if (Number.isInteger(parsed)) return parsed;
   return typeof fromBody === "number" ? fromBody : null;
 }
 
-export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: string; fetch?: Fetch }): UcompApi {
+export function createUcompApi({
+  origin,
+  fetch = globalThis.fetch,
+}: {
+  origin: string;
+  fetch?: Fetch;
+}): UcompApi {
   const base = origin.replace(/\/+$/, "");
 
   async function call(
     path: string,
     init: RequestInit = {},
-  ): Promise<{ ok: true; response: Response } | { ok: false; error: SimApiError; response?: Response }> {
+  ): Promise<
+    | { ok: true; response: Response }
+    | { ok: false; error: SimApiError; response?: Response }
+  > {
     const requestHeaders = new Headers(init.headers);
     requestHeaders.set(API_HEADERS.consumer, CONSUMER_ID);
     requestHeaders.set("Accept", "application/json");
     let response: Response;
     try {
-      response = await fetch(`${base}${path}`, { ...init, headers: requestHeaders, cache: "no-store" });
+      response = await fetch(`${base}${path}`, {
+        ...init,
+        headers: requestHeaders,
+        cache: "no-store",
+      });
     } catch (error) {
-      return { ok: false, error: UNREACHABLE((error as Error)?.message || "network error") };
+      return {
+        ok: false,
+        error: UNREACHABLE((error as Error)?.message || "network error"),
+      };
     }
-    if (!response.ok) return { ok: false, error: await errorOf(response), response };
+    if (!response.ok)
+      return { ok: false, error: await errorOf(response), response };
     return { ok: true, response };
   }
 
@@ -150,7 +194,14 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
     try {
       return { ok: true, data: (await result.response.json()) as T };
     } catch {
-      return { ok: false, error: { status: result.response.status, code: "bad_response", message: "Stencil answered with something that isn't JSON." } };
+      return {
+        ok: false,
+        error: {
+          status: result.response.status,
+          code: "bad_response",
+          message: "Stencil answered with something that isn't JSON.",
+        },
+      };
     }
   }
 
@@ -160,20 +211,31 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
     origin: base,
 
     searchTemplates: ({ q, limit, after } = {}) =>
-      getJson<ApiTemplateSearch>(`/api/v1/templates${query({ q: q?.trim(), limit, after })}`),
+      getJson<ApiTemplateSearch>(
+        `/api/v1/templates${query({ q: q?.trim(), limit, after })}`,
+      ),
 
     getTemplate: (templateId, { version, since } = {}) =>
-      getJson<ApiTemplateDetail>(`/api/v1/templates/${id(templateId)}${query({ version, since })}`),
+      getJson<ApiTemplateDetail>(
+        `/api/v1/templates/${id(templateId)}${query({ version, since })}`,
+      ),
 
     listNotices: ({ after, templateId, limit } = {}) =>
-      getJson<ApiNoticeList>(`/api/v1/consumers/${CONSUMER_ID}/notices${query({ templateId, limit, after })}`),
+      getJson<ApiNoticeList>(
+        `/api/v1/consumers/${CONSUMER_ID}/notices${query({ templateId, limit, after })}`,
+      ),
 
     async render(templateId, body, correlationId) {
       const channel: ApiChannel = body.channel;
-      const request: ApiRenderRequest = asBase64(channel) ? { ...body, encoding: "base64" } : { ...body };
+      const request: ApiRenderRequest = asBase64(channel)
+        ? { ...body, encoding: "base64" }
+        : { ...body };
       const result = await call(`/api/v1/templates/${id(templateId)}/render`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", [API_HEADERS.correlation]: correlationId },
+        headers: {
+          "Content-Type": "application/json",
+          [API_HEADERS.correlation]: correlationId,
+        },
         body: JSON.stringify(request),
       });
       const at = answeredAt(result.response);
@@ -182,30 +244,80 @@ export function createUcompApi({ origin, fetch = globalThis.fetch }: { origin: s
       try {
         switch (channel) {
           case "web":
-            return { ok: true, data: { output: await response.text(), newerVersion: newerVersionOf(response) }, at };
+            return {
+              ok: true,
+              data: {
+                output: await response.text(),
+                newerVersion: newerVersionOf(response),
+              },
+              at,
+            };
           case "pdf": {
             const json = (await response.json()) as ApiBase64Response;
-            return { ok: true, data: { output: json.data, newerVersion: newerVersionOf(response, json.newerVersion) }, at };
+            return {
+              ok: true,
+              data: {
+                output: json.data,
+                newerVersion: newerVersionOf(response, json.newerVersion),
+              },
+              at,
+            };
           }
           case "email": {
             const json = (await response.json()) as ApiEmailResponse;
-            const email: EmailOutput = { subject: json.subject, preheader: json.preheader, html: json.html, text: json.text };
-            return { ok: true, data: { output: JSON.stringify(email), newerVersion: newerVersionOf(response, json.newerVersion) }, at };
+            const email: EmailOutput = {
+              subject: json.subject,
+              preheader: json.preheader,
+              html: json.html,
+              text: json.text,
+            };
+            return {
+              ok: true,
+              data: {
+                output: JSON.stringify(email),
+                newerVersion: newerVersionOf(response, json.newerVersion),
+              },
+              at,
+            };
           }
           // Kept as the JSON the API sent, without newerVersion.
           case "push": {
-            const { newerVersion, ...push } = (await response.json()) as ApiPushResponse;
-            return { ok: true, data: { output: JSON.stringify(push), newerVersion: newerVersionOf(response, newerVersion) }, at };
+            const { newerVersion, ...push } =
+              (await response.json()) as ApiPushResponse;
+            return {
+              ok: true,
+              data: {
+                output: JSON.stringify(push),
+                newerVersion: newerVersionOf(response, newerVersion),
+              },
+              at,
+            };
           }
           case "sms": {
-            const { newerVersion, ...sms } = (await response.json()) as ApiSmsResponse;
-            return { ok: true, data: { output: JSON.stringify(sms), newerVersion: newerVersionOf(response, newerVersion) }, at };
+            const { newerVersion, ...sms } =
+              (await response.json()) as ApiSmsResponse;
+            return {
+              ok: true,
+              data: {
+                output: JSON.stringify(sms),
+                newerVersion: newerVersionOf(response, newerVersion),
+              },
+              at,
+            };
           }
           default:
             return assertNever(channel, "channel");
         }
       } catch {
-        return { ok: false, error: { status: response.status, code: "bad_response", message: "Stencil's render answer couldn't be read." }, at };
+        return {
+          ok: false,
+          error: {
+            status: response.status,
+            code: "bad_response",
+            message: "Stencil's render answer couldn't be read.",
+          },
+          at,
+        };
       }
     },
   };

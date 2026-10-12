@@ -24,7 +24,10 @@ export function SettingsNavList({
   const groups = visibleGroups(access);
 
   return (
-    <nav aria-label="Settings sections" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-7 pb-5 max-[56.25rem]:px-3">
+    <nav
+      aria-label="Settings sections"
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-7 pb-5 max-[56.25rem]:px-3"
+    >
       <div className="flex flex-col gap-7">
         {groups.map((group) => (
           <div key={group.key}>
@@ -57,13 +60,17 @@ export function SettingsNavList({
                         strokeWidth={NAV_ICON_STROKE}
                         className="relative size-5 text-text-muted"
                       />
-                      <span className="relative flex-1 truncate">{section.label}</span>
+                      <span className="relative flex-1 truncate">
+                        {section.label}
+                      </span>
                       {trails[section.key] ? (
                         // Muted on the plain nav; full strength on the selected and hover fills (contrast).
                         <span
                           className={cn(
                             "relative text-[13px] font-normal tabular-nums",
-                            isActive ? "text-text" : "text-text-muted group-hover:text-text",
+                            isActive
+                              ? "text-text"
+                              : "text-text-muted group-hover:text-text",
                           )}
                         >
                           {trails[section.key]}
@@ -77,7 +84,9 @@ export function SettingsNavList({
           </div>
         ))}
       </div>
-      <p className="mt-auto px-3 pt-6 text-[13px] text-text-muted">Stencil · v0.1</p>
+      <p className="mt-auto px-3 pt-6 text-[13px] text-text-muted">
+        Stencil · v0.1
+      </p>
     </nav>
   );
 }

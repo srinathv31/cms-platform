@@ -1,13 +1,41 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useMemo, useOptimistic, useRef, useState } from "react";
-import { DOCUMENT_THREAD, type ActionResult, type Person } from "@/domain/review-types";
-import { addComment, reopenThread, reply, resolveThread } from "@/server/actions/comments";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+} from "react";
+import {
+  DOCUMENT_THREAD,
+  type ActionResult,
+  type Person,
+} from "@/domain/review-types";
+import {
+  addComment,
+  reopenThread,
+  reply,
+  resolveThread,
+} from "@/server/actions/comments";
 import { cn } from "@/lib/utils";
 import type { CommentView, ThreadView } from "@/server/queries/threads";
 import { revealInScroller } from "./reveal";
-import { ComposeCard, ResolvedGroup, ThreadCard, type Outcome } from "./thread-card";
-import { groupThreads, isOptimistic, optimisticId, reduceThreads, type ThreadMutation } from "./thread-state";
+import {
+  ComposeCard,
+  ResolvedGroup,
+  ThreadCard,
+  type Outcome,
+} from "./thread-card";
+import {
+  groupThreads,
+  isOptimistic,
+  optimisticId,
+  reduceThreads,
+  type ThreadMutation,
+} from "./thread-state";
 import type { ComposerState } from "./use-review-threads";
 
 const UNREACHABLE = "Couldn't reach the server. Try again.";
@@ -135,7 +163,8 @@ export function ThreadList({
   const askFocus = (find: FocusRequest["find"], frames = 0) => {
     const active = document.activeElement;
     // <body> isn't a control that goes away: with nothing focused there is nothing to wait for.
-    const from = active instanceof HTMLElement && active !== document.body ? active : null;
+    const from =
+      active instanceof HTMLElement && active !== document.body ? active : null;
     pending.current = { find, from, until: Date.now() + FOCUS_WAIT, frames };
   };
   useEffect(() => {
@@ -170,12 +199,18 @@ export function ThreadList({
   });
 
   const byThread = (threadId: string) =>
-    Array.from(root.current?.querySelectorAll<HTMLElement>("[data-thread]") ?? []).find((el) => el.dataset.thread === threadId) ?? null;
-  const resolvedToggle = () => root.current?.querySelector<HTMLElement>('[data-slot="resolved-toggle"]') ?? null;
+    Array.from(
+      root.current?.querySelectorAll<HTMLElement>("[data-thread]") ?? [],
+    ).find((el) => el.dataset.thread === threadId) ?? null;
+  const resolvedToggle = () =>
+    root.current?.querySelector<HTMLElement>('[data-slot="resolved-toggle"]') ??
+    null;
   /** A card's way in: its Reply, else its open reply box, else the card. */
   const wayIn = (threadId: string) => {
     const card = byThread(threadId);
-    return card?.querySelector<HTMLElement>('[data-slot="reply"], textarea') ?? card;
+    return (
+      card?.querySelector<HTMLElement>('[data-slot="reply"], textarea') ?? card
+    );
   };
 
   /** Applies `mutation` now and asks the server; resolves with what it answered once it has. */
@@ -220,7 +255,12 @@ export function ThreadList({
       createdAt: stamp(),
     };
     clearRefusal(threadId);
-    return settle(threadId, await run({ type: "reply", threadId, comment }, () => reply({ threadId, body })));
+    return settle(
+      threadId,
+      await run({ type: "reply", threadId, comment }, () =>
+        reply({ threadId, body }),
+      ),
+    );
   };
 
   const onResolve = async (threadId: string): Promise<Outcome> => {
@@ -228,21 +268,46 @@ export function ThreadList({
     clearRefusal(threadId);
     // The Resolve button goes with the card (it moves to the collapsed group): focus moves to the next open
     // card's Reply (the one before it when this was the last), or to "Resolved (N)" when none are left.
-    const open = Array.from(root.current?.querySelectorAll<HTMLElement>('[data-thread][data-status="open"]') ?? []).filter(
-      (el) => el.dataset.thread !== threadId && !isOptimistic(el.dataset.thread ?? ""),
+    const open = Array.from(
+      root.current?.querySelectorAll<HTMLElement>(
+        '[data-thread][data-status="open"]',
+      ) ?? [],
+    ).filter(
+      (el) =>
+        el.dataset.thread !== threadId &&
+        !isOptimistic(el.dataset.thread ?? ""),
     );
     const own = byThread(threadId);
-    const next = open.find((el) => own && own.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) ?? open.at(-1);
-    askFocus(() => (next?.dataset.thread ? wayIn(next.dataset.thread) : null) ?? resolvedToggle());
-    const mutation: ThreadMutation = { type: "resolve", threadId, by: me, at: stamp() };
-    return settle(threadId, await run(mutation, () => resolveThread({ threadId })));
+    const next =
+      open.find(
+        (el) =>
+          own &&
+          own.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ) ?? open.at(-1);
+    askFocus(
+      () =>
+        (next?.dataset.thread ? wayIn(next.dataset.thread) : null) ??
+        resolvedToggle(),
+    );
+    const mutation: ThreadMutation = {
+      type: "resolve",
+      threadId,
+      by: me,
+      at: stamp(),
+    };
+    return settle(
+      threadId,
+      await run(mutation, () => resolveThread({ threadId })),
+    );
   };
 
   const onReopen = async (threadId: string): Promise<Outcome> => {
     clearRefusal(threadId);
     // Reopen goes with the card (it moves back among the open ones): focus follows the card.
     askFocus(() => byThread(threadId));
-    const result = await run({ type: "reopen", threadId }, () => reopenThread({ threadId }));
+    const result = await run({ type: "reopen", threadId }, () =>
+      reopenThread({ threadId }),
+    );
     if (result.ok) onActivate(threadId);
     return settle(threadId, result);
   };
@@ -259,12 +324,24 @@ export function ThreadList({
       originRound: null,
       originLabel: null,
       comments: [
-        { id: optimisticId("comment", ++counter.current), author: me, body, kind: "comment", createdAt: stamp() },
+        {
+          id: optimisticId("comment", ++counter.current),
+          author: me,
+          body,
+          kind: "comment",
+          createdAt: stamp(),
+        },
       ],
       orphaned: false,
     };
     const result = await run({ type: "add", thread, blockPosition }, () =>
-      addComment({ templateId, versionId, blockId, quote: quote ?? null, body }),
+      addComment({
+        templateId,
+        versionId,
+        blockId,
+        quote: quote ?? null,
+        body,
+      }),
     );
     if (!result.ok) return result.reason;
     composer.onDraftChange?.("");
@@ -279,7 +356,8 @@ export function ThreadList({
   const onCancel = () => {
     const opener = composer?.opener ?? null;
     askFocus(() => {
-      if (opener?.isConnected && opener.getClientRects().length > 0) return opener.closest(".ProseMirror") ? null : opener;
+      if (opener?.isConnected && opener.getClientRects().length > 0)
+        return opener.closest(".ProseMirror") ? null : opener;
       return root.current; // the opener is gone with the box: the list itself
     }, 2);
     onComposerClose("cancelled");
@@ -288,15 +366,22 @@ export function ThreadList({
   // The document asked for a thread (a marker, a quote): bring its card into view.
   useEffect(() => {
     if (!activeThreadId) return;
-    const cards = root.current?.querySelectorAll<HTMLElement>("[data-thread]") ?? [];
-    revealInScroller(Array.from(cards).find((el) => el.dataset.thread === activeThreadId));
+    const cards =
+      root.current?.querySelectorAll<HTMLElement>("[data-thread]") ?? [];
+    revealInScroller(
+      Array.from(cards).find((el) => el.dataset.thread === activeThreadId),
+    );
   }, [activeThreadId]);
 
   // A composer opened (the Comment button): it is at the top, so show the top.
-  const composerKey = composer ? `${composer.blockId}:${composer.quote ?? ""}` : null;
+  const composerKey = composer
+    ? `${composer.blockId}:${composer.quote ?? ""}`
+    : null;
   useEffect(() => {
     if (composerKey === null) return;
-    revealInScroller(root.current?.querySelector<HTMLElement>("[data-compose]"));
+    revealInScroller(
+      root.current?.querySelector<HTMLElement>("[data-compose]"),
+    );
   }, [composerKey]);
 
   const groups = useMemo(() => groupThreads(shown), [shown]);
@@ -307,7 +392,11 @@ export function ThreadList({
       active={thread.id === activeThreadId}
       canComment={canComment}
       nowMs={nowMs}
-      snippet={thread.quote || thread.blockId === DOCUMENT_THREAD || thread.orphaned ? null : (blockText?.(thread.blockId) ?? null)}
+      snippet={
+        thread.quote || thread.blockId === DOCUMENT_THREAD || thread.orphaned
+          ? null
+          : (blockText?.(thread.blockId) ?? null)
+      }
       onSelect={
         selectable
           ? () => {
@@ -322,7 +411,8 @@ export function ThreadList({
       onClearRefusal={() => clearRefusal(thread.id)}
     />
   );
-  const openCards = groups.document.length + groups.anchored.length + groups.orphaned.length;
+  const openCards =
+    groups.document.length + groups.anchored.length + groups.orphaned.length;
 
   return (
     <div
@@ -339,7 +429,9 @@ export function ThreadList({
           key={composerKey}
           anchor={composer}
           author={me}
-          snippet={composer.quote ? null : (blockText?.(composer.blockId) ?? null)}
+          snippet={
+            composer.quote ? null : (blockText?.(composer.blockId) ?? null)
+          }
           draft={composer.draft}
           onDraftChange={composer.onDraftChange}
           onSubmit={onCompose}
@@ -349,13 +441,20 @@ export function ThreadList({
       {groups.document.map((thread) => card(thread, false))}
       {groups.anchored.map((thread) => card(thread, true))}
       {groups.orphaned.length > 0 ? (
-        <section aria-label="Comments on removed content" className="flex flex-col gap-3 pt-1">
-          <h3 className="text-[13px] leading-5 font-normal text-text-subtle">On removed content</h3>
+        <section
+          aria-label="Comments on removed content"
+          className="flex flex-col gap-3 pt-1"
+        >
+          <h3 className="text-[13px] leading-5 font-normal text-text-subtle">
+            On removed content
+          </h3>
           {groups.orphaned.map((thread) => card(thread, false))}
         </section>
       ) : null}
       {openCards === 0 && !composer ? (
-        <p className="text-[14px] leading-6 text-text-muted">No open comments.</p>
+        <p className="text-[14px] leading-6 text-text-muted">
+          No open comments.
+        </p>
       ) : null}
       <ResolvedGroup
         count={groups.resolved.length}

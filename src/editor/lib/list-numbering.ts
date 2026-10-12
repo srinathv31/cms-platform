@@ -12,7 +12,11 @@ import { closeHistory } from "@tiptap/pm/history";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import { listStart, orderedDepthAt, storedNumbering } from "../extensions/list-markers";
+import {
+  listStart,
+  orderedDepthAt,
+  storedNumbering,
+} from "../extensions/list-markers";
 import {
   NUMBERING_STYLES,
   ORDERED_LIST_ATTRS,
@@ -32,11 +36,16 @@ export interface NumberingTarget {
 
 function target(doc: PMNode, pos: number): NumberingTarget | null {
   const node = doc.nodeAt(pos);
-  return node?.type.name === "orderedList" ? { pos, node, orderedDepth: orderedDepthAt(doc, pos) } : null;
+  return node?.type.name === "orderedList"
+    ? { pos, node, orderedDepth: orderedDepthAt(doc, pos) }
+    : null;
 }
 
 /** The innermost numbered list around the caret, or null. With `stopAtTable`, null when a table is nearer. */
-function listAround(state: EditorState, stopAtTable: boolean): NumberingTarget | null {
+function listAround(
+  state: EditorState,
+  stopAtTable: boolean,
+): NumberingTarget | null {
   const { $head } = state.selection;
   for (let d = $head.depth; d > 0; d--) {
     const name = $head.node(d).type.name;
@@ -47,7 +56,10 @@ function listAround(state: EditorState, stopAtTable: boolean): NumberingTarget |
 }
 
 /** The numbered list the block menu of the block at `blockPos` acts on, or null when it has none. */
-export function numberingTarget(state: EditorState, blockPos: number): NumberingTarget | null {
+export function numberingTarget(
+  state: EditorState,
+  blockPos: number,
+): NumberingTarget | null {
   const block = state.doc.nodeAt(blockPos);
   if (!block) return null;
   const { head } = state.selection;
@@ -69,11 +81,14 @@ export function numberingTarget(state: EditorState, blockPos: number): Numbering
  * Where the keyboard opens the block menu (Alt+F10): the caret's top-level block, unless the caret
  * is in a table and not in a numbered list inside it (there Alt+F10 is the table control's).
  */
-export function keyboardBlockAt(state: EditorState): { blockPos: number; target: NumberingTarget | null } | null {
+export function keyboardBlockAt(
+  state: EditorState,
+): { blockPos: number; target: NumberingTarget | null } | null {
   const { $head } = state.selection;
   if ($head.depth < 1) return null;
   let inTable = false;
-  for (let d = $head.depth; d > 0; d--) if ($head.node(d).type.name === "table") inTable = true;
+  for (let d = $head.depth; d > 0; d--)
+    if ($head.node(d).type.name === "table") inTable = true;
   if (inTable && !listAround(state, true)) return null;
   const blockPos = $head.before(1);
   return { blockPos, target: numberingTarget(state, blockPos) };
@@ -83,7 +98,9 @@ export function keyboardBlockAt(state: EditorState): { blockPos: number; target:
 
 /** The first three markers of a style, as the menu previews it: "1. 2. 3.", "(a) (b) (c)". */
 export function numberingPreview(style: NumberingStyle): string {
-  return [1, 2, 3].map((n) => formatMarker(n, style.format, style.delimiter)).join(" ");
+  return [1, 2, 3]
+    .map((n) => formatMarker(n, style.format, style.delimiter))
+    .join(" ");
 }
 
 /** The style a list nobody styled has at this ordered depth (what "Default" means there). */
@@ -100,7 +117,9 @@ export function numberingValue(style: NumberingStyle | null): string {
 export function currentNumberingValue(list: PMNode): string | null {
   const { format, delimiter } = storedNumbering(list);
   if (format === null && delimiter === null) return "default";
-  const match = NUMBERING_STYLES.find((s) => s.format === format && s.delimiter === delimiter);
+  const match = NUMBERING_STYLES.find(
+    (s) => s.format === format && s.delimiter === delimiter,
+  );
   return match ? numberingValue(match) : null;
 }
 
@@ -123,19 +142,30 @@ export function parseListStart(text: string): number | null {
 // ── Edits ────────────────────────────────────────────────────────
 
 /** Writes attributes on the orderedList at `pos` as one undo step. False when there's nothing to change. */
-function writeList(view: EditorView, pos: number, attrs: Record<string, unknown>): boolean {
+function writeList(
+  view: EditorView,
+  pos: number,
+  attrs: Record<string, unknown>,
+): boolean {
   const node = view.state.doc.nodeAt(pos);
   if (node?.type.name !== "orderedList") return false;
-  const changed = Object.entries(attrs).filter(([name, value]) => node.attrs[name] !== value);
+  const changed = Object.entries(attrs).filter(
+    ([name, value]) => node.attrs[name] !== value,
+  );
   if (changed.length === 0) return false;
   let tr = view.state.tr;
-  for (const [name, value] of changed) tr = tr.setNodeAttribute(pos, name, value);
+  for (const [name, value] of changed)
+    tr = tr.setNodeAttribute(pos, name, value);
   view.dispatch(closeHistory(tr));
   return true;
 }
 
 /** Sets the list's numbering style; null clears it back to the default for its depth. */
-export function setListNumbering(view: EditorView, pos: number, style: NumberingStyle | null): boolean {
+export function setListNumbering(
+  view: EditorView,
+  pos: number,
+  style: NumberingStyle | null,
+): boolean {
   return writeList(view, pos, {
     [ORDERED_LIST_ATTRS.format]: style?.format ?? null,
     [ORDERED_LIST_ATTRS.delimiter]: style?.delimiter ?? null,
@@ -143,7 +173,11 @@ export function setListNumbering(view: EditorView, pos: number, style: Numbering
 }
 
 /** Sets the list's first number (0 to 9999; anything else is refused). */
-export function setListStart(view: EditorView, pos: number, start: number): boolean {
+export function setListStart(
+  view: EditorView,
+  pos: number,
+  start: number,
+): boolean {
   if (!isListStart(start)) return false;
   return writeList(view, pos, { start });
 }

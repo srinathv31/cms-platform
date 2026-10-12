@@ -14,22 +14,45 @@ import {
 } from "@/domain/lifecycle/revoke";
 import { contractBaseline } from "@/domain/lifecycle/baselines";
 import { requestChanges as requestChangesTransition } from "@/domain/lifecycle/request-changes";
-import { setSunset as setSunsetTransition, sunsetPassed } from "@/domain/lifecycle/sunset";
+import {
+  setSunset as setSunsetTransition,
+  sunsetPassed,
+} from "@/domain/lifecycle/sunset";
 import { submit } from "@/domain/lifecycle/submit";
 import { withWriter } from "@/domain/lifecycle/drafts";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import type { ReviewVersion } from "@/domain/lifecycle/types";
-import { REQUEST_REFUSALS, type Refusal, type Refused } from "@/domain/refusals";
+import {
+  REQUEST_REFUSALS,
+  type Refusal,
+  type Refused,
+} from "@/domain/refusals";
 import { OUTPUT_KEYS, type OutputKey } from "@/domain/review-outputs";
-import { DOCUMENT_THREAD, type ActionResult, type ApprovalStage, type LifecycleEffect } from "@/domain/review-types";
+import {
+  DOCUMENT_THREAD,
+  type ActionResult,
+  type ApprovalStage,
+  type LifecycleEffect,
+} from "@/domain/review-types";
 import type { PermissionResource, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
 import { db } from "@/server/db/client";
-import { approvals, commentThreads, comments, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  approvals,
+  commentThreads,
+  comments,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { findRound } from "@/server/queries/find-round";
-import { loadChain, loadDecisions, loadMessageRules, stageApproverIds } from "@/server/queries/review-shared";
+import {
+  loadChain,
+  loadDecisions,
+  loadMessageRules,
+  stageApproverIds,
+} from "@/server/queries/review-shared";
 import { draftRow } from "@/server/templates/create";
 import { check, refuse, serverAction, type CommitContext } from "./kit";
 
@@ -63,14 +86,20 @@ function refreshAfter() {
 }
 
 const TemplateRef = z.object({ templateId: z.string().min(1).max(32) });
-const VersionRef = TemplateRef.extend({ versionNumber: z.number().int().positive() });
+const VersionRef = TemplateRef.extend({
+  versionNumber: z.number().int().positive(),
+});
 /** A decision names the round it decides: the one on the approver's screen, never whichever is newest. */
 const RoundRefInput = VersionRef.extend({ round: z.number().int().positive() });
 
 /** The template, read only to learn its team (and the version's people) for the permission check. */
 async function findTemplate(templateId: string) {
   return db
-    .select({ id: templates.id, teamId: templates.teamId, contentTypeId: templates.contentTypeId })
+    .select({
+      id: templates.id,
+      teamId: templates.teamId,
+      contentTypeId: templates.contentTypeId,
+    })
     .from(templates)
     .where(eq(templates.id, templateId))
     .limit(1)
@@ -82,7 +111,10 @@ async function findTemplate(templateId: string) {
  * one the number's head (`findRound`). The transaction reads it again (`loadVersion`).
  */
 async function findVersion(templateId: string, number: number, round?: number) {
-  const [template, version] = await Promise.all([findTemplate(templateId), findRound(db, templateId, number, round)]);
+  const [template, version] = await Promise.all([
+    findTemplate(templateId),
+    findRound(db, templateId, number, round),
+  ]);
   if (!template || !version) return undefined;
   return {
     templateId: template.id,
@@ -102,17 +134,33 @@ async function findVersion(templateId: string, number: number, round?: number) {
  * users the stage the version waits on names (they decide it on any team). The stage is read again in the
  * transaction.
  */
-async function decideResource(found: FoundVersion | undefined): Promise<PermissionResource> {
+async function decideResource(
+  found: FoundVersion | undefined,
+): Promise<PermissionResource> {
   if (!found) return { teamId: null };
   const named =
-    found.state === "in_review" ? stageApproverIds(currentStageOf(found, await loadChain(db, found.contentTypeId))) : [];
-  return { teamId: found.teamId, submittedBy: found.submittedBy, writers: found.writers, stageApproverIds: named };
+    found.state === "in_review"
+      ? stageApproverIds(
+          currentStageOf(found, await loadChain(db, found.contentTypeId)),
+        )
+      : [];
+  return {
+    teamId: found.teamId,
+    submittedBy: found.submittedBy,
+    writers: found.writers,
+    stageApproverIds: named,
+  };
 }
 
 type FoundVersion = NonNullable<Awaited<ReturnType<typeof findVersion>>>;
 
 /** The version as the transitions read it (a whole row), fresh inside the transaction: as `findVersion` found it. */
-async function loadVersion(tx: Tx, found: FoundVersion, number: number, round?: number) {
+async function loadVersion(
+  tx: Tx,
+  found: FoundVersion,
+  number: number,
+  round?: number,
+) {
   const row = await findRound(tx, found.templateId, number, round);
   if (!row) refuse(REQUEST_REFUSALS.versionGone);
   return row satisfies ReviewVersion;
@@ -121,12 +169,20 @@ async function loadVersion(tx: Tx, found: FoundVersion, number: number, round?: 
 async function activeVersion(tx: Tx, templateId: string) {
   return tx.query.versions.findFirst({
     columns: { id: true, number: true, contractChanges: true },
-    where: and(eq(versions.templateId, templateId), eq(versions.state, "active")),
+    where: and(
+      eq(versions.templateId, templateId),
+      eq(versions.state, "active"),
+    ),
   });
 }
 
 /** The stage's own rule (who it names now), asked of the stage of its own the version waits on. */
-function assertStage(viewer: Viewer, chain: readonly ApprovalStage[], version: ReviewVersion, teamId: string) {
+function assertStage(
+  viewer: Viewer,
+  chain: readonly ApprovalStage[],
+  version: ReviewVersion,
+  teamId: string,
+) {
   if (version.state !== "in_review") return; // the transition refuses with its own sentence
   const stage = currentStageOf(version, chain);
   if (!stage) return;
@@ -141,7 +197,12 @@ function assertStage(viewer: Viewer, chain: readonly ApprovalStage[], version: R
  */
 async function updateVersion(
   tx: Tx,
-  version: { id: string; state: ReviewVersion["state"]; rev: number; currentStage: number },
+  version: {
+    id: string;
+    state: ReviewVersion["state"];
+    rev: number;
+    currentStage: number;
+  },
   set: Partial<typeof versions.$inferInsert>,
   at: Date,
   whenMissed: Refusal,
@@ -161,13 +222,27 @@ async function updateVersion(
   if (!saved) refuse(whenMissed);
 }
 
-function effectContext(viewer: Viewer, found: { teamId: string; templateId: string }, versionId: string, at: Date) {
-  return { at, actorId: viewer.userId, teamId: found.teamId, templateId: found.templateId, versionId };
+function effectContext(
+  viewer: Viewer,
+  found: { teamId: string; templateId: string },
+  versionId: string,
+  at: Date,
+) {
+  return {
+    at,
+    actorId: viewer.userId,
+    teamId: found.teamId,
+    templateId: found.templateId,
+    versionId,
+  };
 }
 
 // ── Submit for review ─────────────────────────────────────────
 
-const SubmitInput = TemplateRef.extend({ note: z.string().nullish(), rev: z.number().int().nonnegative() });
+const SubmitInput = TemplateRef.extend({
+  note: z.string().nullish(),
+  rev: z.number().int().nonnegative(),
+});
 
 /**
  * "Submit v2" (or "Submit v1, round 2" after a send-back): the template's open draft becomes its next
@@ -198,7 +273,8 @@ export async function submitVersion(input: {
       const found = await findTemplate(input.templateId);
       check(viewer, "version.submit", { teamId: found?.teamId ?? null });
       if (!found) refuse(REQUEST_REFUSALS.templateGone);
-      if ((input.note?.trim().length ?? 0) > NOTE_MAX) refuse(REQUEST_REFUSALS.noteTooLong(NOTE_MAX));
+      if ((input.note?.trim().length ?? 0) > NOTE_MAX)
+        refuse(REQUEST_REFUSALS.noteTooLong(NOTE_MAX));
       return found;
     },
     transaction: async (tx, { viewer, input, found, now: at }) => {
@@ -214,8 +290,15 @@ export async function submitVersion(input: {
         .where(eq(versions.templateId, found.id));
 
       const open = list.find((v) => v.state === "draft");
-      if (!open) refuse(list.some((v) => v.state === "in_review") ? REFUSALS.alreadyInReview : REQUEST_REFUSALS.noDraftToSubmit);
-      const draft = await tx.query.versions.findFirst({ where: eq(versions.id, open.id) });
+      if (!open)
+        refuse(
+          list.some((v) => v.state === "in_review")
+            ? REFUSALS.alreadyInReview
+            : REQUEST_REFUSALS.noDraftToSubmit,
+        );
+      const draft = await tx.query.versions.findFirst({
+        where: eq(versions.id, open.id),
+      });
       if (!draft) refuse(REQUEST_REFUSALS.noDraftToSubmit);
 
       const baselineId = contractBaseline(list, at)?.id;
@@ -267,7 +350,10 @@ export async function submitVersion(input: {
       // open whole-version threads resolve as the submitter's, recording the round that answered them.
       // Block comments stay as they are; the author resolves those one by one.
       const answered = await tx
-        .select({ id: commentThreads.id, originVersionId: commentThreads.originVersionId })
+        .select({
+          id: commentThreads.id,
+          originVersionId: commentThreads.originVersionId,
+        })
         .from(commentThreads)
         .where(
           and(
@@ -279,8 +365,17 @@ export async function submitVersion(input: {
       if (answered.length > 0) {
         await tx
           .update(commentThreads)
-          .set({ status: "resolved", resolvedBy: viewer.userId, resolvedAt: at })
-          .where(inArray(commentThreads.id, answered.map((t) => t.id)));
+          .set({
+            status: "resolved",
+            resolvedBy: viewer.userId,
+            resolvedAt: at,
+          })
+          .where(
+            inArray(
+              commentThreads.id,
+              answered.map((t) => t.id),
+            ),
+          );
       }
       const answeredEffects: LifecycleEffect[] = answered.map((t) => ({
         kind: "audit",
@@ -298,7 +393,12 @@ export async function submitVersion(input: {
       await writeEffects(
         tx,
         [...effects, ...answeredEffects],
-        effectContext(viewer, { teamId: found.teamId, templateId: found.id }, draft.id, at),
+        effectContext(
+          viewer,
+          { teamId: found.teamId, templateId: found.id },
+          draft.id,
+          at,
+        ),
       );
       return { ok: true, number: changes.number, round: changes.round };
     },
@@ -326,14 +426,24 @@ export async function requestChanges(input: {
   return serverAction(input, {
     input: RequestChangesInput,
     authorize: async ({ viewer, input }) => {
-      const found = await findVersion(input.templateId, input.versionNumber, input.round);
+      const found = await findVersion(
+        input.templateId,
+        input.versionNumber,
+        input.round,
+      );
       check(viewer, "version.decide", await decideResource(found));
       if (!found) refuse(REQUEST_REFUSALS.versionGone);
-      if (input.reason.trim().length > REASON_MAX) refuse(REQUEST_REFUSALS.reasonTooLong(REASON_MAX));
+      if (input.reason.trim().length > REASON_MAX)
+        refuse(REQUEST_REFUSALS.reasonTooLong(REASON_MAX));
       return found;
     },
     transaction: async (tx, { viewer, input, found, now: at }) => {
-      const version = await loadVersion(tx, found, input.versionNumber, input.round);
+      const version = await loadVersion(
+        tx,
+        found,
+        input.versionNumber,
+        input.round,
+      );
       const chain = await loadChain(tx, found.contentTypeId);
       assertStage(viewer, chain, version, found.teamId);
 
@@ -348,8 +458,16 @@ export async function requestChanges(input: {
       });
       if (!outcome.ok) refuse(outcome);
 
-      await updateVersion(tx, version, { state: outcome.changes.state }, at, REFUSALS.notInReview);
-      await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
+      await updateVersion(
+        tx,
+        version,
+        { state: outcome.changes.state },
+        at,
+        REFUSALS.notInReview,
+      );
+      await tx
+        .insert(approvals)
+        .values({ id: newId("ap"), ...outcome.approval });
 
       // A template has at most one open draft. There is none while a version is in review, but if one
       // exists the author keeps working in it rather than the request failing. It takes on the returned
@@ -357,16 +475,29 @@ export async function requestChanges(input: {
       // touched, so `rev` stays and an autosave in flight still lands.
       const openDraft = await tx.query.versions.findFirst({
         columns: { id: true, writers: true },
-        where: and(eq(versions.templateId, found.templateId), eq(versions.state, "draft")),
+        where: and(
+          eq(versions.templateId, found.templateId),
+          eq(versions.state, "draft"),
+        ),
       });
       if (!openDraft) {
-        await tx.insert(versions).values(draftRow(outcome.newDraft, { id: newId("v"), templateId: found.templateId }));
+        await tx.insert(versions).values(
+          draftRow(outcome.newDraft, {
+            id: newId("v"),
+            templateId: found.templateId,
+          }),
+        );
       } else {
-        const writers = outcome.newDraft.writers.reduce((all, userId) => withWriter(all, userId), openDraft.writers);
+        const writers = outcome.newDraft.writers.reduce(
+          (all, userId) => withWriter(all, userId),
+          openDraft.writers,
+        );
         await tx
           .update(versions)
           .set({ writers })
-          .where(and(eq(versions.id, openDraft.id), eq(versions.state, "draft")));
+          .where(
+            and(eq(versions.id, openDraft.id), eq(versions.state, "draft")),
+          );
       }
 
       const threadId = newId("th");
@@ -388,7 +519,11 @@ export async function requestChanges(input: {
         createdAt: at,
       });
 
-      await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
+      await writeEffects(
+        tx,
+        outcome.effects,
+        effectContext(viewer, found, version.id, at),
+      );
       return { ok: true };
     },
     after: refreshAfter,
@@ -424,19 +559,31 @@ export async function approveVersion(input: {
   sunsetPrevious?: string | null;
   sampleSetsSeen: string[];
   outputsViewed: readonly OutputKey[];
-}): Promise<ActionResult<{ wentLive: boolean; number: number; round: number }>> {
+}): Promise<
+  ActionResult<{ wentLive: boolean; number: number; round: number }>
+> {
   return serverAction(input, {
     input: ApproveInput,
     authorize: async ({ viewer, input }) => {
-      const found = await findVersion(input.templateId, input.versionNumber, input.round);
+      const found = await findVersion(
+        input.templateId,
+        input.versionNumber,
+        input.round,
+      );
       check(viewer, "version.decide", await decideResource(found));
       if (!found) refuse(REQUEST_REFUSALS.versionGone);
       // A calendar day; the transition reads it in the business time zone (00:00 there ends renders).
-      if (input.sunsetPrevious && !isCalendarDay(input.sunsetPrevious)) refuse(REQUEST_REFUSALS.invalidDate);
+      if (input.sunsetPrevious && !isCalendarDay(input.sunsetPrevious))
+        refuse(REQUEST_REFUSALS.invalidDate);
       return found;
     },
     transaction: async (tx, { viewer, input, found, now: at }) => {
-      const version = await loadVersion(tx, found, input.versionNumber, input.round);
+      const version = await loadVersion(
+        tx,
+        found,
+        input.versionNumber,
+        input.round,
+      );
       const chain = await loadChain(tx, found.contentTypeId);
       assertStage(viewer, chain, version, found.teamId);
       const active = await activeVersion(tx, found.templateId);
@@ -447,13 +594,17 @@ export async function approveVersion(input: {
         actorId: viewer.userId,
         actorName: viewer.name,
         now: at,
-        active: active && active.id !== version.id && active.number !== null ? { id: active.id, number: active.number } : null,
+        active:
+          active && active.id !== version.id && active.number !== null
+            ? { id: active.id, number: active.number }
+            : null,
         sunsetPrevious: input.sunsetPrevious || null,
         zone: await readBusinessZone(tx),
         sampleSetsSeen: input.sampleSetsSeen,
         outputsViewed: input.outputsViewed,
         templateName: version.name,
-        decisions: (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
+        decisions:
+          (await loadDecisions(tx, [version.id])).get(version.id) ?? [],
       });
       if (!outcome.ok) refuse(outcome);
 
@@ -461,8 +612,17 @@ export async function approveVersion(input: {
       if (outcome.previous) {
         const [superseded] = await tx
           .update(versions)
-          .set({ ...outcome.previous.changes, rev: sql`${versions.rev} + 1`, updatedAt: at })
-          .where(and(eq(versions.id, outcome.previous.id), eq(versions.state, "active")))
+          .set({
+            ...outcome.previous.changes,
+            rev: sql`${versions.rev} + 1`,
+            updatedAt: at,
+          })
+          .where(
+            and(
+              eq(versions.id, outcome.previous.id),
+              eq(versions.state, "active"),
+            ),
+          )
           .returning({ id: versions.id });
         if (!superseded) refuse(REQUEST_REFUSALS.activeChanged);
       }
@@ -479,9 +639,20 @@ export async function approveVersion(input: {
         at,
         REFUSALS.notInReview,
       );
-      await tx.insert(approvals).values({ id: newId("ap"), ...outcome.approval });
-      await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
-      return { ok: true, wentLive: outcome.wentLive, number: version.number!, round: version.round! };
+      await tx
+        .insert(approvals)
+        .values({ id: newId("ap"), ...outcome.approval });
+      await writeEffects(
+        tx,
+        outcome.effects,
+        effectContext(viewer, found, version.id, at),
+      );
+      return {
+        ok: true,
+        wentLive: outcome.wentLive,
+        number: version.number!,
+        round: version.round!,
+      };
     },
     after: refreshAfter,
   });
@@ -519,8 +690,15 @@ export async function setSunset(input: {
       const sunsetDay = input.sunsetAt;
       const version = await loadVersion(tx, found, input.versionNumber);
       const zone = await readBusinessZone(tx);
-      const unchanged = version.sunsetAt?.getTime() === sunsetInstant(sunsetDay, zone).getTime();
-      if (version.state === "superseded" && unchanged && !sunsetPassed(version, at)) return { ok: true };
+      const unchanged =
+        version.sunsetAt?.getTime() ===
+        sunsetInstant(sunsetDay, zone).getTime();
+      if (
+        version.state === "superseded" &&
+        unchanged &&
+        !sunsetPassed(version, at)
+      )
+        return { ok: true };
       const active = await activeVersion(tx, found.templateId);
 
       const outcome = setSunsetTransition({
@@ -535,8 +713,18 @@ export async function setSunset(input: {
       });
       if (!outcome.ok) refuse(outcome);
 
-      await updateVersion(tx, version, outcome.changes, at, REFUSALS.sunsetNotSuperseded);
-      await writeEffects(tx, outcome.effects, effectContext(viewer, found, version.id, at));
+      await updateVersion(
+        tx,
+        version,
+        outcome.changes,
+        at,
+        REFUSALS.sunsetNotSuperseded,
+      );
+      await writeEffects(
+        tx,
+        outcome.effects,
+        effectContext(viewer, found, version.id, at),
+      );
       wrote = true;
       return { ok: true };
     },
@@ -562,7 +750,8 @@ export async function startRevoke(input: {
       const found = await findVersion(input.templateId, input.versionNumber);
       check(viewer, "version.revoke.start", { teamId: found?.teamId ?? null });
       if (!found) refuse(REQUEST_REFUSALS.versionGone);
-      if (input.reason.trim().length > REASON_MAX) refuse(REQUEST_REFUSALS.reasonTooLong(REASON_MAX));
+      if (input.reason.trim().length > REASON_MAX)
+        refuse(REQUEST_REFUSALS.reasonTooLong(REASON_MAX));
       return found;
     },
     transaction: revokeStep((version, { viewer, input, now: at }) =>
@@ -580,14 +769,20 @@ export async function startRevoke(input: {
 }
 
 /** A different approver confirms the revoke: the version is Revoked and its renders fail at once. */
-export async function confirmRevoke(input: { templateId: string; versionNumber: number }): Promise<ActionResult> {
+export async function confirmRevoke(input: {
+  templateId: string;
+  versionNumber: number;
+}): Promise<ActionResult> {
   return serverAction(input, {
     input: VersionRef,
     authorize: async ({ viewer, input }) => {
       const found = await findVersion(input.templateId, input.versionNumber);
       check(viewer, "version.revoke.confirm", {
         teamId: found?.teamId ?? null,
-        revokeStartedBy: found?.revoke && !found.revoke.confirmedAt ? found.revoke.startedBy : null,
+        revokeStartedBy:
+          found?.revoke && !found.revoke.confirmedAt
+            ? found.revoke.startedBy
+            : null,
       });
       if (!found) refuse(REQUEST_REFUSALS.versionGone);
       return found;
@@ -612,7 +807,10 @@ export async function confirmRevoke(input: { templateId: string; versionNumber: 
  * or another approver declining to confirm. Cancelling returns to the safe state (the version keeps
  * rendering), so the two-person rule that guards confirming doesn't apply.
  */
-export async function cancelRevoke(input: { templateId: string; versionNumber: number }): Promise<ActionResult> {
+export async function cancelRevoke(input: {
+  templateId: string;
+  versionNumber: number;
+}): Promise<ActionResult> {
   return serverAction(input, {
     input: VersionRef,
     authorize: async ({ viewer, input }) => {
@@ -629,7 +827,11 @@ export async function cancelRevoke(input: { templateId: string; versionNumber: n
 }
 
 type RevokeOutcome =
-  | { ok: true; changes: Partial<Pick<typeof versions.$inferInsert, "state" | "revoke">>; effects: LifecycleEffect[] }
+  | {
+      ok: true;
+      changes: Partial<Pick<typeof versions.$inferInsert, "state" | "revoke">>;
+      effects: LifecycleEffect[];
+    }
   | Refused;
 
 /** The three revoke steps share their transaction: read, transition, compare-and-set, effects. */
@@ -640,12 +842,25 @@ function revokeStep<I extends { versionNumber: number }>(
     tx: Tx,
   ) => RevokeOutcome | Promise<RevokeOutcome>,
 ) {
-  return async (tx: Tx, ctx: CommitContext<I, FoundVersion>): Promise<ActionResult> => {
+  return async (
+    tx: Tx,
+    ctx: CommitContext<I, FoundVersion>,
+  ): Promise<ActionResult> => {
     const version = await loadVersion(tx, ctx.found, ctx.input.versionNumber);
     const outcome = await transition(version, ctx, tx);
     if (!outcome.ok) refuse(outcome);
-    await updateVersion(tx, version, outcome.changes, ctx.now, REFUSALS.noRevokePending);
-    await writeEffects(tx, outcome.effects, effectContext(ctx.viewer, ctx.found, version.id, ctx.now));
+    await updateVersion(
+      tx,
+      version,
+      outcome.changes,
+      ctx.now,
+      REFUSALS.noRevokePending,
+    );
+    await writeEffects(
+      tx,
+      outcome.effects,
+      effectContext(ctx.viewer, ctx.found, version.id, ctx.now),
+    );
     return { ok: true };
   };
 }

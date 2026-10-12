@@ -1,6 +1,13 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, useTransition, type RefObject } from "react";
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type RefObject,
+} from "react";
 import { unstable_rethrow } from "next/navigation";
 import { TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -8,14 +15,26 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { NARROW_BODY, NARROW_BUTTON, NARROW_FOOTER, NARROW_REFUSAL, NARROW_SHELL, ScrimDialogContent } from "@/components/app-shell/scrim-dialog";
+import {
+  NARROW_BODY,
+  NARROW_BUTTON,
+  NARROW_FOOTER,
+  NARROW_REFUSAL,
+  NARROW_SHELL,
+  ScrimDialogContent,
+} from "@/components/app-shell/scrim-dialog";
 import { NameChangeLine } from "@/components/redline/name-change";
 import { ChannelSelector } from "@/components/workspace/content/channels";
 import { BreakingBadge } from "@/components/review-queue/breaking-badge";
 import { nameChange } from "@/domain/redline/document";
 import type { ActionResult } from "@/domain/review-types";
 import { versionLabel } from "@/domain/rounds";
-import { contractSection, splitCode, splitKeys, type ContractLine } from "./contract-lines";
+import {
+  contractSection,
+  splitCode,
+  splitKeys,
+  type ContractLine,
+} from "./contract-lines";
 import type { SubmitSummary } from "@/domain/submit-types";
 
 const SUBMIT_FAILED = "Couldn't submit. Try again.";
@@ -33,7 +52,10 @@ function ContractRow({ line }: { line: ContractLine }) {
         line.breaking ? "bg-warning-soft text-warning-text" : "text-text-muted",
       )}
     >
-      <span aria-hidden className="mt-[3px] grid size-3.5 shrink-0 place-items-center">
+      <span
+        aria-hidden
+        className="mt-[3px] grid size-3.5 shrink-0 place-items-center"
+      >
         {line.breaking ? (
           <TriangleAlert strokeWidth={2} className="size-3.5" />
         ) : (
@@ -56,7 +78,15 @@ function ContractRow({ line }: { line: ContractLine }) {
   );
 }
 
-function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+function Section({
+  title,
+  aside,
+  children,
+}: {
+  title: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex min-h-[22px] items-center justify-between gap-3">
@@ -76,7 +106,9 @@ export interface SubmitDialogProps {
   /** Where focus goes when the dialog closes without submitting: the button that opened it. */
   finalFocus: RefObject<HTMLElement | null>;
   /** Submits the version with the note (undefined when it is blank). */
-  onSubmit: (note: string | undefined) => Promise<ActionResult<{ number: number }>>;
+  onSubmit: (
+    note: string | undefined,
+  ) => Promise<ActionResult<{ number: number }>>;
   /** Reads the summary again (the host passes the new one in as `summary`): after the draft changed under this one. */
   onRefresh: () => Promise<ActionResult>;
 }
@@ -102,7 +134,14 @@ export interface SubmitDialogProps {
  * page, and the next Tab would leave the dialog for the sidebar. The note is read-only and the buttons
  * are `aria-disabled` (`focusableWhenDisabled`), so after a refusal focus is still where it was.
  */
-export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit, onRefresh }: SubmitDialogProps) {
+export function SubmitDialog({
+  summary,
+  open,
+  onOpenChange,
+  finalFocus,
+  onSubmit,
+  onRefresh,
+}: SubmitDialogProps) {
   const [note, setNote] = useState("");
   const [reason, setReason] = useState<string | null>(null);
   // The draft has changed since `summary` was read: the one black button refreshes it instead of submitting.
@@ -114,14 +153,25 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
   const contract = useMemo(
     () =>
       summary
-        ? contractSection({ baseline: summary.baseline, variables: summary.variables, versionNumber: summary.number })
+        ? contractSection({
+            baseline: summary.baseline,
+            variables: summary.variables,
+            versionNumber: summary.number,
+          })
         : null,
     [summary],
   );
   // What the submission will be: "v3", or "v1, round 2" for the next round of a version sent back.
-  const label = summary ? versionLabel({ number: summary.number, round: summary.round, state: "in_review" }, { style: "sentence" }) : "";
+  const label = summary
+    ? versionLabel(
+        { number: summary.number, round: summary.round, state: "in_review" },
+        { style: "sentence" },
+      )
+    : "";
   // A rename goes live with the version, so it is listed with what is about to be frozen.
-  const rename = summary ? nameChange(summary.baseline?.name, summary.name) : null;
+  const rename = summary
+    ? nameChange(summary.baseline?.name, summary.name)
+    : null;
 
   function close() {
     // Closing mid-submit would hide the outcome.
@@ -173,33 +223,60 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
   const primary = stale ? refresh : submit;
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+    >
       <ScrimDialogContent
         initialFocus={noteRef}
         finalFocus={finalFocus}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
+          if (
+            event.key === "Enter" &&
+            (event.metaKey || event.ctrlKey) &&
+            !event.nativeEvent.isComposing
+          ) {
             event.preventDefault();
             primary();
           }
         }}
-        className={cn("flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col rounded-3xl p-8 sm:max-w-lg", NARROW_SHELL)}
+        className={cn(
+          "flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col rounded-3xl p-8 sm:max-w-lg",
+          NARROW_SHELL,
+        )}
       >
         {summary ? (
           <>
-            <DialogTitle className="display-lg shrink-0">Submit {label} for review</DialogTitle>
+            <DialogTitle className="display-lg shrink-0">
+              Submit {label} for review
+            </DialogTitle>
             <DialogDescription className="mt-2 shrink-0 text-[14px] leading-6 text-text-muted">
-              The version is frozen as it is and sent to your team&rsquo;s approvers.
+              The version is frozen as it is and sent to your team&rsquo;s
+              approvers.
             </DialogDescription>
 
             {/* The scroll area runs out to the dialog's edges (so its scrollbar sits at the edge); the content keeps the 32px. */}
-            <div className={cn("-mx-8 mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-8 pb-1", NARROW_BODY, "max-[26rem]:-mx-5 max-[26rem]:px-5")}>
+            <div
+              className={cn(
+                "-mx-8 mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-8 pb-1",
+                NARROW_BODY,
+                "max-[26rem]:-mx-5 max-[26rem]:px-5",
+              )}
+            >
               <Section title="Channels">
-                <ChannelSelector channels={summary.channels} allowed={summary.channels} editable={false} onChange={noop} />
+                <ChannelSelector
+                  channels={summary.channels}
+                  allowed={summary.channels}
+                  editable={false}
+                  onChange={noop}
+                />
               </Section>
 
               <Section title="Sample data">
-                <ul aria-label="Sample data sets" className="flex flex-wrap gap-x-2 text-[14px] leading-6 text-text">
+                <ul
+                  aria-label="Sample data sets"
+                  className="flex flex-wrap gap-x-2 text-[14px] leading-6 text-text"
+                >
                   {/* The dot trails the name before it, so a wrap never leaves one at the start of a line. */}
                   {summary.sampleSetNames.map((name, index) => (
                     <li key={name} className="flex gap-2">
@@ -221,7 +298,10 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
               ) : null}
 
               {contract ? (
-                <Section title="Contract changes" aside={contract.breaking ? <BreakingBadge /> : null}>
+                <Section
+                  title="Contract changes"
+                  aside={contract.breaking ? <BreakingBadge /> : null}
+                >
                   {contract.lines.length > 0 ? (
                     <ul className="overflow-hidden rounded-xl border border-hairline">
                       {contract.lines.map((line) => (
@@ -229,13 +309,18 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[13px] leading-5 text-text-muted">No contract changes from v{contract.baselineNumber}.</p>
+                    <p className="text-[13px] leading-5 text-text-muted">
+                      No contract changes from v{contract.baselineNumber}.
+                    </p>
                   )}
                 </Section>
               ) : null}
 
               <section className="flex flex-col gap-2">
-                <label htmlFor={noteId} className="caps-label flex min-h-[22px] items-center">
+                <label
+                  htmlFor={noteId}
+                  className="caps-label flex min-h-[22px] items-center"
+                >
                   Note to reviewers
                 </label>
                 <Textarea
@@ -251,9 +336,20 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
               </section>
             </div>
 
-            <div className={cn("mt-7 flex shrink-0 items-center gap-3", NARROW_FOOTER)}>
+            <div
+              className={cn(
+                "mt-7 flex shrink-0 items-center gap-3",
+                NARROW_FOOTER,
+              )}
+            >
               {/* Always in the row (empty until a refusal), so it is announced when the reason arrives. */}
-              <p role="alert" className={cn("min-w-0 flex-1 text-[13px] leading-4 text-danger-text", NARROW_REFUSAL)}>
+              <p
+                role="alert"
+                className={cn(
+                  "min-w-0 flex-1 text-[13px] leading-4 text-danger-text",
+                  NARROW_REFUSAL,
+                )}
+              >
                 {reason
                   ? splitKeys(reason).map((part, index) =>
                       part.code ? (
@@ -266,12 +362,30 @@ export function SubmitDialog({ summary, open, onOpenChange, finalFocus, onSubmit
                     )
                   : null}
               </p>
-              <Button variant="outline" className={cn("px-4", NARROW_BUTTON, PENDING)} onClick={close} disabled={pending} focusableWhenDisabled>
+              <Button
+                variant="outline"
+                className={cn("px-4", NARROW_BUTTON, PENDING)}
+                onClick={close}
+                disabled={pending}
+                focusableWhenDisabled
+              >
                 Cancel
               </Button>
-              <Button className={cn("relative px-4", NARROW_BUTTON, PENDING)} onClick={primary} disabled={pending} focusableWhenDisabled>
-                <span className={cn(pending && "invisible")}>{stale ? "Refresh summary" : `Submit ${label}`}</span>
-                {pending ? <Spinner aria-label={stale ? "Refreshing" : "Submitting"} className="absolute" /> : null}
+              <Button
+                className={cn("relative px-4", NARROW_BUTTON, PENDING)}
+                onClick={primary}
+                disabled={pending}
+                focusableWhenDisabled
+              >
+                <span className={cn(pending && "invisible")}>
+                  {stale ? "Refresh summary" : `Submit ${label}`}
+                </span>
+                {pending ? (
+                  <Spinner
+                    aria-label={stale ? "Refreshing" : "Submitting"}
+                    className="absolute"
+                  />
+                ) : null}
               </Button>
             </div>
           </>

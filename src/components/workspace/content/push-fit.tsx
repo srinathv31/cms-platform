@@ -1,9 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PushPreview, frameSize, type DeviceSettings, type PushContent, type PushMeasure } from "@/components/device";
+import {
+  PushPreview,
+  frameSize,
+  type DeviceSettings,
+  type PushContent,
+  type PushMeasure,
+} from "@/components/device";
 import { monogramOf } from "@/components/preview/phone-output";
-import { channelFieldsFrom, channelFieldsOf, type ChannelFieldValues } from "@/domain/channel-fields";
+import {
+  channelFieldsFrom,
+  channelFieldsOf,
+  type ChannelFieldValues,
+} from "@/domain/channel-fields";
 import { PUSH_PLATFORMS, type PushPlatform } from "@/domain/messages/push";
 import type { LockScreenFit } from "@/domain/messages/truncation";
 import type { MessageTypeRules } from "@/domain/platform-config/limits";
@@ -64,24 +74,47 @@ export function usePushContent({
     const push = resolveMessage(
       { channel: "push", platform: "ios" },
       {
-        fields: channelFieldsFrom({ [TITLE!.id]: title, [SUBTITLE!.id]: subtitle, [BODY!.id]: body }),
+        fields: channelFieldsFrom({
+          [TITLE!.id]: title,
+          [SUBTITLE!.id]: subtitle,
+          [BODY!.id]: body,
+        }),
         variables,
         values: checked.values,
         rules,
       },
     );
-    return { appName, appMark: { monogram: monogramOf(appName) }, ...push, time: "now" };
+    return {
+      appName,
+      appMark: { monogram: monogramOf(appName) },
+      ...push,
+      time: "now",
+    };
   }, [on, title, subtitle, body, variables, values, rules, appName]);
 }
 
 /** The lock screens' fit for `content` (null: nothing to measure), and the hidden phones that measure it. */
-export function usePushFit(content: PushContent | null): { fits: LockScreenFit[]; probe: React.ReactNode } {
-  const [measured, setMeasured] = useState<Partial<Record<PushPlatform, PushMeasure>>>({});
+export function usePushFit(content: PushContent | null): {
+  fits: LockScreenFit[];
+  probe: React.ReactNode;
+} {
+  const [measured, setMeasured] = useState<
+    Partial<Record<PushPlatform, PushMeasure>>
+  >({});
 
   const fits = content
     ? PUSH_PLATFORMS.flatMap((platform) => {
         const fit = measured[platform];
-        return fit ? [{ platform, title: fit.title, subtitle: fit.subtitle, body: fit.body }] : [];
+        return fit
+          ? [
+              {
+                platform,
+                title: fit.title,
+                subtitle: fit.subtitle,
+                body: fit.body,
+              },
+            ]
+          : [];
       })
     : [];
 
@@ -90,17 +123,27 @@ export function usePushFit(content: PushContent | null): { fits: LockScreenFit[]
   const probe = useMemo(
     () =>
       content ? (
-        <div aria-hidden inert data-slot="push-fit" className="pointer-events-none invisible fixed top-0 left-[-10000px]">
+        <div
+          aria-hidden
+          inert
+          data-slot="push-fit"
+          className="pointer-events-none invisible fixed top-0 left-[-10000px]"
+        >
           {PUSH_PLATFORMS.map((platform) => {
             // The whole phone's size: it draws at 1:1 (it would cut the same at any scale).
             const size = frameSize(platform, MEASURED.width);
             return (
-              <div key={platform} style={{ width: size.width, height: size.height }}>
+              <div
+                key={platform}
+                style={{ width: size.width, height: size.height }}
+              >
                 <PushPreview
                   settings={{ platform, ...MEASURED }}
                   screen="lock"
                   content={content}
-                  onMeasure={(measure) => setMeasured((all) => ({ ...all, [platform]: measure }))}
+                  onMeasure={(measure) =>
+                    setMeasured((all) => ({ ...all, [platform]: measure }))
+                  }
                 />
               </div>
             );

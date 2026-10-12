@@ -19,7 +19,8 @@ export async function click(target: Locator) {
 
 // ── Personas ─────────────────────────────────────────────────────────────────
 
-export const profileButton = (page: Page) => page.getByRole("button", { name: /profile and persona/ });
+export const profileButton = (page: Page) =>
+  page.getByRole("button", { name: /profile and persona/ });
 
 /**
  * Through the persona switcher, as a presenter would: the cookie changes, the access sweep runs, and the
@@ -28,22 +29,32 @@ export const profileButton = (page: Page) => page.getByRole("button", { name: /p
  */
 export async function switchPersona(page: Page, person: string) {
   await click(profileButton(page));
-  await click(page.getByRole("menuitemradio", { name: new RegExp(escapeRe(person)) }));
+  await click(
+    page.getByRole("menuitemradio", { name: new RegExp(escapeRe(person)) }),
+  );
   await expect(page.getByRole("menu")).toBeHidden();
-  await expect(profileButton(page)).toHaveAccessibleName(new RegExp(`^${escapeRe(person)},`));
+  await expect(profileButton(page)).toHaveAccessibleName(
+    new RegExp(`^${escapeRe(person)},`),
+  );
 }
 
 // ── The settings modal ───────────────────────────────────────────────────────
 
 // The dialog is named by its section's title ("Teams", "Members"), so find it by the nav it holds.
 export const settingsDialog = (page: Page) =>
-  page.getByRole("dialog").filter({ has: page.getByRole("navigation", { name: "Settings sections" }) });
+  page.getByRole("dialog").filter({
+    has: page.getByRole("navigation", { name: "Settings sections" }),
+  });
 
 /** Opens the settings modal from the sidebar footer and goes to a section (a nav link name, or a RegExp). */
 export async function openSettings(page: Page, section: string | RegExp) {
   const dialog = settingsDialog(page);
   if (!(await dialog.isVisible())) {
-    await click(page.locator('[data-slot="sidebar-footer"]').getByRole("link", { name: "Settings" }));
+    await click(
+      page
+        .locator('[data-slot="sidebar-footer"]')
+        .getByRole("link", { name: "Settings" }),
+    );
     await expect(dialog).toBeVisible();
   }
   await goToSection(page, section);
@@ -53,8 +64,11 @@ export async function openSettings(page: Page, section: string | RegExp) {
 /** A section of the open modal. The count trail (Access requests 2) is in the link's name, so match loosely. */
 export async function goToSection(page: Page, section: string | RegExp) {
   const dialog = settingsDialog(page);
-  const name = typeof section === "string" ? new RegExp(`^${escapeRe(section)}`) : section;
-  const link = dialog.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name });
+  const name =
+    typeof section === "string" ? new RegExp(`^${escapeRe(section)}`) : section;
+  const link = dialog
+    .getByRole("navigation", { name: "Settings sections" })
+    .getByRole("link", { name });
   await click(link);
   await expect(link).toHaveAttribute("aria-current", /page|true/);
 }
@@ -70,11 +84,13 @@ export const personRow = (scope: Locator | Page, userId: string): Locator =>
   scope.locator(`[role=row][data-person=${userId}]`).filter({ visible: true });
 
 /** The consequence strip under a row, once open. */
-export const strip = (scope: Locator | Page): Locator => scope.locator('[data-slot="consequence-strip"]').filter({ visible: true });
+export const strip = (scope: Locator | Page): Locator =>
+  scope.locator('[data-slot="consequence-strip"]').filter({ visible: true });
 
 // ── The bell ─────────────────────────────────────────────────────────────────
 
-export const bell = (page: Page) => page.getByRole("button", { name: /^Notifications/ });
+export const bell = (page: Page) =>
+  page.getByRole("button", { name: /^Notifications/ });
 
 export async function unreadCount(page: Page): Promise<number> {
   const name = (await bell(page).getAttribute("aria-label")) ?? "";
@@ -104,7 +120,9 @@ export async function advanceClock(page: Page, days: number) {
   await click(drawer.getByRole("button", { name: "Advance", exact: true }));
   // The server action moves the clock, runs the sweep and refreshes; the field empties when it is submitted.
   await expect(field).toHaveValue("");
-  await expect(drawer.getByRole("button", { name: "+1 day" })).toBeEnabled({ timeout: 30_000 });
+  await expect(drawer.getByRole("button", { name: "+1 day" })).toBeEnabled({
+    timeout: 30_000,
+  });
   await beat(page, 900);
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
@@ -119,7 +137,10 @@ export async function advanceClock(page: Page, days: number) {
  * the starting data. Called from afterAll.
  */
 export function resetDemoData() {
-  const root = path.dirname(test.info().config.configFile ?? path.join(process.cwd(), "playwright.config.ts"));
+  const root = path.dirname(
+    test.info().config.configFile ??
+      path.join(process.cwd(), "playwright.config.ts"),
+  );
   // The database file is shared with whatever else has it open (the server, a dev server on the same
   // worktree), and has no busy timeout: if someone is writing at that moment, wait a moment and go again.
   for (let attempt = 1; ; attempt++) {
@@ -127,12 +148,29 @@ export function resetDemoData() {
       execFileSync("npm", ["run", "db:reset"], {
         cwd: root,
         stdio: "pipe",
-        env: { ...process.env, DATABASE_URL: E2E_DATABASE_URL, UPLOADS_DIR: E2E_UPLOADS_DIR },
+        env: {
+          ...process.env,
+          DATABASE_URL: E2E_DATABASE_URL,
+          UPLOADS_DIR: E2E_UPLOADS_DIR,
+        },
       });
       return;
     } catch (error) {
-      if (attempt >= 5 || !/SQLITE_BUSY|database is locked/i.test(String((error as { stderr?: unknown; message?: unknown }).stderr ?? "") + String((error as Error).message))) throw error;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500 * attempt);
+      if (
+        attempt >= 5 ||
+        !/SQLITE_BUSY|database is locked/i.test(
+          String(
+            (error as { stderr?: unknown; message?: unknown }).stderr ?? "",
+          ) + String((error as Error).message),
+        )
+      )
+        throw error;
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        1500 * attempt,
+      );
     }
   }
 }

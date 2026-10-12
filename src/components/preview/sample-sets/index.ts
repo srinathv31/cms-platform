@@ -2,7 +2,11 @@
 // row, and the pure list helpers the preview and review code share. (`listSets` and `isDefaultSet`
 // are in `@/editor/model/sample-sets`.)
 
-export { SampleSetSwitcher, type SampleSetSwitcherHandle, type SampleSetSwitcherProps } from "./sample-set-switcher";
+export {
+  SampleSetSwitcher,
+  type SampleSetSwitcherHandle,
+  type SampleSetSwitcherProps,
+} from "./sample-set-switcher";
 export {
   MAX_SET_NAME_LENGTH,
   addSet,

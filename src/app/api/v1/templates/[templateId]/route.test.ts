@@ -18,16 +18,27 @@ vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 
 const ids = seededDatabasePerTest({ base: env.now });
 
-
 const CORAL = { "X-Consumer-Id": "coral" };
 
-function get(template: string, query = "", headers: Record<string, string> = CORAL) {
+function get(
+  template: string,
+  query = "",
+  headers: Record<string, string> = CORAL,
+) {
   const templateId = ids[template] ?? template;
-  const request = new NextRequest(`http://localhost/api/v1/templates/${templateId}${query}`, { headers });
+  const request = new NextRequest(
+    `http://localhost/api/v1/templates/${templateId}${query}`,
+    { headers },
+  );
   return GET(request, { params: Promise.resolve({ templateId }) });
 }
 
-async function expectError(res: Response, status: number, code: string, message: string) {
+async function expectError(
+  res: Response,
+  status: number,
+  code: string,
+  message: string,
+) {
   expect(res.status).toBe(status);
   expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
   expect(res.headers.get("Cache-Control")).toBe("no-store");
@@ -40,70 +51,153 @@ async function expectError(res: Response, status: number, code: string, message:
 
 describe("GET /api/v1/templates/[templateId]: 200", () => {
   it("the Active contract, with the API headers", async () => {
-    const res = await get("balance-transfer", "", { ...CORAL, "X-Correlation-Id": "detail-1" });
+    const res = await get("balance-transfer", "", {
+      ...CORAL,
+      "X-Correlation-Id": "detail-1",
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(res.headers.get("X-Correlation-Id")).toBe("detail-1");
     const body = (await res.json()) as ApiTemplateDetail;
-    expect(body).toMatchObject({ id: ids["balance-transfer"], activeVersion: 2, asOf: env.now.toISOString(), contract: { version: 2 } });
+    expect(body).toMatchObject({
+      id: ids["balance-transfer"],
+      activeVersion: 2,
+      asOf: env.now.toISOString(),
+      contract: { version: 2 },
+    });
     expect(body.changes).toBeUndefined();
   });
 
   it("a Superseded version's sunset comes with its day and zone", async () => {
-    const body = (await (await get("balance-transfer")).json()) as ApiTemplateDetail;
+    const body = (await (
+      await get("balance-transfer")
+    ).json()) as ApiTemplateDetail;
     const [active, superseded] = body.versions;
-    expect(active).toMatchObject({ number: 2, sunsetAt: null, sunsetDay: null, zone: null });
-    expect(superseded).toMatchObject({ number: 1, zone: "America/New_York", sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+    expect(active).toMatchObject({
+      number: 2,
+      sunsetAt: null,
+      sunsetDay: null,
+      zone: null,
+    });
+    expect(superseded).toMatchObject({
+      number: 1,
+      zone: "America/New_York",
+      sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
     // 00:00 Eastern on that day, so the instant is 4 or 5 hours into the same UTC date.
-    expect(superseded!.sunsetAt).toMatch(new RegExp(`^${superseded!.sunsetDay}T0[45]:00:00\\.000Z$`));
+    expect(superseded!.sunsetAt).toMatch(
+      new RegExp(`^${superseded!.sunsetDay}T0[45]:00:00\\.000Z$`),
+    );
   });
 
   it("version and since", async () => {
-    const body = (await (await get("balance-transfer", "?version=2&since=1")).json()) as ApiTemplateDetail;
+    const body = (await (
+      await get("balance-transfer", "?version=2&since=1")
+    ).json()) as ApiTemplateDetail;
     expect(body.contract!.version).toBe(2);
-    expect(body.changes).toMatchObject({ since: 1, to: 2, breaking: false, newRequired: [] });
-    const old = (await (await get("balance-transfer", "?version=1")).json()) as ApiTemplateDetail;
+    expect(body.changes).toMatchObject({
+      since: 1,
+      to: 2,
+      breaking: false,
+      newRequired: [],
+    });
+    const old = (await (
+      await get("balance-transfer", "?version=1")
+    ).json()) as ApiTemplateDetail;
     expect(old.contract).toMatchObject({ version: 1, state: "superseded" });
   });
 });
 
 describe("GET /api/v1/templates/[templateId]: errors", () => {
   it("400 consumer_required", async () => {
-    await expectError(await get("balance-transfer", "", {}), 400, "consumer_required", "X-Consumer-Id is required.");
+    await expectError(
+      await get("balance-transfer", "", {}),
+      400,
+      "consumer_required",
+      "X-Consumer-Id is required.",
+    );
   });
 
   it("403 unknown_consumer", async () => {
-    await expectError(await get("balance-transfer", "", { "X-Consumer-Id": "acme" }), 403, "unknown_consumer", 'Consumer "acme" isn\'t registered.');
+    await expectError(
+      await get("balance-transfer", "", { "X-Consumer-Id": "acme" }),
+      403,
+      "unknown_consumer",
+      'Consumer "acme" isn\'t registered.',
+    );
   });
 
-  it.each([["?version=0"], ["?version=two"], ["?version=1.5"]])("400 bad_request for %s", async (query) => {
-    await expectError(await get("balance-transfer", query), 400, "bad_request", "version must be a version number.");
-  });
+  it.each([["?version=0"], ["?version=two"], ["?version=1.5"]])(
+    "400 bad_request for %s",
+    async (query) => {
+      await expectError(
+        await get("balance-transfer", query),
+        400,
+        "bad_request",
+        "version must be a version number.",
+      );
+    },
+  );
 
   it("400 bad_request for a since that isn't a version number", async () => {
-    await expectError(await get("balance-transfer", "?since=v1"), 400, "bad_request", "since must be a version number.");
+    await expectError(
+      await get("balance-transfer", "?since=v1"),
+      400,
+      "bad_request",
+      "since must be a version number.",
+    );
   });
 
   it("400 bad_request when since isn't lower than the version", async () => {
-    await expectError(await get("balance-transfer", "?version=1&since=2"), 400, "bad_request", "since must be lower than version.");
-    await expectError(await get("balance-transfer", "?since=2"), 400, "bad_request", "since must be lower than version.");
+    await expectError(
+      await get("balance-transfer", "?version=1&since=2"),
+      400,
+      "bad_request",
+      "since must be lower than version.",
+    );
+    await expectError(
+      await get("balance-transfer", "?since=2"),
+      400,
+      "bad_request",
+      "since must be lower than version.",
+    );
   });
 
   it("404 template_not_found: no such template", async () => {
-    await expectError(await get("UC-ZZZZZZ"), 404, "template_not_found", "Template UC-ZZZZZZ doesn't exist.");
+    await expectError(
+      await get("UC-ZZZZZZ"),
+      404,
+      "template_not_found",
+      "Template UC-ZZZZZZ doesn't exist.",
+    );
   });
 
   it("404 template_not_found: nothing released yet", async () => {
-    await expectError(await get("annual-fee-waiver"), 404, "template_not_found", `Template ${ids["annual-fee-waiver"]} doesn't exist.`);
+    await expectError(
+      await get("annual-fee-waiver"),
+      404,
+      "template_not_found",
+      `Template ${ids["annual-fee-waiver"]} doesn't exist.`,
+    );
   });
 
   it("404 version_not_found", async () => {
-    await expectError(await get("balance-transfer", "?version=9"), 404, "version_not_found", `Template ${ids["balance-transfer"]} has no version 9.`);
+    await expectError(
+      await get("balance-transfer", "?version=9"),
+      404,
+      "version_not_found",
+      `Template ${ids["balance-transfer"]} has no version 9.`,
+    );
   });
 
   it("409 version_not_released", async () => {
-    const error = await expectError(await get("cash-back", "?version=3"), 409, "version_not_released", "Version 3 is in review. Version 2 is active.");
+    const error = await expectError(
+      await get("cash-back", "?version=3"),
+      409,
+      "version_not_released",
+      "Version 3 is in review. Version 2 is active.",
+    );
     expect(error.details).toEqual({ version: 3, activeVersion: 2 });
   });
 });

@@ -2,27 +2,44 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ActionResult, ConsumerUsage, StepView } from "@/domain/review-types";
+import type {
+  ActionResult,
+  ConsumerUsage,
+  StepView,
+} from "@/domain/review-types";
 import type { ContractChange } from "@/domain/types";
 
 // The review screen's two decision dialogs: what they refuse before sending, what they send, how the
 // consequence lines follow the sunset switch, and where a refusal from the server shows. The server
 // actions are replaced; the dialogs and the domain's consequence lines are real.
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const actions = vi.hoisted(() => ({
-  approveVersion: vi.fn<
-    (input: {
-      templateId: string;
-      versionNumber: number;
-      round: number;
-      sunsetPrevious?: string | null;
-      sampleSetsSeen: string[];
-      outputsViewed: readonly string[];
-    }) => Promise<ActionResult<{ wentLive: boolean; number: number; round: number }>>
-  >(),
-  requestChanges: vi.fn<(input: { templateId: string; versionNumber: number; round: number; reason: string }) => Promise<ActionResult>>(),
+  approveVersion:
+    vi.fn<
+      (input: {
+        templateId: string;
+        versionNumber: number;
+        round: number;
+        sunsetPrevious?: string | null;
+        sampleSetsSeen: string[];
+        outputsViewed: readonly string[];
+      }) => Promise<
+        ActionResult<{ wentLive: boolean; number: number; round: number }>
+      >
+    >(),
+  requestChanges:
+    vi.fn<
+      (input: {
+        templateId: string;
+        versionNumber: number;
+        round: number;
+        reason: string;
+      }) => Promise<ActionResult>
+    >(),
   // The Versions tab's dialogs share this module; they aren't under test here.
   setSunset: vi.fn(),
   startRevoke: vi.fn(),
@@ -35,12 +52,25 @@ const { ApproveDialog } = await import("./approve-dialog");
 const { RequestChangesDialog } = await import("./request-dialog");
 const { approvalStage } = await import("./decision-model");
 
-const step = (position: number, name: string, status: StepView["status"]): StepView => ({ position, name, status });
+const step = (
+  position: number,
+  name: string,
+  status: StepView["status"],
+): StepView => ({ position, name, status });
 const ONE = approvalStage([step(0, "Team approver", "current")]);
-const FIRST_OF_TWO = approvalStage([step(0, "Team approver", "current"), step(1, "Legal reviewer", "waiting")]);
+const FIRST_OF_TWO = approvalStage([
+  step(0, "Team approver", "current"),
+  step(1, "Legal reviewer", "waiting"),
+]);
 
 const USAGE: ConsumerUsage[] = [
-  { consumerId: "coral", consumerName: "Coral", versionNumber: 1, lastRenderAt: "2026-10-05T01:00:00.000Z", renders30d: 332 },
+  {
+    consumerId: "coral",
+    consumerName: "Coral",
+    versionNumber: 1,
+    lastRenderAt: "2026-10-05T01:00:00.000Z",
+    renders30d: 332,
+  },
 ];
 const NOW = "2026-10-05T02:29:00.000Z";
 
@@ -64,19 +94,30 @@ async function render(node: ReactNode) {
   await act(async () => root.render(node));
 }
 
-const dialog = () => document.body.querySelector('[role="dialog"]') as HTMLElement;
+const dialog = () =>
+  document.body.querySelector('[role="dialog"]') as HTMLElement;
 const button = (name: string) =>
-  [...dialog().querySelectorAll("button")].find((b) => b.textContent?.trim() === name) as HTMLButtonElement;
+  [...dialog().querySelectorAll("button")].find(
+    (b) => b.textContent?.trim() === name,
+  ) as HTMLButtonElement;
 // The footer's reason is the one live region in the dialog (it is always there, empty until a refusal).
-const alertText = () => dialog().querySelector('[role="alert"]')?.textContent || null;
-const blocked = (el: HTMLElement) => el.getAttribute("aria-disabled") === "true";
+const alertText = () =>
+  dialog().querySelector('[role="alert"]')?.textContent || null;
+const blocked = (el: HTMLElement) =>
+  el.getAttribute("aria-disabled") === "true";
 // The first consequence line is the dialog's description; the rest sit in the box under it.
-const description = () => dialog().querySelector('[data-slot="dialog-description"]')!.textContent;
-const boxLines = () => [...dialog().querySelectorAll('[data-slot="consequences"] li')].map((li) => li.textContent);
+const description = () =>
+  dialog().querySelector('[data-slot="dialog-description"]')!.textContent;
+const boxLines = () =>
+  [...dialog().querySelectorAll('[data-slot="consequences"] li')].map(
+    (li) => li.textContent,
+  );
 const lines = () => [description(), ...boxLines()];
-const sunsetSwitch = () => dialog().querySelector('[role="checkbox"]') as HTMLElement | null;
+const sunsetSwitch = () =>
+  dialog().querySelector('[role="checkbox"]') as HTMLElement | null;
 // Base UI's checkbox is a button with a hidden input beside it; a click on the label reaches both.
-const sunsetLabel = () => dialog().querySelector('label[id$="-sunset"]') as HTMLElement | null;
+const sunsetLabel = () =>
+  dialog().querySelector('label[id$="-sunset"]') as HTMLElement | null;
 
 async function click(el: HTMLElement) {
   await act(async () => {
@@ -86,12 +127,16 @@ async function click(el: HTMLElement) {
 
 async function typeInto(el: HTMLTextAreaElement, value: string) {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
 
-const title = () => dialog().querySelector('[data-slot="dialog-title"]')!.textContent;
+const title = () =>
+  dialog().querySelector('[data-slot="dialog-title"]')!.textContent;
 
 describe("RequestChangesDialog", () => {
   const onOpenChange = vi.fn();
@@ -131,7 +176,9 @@ describe("RequestChangesDialog", () => {
     await click(button("Request changes"));
     expect(actions.requestChanges).not.toHaveBeenCalled();
     // Marked invalid, with the caret in it, and no sentence: the label says what the field is.
-    expect(dialog().querySelector("textarea")!.getAttribute("aria-invalid")).toBe("true");
+    expect(
+      dialog().querySelector("textarea")!.getAttribute("aria-invalid"),
+    ).toBe("true");
     expect(dialog().querySelector("[id$='-problem']")).toBeNull();
     expect(dialog().textContent).not.toContain("Say what needs to change.");
     expect(document.activeElement).toBe(dialog().querySelector("textarea"));
@@ -139,7 +186,9 @@ describe("RequestChangesDialog", () => {
 
   it("follows the dialog standard: the consequence as the one-line description, no Close X, an outline Cancel", async () => {
     await open();
-    expect(dialog().querySelector('[data-slot="dialog-description"]')!.textContent).toBe(
+    expect(
+      dialog().querySelector('[data-slot="dialog-description"]')!.textContent,
+    ).toBe(
       "Maya Chen gets a new draft of v3 with your reason and the comments.",
     );
     expect(dialog().querySelector('[aria-label="Close"]')).toBeNull();
@@ -151,16 +200,26 @@ describe("RequestChangesDialog", () => {
     await open(2);
     expect(title()).toBe("Request changes on v3, round 2");
     // The new draft is of the version: its submission is the version's next round.
-    expect(description()).toBe("Maya Chen gets a new draft of v3 with your reason and the comments.");
-    await typeInto(dialog().querySelector("textarea")!, "Say when the fee starts.");
+    expect(description()).toBe(
+      "Maya Chen gets a new draft of v3 with your reason and the comments.",
+    );
+    await typeInto(
+      dialog().querySelector("textarea")!,
+      "Say when the fee starts.",
+    );
     await click(button("Request changes"));
-    expect(actions.requestChanges).toHaveBeenCalledWith(expect.objectContaining({ versionNumber: 3, round: 2 }));
+    expect(actions.requestChanges).toHaveBeenCalledWith(
+      expect.objectContaining({ versionNumber: 3, round: 2 }),
+    );
   });
 
   it("sends the trimmed reason, then says so and closes", async () => {
     actions.requestChanges.mockResolvedValue({ ok: true });
     await open();
-    await typeInto(dialog().querySelector("textarea")!, "  The APR in Legal notices is wrong.  ");
+    await typeInto(
+      dialog().querySelector("textarea")!,
+      "  The APR in Legal notices is wrong.  ",
+    );
     expect(blocked(button("Request changes"))).toBe(false);
     await click(button("Request changes"));
     expect(actions.requestChanges).toHaveBeenCalledWith({
@@ -176,13 +235,19 @@ describe("RequestChangesDialog", () => {
   it("says when the reason is too long, and doesn't send it", async () => {
     await open();
     await typeInto(dialog().querySelector("textarea")!, "a".repeat(2001));
-    expect(dialog().textContent).toContain("Keep the reason under 2,000 characters.");
+    expect(dialog().textContent).toContain(
+      "Keep the reason under 2,000 characters.",
+    );
     expect(blocked(button("Request changes"))).toBe(true);
     expect(actions.requestChanges).not.toHaveBeenCalled();
   });
 
   it("shows a refusal at the button, stays open, and keeps the reason", async () => {
-    actions.requestChanges.mockResolvedValue({ ok: false, code: "not_in_review", reason: "This version isn't in review." });
+    actions.requestChanges.mockResolvedValue({
+      ok: false,
+      code: "not_in_review",
+      reason: "This version isn't in review.",
+    });
     await open();
     await typeInto(dialog().querySelector("textarea")!, "Fix the APR.");
     await click(button("Request changes"));
@@ -210,7 +275,11 @@ describe("ApproveDialog", () => {
   const open = (
     over: {
       previousNumber?: number | null;
-      stillRenders?: { number: number; sunsetDay: string | null; contractChanges: ContractChange[] } | null;
+      stillRenders?: {
+        number: number;
+        sunsetDay: string | null;
+        contractChanges: ContractChange[];
+      } | null;
       stage?: typeof ONE;
       sampleSetsSeen?: string[];
       contractChanges?: ContractChange[];
@@ -224,7 +293,9 @@ describe("ApproveDialog", () => {
         templateId="UC-ABC123"
         versionNumber={2}
         round={over.round ?? 1}
-        previousNumber={over.previousNumber === undefined ? 1 : over.previousNumber}
+        previousNumber={
+          over.previousNumber === undefined ? 1 : over.previousNumber
+        }
         stillRenders={over.stillRenders ?? null}
         contractChanges={over.contractChanges ?? []}
         stage={over.stage ?? ONE}
@@ -240,13 +311,16 @@ describe("ApproveDialog", () => {
     );
 
   beforeEach(() => {
-    for (const fn of [onOpenChange, onBegin, onApproved, onFailed]) fn.mockReset();
+    for (const fn of [onOpenChange, onBegin, onApproved, onFailed])
+      fn.mockReset();
   });
 
   it("says what goes live and that the previous version keeps rendering until it relinks, as its description", async () => {
     await open();
     expect(title()).toBe("Approve v2");
-    expect(description()).toBe("v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.");
+    expect(description()).toBe(
+      "v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.",
+    );
     // No lead-in about "what happens", and nothing more to say: no box.
     expect(dialog().textContent).not.toContain("What happens when");
     expect(boxLines()).toEqual([]);
@@ -256,15 +330,29 @@ describe("ApproveDialog", () => {
   it("says what a breaking change asks of each consumer, with the keys in mono", async () => {
     await open({
       contractChanges: [
-        { kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true },
-        { kind: "key_renamed", key: "state", breaking: true, from: "home_state", to: "state" },
+        {
+          kind: "added",
+          key: "annual_fee",
+          breaking: true,
+          type: "currency",
+          required: true,
+        },
+        {
+          kind: "key_renamed",
+          key: "state",
+          breaking: true,
+          from: "home_state",
+          to: "state",
+        },
       ],
     });
     expect(lines()).toEqual([
       "v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.",
       "Coral has to map annual_fee and state before it moves to v2.",
     ]);
-    const keys = [...dialog().querySelectorAll('[data-slot="consequences"] code')];
+    const keys = [
+      ...dialog().querySelectorAll('[data-slot="consequences"] code'),
+    ];
     expect(keys.map((k) => k.textContent)).toEqual(["annual_fee", "state"]);
     expect(keys[0].className).toContain("font-mono");
   });
@@ -280,7 +368,9 @@ describe("ApproveDialog", () => {
       "Coral still renders v1 (last render today). It will keep working until November 4, 2026.",
     ]);
     expect(dialog().textContent).toContain("Set a sunset date for v1");
-    const picker = dialog().querySelector<HTMLButtonElement>('button[aria-label^="Sunset date"]');
+    const picker = dialog().querySelector<HTMLButtonElement>(
+      'button[aria-label^="Sunset date"]',
+    );
     expect(picker?.textContent).toContain("November 4, 2026");
     // The picker names the zone the day ends in.
     const zone = dialog().querySelector('[data-slot="sunset-zone"]');
@@ -289,11 +379,18 @@ describe("ApproveDialog", () => {
 
     // Switched off again: back to the first answer.
     await click(sunsetLabel()!);
-    expect(lines()).toEqual(["v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks."]);
+    expect(lines()).toEqual([
+      "v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.",
+    ]);
   });
 
   it("approves with no sunset by default, and records the sample sets that were looked at", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2, round: 1 });
+    actions.approveVersion.mockResolvedValue({
+      ok: true,
+      wentLive: true,
+      number: 2,
+      round: 1,
+    });
     await open({ sampleSetsSeen: ["typical", "long"] });
     await click(button("Approve v2"));
     expect(actions.approveVersion).toHaveBeenCalledWith({
@@ -315,52 +412,109 @@ describe("ApproveDialog", () => {
     await open({
       previousNumber: null,
       // What submit stored was against a version revoked since; the dialog reads the changes against v1.
-      stillRenders: { number: 1, sunsetDay: null, contractChanges: [{ kind: "added", key: "annual_fee", breaking: true, type: "currency", required: true }] },
-      contractChanges: [{ kind: "added", key: "stale_key", breaking: true, type: "text", required: true }],
+      stillRenders: {
+        number: 1,
+        sunsetDay: null,
+        contractChanges: [
+          {
+            kind: "added",
+            key: "annual_fee",
+            breaking: true,
+            type: "currency",
+            required: true,
+          },
+        ],
+      },
+      contractChanges: [
+        {
+          kind: "added",
+          key: "stale_key",
+          breaking: true,
+          type: "text",
+          required: true,
+        },
+      ],
     });
     expect(description()).toBe("v2 becomes Active.");
-    expect(boxLines()).toEqual(["Coral keeps rendering v1 until it relinks.", "Coral has to map annual_fee before it moves to v2."]);
-    expect(dialog().textContent).not.toContain("Consumers can start using it right away.");
+    expect(boxLines()).toEqual([
+      "Coral keeps rendering v1 until it relinks.",
+      "Coral has to map annual_fee before it moves to v2.",
+    ]);
+    expect(dialog().textContent).not.toContain(
+      "Consumers can start using it right away.",
+    );
     expect(sunsetSwitch()).toBeFalsy();
   });
 
   it("names the round it approves once the version was sent back, and approves exactly that round", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2, round: 3 });
+    actions.approveVersion.mockResolvedValue({
+      ok: true,
+      wentLive: true,
+      number: 2,
+      round: 3,
+    });
     await open({ round: 3 });
     expect(title()).toBe("Approve v2, round 3");
     // What goes live is the version consumers know: no round.
-    expect(description()).toBe("v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.");
+    expect(description()).toBe(
+      "v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks.",
+    );
     await click(button("Approve v2, round 3"));
-    expect(actions.approveVersion).toHaveBeenCalledWith(expect.objectContaining({ versionNumber: 2, round: 3 }));
+    expect(actions.approveVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ versionNumber: 2, round: 3 }),
+    );
     expect(onApproved).toHaveBeenCalledWith({ wentLive: true });
   });
 
   it("sends the sunset date as a calendar day when it is on", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: true, number: 2, round: 1 });
+    actions.approveVersion.mockResolvedValue({
+      ok: true,
+      wentLive: true,
+      number: 2,
+      round: 1,
+    });
     await open();
     await click(sunsetLabel()!);
     await click(button("Approve v2"));
-    expect(actions.approveVersion).toHaveBeenCalledWith(expect.objectContaining({ sunsetPrevious: "2026-11-04" }));
+    expect(actions.approveVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ sunsetPrevious: "2026-11-04" }),
+    );
   });
 
   it("has no sunset to set when nothing is Active yet", async () => {
     await open({ previousNumber: null });
-    expect(lines()).toEqual(["v2 becomes Active.", "Consumers can start using it right away."]);
+    expect(lines()).toEqual([
+      "v2 becomes Active.",
+      "Consumers can start using it right away.",
+    ]);
     expect(sunsetSwitch()).toBeNull();
   });
 
   it("only moves the version along at an earlier stage: no sunset row, nothing goes live", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: true, wentLive: false, number: 2, round: 1 });
+    actions.approveVersion.mockResolvedValue({
+      ok: true,
+      wentLive: false,
+      number: 2,
+      round: 1,
+    });
     await open({ stage: FIRST_OF_TWO });
-    expect(lines()).toEqual(["v2 moves to Legal reviewer for approval. It isn't Active until the last stage approves."]);
+    expect(lines()).toEqual([
+      "v2 moves to Legal reviewer for approval. It isn't Active until the last stage approves.",
+    ]);
     expect(sunsetSwitch()).toBeNull();
     await click(button("Approve v2"));
-    expect(actions.approveVersion).toHaveBeenCalledWith(expect.objectContaining({ sunsetPrevious: null }));
+    expect(actions.approveVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ sunsetPrevious: null }),
+    );
     expect(onApproved).toHaveBeenCalledWith({ wentLive: false });
   });
 
   it("shows a refusal at the button, stays open, and lets the screen know it failed", async () => {
-    actions.approveVersion.mockResolvedValue({ ok: false, code: "submitted_version", reason: "You submitted this version." });
+    actions.approveVersion.mockResolvedValue({
+      ok: false,
+      code: "submitted_version",
+      reason: "You submitted this version.",
+    });
     await open();
     await click(button("Approve v2"));
     expect(alertText()).toBe("You submitted this version.");

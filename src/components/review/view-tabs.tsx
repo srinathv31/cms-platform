@@ -38,7 +38,11 @@ export function ViewTabs({
             value={tab.id}
             // The panels (document-view.tsx, preview-view.tsx) are labelled by these ids.
             id={`review-tab-${tab.id}`}
-            aria-controls={tab.id === "preview" && !previewMounted ? undefined : `review-panel-${tab.id}`}
+            aria-controls={
+              tab.id === "preview" && !previewMounted
+                ? undefined
+                : `review-panel-${tab.id}`
+            }
           >
             {tab.label}
           </Tab>
@@ -72,7 +76,10 @@ function Toggle({
   countTitle?: string;
 }) {
   return (
-    <label title={label} className="flex h-8 cursor-pointer items-center gap-2 text-[14px] whitespace-nowrap text-text">
+    <label
+      title={label}
+      className="flex h-8 cursor-pointer items-center gap-2 text-[14px] whitespace-nowrap text-text"
+    >
       <Switch aria-label={label} checked={checked} onCheckedChange={onChange} />
       {shortLabel ? (
         <>
@@ -100,8 +107,16 @@ function Toggle({
  * What the redline is against: "vs v2" for the Active version. With none Active (after a revoke) it is
  * an older text, and the label says which: "vs v3 (revoked)".
  */
-export function baselineLabel({ number, state }: { number: number; state: VersionState }): string {
-  return state === "active" ? `vs v${number}` : `vs v${number} (${statusLabel(state).toLowerCase()})`;
+export function baselineLabel({
+  number,
+  state,
+}: {
+  number: number;
+  state: VersionState;
+}): string {
+  return state === "active"
+    ? `vs v${number}`
+    : `vs v${number} (${statusLabel(state).toLowerCase()})`;
 }
 
 /**
@@ -134,14 +149,19 @@ export function ChangeToggles({
   summary: string;
 }) {
   return (
-    <div data-change-toggles="" className="flex items-center gap-x-5 @max-[32rem]/bar:gap-x-4">
+    <div
+      data-change-toggles=""
+      className="flex items-center gap-x-5 @max-[32rem]/bar:gap-x-4"
+    >
       {showChanges ? (
         <>
           <span
             data-slot="baseline-label"
             className={cn(
               "text-[13px] whitespace-nowrap text-text-muted",
-              baseline.state === "active" ? "@max-[32rem]/bar:hidden" : "@max-[40rem]/bar:hidden",
+              baseline.state === "active"
+                ? "@max-[32rem]/bar:hidden"
+                : "@max-[40rem]/bar:hidden",
             )}
           >
             {baselineLabel(baseline)}

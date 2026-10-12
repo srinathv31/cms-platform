@@ -19,7 +19,10 @@ export function MappingTable({
 }) {
   return (
     <TableWrap label={label}>
-      <table aria-label={label} className="w-full min-w-[34rem] border-collapse">
+      <table
+        aria-label={label}
+        className="w-full min-w-[34rem] border-collapse"
+      >
         <thead>
           <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">
             <th className={TH}>Variable</th>
@@ -30,17 +33,32 @@ export function MappingTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.key} className="border-b border-(--sim-line) last:border-0">
+            <tr
+              key={row.key}
+              className="border-b border-(--sim-line) last:border-0"
+            >
               <td className={TD}>
                 <p className="m-0 font-medium">{row.label}</p>
                 <Mono className="text-(--sim-muted)">{row.key}</Mono>
               </td>
-              <td className={`${TD} text-(--sim-muted)`}>{TYPE_LABEL[row.type]}</td>
+              <td className={`${TD} text-(--sim-muted)`}>
+                {TYPE_LABEL[row.type]}
+              </td>
               <td className={TD}>{row.required ? "Yes" : "No"}</td>
               <td className={TD}>
-                <MappingSelect label={row.label} type={row.type} value={row.field} fields={fields} invalid={row.required && !row.field} onChange={(f) => onChange(row.key, f)} />
+                <MappingSelect
+                  label={row.label}
+                  type={row.type}
+                  value={row.field}
+                  fields={fields}
+                  invalid={row.required && !row.field}
+                  onChange={(f) => onChange(row.key, f)}
+                />
                 {error?.key === row.key ? (
-                  <p role="alert" className="m-0 mt-1 text-[12px] text-(--sim-bad)">
+                  <p
+                    role="alert"
+                    className="m-0 mt-1 text-[12px] text-(--sim-bad)"
+                  >
                     {error.reason}
                   </p>
                 ) : null}

@@ -11,25 +11,46 @@ import type { Variable } from "../model/types";
 import { EditorRoot } from "./editor-root";
 import { VariablesPanel } from "./variables-panel";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const VARIABLES: Variable[] = [
-  { key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" },
-  { key: "bonus_points", label: "Bonus points", type: "number", required: false, sample: "20000" },
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+  {
+    key: "bonus_points",
+    label: "Bonus points",
+    type: "number",
+    required: false,
+    sample: "20000",
+  },
 ];
 
 let root: Root | null = null;
 let host: HTMLElement | null = null;
 const onVariablesChange = vi.fn();
 
-async function show(props: { held?: boolean; readOnly?: boolean }): Promise<HTMLElement> {
+async function show(props: {
+  held?: boolean;
+  readOnly?: boolean;
+}): Promise<HTMLElement> {
   if (!host || !root) {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
   }
   const tree: ReactNode = (
-    <EditorRoot variables={VARIABLES} onVariablesChange={onVariablesChange} {...props}>
+    <EditorRoot
+      variables={VARIABLES}
+      onVariablesChange={onVariablesChange}
+      {...props}
+    >
       <VariablesPanel />
     </EditorRoot>
   );
@@ -45,13 +66,22 @@ afterEach(async () => {
   onVariablesChange.mockClear();
 });
 
-const byLabel = (el: HTMLElement, label: string) => el.querySelector<HTMLElement>(`[aria-label="${label}"]`);
-const button = (el: HTMLElement, name: string) => [...el.querySelectorAll("button")].find((b) => b.textContent?.trim() === name) ?? null;
-const isDisabled = (el: Element | null) => el !== null && (el.hasAttribute("disabled") || el.hasAttribute("data-disabled"));
+const byLabel = (el: HTMLElement, label: string) =>
+  el.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+const button = (el: HTMLElement, name: string) =>
+  [...el.querySelectorAll("button")].find(
+    (b) => b.textContent?.trim() === name,
+  ) ?? null;
+const isDisabled = (el: Element | null) =>
+  el !== null &&
+  (el.hasAttribute("disabled") || el.hasAttribute("data-disabled"));
 
 async function type(input: HTMLInputElement, value: string) {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -66,7 +96,9 @@ describe("VariablesPanel while the root is held", () => {
     const held = await show({ held: true });
     // The same controls as editing, none removed...
     expect(held.querySelectorAll("[data-variable-row]").length).toBe(freeRows);
-    expect(held.querySelectorAll("button, [role=switch]").length).toBe(freeControls);
+    expect(held.querySelectorAll("button, [role=switch]").length).toBe(
+      freeControls,
+    );
     expect(held.textContent).toContain("Required");
     expect(button(held, "New variable")).not.toBeNull();
     // ...each disabled.
@@ -74,7 +106,9 @@ describe("VariablesPanel while the root is held", () => {
     expect(isDisabled(byLabel(held, "Edit First name"))).toBe(true);
     expect(isDisabled(byLabel(held, "First name required"))).toBe(true);
     expect(isDisabled(button(held, "New variable"))).toBe(true);
-    expect(held.querySelector("[data-variable-row]")?.getAttribute("draggable")).toBe("false");
+    expect(
+      held.querySelector("[data-variable-row]")?.getAttribute("draggable"),
+    ).toBe("false");
   });
 
   it("does nothing when a disabled control is clicked", async () => {
@@ -90,9 +124,12 @@ describe("VariablesPanel while the root is held", () => {
   it("keeps an open form, and what was typed in it, disabled until the hold lets go", async () => {
     let host = await show({});
     await act(async () => button(host, "New variable")?.click());
-    const label = () => host.querySelector<HTMLInputElement>('form input[id$="-label"]')!;
+    const label = () =>
+      host.querySelector<HTMLInputElement>('form input[id$="-label"]')!;
     await type(label(), "Annual fee");
-    expect(host.querySelector<HTMLInputElement>('form input[id$="-key"]')!.value).toBe("annual_fee");
+    expect(
+      host.querySelector<HTMLInputElement>('form input[id$="-key"]')!.value,
+    ).toBe("annual_fee");
 
     // The hold starts: the same form, the same inputs, now disabled.
     const input = label();
@@ -101,16 +138,32 @@ describe("VariablesPanel while the root is held", () => {
     expect(label()).toBe(input);
     expect(label().value).toBe("Annual fee");
     expect(label().disabled).toBe(true);
-    expect(host.querySelector<HTMLInputElement>('form input[id$="-key"]')!.disabled).toBe(true);
+    expect(
+      host.querySelector<HTMLInputElement>('form input[id$="-key"]')!.disabled,
+    ).toBe(true);
     expect(isDisabled(host.querySelector('form [role="switch"]'))).toBe(true);
-    expect(isDisabled(host.querySelector('form [data-slot="select-trigger"]'))).toBe(true);
+    expect(
+      isDisabled(host.querySelector('form [data-slot="select-trigger"]')),
+    ).toBe(true);
     expect(button(host.querySelector("form")!, "Create")?.disabled).toBe(true);
     expect(button(host.querySelector("form")!, "Cancel")?.disabled).toBe(true);
 
     // Enter and Esc in a disabled form do nothing.
     await act(async () => {
-      label().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-      label().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      label().dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      label().dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     });
     expect(host.querySelector("form")).not.toBeNull();
     expect(onVariablesChange).not.toHaveBeenCalled();
@@ -126,7 +179,8 @@ describe("VariablesPanel while the root is held", () => {
   it("keeps an open edit form the same way", async () => {
     let host = await show({});
     await act(async () => byLabel(host, "Edit First name")?.click());
-    const label = () => host.querySelector<HTMLInputElement>('form input[id$="-label"]')!;
+    const label = () =>
+      host.querySelector<HTMLInputElement>('form input[id$="-label"]')!;
     await type(label(), "Given name");
 
     host = await show({ held: true });

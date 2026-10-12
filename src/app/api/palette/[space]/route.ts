@@ -8,9 +8,18 @@ import { getViewer } from "@/server/viewer";
 // { ok: true, …PaletteResults } | { ok: false, code, reason }, with 400 (a search that doesn't parse) or 404
 // (a space the viewer can't see). Request-time only: it reads the persona cookie first.
 
-export async function GET(request: NextRequest, ctx: RouteContext<"/api/palette/[space]">) {
+export async function GET(
+  request: NextRequest,
+  ctx: RouteContext<"/api/palette/[space]">,
+) {
   const viewer = await getViewer();
   const { space } = await ctx.params;
   const query = request.nextUrl.searchParams;
-  return readResponse(await searchPalette(viewer, { space, q: query.get("q"), template: query.get("template") }));
+  return readResponse(
+    await searchPalette(viewer, {
+      space,
+      q: query.get("q"),
+      template: query.get("template"),
+    }),
+  );
 }

@@ -7,7 +7,8 @@ import type { SeedTemplate } from "./types";
 // to this team, which is how the demo shows that teams are isolated.
 
 const ISSUER = "Coral Bank, N.A. Member FDIC.";
-const STATE_TERMS = "State-specific terms for {home_state} residents are in your cardmember agreement.";
+const STATE_TERMS =
+  "State-specific terms for {home_state} residents are in your cardmember agreement.";
 
 function rateChangeInsert() {
   return disclosure("statement-rate-change", {
@@ -46,7 +47,10 @@ function rateChangeInsert() {
 function paperlessInsert() {
   return disclosure("statement-paperless", {
     offer: [
-      p("intro", "Hi {first_name}, go paperless and get your statement the moment it closes."),
+      p(
+        "intro",
+        "Hi {first_name}, go paperless and get your statement the moment it closes.",
+      ),
       ul("benefits", [
         "Statements are ready online and in the app on the day they close.",
         "You get an email when a new statement is available.",
@@ -81,7 +85,10 @@ function privacyInsert() {
         "intro",
         "Hi {first_name}, once a year we remind you how we collect, use and protect your personal information.",
       ),
-      p("link", "Read the full notice at [coral.example/privacy](https://coral.example/privacy)."),
+      p(
+        "link",
+        "Read the full notice at [coral.example/privacy](https://coral.example/privacy).",
+      ),
     ],
     rates: [p("no_fees", "There is no fee associated with this notice.")],
     legal: [p("state_terms", STATE_TERMS), p("issuer", ISSUER)],
@@ -105,14 +112,26 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
           number: 1,
           state: "active",
           body: rateChangeInsert(),
-          variables: vars.list(["first_name", "purchase_apr", "effective_date", "home_state"]),
+          variables: vars.list([
+            "first_name",
+            "purchase_apr",
+            "effective_date",
+            "home_state",
+          ]),
           channels: ["pdf", "web"],
           createdBy: "marcus",
           createdAt: 110,
           submittedBy: "marcus",
           submittedAt: 106,
           submitNote: "Statement insert for APR changes.",
-          approvals: [{ actor: "hana", decision: "approved", at: 104, seen: ["typical", "long", "minimum"] }],
+          approvals: [
+            {
+              actor: "hana",
+              decision: "approved",
+              at: 104,
+              seen: ["typical", "long", "minimum"],
+            },
+          ],
           activatedAt: 104,
         },
       ],
@@ -134,7 +153,9 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
           channels: ["pdf", "web", "email"],
           channelFields: {
             email: {
-              subject: inlineDoc("{first_name}, go paperless and skip the stack"),
+              subject: inlineDoc(
+                "{first_name}, go paperless and skip the stack",
+              ),
               preheader: inlineDoc("Switch in one step. Switch back any time."),
             },
           },
@@ -143,7 +164,14 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
           submittedBy: "marcus",
           submittedAt: 92,
           submitNote: "Paperless enrollment insert.",
-          approvals: [{ actor: "hana", decision: "approved", at: 91, seen: ["typical", "minimum"] }],
+          approvals: [
+            {
+              actor: "hana",
+              decision: "approved",
+              at: 91,
+              seen: ["typical", "minimum"],
+            },
+          ],
           activatedAt: 91,
         },
       ],

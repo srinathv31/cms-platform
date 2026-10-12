@@ -3,7 +3,12 @@
 // (`ReviewScreenData`, `VersionsData`, `ThreadView`, …) are not here: each sits beside the query in
 // src/server/queries/ that builds it.
 
-import type { ApproverRule, ContractChange, JSONContent, TeamRole } from "./types";
+import type {
+  ApproverRule,
+  ContractChange,
+  JSONContent,
+  TeamRole,
+} from "./types";
 import type { ChannelField } from "./channel-fields";
 import type { Refused } from "./refusals";
 
@@ -64,7 +69,9 @@ export type AuditEffect = {
     action: A;
     /** The version the event is about; defaults to the transition's version. */
     versionId?: string;
-    details: A extends keyof AuditDetailsByAction ? AuditDetailsByAction[A] : Record<string, unknown>;
+    details: A extends keyof AuditDetailsByAction
+      ? AuditDetailsByAction[A]
+      : Record<string, unknown>;
   };
 }[AuditAction];
 
@@ -113,7 +120,8 @@ export interface NotificationEffect {
   link: NotificationLink;
 }
 
-export type ConsumerNoticeKind = "new_version" | "sunset_scheduled" | "sunset_passed" | "revoked";
+export type ConsumerNoticeKind =
+  "new_version" | "sunset_scheduled" | "sunset_passed" | "revoked";
 
 /**
  * Sent to every consumer that rendered the template (not as a preview) in the 90 days before the event,
@@ -137,7 +145,8 @@ export interface ConsumerNoticeEffect {
   };
 }
 
-export type LifecycleEffect = AuditEffect | NotificationEffect | ConsumerNoticeEffect;
+export type LifecycleEffect =
+  AuditEffect | NotificationEffect | ConsumerNoticeEffect;
 
 // ── Approval chain (configuration, not code) ─────────────────────────────────
 
@@ -176,7 +185,8 @@ export const DOCUMENT_THREAD = "doc";
 
 // ── Redline (domain/redline/) ─────────────────────────────────────────────
 
-export type RedlineStatus = "unchanged" | "added" | "removed" | "changed" | "moved";
+export type RedlineStatus =
+  "unchanged" | "added" | "removed" | "changed" | "moved";
 
 /** The mark the redline puts on inline content inside a "changed" block. */
 export interface RedlineMark {
@@ -263,7 +273,12 @@ export type ConsequenceAction =
        */
       breakingKeys?: string[];
     }
-  | { kind: "sunset"; number: number; sunsetAt: string; activeNumber: number | null }
+  | {
+      kind: "sunset";
+      number: number;
+      sunsetAt: string;
+      activeNumber: number | null;
+    }
   | {
       kind: "revoke";
       number: number;
@@ -278,4 +293,5 @@ export type ConsequenceAction =
  * What a server action or an on-demand read answers: done, with what it carries, or refused with a
  * stable `code` to branch on and the sentence to show (domain/refusals.ts).
  */
-export type ActionResult<T = Record<never, never>> = ({ ok: true } & T) | Refused;
+export type ActionResult<T = Record<never, never>> =
+  ({ ok: true } & T) | Refused;

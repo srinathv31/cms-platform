@@ -47,7 +47,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
 const TEAM = "coral-offers";
 const NAME = "Spring Travel Rewards — Terms";
-const OFFER_SENTENCE = "Earn a $200 statement credit on your first travel purchase.";
+const OFFER_SENTENCE =
+  "Earn a $200 statement credit on your first travel purchase.";
 
 /** Copilot's answer, as the prompt asks for it: Markdown, the required heading, placeholders in braces. */
 const ANSWER = [
@@ -76,7 +77,10 @@ test.afterAll(async () => {
   }
 });
 
-const copilotRow = (page: Page) => page.getByRole("button", { name: "Copilot prompt" }).filter({ visible: true });
+const copilotRow = (page: Page) =>
+  page
+    .getByRole("button", { name: "Copilot prompt" })
+    .filter({ visible: true });
 
 /**
  * The editor's own selection has caught up with the browser's. A key that moves the caret (End) moves the browser's
@@ -91,19 +95,31 @@ async function expectEditorSelectionCaughtUp(page: Page) {
             state: { selection: { from: number } };
             view: { posAtDOM(node: Node, offset: number): number };
           }
-          const dom = [...document.querySelectorAll(".ProseMirror")].find((el) => (el as HTMLElement).offsetParent !== null) as
-            | (HTMLElement & { editor: Live })
-            | undefined;
+          const dom = [...document.querySelectorAll(".ProseMirror")].find(
+            (el) => (el as HTMLElement).offsetParent !== null,
+          ) as (HTMLElement & { editor: Live }) | undefined;
           const selection = window.getSelection();
-          if (!dom || !selection?.anchorNode || !dom.contains(selection.anchorNode)) return false;
-          return dom.editor.view.posAtDOM(selection.anchorNode, selection.anchorOffset) === dom.editor.state.selection.from;
+          if (
+            !dom ||
+            !selection?.anchorNode ||
+            !dom.contains(selection.anchorNode)
+          )
+            return false;
+          return (
+            dom.editor.view.posAtDOM(
+              selection.anchorNode,
+              selection.anchorOffset,
+            ) === dom.editor.state.selection.from
+          );
         }),
       { message: "the editor's selection is the browser's" },
     )
     .toBe(true);
 }
 
-test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{purchase_apr}}, which becomes a chip", async ({ page }) => {
+test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{purchase_apr}}, which becomes a chip", async ({
+  page,
+}) => {
   test.setTimeout(120_000);
 
   await asPersona(page, "maya");
@@ -126,10 +142,17 @@ test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{
     await typeSlowly(page, NAME);
     await page.keyboard.press("Enter");
     await liveEditor(page);
-    await expect.poll(async () => (await caret(page)).focused, { message: "the document has focus" }).toBe(true);
+    await expect
+      .poll(async () => (await caret(page)).focused, {
+        message: "the document has focus",
+      })
+      .toBe(true);
     await typeSlowly(page, OFFER_SENTENCE);
     await expect(documentEditor(page)).toContainText(OFFER_SENTENCE);
-    expect(await chipsPresent(page, ["purchase_apr"]), "no purchase APR chip yet").toEqual([]);
+    expect(
+      await chipsPresent(page, ["purchase_apr"]),
+      "no purchase APR chip yet",
+    ).toEqual([]);
     await expectAutosaved(page);
     await shoot(page, "01-draft");
   });
@@ -148,7 +171,9 @@ test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{
 
     expect(prompt).toContain(`Template: ${NAME}`);
     // The sections, exactly and in order.
-    expect(prompt).toMatch(/## Offer details\n## Rates and fees\n## Legal notices/);
+    expect(prompt).toMatch(
+      /## Offer details\n## Rates and fees\n## Legal notices/,
+    );
     // The placeholders it may use, in braces.
     expect(prompt).toContain("{{purchase_apr}}");
     expect(prompt).toContain("{{first_name}}");
@@ -195,19 +220,35 @@ test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{
     await expect(chip(page, "purchase_apr")).toHaveCount(1);
     await expect(chip(page, "purchase_apr")).toBeVisible();
     // The chip is in the Rates and fees section, which is still one section.
-    await expect(body.locator("h2[data-required]")).toHaveText(["Offer details", "Rates and fees", "Legal notices"]);
-    expect(await body.getByRole("heading", { name: "Rates and fees" }).count(), "the heading merged, not repeated").toBe(1);
+    await expect(body.locator("h2[data-required]")).toHaveText([
+      "Offer details",
+      "Rates and fees",
+      "Legal notices",
+    ]);
+    expect(
+      await body.getByRole("heading", { name: "Rates and fees" }).count(),
+      "the heading merged, not repeated",
+    ).toBe(1);
     const section = await body.evaluate((root) => {
       const heading = root.querySelector('h2[data-required="rates_and_fees"]')!;
       const next = root.querySelector('h2[data-required="legal_notices"]')!;
       const between: Element[] = [];
-      for (let el = heading.nextElementSibling; el && el !== next; el = el.nextElementSibling) between.push(el);
+      for (
+        let el = heading.nextElementSibling;
+        el && el !== next;
+        el = el.nextElementSibling
+      )
+        between.push(el);
       return {
-        chipInSection: between.some((el) => el.querySelector('[data-variable="purchase_apr"]')),
+        chipInSection: between.some((el) =>
+          el.querySelector('[data-variable="purchase_apr"]'),
+        ),
         lists: between.filter((el) => el.tagName === "UL").length,
       };
     });
-    expect(section.chipInSection, "the chip is under Rates and fees").toBe(true);
+    expect(section.chipInSection, "the chip is under Rates and fees").toBe(
+      true,
+    );
     expect(section.lists, "the bullets became a list").toBe(1);
     await expect(body).toContainText("No foreign transaction fee");
     await expect(body).not.toContainText("{{purchase_apr}}");

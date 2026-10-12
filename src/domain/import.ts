@@ -31,7 +31,8 @@ const ATOM = "￼";
 // ── Placeholders ─────────────────────────────────────────────────────────────
 
 /** What a `{{inner}}` token is: a key (it becomes a chip), template logic, or something else. */
-export type PlaceholderClass = { kind: "key"; key: string } | { kind: "logic" } | { kind: "invalid" };
+export type PlaceholderClass =
+  { kind: "key"; key: string } | { kind: "logic" } | { kind: "invalid" };
 
 const LOGIC_START = /^[#/^>!&]/;
 const LOGIC_ELSE = /^else\b/;
@@ -46,7 +47,8 @@ const MAX_NAME_PLACEHOLDER = 64;
  */
 export function classifyPlaceholder(inner: string): PlaceholderClass {
   const text = inner.trim();
-  if (LOGIC_START.test(text) || LOGIC_ELSE.test(text) || LOGIC_CHARS.test(text)) return { kind: "logic" };
+  if (LOGIC_START.test(text) || LOGIC_ELSE.test(text) || LOGIC_CHARS.test(text))
+    return { kind: "logic" };
   if (isValidKey(text)) return { kind: "key", key: text };
   if (text.length <= MAX_NAME_PLACEHOLDER && NAME.test(text)) {
     const key = toKey(text);
@@ -68,7 +70,12 @@ export interface PlaceholderToken {
 export function scanPlaceholders(text: string): PlaceholderToken[] {
   const tokens: PlaceholderToken[] = [];
   for (const match of text.matchAll(/\{\{([^{}￼]*)\}\}/g)) {
-    tokens.push({ raw: match[0], inner: match[1], index: match.index ?? 0, class: classifyPlaceholder(match[1]) });
+    tokens.push({
+      raw: match[0],
+      inner: match[1],
+      index: match.index ?? 0,
+      class: classifyPlaceholder(match[1]),
+    });
   }
   return tokens;
 }
@@ -105,7 +112,11 @@ export function applyPlaceholders(body: JSONContent): AppliedPlaceholders {
     return changed ? { ...node, content: next } : node;
   };
 
-  return { body: visit(body), placeholders: [...detected.values()], skipped: [...skipped.values()] };
+  return {
+    body: visit(body),
+    placeholders: [...detected.values()],
+    skipped: [...skipped.values()],
+  };
 }
 
 function chipInline(
@@ -125,13 +136,26 @@ function chipInline(
   for (const token of scanPlaceholders(joined)) {
     if (token.class.kind === "key") {
       const key = token.class.key;
-      const entry = detected.get(key) ?? { key, label: labelFromKey(key), raw: [], count: 0 };
+      const entry = detected.get(key) ?? {
+        key,
+        label: labelFromKey(key),
+        raw: [],
+        count: 0,
+      };
       if (!entry.raw.includes(token.raw)) entry.raw.push(token.raw);
       entry.count += 1;
       detected.set(key, entry);
-      chips.push({ start: token.index, end: token.index + token.raw.length, key });
+      chips.push({
+        start: token.index,
+        end: token.index + token.raw.length,
+        key,
+      });
     } else {
-      const entry = skipped.get(token.raw) ?? { raw: token.raw, reason: token.class.kind, count: 0 };
+      const entry = skipped.get(token.raw) ?? {
+        raw: token.raw,
+        reason: token.class.kind,
+        count: 0,
+      };
       entry.count += 1;
       skipped.set(token.raw, entry);
     }
@@ -148,14 +172,25 @@ function chipInline(
     const start = starts[i];
     const end = start + text.length;
     const piece = (from: number, to: number) => {
-      if (to > from) out.push(withMarks({ type: "text", text: text.slice(from - start, to - start) }, child.marks));
+      if (to > from)
+        out.push(
+          withMarks(
+            { type: "text", text: text.slice(from - start, to - start) },
+            child.marks,
+          ),
+        );
     };
     let at = start;
     for (const chip of chips) {
       if (chip.end <= start || chip.start >= end) continue;
       if (chip.start >= start) {
         piece(at, chip.start);
-        out.push(withMarks({ type: "variable", attrs: { key: chip.key } }, child.marks));
+        out.push(
+          withMarks(
+            { type: "variable", attrs: { key: chip.key } },
+            child.marks,
+          ),
+        );
       }
       at = Math.max(at, Math.min(chip.end, end));
     }
@@ -164,13 +199,24 @@ function chipInline(
   return out;
 }
 
-function withMarks(node: JSONContent, marks: JSONContent["marks"]): JSONContent {
+function withMarks(
+  node: JSONContent,
+  marks: JSONContent["marks"],
+): JSONContent {
   return marks?.length ? { ...node, marks } : node;
 }
 
 /** The variables an import creates: Text, required, no sample (sample sets fill it). */
-export function importedVariables(placeholders: readonly DetectedPlaceholder[]): Variable[] {
-  return placeholders.map((p) => ({ key: p.key, label: p.label, type: "text", required: true, sample: "" }));
+export function importedVariables(
+  placeholders: readonly DetectedPlaceholder[],
+): Variable[] {
+  return placeholders.map((p) => ({
+    key: p.key,
+    label: p.label,
+    type: "text",
+    required: true,
+    sample: "",
+  }));
 }
 
 // ── Required sections ────────────────────────────────────────────────────────
@@ -186,7 +232,10 @@ export interface FittedSections {
  * match. A match becomes the required H2 with the canonical title; a section not found is added
  * empty right before the next matched one, or at the end. The result has every section once, in order.
  */
-export function fitRequiredSections(body: JSONContent, sections: readonly RequiredSection[]): FittedSections {
+export function fitRequiredSections(
+  body: JSONContent,
+  sections: readonly RequiredSection[],
+): FittedSections {
   const blocks = body.content ?? [];
   const keys = sections.map((s) => sectionTitleKey(s.title));
   const matchedAt = new Map<number, number>();
@@ -225,7 +274,11 @@ export function fitRequiredSections(body: JSONContent, sections: readonly Requir
     const s = sections[j];
     const id = typeof block.attrs?.id === "string" ? block.attrs.id : undefined;
     out.push(requiredHeading(s, id));
-    fit.matched.push({ key: s.key, title: s.title, from: plainText(block).replace(/\s+/g, " ").trim() });
+    fit.matched.push({
+      key: s.key,
+      title: s.title,
+      from: plainText(block).replace(/\s+/g, " ").trim(),
+    });
     emitted = j + 1;
   });
   addMissing(sections.length);
@@ -242,14 +295,17 @@ function requiredHeading(section: RequiredSection, id?: string): JSONContent {
 }
 
 function clearRequiredKey(block: JSONContent): JSONContent {
-  if (block.type !== "heading" || block.attrs?.requiredKey == null) return block;
+  if (block.type !== "heading" || block.attrs?.requiredKey == null)
+    return block;
   return { ...block, attrs: { ...block.attrs, requiredKey: null } };
 }
 
 function isSectionCandidate(block: JSONContent): boolean {
   if (block.type === "heading") return true;
   if (block.type !== "paragraph" || !block.content?.length) return false;
-  const texts = block.content.filter((c) => c.type === "text" && (c.text ?? "").trim());
+  const texts = block.content.filter(
+    (c) => c.type === "text" && (c.text ?? "").trim(),
+  );
   return (
     texts.length > 0 &&
     block.content.every((c) => c.type === "text") &&
@@ -277,15 +333,20 @@ export interface TakenTitle {
  * When the first non-empty block is an H1 (Word's Title or Heading 1), its text is the name and the
  * block goes. An H1 that is itself one of `sections` is a section, not a title.
  */
-export function takeTitle(body: JSONContent, sections: readonly RequiredSection[] = []): TakenTitle {
+export function takeTitle(
+  body: JSONContent,
+  sections: readonly RequiredSection[] = [],
+): TakenTitle {
   const blocks = body.content ?? [];
   const first = blocks.findIndex((b) => !isEmptyBlock(b));
   const block = blocks[first];
-  if (!block || block.type !== "heading" || Number(block.attrs?.level) !== 1) return { body, title: null };
+  if (!block || block.type !== "heading" || Number(block.attrs?.level) !== 1)
+    return { body, title: null };
   const text = clampName(plainText(block));
   if (!text) return { body, title: null };
   const key = sectionTitleKey(text);
-  if (sections.some((s) => sectionTitleKey(s.title) === key)) return { body, title: null };
+  if (sections.some((s) => sectionTitleKey(s.title) === key))
+    return { body, title: null };
   return { body: { ...body, content: blocks.slice(first + 1) }, title: text };
 }
 
@@ -348,9 +409,17 @@ export function sanitizeFilename(name: string): string {
 export function textToBody(text: string): JSONContent {
   const clean = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n").trim();
   const blank = /\n[ \t]*\n/;
-  const chunks = blank.test(clean) ? clean.split(/\n(?:[ \t]*\n)+/) : clean.split("\n");
+  const chunks = blank.test(clean)
+    ? clean.split(/\n(?:[ \t]*\n)+/)
+    : clean.split("\n");
   const content = chunks
-    .map((chunk) => chunk.split("\n").map((line) => line.trim()).filter(Boolean).reduce(joinLine, ""))
+    .map((chunk) =>
+      chunk
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .reduce(joinLine, ""),
+    )
     .filter(Boolean)
     .map(paragraph);
   return { type: "doc", content };
@@ -417,11 +486,16 @@ export function pdfLinesToBody(pages: readonly PdfPageText[]): PdfBody {
   const perPage = pages.map((page, i) => linesOf(page.items, i));
   const { kept, repeated } = dropRepeatedLines(perPage);
   const lines = kept.flat();
-  if (!lines.length) return { body: { type: "doc", content: [] }, repeatedLines: repeated };
+  if (!lines.length)
+    return { body: { type: "doc", content: [] }, repeatedLines: repeated };
 
   const bodySize = bodyFontSize(lines);
   const level = (line: Line): 0 | 1 | 2 =>
-    line.h >= bodySize * TITLE_RATIO ? 1 : line.h >= bodySize * HEADING_RATIO ? 2 : 0;
+    line.h >= bodySize * TITLE_RATIO
+      ? 1
+      : line.h >= bodySize * HEADING_RATIO
+        ? 2
+        : 0;
 
   type Block =
     | { kind: "heading"; level: 1 | 2; text: string; last: Line }
@@ -433,29 +507,50 @@ export function pdfLinesToBody(pages: readonly PdfPageText[]): PdfBody {
     const prev = blocks[blocks.length - 1];
     const lineLevel = level(line);
     const bullet = lineLevel === 0 ? BULLET.exec(line.text) : null;
-    const numbered = lineLevel === 0 && !bullet ? NUMBERED.exec(line.text) : null;
+    const numbered =
+      lineLevel === 0 && !bullet ? NUMBERED.exec(line.text) : null;
 
     if (bullet || numbered) {
-      blocks.push({ kind: "item", ordered: Boolean(numbered), text: (bullet ?? numbered)![1], last: line });
+      blocks.push({
+        kind: "item",
+        ordered: Boolean(numbered),
+        text: (bullet ?? numbered)![1],
+        last: line,
+      });
       continue;
     }
-    if (prev && continues(prev.last, line, prev.text) && (prev.kind === "heading" ? prev.level === lineLevel : lineLevel === 0)) {
+    if (
+      prev &&
+      continues(prev.last, line, prev.text) &&
+      (prev.kind === "heading" ? prev.level === lineLevel : lineLevel === 0)
+    ) {
       prev.text = joinLine(prev.text, line.text);
       prev.last = line;
       continue;
     }
-    blocks.push(lineLevel ? { kind: "heading", level: lineLevel, text: line.text, last: line } : { kind: "paragraph", text: line.text, last: line });
+    blocks.push(
+      lineLevel
+        ? { kind: "heading", level: lineLevel, text: line.text, last: line }
+        : { kind: "paragraph", text: line.text, last: line },
+    );
   }
 
   const content: JSONContent[] = [];
   for (const block of blocks) {
     if (block.kind === "heading") {
-      content.push({ type: "heading", attrs: { level: block.level }, content: [{ type: "text", text: block.text }] });
+      content.push({
+        type: "heading",
+        attrs: { level: block.level },
+        content: [{ type: "text", text: block.text }],
+      });
     } else if (block.kind === "paragraph") {
       content.push(paragraph(block.text));
     } else {
       const type = block.ordered ? "orderedList" : "bulletList";
-      const item: JSONContent = { type: "listItem", content: [paragraph(block.text)] };
+      const item: JSONContent = {
+        type: "listItem",
+        content: [paragraph(block.text)],
+      };
       const last = content[content.length - 1];
       if (last?.type === type) last.content = [...(last.content ?? []), item];
       else content.push({ type, content: [item] });
@@ -469,19 +564,25 @@ function continues(last: Line, line: Line, text: string): boolean {
   if (Math.abs(line.h - last.h) > Math.max(line.h, last.h) * 0.15) return false;
   if (line.page !== last.page) {
     // A paragraph running over a page break: it didn't end a sentence, and the next line goes on.
-    return insidePlaceholder(text) || (!/[.!?:;]$/.test(text) && /^[a-z{]/.test(line.text));
+    return (
+      insidePlaceholder(text) ||
+      (!/[.!?:;]$/.test(text) && /^[a-z{]/.test(line.text))
+    );
   }
   const gap = line.y - last.y;
   return gap > 0 && gap <= 1.5 * Math.max(line.h, last.h);
 }
 
 function linesOf(items: readonly PdfTextItem[], page: number): Line[] {
-  const sorted = items.filter((it) => it.str.length > 0).sort((a, b) => a.y - b.y || a.x - b.x);
+  const sorted = items
+    .filter((it) => it.str.length > 0)
+    .sort((a, b) => a.y - b.y || a.x - b.x);
   const rows: PdfTextItem[][] = [];
   for (const item of sorted) {
     const row = rows[rows.length - 1];
     const ref = row?.[0];
-    if (row && ref && Math.abs(item.y - ref.y) <= Math.max(ref.h, item.h) * 0.4) row.push(item);
+    if (row && ref && Math.abs(item.y - ref.y) <= Math.max(ref.h, item.h) * 0.4)
+      row.push(item);
     else rows.push([item]);
   }
   const lines: Line[] = [];
@@ -492,13 +593,24 @@ function linesOf(items: readonly PdfTextItem[], page: number): Line[] {
     for (const item of row) {
       if (prev) {
         const gap = item.x - (prev.x + prev.w);
-        if (gap > Math.max(prev.h, item.h) * 0.2 && !/\s$/.test(text) && !/^\s/.test(item.str)) text += " ";
+        if (
+          gap > Math.max(prev.h, item.h) * 0.2 &&
+          !/\s$/.test(text) &&
+          !/^\s/.test(item.str)
+        )
+          text += " ";
       }
       text += item.str;
       prev = item;
     }
     const clean = text.replace(/\s+/g, " ").trim();
-    if (clean) lines.push({ page, text: clean, y: row[0].y, h: Math.max(...row.map((it) => it.h)) });
+    if (clean)
+      lines.push({
+        page,
+        text: clean,
+        y: row[0].y,
+        h: Math.max(...row.map((it) => it.h)),
+      });
   }
   return lines;
 }
@@ -510,7 +622,10 @@ const EDGE = 2;
  * A line repeats when the same text (digits ignored, so page numbers match) sits in the same edge
  * slot (first, second, last or second-to-last line) on more than half of the pages.
  */
-function dropRepeatedLines(pages: Line[][]): { kept: Line[][]; repeated: number } {
+function dropRepeatedLines(pages: Line[][]): {
+  kept: Line[][];
+  repeated: number;
+} {
   if (pages.length < 2) return { kept: pages, repeated: 0 };
   const shape = (line: Line) => line.text.toLowerCase().replace(/\d+/g, "#");
   const slots = (lines: Line[]): [string, Line][] => {
@@ -522,17 +637,30 @@ function dropRepeatedLines(pages: Line[][]): { kept: Line[][]; repeated: number 
   };
   const seen = new Map<string, number>();
   for (const lines of pages) {
-    for (const key of new Set(slots(lines).map(([slot, line]) => `${slot}|${shape(line)}`))) {
+    for (const key of new Set(
+      slots(lines).map(([slot, line]) => `${slot}|${shape(line)}`),
+    )) {
       seen.set(key, (seen.get(key) ?? 0) + 1);
     }
   }
-  const repeated = new Set([...seen].filter(([, n]) => n > pages.length / 2).map(([key]) => key));
+  const repeated = new Set(
+    [...seen].filter(([, n]) => n > pages.length / 2).map(([key]) => key),
+  );
   if (!repeated.size) return { kept: pages, repeated: 0 };
   const kept = pages.map((lines) => {
-    const drop = new Set(slots(lines).filter(([slot, line]) => repeated.has(`${slot}|${shape(line)}`)).map(([, line]) => line));
+    const drop = new Set(
+      slots(lines)
+        .filter(([slot, line]) => repeated.has(`${slot}|${shape(line)}`))
+        .map(([, line]) => line),
+    );
     return lines.filter((line) => !drop.has(line));
   });
-  return { kept, repeated: new Set([...repeated].map((key) => key.slice(key.indexOf("|") + 1))).size };
+  return {
+    kept,
+    repeated: new Set(
+      [...repeated].map((key) => key.slice(key.indexOf("|") + 1)),
+    ).size,
+  };
 }
 
 /** The font size most of the text is set in: the median weighted by characters. */
@@ -584,9 +712,12 @@ export function finishImport(input: FinishImportInput): FinishedImport {
 export function countBlocks(body: JSONContent): ImportReport["counts"] {
   const counts = { headings: 0, paragraphs: 0, lists: 0, tables: 0 };
   for (const block of body.content ?? []) {
-    if (block.type === "heading" && block.attrs?.requiredKey == null) counts.headings++;
-    else if (block.type === "paragraph" && plainText(block).trim()) counts.paragraphs++;
-    else if (block.type === "bulletList" || block.type === "orderedList") counts.lists++;
+    if (block.type === "heading" && block.attrs?.requiredKey == null)
+      counts.headings++;
+    else if (block.type === "paragraph" && plainText(block).trim())
+      counts.paragraphs++;
+    else if (block.type === "bulletList" || block.type === "orderedList")
+      counts.lists++;
     else if (block.type === "table") counts.tables++;
   }
   return counts;
@@ -595,7 +726,9 @@ export function countBlocks(body: JSONContent): ImportReport["counts"] {
 // ── The report as lines ──────────────────────────────────────────────────────
 
 function andList(items: readonly string[]): string {
-  return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  return items.length <= 1
+    ? (items[0] ?? "")
+    : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 function describeDrop(drop: ImportDrop): string {
@@ -654,7 +787,11 @@ export function keptLines(skipped: readonly SkippedPlaceholder[]): string[] {
       // Each opener takes one closer of its name, in order.
       const left = closersLeft.get(block.name) ?? 0;
       if (left > 0) closersLeft.set(block.name, left - 1);
-      latest = { raw: s.raw, closer: left > 0 ? (closerRaw.get(block.name) ?? null) : null, hasElse: false };
+      latest = {
+        raw: s.raw,
+        closer: left > 0 ? (closerRaw.get(block.name) ?? null) : null,
+        hasElse: false,
+      };
       openers.push(latest);
     } else if (latest && /^\{\{\s*else\b/.test(s.raw)) {
       latest.hasElse = true;
@@ -663,11 +800,14 @@ export function keptLines(skipped: readonly SkippedPlaceholder[]): string[] {
     }
   }
   // A closer with no opener to take it is its own line.
-  for (const [name, left] of closersLeft) if (left > 0) alone.push(closerRaw.get(name)!);
+  for (const [name, left] of closersLeft)
+    if (left > 0) alone.push(closerRaw.get(name)!);
 
   const blocks = openers.map((o) => {
     const middle = o.hasElse ? "{{else}} … " : "";
-    return o.closer ? `${o.raw} … ${middle}${o.closer} ${AS_WRITTEN}` : `${o.raw} ${middle ? `… ${middle}` : ""}${AS_WRITTEN}`;
+    return o.closer
+      ? `${o.raw} … ${middle}${o.closer} ${AS_WRITTEN}`
+      : `${o.raw} ${middle ? `… ${middle}` : ""}${AS_WRITTEN}`;
   });
   return [...blocks, ...alone.map((raw) => `${raw} ${AS_WRITTEN}`)];
 }
@@ -683,8 +823,11 @@ export function describeImport(report: ImportReport): ImportReportLines {
   const vars = report.placeholders;
   // An import makes every variable Text and required; the author sees that once, here.
   if (vars.length) {
-    const kind = vars.length === 1 ? "Text and required" : "all Text and required";
-    detected.push(`${plural(vars.length, "variable")}, ${kind}: ${vars.map((p) => p.label).join(", ")}`);
+    const kind =
+      vars.length === 1 ? "Text and required" : "all Text and required";
+    detected.push(
+      `${plural(vars.length, "variable")}, ${kind}: ${vars.map((p) => p.label).join(", ")}`,
+    );
   }
   if (report.pages) detected.push(plural(report.pages, "page"));
   const { headings, paragraphs, lists, tables } = report.counts;
@@ -692,11 +835,22 @@ export function describeImport(report: ImportReport): ImportReportLines {
   if (lists) detected.push(plural(lists, "list"));
   if (tables) detected.push(plural(tables, "table"));
   const added = report.sections.added;
-  if (added.length) detected.push(`Added empty ${pluralWord(added.length, "section")}: ${andList(added.map((s) => s.title))}`);
+  if (added.length)
+    detected.push(
+      `Added empty ${pluralWord(added.length, "section")}: ${andList(added.map((s) => s.title))}`,
+    );
   // No section was found in the file, so the sections are all new and the text sits above the first.
-  if (report.sections.matched.length === 0 && headings === 0 && paragraphs + lists + tables > 0) {
+  if (
+    report.sections.matched.length === 0 &&
+    headings === 0 &&
+    paragraphs + lists + tables > 0
+  ) {
     detected.push("The text stays above the first section");
   }
 
-  return { detected, dropped: report.dropped.map(describeDrop), kept: keptLines(report.skippedPlaceholders) };
+  return {
+    detected,
+    dropped: report.dropped.map(describeDrop),
+    kept: keptLines(report.skippedPlaceholders),
+  };
 }

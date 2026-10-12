@@ -21,11 +21,26 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { TABLE_COLUMNS_MESSAGE, canAddColumn } from "../extensions/content-limits";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import {
+  TABLE_COLUMNS_MESSAGE,
+  canAddColumn,
+} from "../extensions/content-limits";
 import { cx } from "../lib/cx";
 import { refocusText, useViewDom, viewDom } from "../lib/editor-view";
-import { MENU_ITEM, MENU_ITEM_DANGER, MENU_POPUP, MENU_REASON, MENU_SEPARATOR } from "./classes";
+import {
+  MENU_ITEM,
+  MENU_ITEM_DANGER,
+  MENU_POPUP,
+  MENU_REASON,
+  MENU_SEPARATOR,
+} from "./classes";
 import { Menu } from "@base-ui/react/menu";
 import {
   DropdownMenu,
@@ -55,16 +70,41 @@ interface Action {
 
 const GROUPS: Action[][] = [
   [
-    { command: "addRowBefore", label: "Insert row above", icon: BetweenHorizontalStart },
-    { command: "addRowAfter", label: "Insert row below", icon: BetweenHorizontalEnd },
-    { command: "addColumnBefore", label: "Insert column left", icon: BetweenVerticalStart, addsColumn: true },
-    { command: "addColumnAfter", label: "Insert column right", icon: BetweenVerticalEnd, addsColumn: true },
+    {
+      command: "addRowBefore",
+      label: "Insert row above",
+      icon: BetweenHorizontalStart,
+    },
+    {
+      command: "addRowAfter",
+      label: "Insert row below",
+      icon: BetweenHorizontalEnd,
+    },
+    {
+      command: "addColumnBefore",
+      label: "Insert column left",
+      icon: BetweenVerticalStart,
+      addsColumn: true,
+    },
+    {
+      command: "addColumnAfter",
+      label: "Insert column right",
+      icon: BetweenVerticalEnd,
+      addsColumn: true,
+    },
   ],
   [
     { command: "deleteRow", label: "Delete row", icon: Rows3 },
     { command: "deleteColumn", label: "Delete column", icon: Columns3 },
   ],
-  [{ command: "deleteTable", label: "Delete table", icon: Trash2, danger: true }],
+  [
+    {
+      command: "deleteTable",
+      label: "Delete table",
+      icon: Trash2,
+      danger: true,
+    },
+  ],
 ];
 
 /** Position before the table the selection is in, or null. */
@@ -77,23 +117,42 @@ function tableAt(editor: Editor): number | null {
 }
 
 export function TableMenu({ editor }: { editor: Editor }) {
-  const tablePos = useEditorState({ editor, selector: ({ editor: e }) => (e.isEditable && !e.isDestroyed ? tableAt(e) : null) });
+  const tablePos = useEditorState({
+    editor,
+    selector: ({ editor: e }) =>
+      e.isEditable && !e.isDestroyed ? tableAt(e) : null,
+  });
   if (tablePos === null || editor.isDestroyed) return null;
   return <TableMenuButton key={tablePos} editor={editor} tablePos={tablePos} />;
 }
 
-function TableMenuButton({ editor, tablePos }: { editor: Editor; tablePos: number }) {
+function TableMenuButton({
+  editor,
+  tablePos,
+}: {
+  editor: Editor;
+  tablePos: number;
+}) {
   const [style, setStyle] = useState<CSSProperties | null>(null);
   // Positioned in the editor's own wrapper (rendered by React, unlike EditorContent's element).
   const frame = viewDom(editor)?.closest<HTMLElement>(".ucomp-editor") ?? null;
   const trigger = useRef<HTMLButtonElement>(null);
-  const columnsFull = useEditorState({ editor, selector: ({ editor: e }) => !e.isDestroyed && !canAddColumn(e.state) });
+  const columnsFull = useEditorState({
+    editor,
+    selector: ({ editor: e }) => !e.isDestroyed && !canAddColumn(e.state),
+  });
   const reasonId = useId();
 
   // Alt+F10 in the table moves focus to the button.
   useViewDom(editor, (dom) => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "F10" || !event.altKey || event.metaKey || event.ctrlKey) return;
+      if (
+        event.key !== "F10" ||
+        !event.altKey ||
+        event.metaKey ||
+        event.ctrlKey
+      )
+        return;
       event.preventDefault();
       trigger.current?.focus();
     };
@@ -145,26 +204,47 @@ function TableMenuButton({ editor, tablePos }: { editor: Editor; tablePos: numbe
         </DropdownMenuTrigger>
         {/* In the editor's wrapper (inside the page's landmarks), not at the end of <body>. */}
         <DropdownMenuPortal container={frame}>
-          <Menu.Positioner align="end" sideOffset={6} collisionBoundary={frame} collisionPadding={8} className="isolate z-50 outline-none">
+          <Menu.Positioner
+            align="end"
+            sideOffset={6}
+            collisionBoundary={frame}
+            collisionPadding={8}
+            className="isolate z-50 outline-none"
+          >
             <Menu.Popup
               finalFocus={() => refocusText(editor)}
               className={cx(MENU_POPUP, "w-52")}
             >
               {GROUPS.map((group, i) => (
                 <Menu.Group key={i}>
-                  {i ? <DropdownMenuSeparator className={MENU_SEPARATOR} /> : null}
-                  {group.map(({ command, label, icon: Icon, danger, addsColumn }) => (
-                    <DropdownMenuItem
-                      key={command}
-                      disabled={(addsColumn && columnsFull) || !editor.can()[command]()}
-                      aria-describedby={addsColumn && columnsFull ? reasonId : undefined}
-                      onClick={() => run(command)}
-                      className={danger ? MENU_ITEM_DANGER : MENU_ITEM}
-                    >
-                      <Icon className={danger ? "size-4" : "size-4 text-text-muted"} strokeWidth={1.75} aria-hidden />
-                      {label}
-                    </DropdownMenuItem>
-                  ))}
+                  {i ? (
+                    <DropdownMenuSeparator className={MENU_SEPARATOR} />
+                  ) : null}
+                  {group.map(
+                    ({ command, label, icon: Icon, danger, addsColumn }) => (
+                      <DropdownMenuItem
+                        key={command}
+                        disabled={
+                          (addsColumn && columnsFull) ||
+                          !editor.can()[command]()
+                        }
+                        aria-describedby={
+                          addsColumn && columnsFull ? reasonId : undefined
+                        }
+                        onClick={() => run(command)}
+                        className={danger ? MENU_ITEM_DANGER : MENU_ITEM}
+                      >
+                        <Icon
+                          className={
+                            danger ? "size-4" : "size-4 text-text-muted"
+                          }
+                          strokeWidth={1.75}
+                          aria-hidden
+                        />
+                        {label}
+                      </DropdownMenuItem>
+                    ),
+                  )}
                   {i === 0 && columnsFull ? (
                     <p id={reasonId} className={cx(MENU_REASON, "pb-1")}>
                       {TABLE_COLUMNS_MESSAGE}

@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, use, useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useDraftAutosave } from "../autosave/use-draft-autosave";
 import type { FocusTargetElements, FocusTargetName } from "./focus-targets";
 import {
@@ -24,7 +32,11 @@ const SessionContext = createContext<WorkspaceSession | null>(null);
  * switching tabs doesn't end it, a rename on Versions saves like one on Content, and the pending save
  * of a hidden Content tab still goes out.
  */
-export function WorkspaceSessionProvider({ children }: { children: React.ReactNode }) {
+export function WorkspaceSessionProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [session] = useState(createWorkspaceSession);
   return (
     <SessionContext value={session}>
@@ -35,9 +47,19 @@ export function WorkspaceSessionProvider({ children }: { children: React.ReactNo
 }
 
 function SessionHostSlot({ session }: { session: WorkspaceSession }) {
-  const binding = useSyncExternalStore(session.subscribe, session.getBinding, () => INITIAL_SESSION_STATE.binding);
+  const binding = useSyncExternalStore(
+    session.subscribe,
+    session.getBinding,
+    () => INITIAL_SESSION_STATE.binding,
+  );
   // A new version is a new autosave session, so it is a new host.
-  return binding ? <DraftSessionHost key={binding.versionId} session={session} binding={binding} /> : null;
+  return binding ? (
+    <DraftSessionHost
+      key={binding.versionId}
+      session={session}
+      binding={binding}
+    />
+  ) : null;
 }
 
 /**
@@ -46,8 +68,17 @@ function SessionHostSlot({ session }: { session: WorkspaceSession }) {
  * holds the page inert for as long as it lives, so nothing more can be typed that would be dropped;
  * the header says why and offers Reload (`SaveStopped`).
  */
-function DraftSessionHost({ session, binding }: { session: WorkspaceSession; binding: DraftBinding }) {
-  const { save, flush, status, error, stopped } = useDraftAutosave({ versionId: binding.versionId, initialRev: binding.rev });
+function DraftSessionHost({
+  session,
+  binding,
+}: {
+  session: WorkspaceSession;
+  binding: DraftBinding;
+}) {
+  const { save, flush, status, error, stopped } = useDraftAutosave({
+    versionId: binding.versionId,
+    initialRev: binding.rev,
+  });
 
   // Layout effect: changes held while this host was mounting go out before the browser paints.
   useLayoutEffect(() => {
@@ -56,11 +87,18 @@ function DraftSessionHost({ session, binding }: { session: WorkspaceSession; bin
   }, [session, save, flush]);
 
   useLayoutEffect(() => {
-    session.publishStatus({ status, ...(error === undefined ? {} : { error }), ...(stopped ? { stopped } : {}) });
+    session.publishStatus({
+      status,
+      ...(error === undefined ? {} : { error }),
+      ...(stopped ? { stopped } : {}),
+    });
   }, [session, status, error, stopped]);
 
   // Stopped is for good: the hold goes only with this host (another draft bound, or none).
-  useLayoutEffect(() => (stopped ? session.makeInert() : undefined), [session, stopped]);
+  useLayoutEffect(
+    () => (stopped ? session.makeInert() : undefined),
+    [session, stopped],
+  );
 
   return null;
 }
@@ -75,14 +113,19 @@ export function BindDraft({ draft }: { draft: DraftBinding | null }) {
   const versionId = draft?.versionId ?? null;
   const rev = draft?.rev ?? null;
   useEffect(() => {
-    session.bind(versionId === null || rev === null ? null : { versionId, rev });
+    session.bind(
+      versionId === null || rev === null ? null : { versionId, rev },
+    );
   }, [session, versionId, rev]);
   return null;
 }
 
 export function useWorkspaceSession(): WorkspaceSession {
   const session = use(SessionContext);
-  if (!session) throw new Error("useWorkspaceSession must be used inside <WorkspaceSessionProvider>.");
+  if (!session)
+    throw new Error(
+      "useWorkspaceSession must be used inside <WorkspaceSessionProvider>.",
+    );
   return session;
 }
 
@@ -92,42 +135,70 @@ export function useWorkspaceSession(): WorkspaceSession {
 /** The autosave status of the draft on screen. "saved" before a draft is bound. */
 export function useSaveStatus(): SessionStatus {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getStatus, () => INITIAL_SESSION_STATE.status);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getStatus,
+    () => INITIAL_SESSION_STATE.status,
+  );
 }
 
 export function useRailOpen(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getRailOpen, () => INITIAL_SESSION_STATE.railOpen);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getRailOpen,
+    () => INITIAL_SESSION_STATE.railOpen,
+  );
 }
 
 /** The tab the author picked in the rail (Comments | Variables), or null until they pick one. */
 export function useRailTab(): RailTab | null {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getRailTab, () => INITIAL_SESSION_STATE.railTab);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getRailTab,
+    () => INITIAL_SESSION_STATE.railTab,
+  );
 }
 
 /** The preview's state (open, view, channel, sample set, device), shared by the tab bar and the rail. */
 export function usePreviewState(): PreviewState {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getPreview, () => INITIAL_SESSION_STATE.preview);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getPreview,
+    () => INITIAL_SESSION_STATE.preview,
+  );
 }
 
 /** Counts the saves that have landed; a change means the saved draft is different now. */
 export function useSaveTick(): number {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getSaveTick, () => INITIAL_SESSION_STATE.saveTick);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getSaveTick,
+    () => INITIAL_SESSION_STATE.saveTick,
+  );
 }
 
 /** Undo and redo for the header's buttons, or null when no editor is on screen. */
 export function useHistoryControls(): HistoryControls | null {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getHistory, () => INITIAL_SESSION_STATE.history);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getHistory,
+    () => INITIAL_SESSION_STATE.history,
+  );
 }
 
 /** "Revert to when you opened it" can be offered: something changed, and all of it can be put back. */
 export function useCanRevert(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getCanRevert, () => INITIAL_SESSION_STATE.canRevert);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getCanRevert,
+    () => INITIAL_SESSION_STATE.canRevert,
+  );
 }
 
 /**
@@ -137,7 +208,11 @@ export function useCanRevert(): boolean {
  */
 export function useInert(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getInert, () => INITIAL_SESSION_STATE.inert);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getInert,
+    () => INITIAL_SESSION_STATE.inert,
+  );
 }
 
 /**
@@ -146,13 +221,21 @@ export function useInert(): boolean {
  */
 export function useTabFailed(): boolean {
   const session = useWorkspaceSession();
-  return useSyncExternalStore(session.subscribe, session.getTabFailed, () => INITIAL_SESSION_STATE.tabFailed);
+  return useSyncExternalStore(
+    session.subscribe,
+    session.getTabFailed,
+    () => INITIAL_SESSION_STATE.tabFailed,
+  );
 }
 
 /** Some part of the page on screen can show other values of every one of `fields` (the Content tab, editable, for the content fields). */
 export function useOwnsFields(fields: readonly string[]): boolean {
   const session = useWorkspaceSession();
-  const owned = useSyncExternalStore(session.subscribe, session.getOwnedFields, () => INITIAL_SESSION_STATE.ownedFields);
+  const owned = useSyncExternalStore(
+    session.subscribe,
+    session.getOwnedFields,
+    () => INITIAL_SESSION_STATE.ownedFields,
+  );
   const set = new Set(owned.split(","));
   return fields.every((field) => set.has(field));
 }
@@ -163,10 +246,14 @@ export function useOwnsFields(fields: readonly string[]): boolean {
  * is what it shows, for a caller waiting for a particular one (the status row's version state): a new state
  * registers it again.
  */
-export function useFocusTarget<N extends FocusTargetName>(name: N, state?: string) {
+export function useFocusTarget<N extends FocusTargetName>(
+  name: N,
+  state?: string,
+) {
   const session = useWorkspaceSession();
   return useCallback(
-    (element: FocusTargetElements[N] | null) => (element ? session.focusTargets.register(name, element, state) : undefined),
+    (element: FocusTargetElements[N] | null) =>
+      element ? session.focusTargets.register(name, element, state) : undefined,
     [session, name, state],
   );
 }

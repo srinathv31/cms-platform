@@ -4,7 +4,9 @@
  */
 export function downloadPdf(data: Uint8Array, fileName: string): void {
   // `slice()` copies into a plain ArrayBuffer, which Blob accepts whatever backed the input.
-  const url = URL.createObjectURL(new Blob([data.slice()], { type: "application/pdf" }));
+  const url = URL.createObjectURL(
+    new Blob([data.slice()], { type: "application/pdf" }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = withPdfExtension(fileName);

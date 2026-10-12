@@ -8,7 +8,12 @@ import { formatCount } from "@/domain/numbers";
 import { outputsRefusal } from "@/domain/review-outputs";
 import type { ConsumerUsage, StepView } from "@/domain/review-types";
 import { versionLabel, type NumberedRound } from "@/domain/rounds";
-import type { Channel, ContractChange, PermissionResult, VersionState } from "@/domain/types";
+import type {
+  Channel,
+  ContractChange,
+  PermissionResult,
+  VersionState,
+} from "@/domain/types";
 
 /** The longest reason the server accepts (actions/review.ts). */
 export const REASON_MAX = 2000;
@@ -24,7 +29,9 @@ export function reasonReady(reason: string): boolean {
  * is required, and its label says so); the dialog just doesn't send it.
  */
 export function reasonProblem(reason: string): string | null {
-  return reason.trim().length > REASON_MAX ? `Keep the reason under ${formatCount(REASON_MAX)} characters.` : null;
+  return reason.trim().length > REASON_MAX
+    ? `Keep the reason under ${formatCount(REASON_MAX)} characters.`
+    : null;
 }
 
 // ── Who may decide ───────────────────────────────────────────────────────────
@@ -39,12 +46,22 @@ export function reasonProblem(reason: string): string | null {
  *   dead buttons. That is the refusal coded `generic` (no role gives them the decision); every other code
  *   is blocked. It reads the code, never the sentence, so rewording a refusal changes nothing here.
  */
-export type DecisionAccess = { kind: "open" } | { kind: "blocked"; reason: string } | { kind: "hidden" };
+export type DecisionAccess =
+  { kind: "open" } | { kind: "blocked"; reason: string } | { kind: "hidden" };
 
-export function decisionAccess(approve: PermissionResult, requestChanges: PermissionResult): DecisionAccess {
-  const refused = !approve.ok ? approve : !requestChanges.ok ? requestChanges : null;
+export function decisionAccess(
+  approve: PermissionResult,
+  requestChanges: PermissionResult,
+): DecisionAccess {
+  const refused = !approve.ok
+    ? approve
+    : !requestChanges.ok
+      ? requestChanges
+      : null;
   if (!refused) return { kind: "open" };
-  return refused.code === "generic" ? { kind: "hidden" } : { kind: "blocked", reason: refused.reason };
+  return refused.code === "generic"
+    ? { kind: "hidden" }
+    : { kind: "blocked", reason: refused.reason };
 }
 
 /**
@@ -91,7 +108,11 @@ export interface ApproveLinesInput {
    * With nothing Active (after a revoke), the newest version that still renders, which consumers move from
    * (`ReviewScreenData.stillRenders`), with the version's contract changes against it. Null for a first version.
    */
-  stillRenders?: { number: number; sunsetDay: string | null; contractChanges: readonly ContractChange[] } | null;
+  stillRenders?: {
+    number: number;
+    sunsetDay: string | null;
+    contractChanges: readonly ContractChange[];
+  } | null;
   stage: ApprovalStageInfo;
   /** YYYY-MM-DD: the sunset date chosen for the previous version, or null (it keeps rendering until relinked). */
   sunset: string | null;
@@ -123,7 +144,9 @@ export function approveLines({
   if (!stage.final) {
     const next = stage.next?.name ?? "the next stage";
     const v = versionLabel(version, { style: "sentence" });
-    return [`${v} moves to ${next} for approval. It isn't Active until the last stage approves.`];
+    return [
+      `${v} moves to ${next} for approval. It isn't Active until the last stage approves.`,
+    ];
   }
   // With nothing Active the consumers move from the version that still renders, so what they have to map is
   // this version's changes against it, not the ones submit stored against a version revoked since.
@@ -134,8 +157,12 @@ export function approveLines({
       newNumber: version.number,
       previousNumber,
       sunsetAt: previousNumber === null ? null : sunset,
-      stillRenders: from ? { number: from.number, sunsetAt: from.sunsetDay } : null,
-      breakingKeys: breakingKeysOf(from ? from.contractChanges : contractChanges),
+      stillRenders: from
+        ? { number: from.number, sunsetAt: from.sunsetDay }
+        : null,
+      breakingKeys: breakingKeysOf(
+        from ? from.contractChanges : contractChanges,
+      ),
     },
     usage,
     new Date(nowIso),
@@ -162,7 +189,8 @@ export type LocalDecision =
  *   change-request thread), so the row adds no sentence: only the link to where its work went, when it
  *   went somewhere.
  */
-export type DecisionRow = { kind: "buttons" } | { kind: "line"; text: string } | { kind: "sentBack" };
+export type DecisionRow =
+  { kind: "buttons" } | { kind: "line"; text: string } | { kind: "sentBack" };
 
 export function decisionRow({
   version,
@@ -183,14 +211,24 @@ export function decisionRow({
     case "in_review":
       // Approved an earlier stage and has no say on the next: say so instead of a dead pair of buttons.
       if (local?.kind === "approved" && !local.wentLive && !canDecideAgain) {
-        return line(local.nextStage ? `You approved this stage. ${local.nextStage} is next.` : "You approved this stage.");
+        return line(
+          local.nextStage
+            ? `You approved this stage. ${local.nextStage} is next.`
+            : "You approved this stage.",
+        );
       }
       return { kind: "buttons" };
     case "changes_requested":
       // Right after the viewer sent it back, it is theirs.
-      return local?.kind === "returned" ? line(`You returned ${v} to ${authorName}.`) : { kind: "sentBack" };
+      return local?.kind === "returned"
+        ? line(`You returned ${v} to ${authorName}.`)
+        : { kind: "sentBack" };
     case "active":
-      return line(local?.kind === "approved" && local.wentLive ? `You approved ${v}.` : `${v} is Active.`);
+      return line(
+        local?.kind === "approved" && local.wentLive
+          ? `You approved ${v}.`
+          : `${v} is Active.`,
+      );
     case "superseded":
       return line(`${v} is Superseded.`);
     case "revoked":

@@ -53,7 +53,8 @@ export type LabelStyle = "chrome" | "sentence";
 /** The states a version reaches only once approved: its text was released, and consumers can see it. */
 export type ReleasedState = "active" | "superseded" | "revoked";
 
-export const RELEASED_STATES: ReadonlySet<VersionState> = new Set<ReleasedState>(["active", "superseded", "revoked"]);
+export const RELEASED_STATES: ReadonlySet<VersionState> =
+  new Set<ReleasedState>(["active", "superseded", "revoked"]);
 
 export function isReleased(state: VersionState): state is ReleasedState {
   return RELEASED_STATES.has(state);
@@ -62,8 +63,12 @@ export function isReleased(state: VersionState): state is ReleasedState {
 // ── Numbering and order ───────────────────────────────────────
 
 /** Ascending by number, then round; rows with neither (the open draft) last. */
-export function compareRounds(a: Pick<RoundRow, "number" | "round">, b: Pick<RoundRow, "number" | "round">): number {
-  if (a.number === null || b.number === null) return (a.number === null ? 1 : 0) - (b.number === null ? 1 : 0);
+export function compareRounds(
+  a: Pick<RoundRow, "number" | "round">,
+  b: Pick<RoundRow, "number" | "round">,
+): number {
+  if (a.number === null || b.number === null)
+    return (a.number === null ? 1 : 0) - (b.number === null ? 1 : 0);
   return a.number - b.number || (a.round ?? 0) - (b.round ?? 0);
 }
 
@@ -86,12 +91,20 @@ export function nextRound(rows: readonly RoundRow[]): RoundRef {
     if (isReleased(row.state)) released = Math.max(released, row.number);
   }
   const number = top > released ? top : released + 1;
-  const round = rows.reduce((max, row) => (row.number === number ? Math.max(max, row.round ?? 0) : max), 0) + 1;
+  const round =
+    rows.reduce(
+      (max, row) =>
+        row.number === number ? Math.max(max, row.round ?? 0) : max,
+      0,
+    ) + 1;
   return { number, round };
 }
 
 /** The row a number stands for: its released row, else its highest round. Undefined when it has no rows. */
-export function headOf<T extends RoundRow>(rows: readonly T[], number: number): T | undefined {
+export function headOf<T extends RoundRow>(
+  rows: readonly T[],
+  number: number,
+): T | undefined {
   let head: T | undefined;
   for (const row of rows) {
     if (row.number !== number) continue;
@@ -108,20 +121,30 @@ export function headOf<T extends RoundRow>(rows: readonly T[], number: number): 
  * head has none: it is in review, it was released, or it was sent back and the author hasn't resubmitted
  * (their draft has no number yet).
  */
-export function replacedBy<T extends RoundRow>(rows: readonly T[], shown: RoundRef): T | null {
+export function replacedBy<T extends RoundRow>(
+  rows: readonly T[],
+  shown: RoundRef,
+): T | null {
   const head = headOf(rows, shown.number);
   return head !== undefined && head.round !== shown.round ? head : null;
 }
 
 /** Every round of a number, newest first. */
-export function roundsOf<T extends RoundRow>(rows: readonly T[], number: number): T[] {
-  return rows.filter((row) => row.number === number).sort((a, b) => (b.round ?? 0) - (a.round ?? 0));
+export function roundsOf<T extends RoundRow>(
+  rows: readonly T[],
+  number: number,
+): T[] {
+  return rows
+    .filter((row) => row.number === number)
+    .sort((a, b) => (b.round ?? 0) - (a.round ?? 0));
 }
 
 /** A row known to be submitted, as a `NumberedRound`. A row without a number or a round is a bug. */
 export function asNumbered(row: RoundRow): NumberedRound {
   if (row.number === null || row.round === null) {
-    throw new Error(`A ${row.state} version without a number and a round can't be labelled.`);
+    throw new Error(
+      `A ${row.state} version without a number and a round can't be labelled.`,
+    );
   }
   return { number: row.number, round: row.round, state: row.state };
 }
@@ -133,15 +156,23 @@ export function asNumbered(row: RoundRow): NumberedRound {
  * back itself, or it isn't the first round. A released row is the version consumers know, so only the
  * review history (`history`) names the round it was approved on, and only when that wasn't the first.
  */
-export function showsRound(v: NumberedRound, o: { history?: boolean } = {}): boolean {
+export function showsRound(
+  v: NumberedRound,
+  o: { history?: boolean } = {},
+): boolean {
   if (isReleased(v.state)) return o.history === true && v.round > 1;
   return v.state === "changes_requested" || v.round > 1;
 }
 
 /** "v2", or with the round: "v2 · Round 2" (chrome, the default) or "v2, round 2" (sentence). */
-export function versionLabel(v: NumberedRound, o: { style?: LabelStyle; history?: boolean } = {}): string {
+export function versionLabel(
+  v: NumberedRound,
+  o: { style?: LabelStyle; history?: boolean } = {},
+): string {
   if (!showsRound(v, o)) return `v${v.number}`;
-  return o.style === "sentence" ? `v${v.number}, round ${v.round}` : `v${v.number} · ${roundLabel(v.round)}`;
+  return o.style === "sentence"
+    ? `v${v.number}, round ${v.round}`
+    : `v${v.number} · ${roundLabel(v.round)}`;
 }
 
 /** "Round 2". */
@@ -151,7 +182,9 @@ export function roundLabel(round: number): string {
 
 /** "Approved on round 3" for a released row that went through send-backs; null otherwise. */
 export function approvedOnRound(v: NumberedRound): string | null {
-  return isReleased(v.state) && v.round > 1 ? `Approved on round ${v.round}` : null;
+  return isReleased(v.state) && v.round > 1
+    ? `Approved on round ${v.round}`
+    : null;
 }
 
 /** "Review history (3 rounds)". */
@@ -175,13 +208,20 @@ export function reviewHistoryName(number: number, count: number): string {
  * already this row. (For a stage reviewer outside the team the head is closed to, the bare URL opens
  * the newest round they may open instead: `requireReviewVersion` on the server.)
  */
-export function reviewPath(space: string, templateId: string, v: NumberedRound): string {
+export function reviewPath(
+  space: string,
+  templateId: string,
+  v: NumberedRound,
+): string {
   const path = `/${space}/review/${templateId}/${v.number}`;
   return showsRound(v) ? `${path}?round=${v.round}` : path;
 }
 
 /** A notification's link to the round's review screen, naming the round when `reviewPath` would. */
-export function reviewLink(templateId: string, v: NumberedRound): Extract<NotificationLink, { to: "review" }> {
+export function reviewLink(
+  templateId: string,
+  v: NumberedRound,
+): Extract<NotificationLink, { to: "review" }> {
   return showsRound(v)
     ? { to: "review", templateId, versionNumber: v.number, round: v.round }
     : { to: "review", templateId, versionNumber: v.number };
@@ -191,8 +231,11 @@ export function reviewLink(templateId: string, v: NumberedRound): Extract<Notifi
  * The review screen's `?round=`: null when absent (the number's head), the round when it is a whole
  * number from 1, and "invalid" for anything else ("0", "x", a repeated parameter), which is a 404.
  */
-export function parseRoundParam(raw: string | string[] | undefined): number | null | "invalid" {
+export function parseRoundParam(
+  raw: string | string[] | undefined,
+): number | null | "invalid" {
   if (raw === undefined) return null;
-  if (typeof raw !== "string" || !/^[1-9][0-9]{0,8}$/.test(raw)) return "invalid";
+  if (typeof raw !== "string" || !/^[1-9][0-9]{0,8}$/.test(raw))
+    return "invalid";
   return Number(raw);
 }

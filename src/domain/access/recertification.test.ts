@@ -8,7 +8,17 @@ import {
   startRecert,
 } from "./recertification";
 import type { RecertFacts } from "../access-types";
-import { at, CORAL, DEPOSITS, PEOPLE, membership, recert, coral, audits, notes } from "./fixtures";
+import {
+  at,
+  CORAL,
+  DEPOSITS,
+  PEOPLE,
+  membership,
+  recert,
+  coral,
+  audits,
+  notes,
+} from "./fixtures";
 
 describe("recertification phase", () => {
   const r = recert({ startsAt: at(0), dueAt: at(30) });
@@ -34,9 +44,17 @@ describe("recertification subjects and progress", () => {
     const list = [
       ...coral(),
       membership("naomi", ["team_admin"], { teamId: DEPOSITS.id }),
-      membership("morgan", ["viewer"], { status: "lapsed", statusReason: "recert_unconfirmed" }),
+      membership("morgan", ["viewer"], {
+        status: "lapsed",
+        statusReason: "recert_unconfirmed",
+      }),
     ];
-    expect(recertSubjects(list, CORAL.id)).toEqual(["devon", "jordan", "maya", "sam"]);
+    expect(recertSubjects(list, CORAL.id)).toEqual([
+      "devon",
+      "jordan",
+      "maya",
+      "sam",
+    ]);
   });
 
   it('reads "4 of 6 confirmed"', () => {
@@ -45,7 +63,9 @@ describe("recertification subjects and progress", () => {
     r.items[1]!.decision = "keep";
     r.items[2]!.decision = "keep";
     r.items[3]!.decision = "remove";
-    const members = ["a", "b", "c", "e", "f"].map((u) => membership(u, ["viewer"]));
+    const members = ["a", "b", "c", "e", "f"].map((u) =>
+      membership(u, ["viewer"]),
+    );
     expect(recertProgress(r, members)).toEqual({
       total: 6,
       decided: 4,
@@ -69,16 +89,35 @@ describe("recertification subjects and progress", () => {
 });
 
 describe("startRecert", () => {
-  const base = { team: CORAL, actor: PEOPLE.alex, now: at(0), memberships: coral(), unfinished: [] as RecertFacts[] };
+  const base = {
+    team: CORAL,
+    actor: PEOPLE.alex,
+    now: at(0),
+    memberships: coral(),
+    unfinished: [] as RecertFacts[],
+  };
 
   it("starts now, due in 30 days, covering members other than Team Admins", () => {
     const result = startRecert(base);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.recert).toMatchObject({ teamId: CORAL.id, startsAt: at(0), dueAt: at(30), label: "Q1 2027" });
-    expect(result.recert.items.map((i) => i.userId)).toEqual(["devon", "jordan", "maya", "sam"]);
+    expect(result.recert).toMatchObject({
+      teamId: CORAL.id,
+      startsAt: at(0),
+      dueAt: at(30),
+      label: "Q1 2027",
+    });
+    expect(result.recert.items.map((i) => i.userId)).toEqual([
+      "devon",
+      "jordan",
+      "maya",
+      "sam",
+    ]);
     expect(result.recert.items.every((i) => i.decision === null)).toBe(true);
-    expect(audits(result.effects)[0]).toMatchObject({ action: "recert.started", details: { members: 4 } });
+    expect(audits(result.effects)[0]).toMatchObject({
+      action: "recert.started",
+      details: { members: 4 },
+    });
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "recert_due",
       to: { kind: "team_admins", teamId: CORAL.id, exceptUserIds: ["alex"] },
@@ -88,14 +127,29 @@ describe("startRecert", () => {
   });
 
   it("refuses while a review is open or upcoming, and allows it once closed", () => {
-    expect(startRecert({ ...base, unfinished: [recert()] })).toEqual({ ok: false, code: "recert_open", reason: "A review is already open." });
-    expect(startRecert({ ...base, unfinished: [recert({ startsAt: at(5), dueAt: at(35) })] }).ok).toBe(false);
+    expect(startRecert({ ...base, unfinished: [recert()] })).toEqual({
+      ok: false,
+      code: "recert_open",
+      reason: "A review is already open.",
+    });
+    expect(
+      startRecert({
+        ...base,
+        unfinished: [recert({ startsAt: at(5), dueAt: at(35) })],
+      }).ok,
+    ).toBe(false);
     // Deadline reached but not swept yet: it counts as closed.
-    expect(startRecert({ ...base, unfinished: [recert({ dueAt: at(0) })] }).ok).toBe(true);
+    expect(
+      startRecert({ ...base, unfinished: [recert({ dueAt: at(0) })] }).ok,
+    ).toBe(true);
   });
 
   it("refuses when there's nobody to review", () => {
-    expect(startRecert({ ...base, memberships: [coral()[0]!] })).toEqual({ ok: false, code: "nobody_to_recertify", reason: "There's nobody to review." });
+    expect(startRecert({ ...base, memberships: [coral()[0]!] })).toEqual({
+      ok: false,
+      code: "nobody_to_recertify",
+      reason: "There's nobody to review.",
+    });
   });
 });
 
@@ -116,11 +170,18 @@ describe("decideRecertItem", () => {
     const result = decideRecertItem(base);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.item).toEqual({ decision: "keep", decidedBy: "alex", decidedAt: at(0) });
+    expect(result.item).toEqual({
+      decision: "keep",
+      decidedBy: "alex",
+      decidedAt: at(0),
+    });
     expect(result.membership).toBeNull();
     expect(result.completedAt).toBeNull();
     expect(audits(result.effects)).toEqual([
-      expect.objectContaining({ action: "recert.kept", details: expect.objectContaining({ userId: "maya", label: "Q1 2027" }) }),
+      expect.objectContaining({
+        action: "recert.kept",
+        details: expect.objectContaining({ userId: "maya", label: "Q1 2027" }),
+      }),
     ]);
   });
 
@@ -128,12 +189,16 @@ describe("decideRecertItem", () => {
     const result = decideRecertItem({ ...base, decision: "remove" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.membership).toEqual({ kind: "delete", membershipId: team[2]!.id });
+    expect(result.membership).toEqual({
+      kind: "delete",
+      membershipId: team[2]!.id,
+    });
     expect(audits(result.effects)[0]?.action).toBe("recert.removed");
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_removed",
       to: { kind: "user", userId: "maya" },
-      title: "Your access to Coral Offers was removed in the Q1 2027 access review.",
+      title:
+        "Your access to Coral Offers was removed in the Q1 2027 access review.",
     });
   });
 
@@ -156,20 +221,33 @@ describe("decideRecertItem", () => {
   });
 
   it("refuses yourself, outsiders, repeats and people already gone", () => {
-    expect(decideRecertItem({ ...base, userId: "alex", member: PEOPLE.alex })).toEqual({
+    expect(
+      decideRecertItem({ ...base, userId: "alex", member: PEOPLE.alex }),
+    ).toEqual({
       ok: false,
       code: "own_access",
       reason: "You can't change your own access.",
     });
-    expect(decideRecertItem({ ...base, userId: "morgan", member: PEOPLE.morgan })).toEqual({
+    expect(
+      decideRecertItem({ ...base, userId: "morgan", member: PEOPLE.morgan }),
+    ).toEqual({
       ok: false,
       code: "not_in_recert",
       reason: "This person isn't part of this review.",
     });
     const decided = recert();
     decided.items[1]!.decision = "keep";
-    expect(decideRecertItem({ ...base, recert: decided })).toEqual({ ok: false, code: "already_recertified", reason: "This member was already reviewed." });
-    expect(decideRecertItem({ ...base, teamMemberships: team.filter((m) => m.userId !== "maya") })).toEqual({
+    expect(decideRecertItem({ ...base, recert: decided })).toEqual({
+      ok: false,
+      code: "already_recertified",
+      reason: "This member was already reviewed.",
+    });
+    expect(
+      decideRecertItem({
+        ...base,
+        teamMemberships: team.filter((m) => m.userId !== "maya"),
+      }),
+    ).toEqual({
       ok: false,
       code: "no_longer_member",
       reason: "This person is no longer a member.",
@@ -178,20 +256,43 @@ describe("decideRecertItem", () => {
 
   it("closes the review early once everyone is decided", () => {
     const almost = recert();
-    for (const item of almost.items) if (item.userId !== "sam") item.decision = "keep";
-    const result = decideRecertItem({ ...base, recert: almost, userId: "sam", member: PEOPLE.sam });
+    for (const item of almost.items)
+      if (item.userId !== "sam") item.decision = "keep";
+    const result = decideRecertItem({
+      ...base,
+      recert: almost,
+      userId: "sam",
+      member: PEOPLE.sam,
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.completedAt).toEqual(at(0));
-    expect(audits(result.effects).map((e) => e.action)).toEqual(["recert.kept", "recert.closed"]);
-    expect(audits(result.effects)[1]?.details).toMatchObject({ kept: 4, removed: 0, lapsed: 0 });
+    expect(audits(result.effects).map((e) => e.action)).toEqual([
+      "recert.kept",
+      "recert.closed",
+    ]);
+    expect(audits(result.effects)[1]?.details).toMatchObject({
+      kept: 4,
+      removed: 0,
+      lapsed: 0,
+    });
   });
 
   it("closing early counts the last one removed", () => {
     const almost = recert();
-    for (const item of almost.items) if (item.userId !== "sam") item.decision = "keep";
-    const result = decideRecertItem({ ...base, recert: almost, userId: "sam", member: PEOPLE.sam, decision: "remove" });
+    for (const item of almost.items)
+      if (item.userId !== "sam") item.decision = "keep";
+    const result = decideRecertItem({
+      ...base,
+      recert: almost,
+      userId: "sam",
+      member: PEOPLE.sam,
+      decision: "remove",
+    });
     expect(result.ok && result.completedAt).toEqual(at(0));
-    expect(result.ok && audits(result.effects)[1]?.details).toMatchObject({ kept: 3, removed: 1 });
+    expect(result.ok && audits(result.effects)[1]?.details).toMatchObject({
+      kept: 3,
+      removed: 1,
+    });
   });
 });

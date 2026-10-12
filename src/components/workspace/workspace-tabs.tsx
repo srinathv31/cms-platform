@@ -5,7 +5,12 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
 import { LinkPendingLabel } from "@/components/primitives/link-pending";
-import { TAB, TAB_ACTIVE, TAB_IDLE, TAB_LABEL } from "@/components/primitives/tab-styles";
+import {
+  TAB,
+  TAB_ACTIVE,
+  TAB_IDLE,
+  TAB_LABEL,
+} from "@/components/primitives/tab-styles";
 import { TabUnderline } from "@/components/primitives/tabs";
 
 export const WORKSPACE_TABS = [
@@ -35,7 +40,9 @@ export function WorkspaceTabs({ base }: { base: string }) {
             <span className={TAB_LABEL}>
               <LinkPendingLabel>{tab.label}</LinkPendingLabel>
             </span>
-            {active ? <TabUnderline layoutId="workspace-tab-underline" /> : null}
+            {active ? (
+              <TabUnderline layoutId="workspace-tab-underline" />
+            ) : null}
           </Link>
         );
       })}

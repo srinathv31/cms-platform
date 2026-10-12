@@ -30,7 +30,12 @@ async function loadViewer(userId: string): Promise<Viewer | null> {
     ? await db
         .select()
         .from(membershipRoles)
-        .where(inArray(membershipRoles.membershipId, rows.map((r) => r.membershipId)))
+        .where(
+          inArray(
+            membershipRoles.membershipId,
+            rows.map((r) => r.membershipId),
+          ),
+        )
     : [];
 
   const list: ViewerMembership[] = rows.map((r) => ({
@@ -57,7 +62,8 @@ async function loadViewer(userId: string): Promise<Viewer | null> {
 export const getViewer = cache(async (): Promise<Viewer> => {
   const id = (await cookies()).get(PERSONA_COOKIE)?.value ?? DEFAULT_PERSONA;
   const viewer = (await loadViewer(id)) ?? (await loadViewer(DEFAULT_PERSONA));
-  if (!viewer) throw new Error("Database is not seeded. Run `npm run db:reset`.");
+  if (!viewer)
+    throw new Error("Database is not seeded. Run `npm run db:reset`.");
   return viewer;
 });
 

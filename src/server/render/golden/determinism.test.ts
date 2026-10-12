@@ -10,7 +10,11 @@ import { PUSH_PLATFORMS } from "@/domain/messages/push";
 import type { RenderDoc, RenderTarget } from "@/domain/render/types";
 import { CHANNELS } from "@/domain/types";
 import type { RenderFixture } from "@/server/render/testing/fixture";
-import { renderInFreshProcess, type FreshJob, type FreshResult } from "@/server/render/testing/fresh-process";
+import {
+  renderInFreshProcess,
+  type FreshJob,
+  type FreshResult,
+} from "@/server/render/testing/fresh-process";
 import { doc, h, p, t } from "@/server/render/testing/tiptap";
 import { caseSlugs, readInput } from "./files";
 
@@ -38,14 +42,19 @@ const adapterProbe = (name: string, text: string): FreshJob => {
     templateId: "UC-PROBE",
     templateName: "Probe",
     versionNumber: 1,
-    blocks: [{ type: "paragraph", id: null, content: [{ type: "text", text }] }],
+    blocks: [
+      { type: "paragraph", id: null, content: [{ type: "text", text }] },
+    ],
   };
   return { name: `probe adapter ${name}`, pdfDoc, at: AT };
 };
 
 const PROBES: FreshJob[] = [
   probe("soft hyphen", doc(p(t("Ver­sicherung 800-555-0100")))),
-  probe("leading no-break spaces", doc(p(t("  Lead")), h(2, t("  Serif lead")))),
+  probe(
+    "leading no-break spaces",
+    doc(p(t("  Lead")), h(2, t("  Serif lead"))),
+  ),
   probe("an unrenderable character", doc(p(t("Việt")))),
   adapterProbe("soft hyphen", "Ver­sicherung"),
   // Each shares a glyph with a character the footer or a case uses: · (U+00B7), ; and the fraction slash.
@@ -55,8 +64,12 @@ const PROBES: FreshJob[] = [
 /** Each channel the case renders, and a push once per platform. */
 const CASE_JOBS: FreshJob[] = caseSlugs().flatMap((slug) => {
   const input = readInput(slug);
-  const targets = CHANNELS.filter((channel) => input.channels.includes(channel)).flatMap((channel): RenderTarget[] =>
-    channel === "push" ? PUSH_PLATFORMS.map((platform) => ({ channel, platform })) : [{ channel }],
+  const targets = CHANNELS.filter((channel) =>
+    input.channels.includes(channel),
+  ).flatMap((channel): RenderTarget[] =>
+    channel === "push"
+      ? PUSH_PLATFORMS.map((platform) => ({ channel, platform }))
+      : [{ channel }],
   );
   return targets.map((target): FreshJob => ({
     name: `${slug} ${target.channel === "push" ? `push.${target.platform}` : target.channel}`,
@@ -65,7 +78,8 @@ const CASE_JOBS: FreshJob[] = caseSlugs().flatMap((slug) => {
   }));
 });
 
-const byName = (results: readonly FreshResult[]) => new Map(results.map((r) => [r.name, r]));
+const byName = (results: readonly FreshResult[]) =>
+  new Map(results.map((r) => [r.name, r]));
 
 describe("determinism across processes", () => {
   it("renders every case and probe to the same output in fresh processes, in either order", async () => {
@@ -75,8 +89,14 @@ describe("determinism across processes", () => {
     ]);
     const first = byName(forward);
     const second = byName(backward);
-    const differing = [...first.keys()].filter((name) => JSON.stringify(first.get(name)) !== JSON.stringify(second.get(name)));
-    expect(differing, "these outputs depend on what the process rendered before them").toEqual([]);
+    const differing = [...first.keys()].filter(
+      (name) =>
+        JSON.stringify(first.get(name)) !== JSON.stringify(second.get(name)),
+    );
+    expect(
+      differing,
+      "these outputs depend on what the process rendered before them",
+    ).toEqual([]);
     expect(first.size).toBe(CASE_JOBS.length + PROBES.length);
   }, 180_000);
 });

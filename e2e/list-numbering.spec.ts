@@ -2,7 +2,18 @@ import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { removeTemplate } from "./helpers/cleanup";
-import { asPersona, editor, expect, expectAutosaved, liveEditor, nameField, openLibrary, tap, test, typeSlowly } from "./helpers/scenario";
+import {
+  asPersona,
+  editor,
+  expect,
+  expectAutosaved,
+  liveEditor,
+  nameField,
+  openLibrary,
+  tap,
+  test,
+  typeSlowly,
+} from "./helpers/scenario";
 
 // List numbering from the block menu, in the real UI: what the author picks is what every channel prints.
 //
@@ -41,18 +52,27 @@ test.afterAll(async () => {
 
 // ── The editor ───────────────────────────────────────────────────────────────
 
-const item = (page: Page, text: string) => editor(page).locator("li[data-list-marker]", { hasText: text });
+const item = (page: Page, text: string) =>
+  editor(page).locator("li[data-list-marker]", { hasText: text });
 
 /** The markers the editor draws beside the two items. */
 async function expectEditorMarkers(page: Page, markers: [string, string]) {
-  await expect(item(page, FIRST)).toHaveAttribute("data-list-marker", markers[0]);
-  await expect(item(page, SECOND)).toHaveAttribute("data-list-marker", markers[1]);
+  await expect(item(page, FIRST)).toHaveAttribute(
+    "data-list-marker",
+    markers[0],
+  );
+  await expect(item(page, SECOND)).toHaveAttribute(
+    "data-list-marker",
+    markers[1],
+  );
 }
 
 /** The list's block menu, from its grip: hover the list so the handle comes to it, then click the grip. */
 async function openBlockMenu(page: Page): Promise<Locator> {
   await item(page, FIRST).hover();
-  const grip = page.getByLabel("Drag to move block, or click for options", { exact: true });
+  const grip = page.getByLabel("Drag to move block, or click for options", {
+    exact: true,
+  });
   await expect(grip).toBeVisible();
   await tap(grip);
   const menu = page.getByRole("menu", { name: "Block options", exact: true });
@@ -63,11 +83,15 @@ async function openBlockMenu(page: Page): Promise<Locator> {
 
 // ── The preview ──────────────────────────────────────────────────────────────
 
-const previewToggle = (page: Page) => page.getByRole("button", { name: "Preview", exact: true });
+const previewToggle = (page: Page) =>
+  page.getByRole("button", { name: "Preview", exact: true });
 const rail = (page: Page) => page.locator("aside[aria-label='Preview']");
 const channelTab = (page: Page, label: "PDF" | "Web") =>
-  rail(page).getByRole("group", { name: "Channel", exact: true }).getByRole("button", { name: label, exact: true });
-const pdfRegion = (page: Page) => page.getByRole("region", { name: "PDF preview" });
+  rail(page)
+    .getByRole("group", { name: "Channel", exact: true })
+    .getByRole("button", { name: label, exact: true });
+const pdfRegion = (page: Page) =>
+  page.getByRole("region", { name: "PDF preview" });
 const webFrame = (page: Page) => page.locator('iframe[title="Web preview"]');
 
 /** Text compared without any whitespace: a PDF breaks lines and splits runs wherever it likes. */
@@ -89,7 +113,10 @@ const pdfText = (page: Page) =>
 const webItems = (page: Page) =>
   webFrame(page).evaluate((el: HTMLIFrameElement) =>
     [...(el.contentDocument?.querySelectorAll("li") ?? [])]
-      .map((li) => [li.querySelector(":scope > .marker")?.textContent ?? "", li.querySelector(":scope > div")?.textContent ?? ""])
+      .map((li) => [
+        li.querySelector(":scope > .marker")?.textContent ?? "",
+        li.querySelector(":scope > div")?.textContent ?? "",
+      ])
       .filter(([, text]) => text.startsWith("Numbered")),
   );
 
@@ -100,17 +127,24 @@ async function showChannel(page: Page, label: "PDF" | "Web") {
 
 /** The PDF and the Web preview print the list with exactly these markers. */
 async function expectPreviewMarkers(page: Page, markers: [string, string]) {
-  if ((await previewToggle(page).getAttribute("aria-pressed")) !== "true") await tap(previewToggle(page));
+  if ((await previewToggle(page).getAttribute("aria-pressed")) !== "true")
+    await tap(previewToggle(page));
   await expect(previewToggle(page)).toHaveAttribute("aria-pressed", "true");
 
   await showChannel(page, "PDF");
   await expect
-    .poll(async () => compact(await pdfText(page)), { message: `the PDF numbers the list ${markers.join(" ")}`, timeout: 30_000 })
+    .poll(async () => compact(await pdfText(page)), {
+      message: `the PDF numbers the list ${markers.join(" ")}`,
+      timeout: 30_000,
+    })
     .toContain(compact(`${markers[0]} ${FIRST} ${markers[1]} ${SECOND}`));
 
   await showChannel(page, "Web");
   await expect
-    .poll(() => webItems(page), { message: `the Web preview numbers the list ${markers.join(" ")}`, timeout: 20_000 })
+    .poll(() => webItems(page), {
+      message: `the Web preview numbers the list ${markers.join(" ")}`,
+      timeout: 20_000,
+    })
     .toEqual([
       [markers[0], FIRST],
       [markers[1], SECOND],
@@ -123,20 +157,29 @@ async function expectPreviewMarkers(page: Page, markers: [string, string]) {
 // ── The tests ────────────────────────────────────────────────────────────────
 
 test.describe("list numbering from the block menu", () => {
-  test("Numbering: (a) on a list shows (a) in the editor, and the same markers in the PDF and Web previews", async ({ page }) => {
+  test("Numbering: (a) on a list shows (a) in the editor, and the same markers in the PDF and Web previews", async ({
+    page,
+  }) => {
     test.setTimeout(120_000);
     await asPersona(page, "maya");
     await openLibrary(page);
 
     // A new template from the gallery; Enter from the name goes to the document.
     await tap(page.getByRole("button", { name: "New template" }));
-    await tap(page.getByRole("dialog").getByRole("button", { name: /Card offer terms/ }));
+    await tap(
+      page
+        .getByRole("dialog")
+        .getByRole("button", { name: /Card offer terms/ }),
+    );
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1]!;
     await expect(nameField(page)).toBeFocused();
     await page.keyboard.press("Enter");
     await liveEditor(page);
-    await expect(editor(page), "Enter from the name puts the caret in the document").toBeFocused();
+    await expect(
+      editor(page),
+      "Enter from the name puts the caret in the document",
+    ).toBeFocused();
 
     // A numbered list of two items, typed: "1. " starts it.
     await page.keyboard.press("Enter");
@@ -150,8 +193,12 @@ test.describe("list numbering from the block menu", () => {
     const menu = await openBlockMenu(page);
     await tap(menu.getByRole("menuitem", { name: "Numbering" }));
     const styles = page.getByRole("menu", { name: "Numbering" });
-    await expect(styles.getByRole("menuitemradio", { name: /^Default/ })).toHaveAttribute("aria-checked", "true");
-    await tap(styles.getByRole("menuitemradio", { name: "(a) (b) (c)", exact: true }));
+    await expect(
+      styles.getByRole("menuitemradio", { name: /^Default/ }),
+    ).toHaveAttribute("aria-checked", "true");
+    await tap(
+      styles.getByRole("menuitemradio", { name: "(a) (b) (c)", exact: true }),
+    );
     await expect(page.getByRole("menu")).toHaveCount(0);
 
     await expectEditorMarkers(page, ["(a)", "(b)"]);
@@ -159,7 +206,9 @@ test.describe("list numbering from the block menu", () => {
     await expectPreviewMarkers(page, ["(a)", "(b)"]);
   });
 
-  test("Start at…: 3 on the (a) list shows (c) and (d) in the editor, the PDF and the Web preview", async ({ page }) => {
+  test("Start at…: 3 on the (a) list shows (c) and (d) in the editor, the PDF and the Web preview", async ({
+    page,
+  }) => {
     test.setTimeout(120_000);
     await asPersona(page, "maya");
     await page.goto(`/coral-offers/templates/${templateId}`);
@@ -168,7 +217,9 @@ test.describe("list numbering from the block menu", () => {
 
     // Block menu → Start at… → 3, Enter.
     const menu = await openBlockMenu(page);
-    await expect(menu.getByRole("menuitem", { name: /^Start at…/ })).toContainText("1");
+    await expect(
+      menu.getByRole("menuitem", { name: /^Start at…/ }),
+    ).toContainText("1");
     await tap(menu.getByRole("menuitem", { name: /^Start at…/ }));
     const field = menu.getByRole("textbox", { name: "Start at" });
     await expect(field).toBeFocused();

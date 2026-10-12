@@ -22,7 +22,12 @@ describe("sectionKey", () => {
 
 describe("updateRequiredSections", () => {
   const run = (next: RequiredSection[]) =>
-    updateRequiredSections({ contentType: disclosure, next, actor: riley, now: NOW });
+    updateRequiredSections({
+      contentType: disclosure,
+      next,
+      actor: riley,
+      now: NOW,
+    });
 
   it("adds a section with a key from its title, keeps renamed sections' keys, and records it", () => {
     const result = run([
@@ -44,13 +49,19 @@ describe("updateRequiredSections", () => {
         teamId: null,
         details: {
           area: "content_types",
-          summary: "Changed Disclosure required sections: added Privacy; renamed Offer details to Offer summary",
+          summary:
+            "Changed Disclosure required sections: added Privacy; renamed Offer details to Offer summary",
           contentTypeId: "ct_disclosure",
           contentTypeName: "Disclosure",
           added: ["Privacy"],
           removed: [],
           renamed: [{ from: "Offer details", to: "Offer summary" }],
-          sections: ["Offer summary", "Rates and fees", "Legal notices", "Privacy"],
+          sections: [
+            "Offer summary",
+            "Rates and fees",
+            "Legal notices",
+            "Privacy",
+          ],
         },
       },
     ]);
@@ -58,29 +69,47 @@ describe("updateRequiredSections", () => {
 
   it("removes a section (existing templates keep theirs; nothing at submit checks sections)", () => {
     const result = run([SECTIONS[0]!, SECTIONS[2]!]);
-    expect(result.ok && result.requiredSections).toEqual([SECTIONS[0], SECTIONS[2]]);
-    expect(result.ok && result.effects[0]?.kind === "audit" && result.effects[0].details.summary).toBe(
-      "Changed Disclosure required sections: removed Rates and fees",
-    );
+    expect(result.ok && result.requiredSections).toEqual([
+      SECTIONS[0],
+      SECTIONS[2],
+    ]);
+    expect(
+      result.ok &&
+        result.effects[0]?.kind === "audit" &&
+        result.effects[0].details.summary,
+    ).toBe("Changed Disclosure required sections: removed Rates and fees");
   });
 
   it("never reuses a key the type has: a new section titled like an old key gets a suffix", () => {
     const result = run([...SECTIONS, { key: "new", title: "Legal-notices" }]);
-    expect(result.ok && result.requiredSections.at(-1)).toEqual({ key: "legal_notices_2", title: "Legal-notices" });
+    expect(result.ok && result.requiredSections.at(-1)).toEqual({
+      key: "legal_notices_2",
+      title: "Legal-notices",
+    });
   });
 
   it("records a reorder, and nothing when nothing changed", () => {
     const reordered = run([SECTIONS[1]!, SECTIONS[0]!, SECTIONS[2]!]);
-    expect(reordered.ok && reordered.effects[0]?.kind === "audit" && reordered.effects[0].details.summary).toBe(
-      "Changed Disclosure required sections: reordered the sections",
+    expect(
+      reordered.ok &&
+        reordered.effects[0]?.kind === "audit" &&
+        reordered.effects[0].details.summary,
+    ).toBe("Changed Disclosure required sections: reordered the sections");
+    expect(run(SECTIONS.map((s) => ({ ...s, title: ` ${s.title} ` })))).toEqual(
+      { ok: true, requiredSections: SECTIONS, effects: [] },
     );
-    expect(run(SECTIONS.map((s) => ({ ...s, title: ` ${s.title} ` })))).toEqual({ ok: true, requiredSections: SECTIONS, effects: [] });
   });
 
   it("refuses no sections, a blank, long or duplicate title", () => {
     expect(run([])).toEqual({ ok: false, ...PLATFORM_REFUSALS.oneSection });
-    expect(run([{ key: "", title: " " }])).toEqual({ ok: false, ...PLATFORM_REFUSALS.sectionTitle });
-    expect(run([{ key: "", title: "x".repeat(61) }])).toEqual({ ok: false, ...PLATFORM_REFUSALS.sectionTitleTooLong });
+    expect(run([{ key: "", title: " " }])).toEqual({
+      ok: false,
+      ...PLATFORM_REFUSALS.sectionTitle,
+    });
+    expect(run([{ key: "", title: "x".repeat(61) }])).toEqual({
+      ok: false,
+      ...PLATFORM_REFUSALS.sectionTitleTooLong,
+    });
     expect(run([SECTIONS[0]!, { key: "", title: "offer DETAILS" }])).toEqual({
       ok: false,
       code: "section_duplicate",
@@ -90,15 +119,33 @@ describe("updateRequiredSections", () => {
 });
 
 describe("the sections editor: validateRequiredSections, removeSectionRefusal, describeSectionsChange", () => {
-  const describe_ = (next: RequiredSection[]) => describeSectionsChange({ contentTypeName: "Disclosure", current: SECTIONS, next });
-  const SCOPE = "Applies to new Disclosure templates only. Existing templates keep their sections.";
+  const describe_ = (next: RequiredSection[]) =>
+    describeSectionsChange({
+      contentTypeName: "Disclosure",
+      current: SECTIONS,
+      next,
+    });
+  const SCOPE =
+    "Applies to new Disclosure templates only. Existing templates keep their sections.";
 
   it("validateRequiredSections is the reason updateRequiredSections refuses with", () => {
-    const lists: RequiredSection[][] = [[], [{ key: "", title: " " }], [{ key: "", title: "x".repeat(61) }], [SECTIONS[0]!, { key: "n", title: "offer details" }]];
+    const lists: RequiredSection[][] = [
+      [],
+      [{ key: "", title: " " }],
+      [{ key: "", title: "x".repeat(61) }],
+      [SECTIONS[0]!, { key: "n", title: "offer details" }],
+    ];
     for (const next of lists) {
       const problem = validateRequiredSections(next);
       expect(problem).not.toBeNull();
-      expect(updateRequiredSections({ contentType: disclosure, next, actor: riley, now: NOW })).toEqual({ ok: false, ...problem });
+      expect(
+        updateRequiredSections({
+          contentType: disclosure,
+          next,
+          actor: riley,
+          now: NOW,
+        }),
+      ).toEqual({ ok: false, ...problem });
     }
     expect(validateRequiredSections(SECTIONS)).toBeNull();
   });
@@ -109,18 +156,39 @@ describe("the sections editor: validateRequiredSections, removeSectionRefusal, d
   });
 
   it("says the scope from the start; nothing to save until something changes", () => {
-    expect(describe_(SECTIONS)).toEqual({ problem: null, changed: false, lines: [SCOPE] });
-    expect(describe_(SECTIONS.map((s) => ({ ...s, title: ` ${s.title} ` })))).toEqual({ problem: null, changed: false, lines: [SCOPE] });
+    expect(describe_(SECTIONS)).toEqual({
+      problem: null,
+      changed: false,
+      lines: [SCOPE],
+    });
+    expect(
+      describe_(SECTIONS.map((s) => ({ ...s, title: ` ${s.title} ` }))),
+    ).toEqual({ problem: null, changed: false, lines: [SCOPE] });
   });
 
   it("names what new templates gain and what becomes an ordinary heading", () => {
-    expect(describe_([SECTIONS[0]!, SECTIONS[2]!, { key: "new-1", title: " Privacy " }, { key: "new-2", title: "Contact" }])).toEqual({
+    expect(
+      describe_([
+        SECTIONS[0]!,
+        SECTIONS[2]!,
+        { key: "new-1", title: " Privacy " },
+        { key: "new-2", title: "Contact" },
+      ]),
+    ).toEqual({
       problem: null,
       changed: true,
-      lines: [SCOPE, "New templates start with Privacy and Contact added.", "Rates and fees becomes an ordinary heading in new templates."],
+      lines: [
+        SCOPE,
+        "New templates start with Privacy and Contact added.",
+        "Rates and fees becomes an ordinary heading in new templates.",
+      ],
     });
     // A rename or a move changes something but adds no line.
-    expect(describe_([SECTIONS[1]!, SECTIONS[0]!, SECTIONS[2]!])).toEqual({ problem: null, changed: true, lines: [SCOPE] });
+    expect(describe_([SECTIONS[1]!, SECTIONS[0]!, SECTIONS[2]!])).toEqual({
+      problem: null,
+      changed: true,
+      lines: [SCOPE],
+    });
   });
 
   it("a draft that can't be saved says why, and only the scope", () => {
@@ -138,10 +206,20 @@ describe("conformToSections", () => {
     attrs: { id, level: 2, requiredKey: key },
     content: [{ type: "text", text }],
   });
-  const p = (id: string): JSONContent => ({ type: "paragraph", attrs: { id }, content: [{ type: "text", text: id }] });
+  const p = (id: string): JSONContent => ({
+    type: "paragraph",
+    attrs: { id },
+    content: [{ type: "text", text: id }],
+  });
   const starter: JSONContent = {
     type: "doc",
-    content: [h("a", "offer_details", "Offer details"), p("a1"), h("b", "rates_and_fees", "Rates and fees"), p("b1"), h("c", "legal_notices", "Legal notices")],
+    content: [
+      h("a", "offer_details", "Offer details"),
+      p("a1"),
+      h("b", "rates_and_fees", "Rates and fees"),
+      p("b1"),
+      h("c", "legal_notices", "Legal notices"),
+    ],
   };
 
   it("leaves a starter alone when the sections match", () => {
@@ -149,7 +227,11 @@ describe("conformToSections", () => {
   });
 
   it("unmarks removed sections, retitles renamed ones and appends new ones", () => {
-    const next = [{ key: "offer_details", title: "Offer summary" }, SECTIONS[2]!, { key: "privacy", title: "Privacy" }];
+    const next = [
+      { key: "offer_details", title: "Offer summary" },
+      SECTIONS[2]!,
+      { key: "privacy", title: "Privacy" },
+    ];
     expect(conformToSections(starter, next, () => "new1").content).toEqual([
       h("a", "offer_details", "Offer summary"),
       p("a1"),

@@ -30,12 +30,12 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 
 ## Endpoints
 
-| Endpoint | Shapes | Handler |
-| --- | --- | --- |
-| `GET /api/v1/templates?q=&limit=&after=` | `ApiTemplateSearch`, `ApiTemplateSummary`, `ApiPage` | [templates/route.ts](../app/api/v1/templates/route.ts) |
-| `GET /api/v1/templates/{id}?version=&since=` | `ApiTemplateDetail`, `ApiVersionSummary`, `ApiContract`, `ApiVariable`, `ApiJsonSchema`, `ApiContractDiff`, `ApiContractChange` | [templates/[templateId]/route.ts](<../app/api/v1/templates/[templateId]/route.ts>) |
-| `GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=` | `ApiNoticeList`, `ApiNotice`, `ApiNoticeKind`, `ApiPage` | [notices/route.ts](<../app/api/v1/consumers/[consumerId]/notices/route.ts>) |
-| `POST /api/v1/templates/{id}/render` | `ApiRenderRequest`, `ApiEmailResponse`, `ApiBase64Response`, `ApiPushResponse`, `ApiSmsResponse` (a raw PDF or HTML answer has no type); errors `ApiPushTooLargeDetails`, `ApiSmsTooLongDetails` | [render/route.ts](<../app/api/v1/templates/[templateId]/render/route.ts>) |
+| Endpoint                                                               | Shapes                                                                                                                                                                                           | Handler                                                                          |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `GET /api/v1/templates?q=&limit=&after=`                               | `ApiTemplateSearch`, `ApiTemplateSummary`, `ApiPage`                                                                                                                                             | [templates/route.ts](../app/api/v1/templates/route.ts)                           |
+| `GET /api/v1/templates/{id}?version=&since=`                           | `ApiTemplateDetail`, `ApiVersionSummary`, `ApiContract`, `ApiVariable`, `ApiJsonSchema`, `ApiContractDiff`, `ApiContractChange`                                                                  | [templates/[templateId]/route.ts](../app/api/v1/templates/[templateId]/route.ts) |
+| `GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=` | `ApiNoticeList`, `ApiNotice`, `ApiNoticeKind`, `ApiPage`                                                                                                                                         | [notices/route.ts](../app/api/v1/consumers/[consumerId]/notices/route.ts)        |
+| `POST /api/v1/templates/{id}/render`                                   | `ApiRenderRequest`, `ApiEmailResponse`, `ApiBase64Response`, `ApiPushResponse`, `ApiSmsResponse` (a raw PDF or HTML answer has no type); errors `ApiPushTooLargeDetails`, `ApiSmsTooLongDetails` | [render/route.ts](../app/api/v1/templates/[templateId]/render/route.ts)          |
 
 Every request carries `X-Consumer-Id` (a registered consumer), the render route's included. `/api/v1` serves consumers
 only: it never serves a draft or a version in review, and it reads no session or cookie.
@@ -67,12 +67,12 @@ push and SMS bodies and their error details equal to the domain's, at compile ti
 version (`versionNumber`, and `template.name` is that version's name) and names the Active version to move to
 (`activeVersion`, null when none is Active). There are four kinds:
 
-| Kind | Written when | Also carries |
-| --- | --- | --- |
-| `new_version` | A version goes Active. | `changes` from the previous Active version. |
+| Kind               | Written when                                                            | Also carries                                                                  |
+| ------------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `new_version`      | A version goes Active.                                                  | `changes` from the previous Active version.                                   |
 | `sunset_scheduled` | A sunset is set or moved, on the Versions tab or in the Approve dialog. | `sunsetAt`, `sunsetDay`, `zone`; `changes` moving to the Active version asks. |
-| `sunset_passed` | Stencil's sunset sweep finds the sunset passed. | `sunsetAt`, `sunsetDay`, `zone`. |
-| `revoked` | A revoke is confirmed. | `reason`. |
+| `sunset_passed`    | Stencil's sunset sweep finds the sunset passed.                         | `sunsetAt`, `sunsetDay`, `zone`.                                              |
+| `revoked`          | A revoke is confirmed.                                                  | `reason`.                                                                     |
 
 A notice goes to every consumer that rendered the template (not as a preview) from 90 days before the event on;
 for `sunset_passed` the event is the sunset. Each version gets one `sunset_passed` notice per consumer, ever.
@@ -113,16 +113,16 @@ Every error is `ApiErrorBody`, `{ error: { code, message, details? } }`; `messag
 people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../domain/golive-types.ts), applied by
 `errorResponse` in `http.ts`. It is a `Record<ApiErrorCode, number>`, so a new code won't compile without a status.
 
-| Status | Codes |
-| --- | --- |
-| 400 | `bad_request`, `consumer_required` |
-| 403 | `unknown_consumer`, `preview_forbidden`, `consumer_mismatch` |
-| 404 | `template_not_found`, `version_not_found`, `consumer_not_found` |
-| 409 | `version_not_released` |
-| 410 | `version_sunset`, `version_revoked` |
-| 413 | `body_too_large` |
-| 422 | `channel_not_allowed`, `channel_not_enabled`, `missing_variables`, `invalid_values` |
-| 500 | `render_failed` |
+| Status | Codes                                                                               |
+| ------ | ----------------------------------------------------------------------------------- |
+| 400    | `bad_request`, `consumer_required`                                                  |
+| 403    | `unknown_consumer`, `preview_forbidden`, `consumer_mismatch`                        |
+| 404    | `template_not_found`, `version_not_found`, `consumer_not_found`                     |
+| 409    | `version_not_released`                                                              |
+| 410    | `version_sunset`, `version_revoked`                                                 |
+| 413    | `body_too_large`                                                                    |
+| 422    | `channel_not_allowed`, `channel_not_enabled`, `missing_variables`, `invalid_values` |
+| 500    | `render_failed`                                                                     |
 
 `preview_forbidden` is Stencil's own preview route's: `/api/v1` never returns it (it stays in `ApiErrorCode` so the
 two code lists match).

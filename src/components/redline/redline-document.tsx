@@ -32,14 +32,30 @@ import { renderToReactElement } from "@tiptap/static-renderer/pm/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { staticHardBreak } from "@/editor/components/static-document";
 import { VariableChipView } from "@/editor/components/variable-chip";
-import { listMarkerAttrs, withListMarkers, type ListItemStatus } from "@/editor/extensions/list-markers";
+import {
+  listMarkerAttrs,
+  withListMarkers,
+  type ListItemStatus,
+} from "@/editor/extensions/list-markers";
 import type { JSONContent, Variable } from "@/editor/model/types";
 import { baseExtensions } from "@/editor/schema";
 import type { DocumentAlign } from "@/editor/types";
 import "@/editor/styles.css";
-import type { RedlineBlock, RedlineDoc, RedlineStatus } from "@/domain/review-types";
+import type {
+  RedlineBlock,
+  RedlineDoc,
+  RedlineStatus,
+} from "@/domain/review-types";
 import { cn } from "@/lib/utils";
-import { BLOCK_LABEL, blockKind, gapLabel, groupBlocks, hostKey, markAllDeleted, type RedlineItem } from "./blocks";
+import {
+  BLOCK_LABEL,
+  blockKind,
+  gapLabel,
+  groupBlocks,
+  hostKey,
+  markAllDeleted,
+  type RedlineItem,
+} from "./blocks";
 import { RedlineMark } from "./redline-mark";
 import "./redline.css";
 
@@ -66,7 +82,11 @@ const BAR: Record<Exclude<RedlineStatus, "unchanged" | "moved">, string> = {
 };
 
 /** What hangs in the gutter beside a block that changed: a bar in its status's colour, or "Moved". A changed channel field has the bar too (fields-document.tsx). */
-export function Gutter({ status }: { status: Exclude<RedlineStatus, "unchanged"> }) {
+export function Gutter({
+  status,
+}: {
+  status: Exclude<RedlineStatus, "unchanged">;
+}) {
   return (
     <>
       {status === "moved" ? (
@@ -81,7 +101,10 @@ export function Gutter({ status }: { status: Exclude<RedlineStatus, "unchanged">
         <span
           aria-hidden
           data-slot="redline-bar"
-          className={cn("pointer-events-none absolute inset-y-[0.15rem] -left-3.5 w-[3px] rounded-full", BAR[status])}
+          className={cn(
+            "pointer-events-none absolute inset-y-[0.15rem] -left-3.5 w-[3px] rounded-full",
+            BAR[status],
+          )}
         />
       )}
     </>
@@ -94,11 +117,21 @@ function collapsedAttrs(item: RedlineItem) {
   if (hidden.length === 0) return {};
   return {
     "data-hidden-blocks": hidden.join(" "),
-    ...(item.type === "block" ? {} : { "data-collapsed": hostKey(item) ?? undefined }),
+    ...(item.type === "block"
+      ? {}
+      : { "data-collapsed": hostKey(item) ?? undefined }),
   };
 }
 
-function Frame({ item, active, children }: { item: Extract<RedlineItem, { type: "block" }>; active: boolean; children: ReactNode }) {
+function Frame({
+  item,
+  active,
+  children,
+}: {
+  item: Extract<RedlineItem, { type: "block" }>;
+  active: boolean;
+  children: ReactNode;
+}) {
   const { block } = item;
   const { status } = block;
   // `data-id` is what the document's hover comment button looks for on a top-level block (a removed
@@ -111,7 +144,12 @@ function Frame({ item, active, children }: { item: Extract<RedlineItem, { type: 
   };
   if (status === "unchanged") {
     return (
-      <div className="rl-item relative" data-kind={blockKind(block.node)} data-redline="unchanged" {...identity}>
+      <div
+        className="rl-item relative"
+        data-kind={blockKind(block.node)}
+        data-redline="unchanged"
+        {...identity}
+      >
         {children}
       </div>
     );
@@ -126,15 +164,28 @@ function Frame({ item, active, children }: { item: Extract<RedlineItem, { type: 
       {...identity}
     >
       <Gutter status={status} />
-      {status === "added" ? <ins className="block no-underline">{children}</ins> : children}
+      {status === "added" ? (
+        <ins className="block no-underline">{children}</ins>
+      ) : (
+        children
+      )}
     </div>
   );
 }
 
 /** The section an unchanged heading names, over the changes below it (Changes only). */
-function Caption({ item }: { item: Extract<RedlineItem, { type: "caption" }> }) {
+function Caption({
+  item,
+}: {
+  item: Extract<RedlineItem, { type: "caption" }>;
+}) {
   return (
-    <div className="rl-item caps-label" data-kind="caption" data-redline-caption="" {...collapsedAttrs(item)}>
+    <div
+      className="rl-item caps-label"
+      data-kind="caption"
+      data-redline-caption=""
+      {...collapsedAttrs(item)}
+    >
       {item.text}
     </div>
   );
@@ -143,7 +194,12 @@ function Caption({ item }: { item: Extract<RedlineItem, { type: "caption" }> }) 
 /** A run of unchanged blocks: a quiet count, where they were. */
 function Gap({ item }: { item: Extract<RedlineItem, { type: "gap" }> }) {
   return (
-    <div className="rl-item text-[12px] leading-5 text-text-subtle" data-kind="gap" data-redline-gap="" {...collapsedAttrs(item)}>
+    <div
+      className="rl-item text-[12px] leading-5 text-text-subtle"
+      data-kind="gap"
+      data-redline-gap=""
+      {...collapsedAttrs(item)}
+    >
       {gapLabel(item.count)}
     </div>
   );
@@ -164,33 +220,60 @@ export function redlineItemStatus(item: PMNode): ListItemStatus {
   let other = 0;
   item.descendants((node) => {
     if (!node.isInline) return true;
-    const op = node.marks.find((mark) => mark.type.name === RedlineMark.name)?.attrs.op as string | undefined;
+    const op = node.marks.find((mark) => mark.type.name === RedlineMark.name)
+      ?.attrs.op as string | undefined;
     if (op === "delete") deleted++;
     else if (op === "insert") inserted++;
     else other++;
     return false;
   });
-  if (other > 0 || deleted + inserted === 0 || (deleted > 0 && inserted > 0)) return null;
+  if (other > 0 || deleted + inserted === 0 || (deleted > 0 && inserted > 0))
+    return null;
   return deleted > 0 ? "deleted" : "inserted";
 }
 
-export function RedlineDocument({ doc, variables, changesOnly = false, activeBlockId = null, align = "center", className }: RedlineDocumentProps) {
+export function RedlineDocument({
+  doc,
+  variables,
+  changesOnly = false,
+  activeBlockId = null,
+  align = "center",
+  className,
+}: RedlineDocumentProps) {
   const byKey = new Map(variables.map((v) => [v.key, v]));
-  const items: RedlineItem[] = groupBlocks(doc, changesOnly, new Map(variables.map((v) => [v.key, v.label])), activeBlockId);
-  const blocks = items.flatMap((item) => (item.type === "block" ? [item.block] : []));
+  const items: RedlineItem[] = groupBlocks(
+    doc,
+    changesOnly,
+    new Map(variables.map((v) => [v.key, v.label])),
+    activeBlockId,
+  );
+  const blocks = items.flatMap((item) =>
+    item.type === "block" ? [item.block] : [],
+  );
 
   /** Everything but a block: the captions and the counts. */
   const aside = (item: RedlineItem, i: number): ReactNode =>
-    item.type === "caption" ? <Caption key={`caption-${i}`} item={item} /> : item.type === "gap" ? <Gap key={`gap-${i}`} item={item} /> : null;
+    item.type === "caption" ? (
+      <Caption key={`caption-${i}`} item={item} />
+    ) : item.type === "gap" ? (
+      <Gap key={`gap-${i}`} item={item} />
+    ) : null;
 
   // One render of all the blocks the document shows; the doc mapping puts each in its frame.
-  const extensions = [...baseExtensions({ variables }), RedlineMark, listMarkerAttrs()];
+  const extensions = [
+    ...baseExtensions({ variables }),
+    RedlineMark,
+    listMarkerAttrs(),
+  ];
   const body: ReactNode =
     blocks.length === 0
       ? items.map(aside)
       : renderToReactElement({
           content: withListMarkers(
-            getSchema(extensions).nodeFromJSON({ type: "doc", content: blocks.map(paintedNode) }),
+            getSchema(extensions).nodeFromJSON({
+              type: "doc",
+              content: blocks.map(paintedNode),
+            }),
             redlineItemStatus,
           ),
           extensions,
@@ -198,7 +281,12 @@ export function RedlineDocument({ doc, variables, changesOnly = false, activeBlo
             nodeMapping: {
               variable: ({ node }: { node: PMNode }) => {
                 const key = (node.attrs.key as string | null) ?? null;
-                return <VariableChipView variableKey={key} variable={key ? byKey.get(key) : undefined} />;
+                return (
+                  <VariableChipView
+                    variableKey={key}
+                    variable={key ? byKey.get(key) : undefined}
+                  />
+                );
               },
               // The empty line after a paragraph's last hard break shows, as in the editor and every channel.
               hardBreak: staticHardBreak,
@@ -209,7 +297,11 @@ export function RedlineDocument({ doc, variables, changesOnly = false, activeBlo
                   <>
                     {items.map((item, i) =>
                       item.type === "block" ? (
-                        <Frame key={`${i}-${item.block.id}`} item={item} active={item.block.id === activeBlockId}>
+                        <Frame
+                          key={`${i}-${item.block.id}`}
+                          item={item}
+                          active={item.block.id === activeBlockId}
+                        >
                           {rendered[at++]}
                         </Frame>
                       ) : (

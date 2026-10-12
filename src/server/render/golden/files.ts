@@ -2,7 +2,11 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { json, parseRenderFixture, type RenderFixture } from "@/server/render/testing/fixture";
+import {
+  json,
+  parseRenderFixture,
+  type RenderFixture,
+} from "@/server/render/testing/fixture";
 import { FOCUSED_CASES } from "./focused-cases";
 
 /** Every path is under the project root, which is the working directory for npm scripts and vitest. */
@@ -14,15 +18,23 @@ export const UPDATING = process.env.GOLDEN_UPDATE === "1";
 
 /** The case folders on disk, plus the hand-built ones (so an update can create them). */
 export function caseSlugs(): string[] {
-  const onDisk = existsSync(CASES_DIR) ? readdirSync(CASES_DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name) : [];
+  const onDisk = existsSync(CASES_DIR)
+    ? readdirSync(CASES_DIR, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+    : [];
   return [...new Set([...onDisk, ...FOCUSED_CASES.map((c) => c.slug)])].sort();
 }
 
 export const caseDir = (slug: string) => path.join(CASES_DIR, slug);
-export const inputPath = (slug: string) => path.join(caseDir(slug), "input.json");
+export const inputPath = (slug: string) =>
+  path.join(caseDir(slug), "input.json");
 
 export function readInput(slug: string): RenderFixture {
-  if (!existsSync(inputPath(slug))) throw new Error(`cases/${slug}/input.json is missing. Run: npm run golden:update`);
+  if (!existsSync(inputPath(slug)))
+    throw new Error(
+      `cases/${slug}/input.json is missing. Run: npm run golden:update`,
+    );
   return parseRenderFixture(readFileSync(inputPath(slug), "utf8"));
 }
 

@@ -8,14 +8,20 @@ import type { SeedTemplate } from "./types";
 
 const FDIC =
   "Deposits are insured by the FDIC up to $250,000 per depositor, per insured bank, for each ownership category.";
-const STATE_TERMS = "Account terms for {home_state} residents are in your deposit account agreement.";
+const STATE_TERMS =
+  "Account terms for {home_state} residents are in your deposit account agreement.";
 
 // Naomi's two send-backs of High-Yield Savings v2.
-const SAVINGS_ROUND_1_REASON = "The withdrawal limit isn't stated. Add the six-per-statement-cycle rule before this goes out.";
-const SAVINGS_ROUND_2_REASON = "The email preheader still says 'rate change'. This is a rate disclosure.";
+const SAVINGS_ROUND_1_REASON =
+  "The withdrawal limit isn't stated. Add the six-per-statement-cycle rule before this goes out.";
+const SAVINGS_ROUND_2_REASON =
+  "The email preheader still says 'rate change'. This is a rate disclosure.";
 
 /** `withdrawals: false` is v2's first round, sent back for leaving out the excess withdrawal limit. */
-function savingsBody(version: 1 | 2, { withdrawals = version === 2 }: { withdrawals?: boolean } = {}) {
+function savingsBody(
+  version: 1 | 2,
+  { withdrawals = version === 2 }: { withdrawals?: boolean } = {},
+) {
   return disclosure("high-yield-savings", {
     offer: [
       p(
@@ -37,7 +43,14 @@ function savingsBody(version: 1 | 2, { withdrawals = version === 2 }: { withdraw
           ["{minimum_balance} and over", "{apy}"],
         ],
       ),
-      ...(withdrawals ? [p("withdrawals", "Excess withdrawals: $10 per withdrawal over 6 in each statement cycle.")] : []),
+      ...(withdrawals
+        ? [
+            p(
+              "withdrawals",
+              "Excess withdrawals: $10 per withdrawal over 6 in each statement cycle.",
+            ),
+          ]
+        : []),
     ],
     legal: [
       p("fdic", FDIC),
@@ -53,7 +66,10 @@ function savingsBody(version: 1 | 2, { withdrawals = version === 2 }: { withdraw
 function checkingBody() {
   return disclosure("checking-fees", {
     offer: [
-      p("intro", "Hi {first_name}, here are the fees for your Everyday Checking account."),
+      p(
+        "intro",
+        "Hi {first_name}, here are the fees for your Everyday Checking account.",
+      ),
       ul("waivers", [
         "The monthly service fee is waived when your daily balance stays at or above {minimum_balance}.",
         "Your first set of checks is free.",
@@ -75,7 +91,10 @@ function checkingBody() {
     ],
     legal: [
       p("fdic", FDIC),
-      callout("changes_callout", "We may change fees with 30 days' written notice."),
+      callout(
+        "changes_callout",
+        "We may change fees with 30 days' written notice.",
+      ),
       p("state_terms", STATE_TERMS),
     ],
   });
@@ -110,7 +129,14 @@ function overdraftBody() {
 
 export function seedDepositsTemplates(ctx: SeedCtx) {
   const { vars } = ctx;
-  const savingsVariables = () => vars.list(["first_name", "home_state", "apy", "minimum_balance", "effective_date"]);
+  const savingsVariables = () =>
+    vars.list([
+      "first_name",
+      "home_state",
+      "apy",
+      "minimum_balance",
+      "effective_date",
+    ]);
   const savingsEmail = (preheader: string) => ({
     email: {
       subject: inlineDoc("Your High-Yield Savings rate: {apy} APY"),
@@ -118,7 +144,8 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
     },
   });
   // Rounds 1 and 2 of v2 called the email a rate change; round 3 fixed it.
-  const rateChangeEmail = () => savingsEmail("Hi {first_name}, here are the details of your rate change.");
+  const rateChangeEmail = () =>
+    savingsEmail("Hi {first_name}, here are the details of your rate change.");
 
   const templates: SeedTemplate[] = [
     // v1 Superseded; v2 Active, approved on round 3 after two send-backs (Naomi).
@@ -142,7 +169,14 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           submittedBy: "eli",
           submittedAt: 196,
           submitNote: "Rate disclosure for the High-Yield Savings launch.",
-          approvals: [{ actor: "naomi", decision: "approved", at: 194, seen: ["typical", "long", "minimum"] }],
+          approvals: [
+            {
+              actor: "naomi",
+              decision: "approved",
+              at: 194,
+              seen: ["typical", "long", "minimum"],
+            },
+          ],
           activatedAt: 194,
           supersededAt: 70,
         },
@@ -162,7 +196,15 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           submittedBy: "eli",
           submittedAt: 77,
           submitNote: "Adds an email version.",
-          approvals: [{ actor: "naomi", decision: "changes_requested", reason: SAVINGS_ROUND_1_REASON, at: 76.4, seen: ["typical"] }],
+          approvals: [
+            {
+              actor: "naomi",
+              decision: "changes_requested",
+              reason: SAVINGS_ROUND_1_REASON,
+              at: 76.4,
+              seen: ["typical"],
+            },
+          ],
         },
         {
           ref: "v2r2",
@@ -182,7 +224,13 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           submittedAt: 75.5,
           submitNote: "Adds the excess withdrawal limit.",
           approvals: [
-            { actor: "naomi", decision: "changes_requested", reason: SAVINGS_ROUND_2_REASON, at: 75.2, seen: ["typical", "long"] },
+            {
+              actor: "naomi",
+              decision: "changes_requested",
+              reason: SAVINGS_ROUND_2_REASON,
+              at: 75.2,
+              seen: ["typical", "long"],
+            },
           ],
         },
         {
@@ -195,14 +243,23 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           body: savingsBody(2),
           variables: savingsVariables(),
           channels: ["pdf", "web", "email"],
-          channelFields: savingsEmail("Hi {first_name}, here are the details of your savings rate."),
+          channelFields: savingsEmail(
+            "Hi {first_name}, here are the details of your savings rate.",
+          ),
           contractChanges: [],
           createdBy: "eli",
           createdAt: 75.2,
           submittedBy: "eli",
           submittedAt: 74,
           submitNote: "Adds the excess withdrawal limit and an email version.",
-          approvals: [{ actor: "naomi", decision: "approved", at: 70, seen: ["typical", "long"] }],
+          approvals: [
+            {
+              actor: "naomi",
+              decision: "approved",
+              at: 70,
+              seen: ["typical", "long"],
+            },
+          ],
           activatedAt: 70,
         },
       ],
@@ -212,14 +269,28 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
         {
           origin: "v2r1",
           block: DOCUMENT_THREAD,
-          comments: [{ author: "naomi", kind: "change_request", body: SAVINGS_ROUND_1_REASON, at: 76.4 }],
+          comments: [
+            {
+              author: "naomi",
+              kind: "change_request",
+              body: SAVINGS_ROUND_1_REASON,
+              at: 76.4,
+            },
+          ],
           resolved: { by: "eli", at: 75.5 },
           keyedIds: true,
         },
         {
           origin: "v2r2",
           block: DOCUMENT_THREAD,
-          comments: [{ author: "naomi", kind: "change_request", body: SAVINGS_ROUND_2_REASON, at: 75.2 }],
+          comments: [
+            {
+              author: "naomi",
+              kind: "change_request",
+              body: SAVINGS_ROUND_2_REASON,
+              at: 75.2,
+            },
+          ],
           resolved: { by: "eli", at: 74 },
           keyedIds: true,
         },
@@ -238,14 +309,26 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           number: 1,
           state: "active",
           body: checkingBody(),
-          variables: vars.list(["first_name", "home_state", "monthly_fee", "minimum_balance"]),
+          variables: vars.list([
+            "first_name",
+            "home_state",
+            "monthly_fee",
+            "minimum_balance",
+          ]),
           channels: ["pdf", "web"],
           createdBy: "eli",
           createdAt: 150,
           submittedBy: "eli",
           submittedAt: 146,
           submitNote: "Fee schedule for Everyday Checking.",
-          approvals: [{ actor: "naomi", decision: "approved", at: 144, seen: ["typical", "long", "minimum"] }],
+          approvals: [
+            {
+              actor: "naomi",
+              decision: "approved",
+              at: 144,
+              seen: ["typical", "long", "minimum"],
+            },
+          ],
           activatedAt: 144,
         },
       ],

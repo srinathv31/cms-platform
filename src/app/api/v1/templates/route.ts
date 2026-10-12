@@ -1,10 +1,22 @@
 import type { NextRequest } from "next/server";
-import { parseLimit, QUERY_MESSAGES, SEARCH_LIMIT } from "@/domain/golive/api-errors";
+import {
+  parseLimit,
+  QUERY_MESSAGES,
+  SEARCH_LIMIT,
+} from "@/domain/golive/api-errors";
 import { readSearchCursor } from "@/domain/golive/cursor";
 import type { ApiTemplateSearch } from "@/domain/golive-types";
-import { correlationIdOf, errorResponse, jsonResponse, withDemoDate } from "@/server/api/http";
+import {
+  correlationIdOf,
+  errorResponse,
+  jsonResponse,
+  withDemoDate,
+} from "@/server/api/http";
 import { now } from "@/server/clock";
-import { requireConsumer, searchActiveTemplates } from "@/server/queries/consumer-api";
+import {
+  requireConsumer,
+  searchActiveTemplates,
+} from "@/server/queries/consumer-api";
 
 // GET /api/v1/templates?q=&limit=&after=: search the templates a consumer can link (Active ones only),
 // paged with an opaque cursor. Contract: ApiTemplateSearch in src/contracts/api-v1.ts.
@@ -20,7 +32,11 @@ export const GET = withDemoDate(async function get(request: NextRequest) {
   const consumer = await requireConsumer(consumerHeader);
   if (!consumer.ok) return errorResponse(consumer.error, correlationId);
 
-  const limit = parseLimit(params.get("limit"), SEARCH_LIMIT, QUERY_MESSAGES.searchLimit);
+  const limit = parseLimit(
+    params.get("limit"),
+    SEARCH_LIMIT,
+    QUERY_MESSAGES.searchLimit,
+  );
   if (!limit.ok) return errorResponse(limit.error, correlationId);
   const query = (params.get("q") ?? "").trim();
   const after = readSearchCursor(params.get("after"), query);

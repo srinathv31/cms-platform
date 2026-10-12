@@ -10,7 +10,15 @@
 // was never committed. An emptied value is stored as "" and the field is marked quietly.
 
 import { Trash2 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import type { SampleSet, Variable, VariableType } from "@/editor/model/types";
 import { isDefaultSet } from "@/editor/model/sample-sets";
 import { MAX_VALUE_LENGTH, formatValue } from "@/editor/model/variables";
@@ -47,8 +55,12 @@ export interface ValuesEditorProps {
 /** The marker the popover's initial focus looks for. */
 export const AUTOFOCUS_ATTR = "data-autofocus";
 
-const ROW = "grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] items-start gap-x-3";
-const INPUT = cn("h-8 rounded-lg bg-surface px-2.5 text-[13px] md:text-[13px]", FIELD_FOCUS_RING);
+const ROW =
+  "grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] items-start gap-x-3";
+const INPUT = cn(
+  "h-8 rounded-lg bg-surface px-2.5 text-[13px] md:text-[13px]",
+  FIELD_FOCUS_RING,
+);
 
 const INPUT_MODE: Partial<Record<VariableType, "decimal">> = {
   currency: "decimal",
@@ -62,9 +74,21 @@ function omit<T>(record: Record<string, T>, key: string): Record<string, T> {
   return rest;
 }
 
-export function ValuesEditor({ set, sets, variables, today, editable, focusName, onChange, onDelete }: ValuesEditorProps) {
+export function ValuesEditor({
+  set,
+  sets,
+  variables,
+  today,
+  editable,
+  focusName,
+  onChange,
+  onDelete,
+}: ValuesEditorProps) {
   const uid = useId();
-  const resolved = useMemo(() => resolveSetValues(set, variables, today), [set, variables, today]);
+  const resolved = useMemo(
+    () => resolveSetValues(set, variables, today),
+    [set, variables, today],
+  );
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [nameDraft, setNameDraft] = useState<string | null>(null);
@@ -89,7 +113,8 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
     }
     setDrafts((current) => omit(current, variable.key));
     setErrors((current) => omit(current, variable.key));
-    if (result.value !== String(resolved[variable.key])) onChange(setValue(sets, set.id, variable.key, result.value));
+    if (result.value !== String(resolved[variable.key]))
+      onChange(setValue(sets, set.id, variable.key, result.value));
   };
 
   const type = (variable: Variable, text: string) => {
@@ -97,14 +122,15 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
     setErrors((current) => omit(current, variable.key)); // judged again on blur
   };
 
-  const onFieldKeyDown = (variable: Variable) => (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.nativeEvent.isComposing) return;
-    // Esc closes the popover; the value typed so far is committed first.
-    if (event.key === "Enter" || event.key === "Escape") {
-      if (event.key === "Enter") event.preventDefault();
-      commit(variable);
-    }
-  };
+  const onFieldKeyDown =
+    (variable: Variable) => (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.nativeEvent.isComposing) return;
+      // Esc closes the popover; the value typed so far is committed first.
+      if (event.key === "Enter" || event.key === "Escape") {
+        if (event.key === "Enter") event.preventDefault();
+        commit(variable);
+      }
+    };
 
   // ── Name ───────────────────────────────────────────────────────
 
@@ -117,7 +143,8 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
     }
     setNameDraft(null);
     setNameError(null);
-    if (result.name !== set.name) onChange(renameSet(sets, set.id, result.name));
+    if (result.name !== set.name)
+      onChange(renameSet(sets, set.id, result.name));
   };
 
   const onNameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -150,8 +177,11 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
 
   // The value that takes focus when the popover opens: the name of a new set, else the first
   // required value that was emptied, else the first value.
-  const firstEmptyRequired = variables.find((v) => v.required && String(resolved[v.key]).trim() === "");
-  const autofocusKey = focusName && custom ? null : (firstEmptyRequired ?? variables[0])?.key;
+  const firstEmptyRequired = variables.find(
+    (v) => v.required && String(resolved[v.key]).trim() === "",
+  );
+  const autofocusKey =
+    focusName && custom ? null : (firstEmptyRequired ?? variables[0])?.key;
 
   if (!editable) {
     return (
@@ -172,7 +202,10 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
                     <span className="sr-only">Empty</span>
                   </>
                 ) : (
-                  <span className="truncate" title={formatValue(variable.type, text)}>
+                  <span
+                    className="truncate"
+                    title={formatValue(variable.type, text)}
+                  >
                     {formatValue(variable.type, text)}
                   </span>
                 )}
@@ -189,7 +222,10 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
       {custom ? (
         <div className="border-b border-hairline px-4 py-3">
           <div className={ROW}>
-            <label htmlFor={nameId} className="flex min-h-8 items-center text-[13px] text-text">
+            <label
+              htmlFor={nameId}
+              className="flex min-h-8 items-center text-[13px] text-text"
+            >
               Name
             </label>
             <div className="min-w-0">
@@ -216,13 +252,19 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
                 aria-describedby={nameError ? `${nameId}-error` : undefined}
                 className={cn(INPUT, "aria-invalid:border-destructive")}
               />
-              {nameError ? <FieldError id={`${nameId}-error`}>{nameError}</FieldError> : null}
+              {nameError ? (
+                <FieldError id={`${nameId}-error`}>{nameError}</FieldError>
+              ) : null}
             </div>
           </div>
         </div>
       ) : null}
 
-      <div role="group" aria-label="Sample values" className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-4 py-4">
+      <div
+        role="group"
+        aria-label="Sample values"
+        className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-4 py-4"
+      >
         {variables.map((variable) => {
           const key = variable.key;
           const draft = drafts[key];
@@ -280,7 +322,9 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
                 cancelDelete();
               }}
             >
-              <p className="min-w-0 flex-1 text-[13px] leading-5 text-text-muted">Delete this set and its edits?</p>
+              <p className="min-w-0 flex-1 text-[13px] leading-5 text-text-muted">
+                Delete this set and its edits?
+              </p>
               <Button
                 type="button"
                 variant="ghost"
@@ -296,7 +340,10 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
                 variant="ghost"
                 size="sm"
                 onClick={onDelete}
-                className={cn("font-normal text-danger-text hover:bg-danger-soft hover:text-danger-text", FOCUS_RING)}
+                className={cn(
+                  "font-normal text-danger-text hover:bg-danger-soft hover:text-danger-text",
+                  FOCUS_RING,
+                )}
               >
                 Delete
               </Button>
@@ -324,14 +371,21 @@ export function ValuesEditor({ set, sets, variables, today, editable, focusName,
 }
 
 /** The left cell of a row: type icon and label, the key under it in small mono. */
-function VariableLabel({ variable, htmlFor }: { variable: Variable; htmlFor?: string }) {
+function VariableLabel({
+  variable,
+  htmlFor,
+}: {
+  variable: Variable;
+  htmlFor?: string;
+}) {
   const name = (
     <>
       <TypeIcon type={variable.type} />
       <span className="truncate">{variable.label}</span>
     </>
   );
-  const className = "flex min-w-0 items-center gap-1.5 text-[13px] leading-5 text-text";
+  const className =
+    "flex min-w-0 items-center gap-1.5 text-[13px] leading-5 text-text";
   return (
     <div className="flex min-h-8 min-w-0 flex-col justify-center">
       {htmlFor ? (
@@ -343,7 +397,9 @@ function VariableLabel({ variable, htmlFor }: { variable: Variable; htmlFor?: st
           {name}
         </span>
       )}
-      <span className="truncate pl-5 font-mono text-[11px] leading-4 text-text-subtle">{variable.key}</span>
+      <span className="truncate pl-5 font-mono text-[11px] leading-4 text-text-subtle">
+        {variable.key}
+      </span>
     </div>
   );
 }

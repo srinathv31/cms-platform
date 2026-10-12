@@ -7,7 +7,10 @@ import { getViewer } from "@/server/viewer";
 // GET → { ok: true, prompt } | { ok: false, code, reason }, with 400, 403, 404 or 409 (src/server/api/reads.ts).
 // Only someone who may edit the team's drafts. Request-time only: it reads the persona cookie first.
 
-export async function GET(_request: NextRequest, ctx: RouteContext<"/api/templates/[templateId]/copilot-prompt">) {
+export async function GET(
+  _request: NextRequest,
+  ctx: RouteContext<"/api/templates/[templateId]/copilot-prompt">,
+) {
   const viewer = await getViewer();
   const { templateId } = await ctx.params;
   return readResponse(await getCopilotPrompt(viewer, { templateId }));

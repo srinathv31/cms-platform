@@ -2,7 +2,11 @@ import "server-only";
 import { getSchema, type JSONContent } from "@tiptap/core";
 import type { Schema } from "@tiptap/pm/model";
 import { channelFieldProblem, type FieldOf } from "@/domain/channel-fields";
-import { DOCUMENT_MESSAGES, documentProblem, type DocumentProblem } from "@/editor/model/document-check";
+import {
+  DOCUMENT_MESSAGES,
+  documentProblem,
+  type DocumentProblem,
+} from "@/editor/model/document-check";
 import { baseExtensions } from "@/editor/schema";
 
 // The document check (docs/render-spec.md §3): the guard between a document and storage (autosave)
@@ -43,7 +47,9 @@ export function parseWithSchema(body: JSONContent): void {
   try {
     const node = editorSchema().nodeFromJSON(body);
     if (node.type !== editorSchema().topNodeType) {
-      throw new Error(`Expected a "${editorSchema().topNodeType.name}" node, got "${node.type.name}".`);
+      throw new Error(
+        `Expected a "${editorSchema().topNodeType.name}" node, got "${node.type.name}".`,
+      );
     }
     node.check();
   } catch (error) {

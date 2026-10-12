@@ -13,11 +13,26 @@ import { requestAuditExport, saveAuditFile } from "./export-audit";
  * export at a time. A modified click (a new tab, the context menu) and a page without its script
  * fall back to the anchor, which downloads the file as before.
  */
-export function ExportLink({ href, label, className }: { href: string; label: string; className?: string }) {
+export function ExportLink({
+  href,
+  label,
+  className,
+}: {
+  href: string;
+  label: string;
+  className?: string;
+}) {
   const sending = useRef(false);
 
   async function onClick(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
     event.preventDefault();
     if (sending.current) return;
     sending.current = true;
@@ -31,7 +46,12 @@ export function ExportLink({ href, label, className }: { href: string; label: st
   }
 
   return (
-    <Button variant="outline" render={<a href={href} download onClick={onClick} />} nativeButton={false} className={className}>
+    <Button
+      variant="outline"
+      render={<a href={href} download onClick={onClick} />}
+      nativeButton={false}
+      className={className}
+    >
       <Download aria-hidden strokeWidth={1.75} data-icon="inline-start" />
       {label}
     </Button>

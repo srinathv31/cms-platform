@@ -7,9 +7,13 @@ import { NoticesPanel } from "./notices-panel";
 
 // Coral's notice inbox: every notice kind Stencil sends gets a title and a tone, and the API's sentence as is.
 
-vi.mock("@/simulator/actions", () => ({ markNoticesRead: vi.fn(async () => ({ ok: true })) }));
+vi.mock("@/simulator/actions", () => ({
+  markNoticesRead: vi.fn(async () => ({ ok: true })),
+}));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const NAME = "Balance Transfer Intro — Terms";
 
@@ -44,7 +48,14 @@ afterEach(() => {
 describe("NoticesPanel", () => {
   it("shows a sunset_passed notice with its title and Stencil's sentence", () => {
     const message = `${NAME} v1 stopped rendering: its sunset passed on October 30, 2026. Move to v2.`;
-    act(() => root.render(<NoticesPanel notices={[notice({ id: "ntc_9", kind: "sunset_passed", message })]} offerNames={{}} />));
+    act(() =>
+      root.render(
+        <NoticesPanel
+          notices={[notice({ id: "ntc_9", kind: "sunset_passed", message })]}
+          offerNames={{}}
+        />,
+      ),
+    );
     const item = container.querySelector("li")!;
     expect(item.textContent).toContain("v1 sunset passed");
     expect(item.textContent).toContain(message);
@@ -52,13 +63,27 @@ describe("NoticesPanel", () => {
   });
 
   it("titles every kind", () => {
-    const kinds = ["new_version", "sunset_scheduled", "sunset_passed", "revoked"] as const;
+    const kinds = [
+      "new_version",
+      "sunset_scheduled",
+      "sunset_passed",
+      "revoked",
+    ] as const;
     act(() =>
       root.render(
-        <NoticesPanel notices={kinds.map((kind, i) => notice({ id: `ntc_${i}`, kind, versionNumber: 2 }))} offerNames={{}} />,
+        <NoticesPanel
+          notices={kinds.map((kind, i) =>
+            notice({ id: `ntc_${i}`, kind, versionNumber: 2 }),
+          )}
+          offerNames={{}}
+        />,
       ),
     );
-    expect([...container.querySelectorAll("li p.font-semibold")].map((p) => p.textContent)).toEqual([
+    expect(
+      [...container.querySelectorAll("li p.font-semibold")].map(
+        (p) => p.textContent,
+      ),
+    ).toEqual([
       "New version: v2",
       "Sunset scheduled for v2",
       "v2 sunset passed",

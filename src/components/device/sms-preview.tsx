@@ -5,7 +5,12 @@ import { PhoneFrame } from "./phone-frame";
 import { DEFAULT_CLOCK } from "./push-preview";
 import { AndroidMessagesThread } from "./android/messages-thread";
 import { MessagesThread } from "./ios/messages-thread";
-import type { DeviceClock, DeviceSettings, PhoneFit, SmsContent } from "./types";
+import type {
+  DeviceClock,
+  DeviceSettings,
+  PhoneFit,
+  SmsContent,
+} from "./types";
 
 export interface SmsPreviewProps {
   /** `previewsHidden` doesn't apply: the thread is the open app. */
@@ -22,7 +27,13 @@ export interface SmsPreviewProps {
  * the phone at its real size, scaled to fit its container. The text is never cut; a long one scrolls.
  * With no sender, the header shows a muted "No sender" and the caption leaves out "from".
  */
-export function SmsPreview({ settings, content, clock = DEFAULT_CLOCK, fit, className }: SmsPreviewProps) {
+export function SmsPreview({
+  settings,
+  content,
+  clock = DEFAULT_CLOCK,
+  fit,
+  className,
+}: SmsPreviewProps) {
   const props = { content, settings, clock };
   return (
     <PhoneFrame
@@ -33,7 +44,11 @@ export function SmsPreview({ settings, content, clock = DEFAULT_CLOCK, fit, clas
       fit={fit}
       className={className}
     >
-      {settings.platform === "ios" ? <MessagesThread {...props} /> : <AndroidMessagesThread {...props} />}
+      {settings.platform === "ios" ? (
+        <MessagesThread {...props} />
+      ) : (
+        <AndroidMessagesThread {...props} />
+      )}
     </PhoneFrame>
   );
 }

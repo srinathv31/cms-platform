@@ -34,12 +34,20 @@ describe("linkStatus", () => {
   it("dates a sunset by its day, not by the UTC date of its instant", () => {
     // 00:00 on March 1 in Kolkata is 18:30Z on February 28; the day Stencil sends is March 1.
     const status = linkStatus(link({ sunsetDay: "2027-03-01" }));
-    expect(status).toEqual({ tone: "warn", label: "Superseded · sunset Mar 1, 2027", failing: false });
+    expect(status).toEqual({
+      tone: "warn",
+      label: "Superseded · sunset Mar 1, 2027",
+      failing: false,
+    });
     expect(dayLabel("2027-02-28T18:30:00.000Z")).toBe("Feb 28, 2027");
   });
 
   it("says Superseded alone when no sunset is set, and Sunset passed once it has", () => {
     expect(linkStatus(link({})).label).toBe("Superseded");
-    expect(linkStatus(link({ sunsetDay: "2027-03-01", sunsetPassed: true, renders: false }))).toEqual({ tone: "bad", label: "Sunset passed", failing: true });
+    expect(
+      linkStatus(
+        link({ sunsetDay: "2027-03-01", sunsetPassed: true, renders: false }),
+      ),
+    ).toEqual({ tone: "bad", label: "Sunset passed", failing: true });
   });
 });

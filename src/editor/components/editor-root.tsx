@@ -4,11 +4,21 @@
 // The root owns the list from the first render on (the `variables` prop is read once) and reports
 // every change through `onVariablesChange`. A <DocumentEditor> outside a root makes its own.
 
-import { createContext, use, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  use,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useStore } from "zustand";
 import { DEFAULT_REQUIRED_NOTE } from "../extensions/required-sections";
 import { diffVariables } from "../model/contract";
-import { createEditorRootRuntime, type EditorRootRuntime } from "../state/editor-root";
+import {
+  createEditorRootRuntime,
+  type EditorRootRuntime,
+} from "../state/editor-root";
 import type { ContractState, EditorHistory, EditorRootProps } from "../types";
 
 const EditorRootContext = createContext<EditorRootRuntime | null>(null);
@@ -23,7 +33,13 @@ export function EditorRoot({
   children,
 }: EditorRootProps) {
   const [runtime] = useState(() =>
-    createEditorRootRuntime({ variables, baseline, readOnly, held, requiredNote }),
+    createEditorRootRuntime({
+      variables,
+      baseline,
+      readOnly,
+      held,
+      requiredNote,
+    }),
   );
 
   // List changes only come from interaction after mount, so wiring the listener in an effect is in time.
@@ -43,7 +59,12 @@ export function EditorRoot({
     ) {
       return;
     }
-    runtime.config.setState({ readOnly: readOnly || held, held: nextHeld, baseline, requiredNote });
+    runtime.config.setState({
+      readOnly: readOnly || held,
+      held: nextHeld,
+      baseline,
+      requiredNote,
+    });
   }, [runtime, readOnly, held, baseline, requiredNote]);
 
   useEffect(() => {
@@ -91,5 +112,8 @@ export function useEditorHistory(): EditorHistory {
   const root = useEditorRoot("useEditorHistory");
   const canUndo = useStore(root.history, (s) => s.canUndo);
   const canRedo = useStore(root.history, (s) => s.canRedo);
-  return useMemo(() => ({ canUndo, canRedo, undo: root.undo, redo: root.redo }), [canUndo, canRedo, root]);
+  return useMemo(
+    () => ({ canUndo, canRedo, undo: root.undo, redo: root.redo }),
+    [canUndo, canRedo, root],
+  );
 }

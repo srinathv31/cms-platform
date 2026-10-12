@@ -61,7 +61,9 @@ export function visibleGroups(access: SettingsAccessLike): SettingsGroup[] {
   return SETTINGS_GROUPS.filter((g) => access[g.key]);
 }
 
-export function firstSettingsSection(access: SettingsAccessLike): string | null {
+export function firstSettingsSection(
+  access: SettingsAccessLike,
+): string | null {
   return visibleGroups(access)[0]?.sections[0]?.key ?? null;
 }
 
@@ -70,5 +72,6 @@ export function findSection(key: string): SettingsSection | undefined {
 }
 
 export function groupOfSection(key: string): SettingsGroupKey | undefined {
-  return SETTINGS_GROUPS.find((g) => g.sections.some((s) => s.key === key))?.key;
+  return SETTINGS_GROUPS.find((g) => g.sections.some((s) => s.key === key))
+    ?.key;
 }

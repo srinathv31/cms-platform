@@ -3,7 +3,20 @@ import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
 import { removeTemplate, rowsOf } from "./helpers/cleanup";
-import { asPersona, beat, chip, expect, liveEditor, nameField, openLibrary, shoot, tap, test, typeSlowly, untilUncovered } from "./helpers/scenario";
+import {
+  asPersona,
+  beat,
+  chip,
+  expect,
+  liveEditor,
+  nameField,
+  openLibrary,
+  shoot,
+  tap,
+  test,
+  typeSlowly,
+  untilUncovered,
+} from "./helpers/scenario";
 
 // Phase 7a gate: demo scenario 9 ("Import").
 //
@@ -25,7 +38,13 @@ import { asPersona, beat, chip, expect, liveEditor, nameField, openLibrary, shoo
 // folder (by id). Console and page errors fail it.
 
 const TEAM = "coral-offers";
-const FILE = path.join(process.cwd(), "e2e", "fixtures", "import", "spring-offer.docx");
+const FILE = path.join(
+  process.cwd(),
+  "e2e",
+  "fixtures",
+  "import",
+  "spring-offer.docx",
+);
 const FILE_NAME = "spring-offer.docx";
 const TEMPLATE_NAME = "Spring Balance Transfer Offer";
 
@@ -46,10 +65,14 @@ test.afterAll(async () => {
   }
 });
 
-const rail = (page: Page) => page.locator('[data-slot="rail"]').filter({ visible: true });
-const railTab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true }).filter({ visible: true });
+const rail = (page: Page) =>
+  page.locator('[data-slot="rail"]').filter({ visible: true });
+const railTab = (page: Page, name: string) =>
+  page.getByRole("tab", { name, exact: true }).filter({ visible: true });
 
-test("scenario 9: Maya imports a .docx; the draft has the chip and the table; the Original tab shows the source", async ({ page }) => {
+test("scenario 9: Maya imports a .docx; the draft has the chip and the table; the Original tab shows the source", async ({
+  page,
+}) => {
   test.setTimeout(120_000);
 
   await asPersona(page, "maya");
@@ -62,15 +85,23 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
     await expect(palette).toBeVisible();
     await expect(palette.getByRole("group", { name: "Actions" })).toBeVisible();
     await typeSlowly(page, "import");
-    await expect(palette.getByRole("option", { name: /Import a file/ })).toBeVisible();
+    await expect(
+      palette.getByRole("option", { name: /Import a file/ }),
+    ).toBeVisible();
     await shoot(page, "00-palette");
     await page.keyboard.press("Enter");
     await expect(palette).toBeHidden();
     const dialog = page.getByRole("dialog", { name: "New template" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Import a file" })).toBeFocused();
-    await expect(dialog.getByRole("button", { name: /Card offer terms/ })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: /Import a file/ })).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Import a file" }),
+    ).toBeFocused();
+    await expect(
+      dialog.getByRole("button", { name: /Card offer terms/ }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: /Import a file/ }),
+    ).toBeVisible();
     await beat(page, 600);
     await shoot(page, "01-import-row");
   });
@@ -79,7 +110,9 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
     const dialog = page.getByRole("dialog");
     // The picker is a hidden file input behind the row; this is what choosing the file in the OS dialog does.
     await dialog.locator('input[type="file"]').setInputFiles(FILE);
-    await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/, {
+      timeout: 30_000,
+    });
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
   });
 
@@ -92,7 +125,10 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
     await expect(chip(page, "first_name").first()).toBeVisible();
     await expect(chip(page, "purchase_apr").first()).toBeVisible();
     await expect(chip(page, "annual_fee").first()).toBeVisible();
-    expect(await chip(page, "first_name").count(), "{{First Name}} and {{first_name}} became chips").toBeGreaterThanOrEqual(2);
+    expect(
+      await chip(page, "first_name").count(),
+      "{{First Name}} and {{first_name}} became chips",
+    ).toBeGreaterThanOrEqual(2);
 
     // The table, header row and all.
     const body = page.getByRole("textbox", { name: "Document" });
@@ -103,8 +139,13 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
     await expect(table.locator('[data-variable="annual_fee"]')).toBeVisible();
 
     // The required sections, in order; "Legal notices" was missing from the file and is added empty.
-    for (const key of ["offer_details", "rates_and_fees", "legal_notices"]) await expect(body.locator(`h2[data-required="${key}"]`)).toBeVisible();
-    await expect(body.locator("h2[data-required]")).toHaveText(["Offer details", "Rates and fees", "Legal notices"]);
+    for (const key of ["offer_details", "rates_and_fees", "legal_notices"])
+      await expect(body.locator(`h2[data-required="${key}"]`)).toBeVisible();
+    await expect(body.locator("h2[data-required]")).toHaveText([
+      "Offer details",
+      "Rates and fees",
+      "Legal notices",
+    ]);
 
     // Template logic stays as text.
     await expect(body).toContainText("{{#if member}}");
@@ -115,18 +156,35 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
     const original = rail(page);
     await expect(original).toHaveAttribute("data-view", "original");
     await expect(original).toHaveAccessibleName("Original");
-    await expect(railTab(page, "Original")).toHaveAttribute("aria-selected", "true");
+    await expect(railTab(page, "Original")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
-    await expect(original.locator('[data-slot="original-file"]')).toContainText(FILE_NAME);
-    await expect(original.locator('[data-slot="original-file"]')).toContainText("Maya Chen");
+    await expect(original.locator('[data-slot="original-file"]')).toContainText(
+      FILE_NAME,
+    );
+    await expect(original.locator('[data-slot="original-file"]')).toContainText(
+      "Maya Chen",
+    );
 
     const report = original.getByRole("region", { name: "Import report" });
     await expect(report).toBeVisible();
-    await expect(report.getByRole("list", { name: "Detected" })).toContainText("First name");
-    await expect(report.getByRole("list", { name: "Detected" })).toContainText("1 table");
-    await expect(report.getByRole("list", { name: "Detected" })).toContainText("Added empty section: Legal notices");
-    await expect(report.getByRole("list", { name: "Kept as text" })).toContainText("{{#if member}}");
-    await expect(report.getByRole("list", { name: "Dropped" })).toContainText("1 comment");
+    await expect(report.getByRole("list", { name: "Detected" })).toContainText(
+      "First name",
+    );
+    await expect(report.getByRole("list", { name: "Detected" })).toContainText(
+      "1 table",
+    );
+    await expect(report.getByRole("list", { name: "Detected" })).toContainText(
+      "Added empty section: Legal notices",
+    );
+    await expect(
+      report.getByRole("list", { name: "Kept as text" }),
+    ).toContainText("{{#if member}}");
+    await expect(report.getByRole("list", { name: "Dropped" })).toContainText(
+      "1 comment",
+    );
 
     // The source, as written: a document with its table and its placeholders still in braces.
     const source = original.getByRole("region", { name: "Original file" });
@@ -147,24 +205,49 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
     await untilUncovered(railTab(page, "Variables"));
     await tap(railTab(page, "Variables"));
     await expect(rail(page)).toHaveAttribute("data-view", "variables");
-    await expect(page.locator('[data-variable-row="first_name"]').filter({ visible: true })).toBeVisible();
+    await expect(
+      page
+        .locator('[data-variable-row="first_name"]')
+        .filter({ visible: true }),
+    ).toBeVisible();
     await shoot(page, "03-variables");
 
     await tap(railTab(page, "Original"));
     await expect(rail(page)).toHaveAttribute("data-view", "original");
-    await expect(rail(page).getByRole("region", { name: "Original file" }).locator(".ucomp-doc table")).toBeVisible();
+    await expect(
+      rail(page)
+        .getByRole("region", { name: "Original file" })
+        .locator(".ucomp-doc table"),
+    ).toBeVisible();
   });
 
   await test.step("6. The database and Activity know where the draft came from", async () => {
-    const [version] = await rowsOf(db, "SELECT import_upload_id, state FROM versions WHERE template_id = ?", [templateId!]);
+    const [version] = await rowsOf(
+      db,
+      "SELECT import_upload_id, state FROM versions WHERE template_id = ?",
+      [templateId!],
+    );
     expect(version.state).toBe("draft");
-    const [upload] = await rowsOf(db, "SELECT id, filename, template_id FROM uploads WHERE template_id = ?", [templateId!]);
-    expect(upload).toMatchObject({ filename: FILE_NAME, template_id: templateId });
+    const [upload] = await rowsOf(
+      db,
+      "SELECT id, filename, template_id FROM uploads WHERE template_id = ?",
+      [templateId!],
+    );
+    expect(upload).toMatchObject({
+      filename: FILE_NAME,
+      template_id: templateId,
+    });
     expect(version.import_upload_id).toBe(upload.id);
 
-    await tap(page.getByRole("navigation", { name: "Template" }).getByRole("link", { name: "Activity" }));
+    await tap(
+      page
+        .getByRole("navigation", { name: "Template" })
+        .getByRole("link", { name: "Activity" }),
+    );
     await expect(page).toHaveURL(/\/activity/);
-    await expect(page.getByText(`Maya Chen imported ${FILE_NAME}`)).toBeVisible();
+    await expect(
+      page.getByText(`Maya Chen imported ${FILE_NAME}`),
+    ).toBeVisible();
     await shoot(page, "04-activity");
   });
 
@@ -174,7 +257,11 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
     const palette = page.getByRole("dialog", { name: "Search" });
     await expect(palette).toBeVisible();
     await typeSlowly(page, "Spring Balance");
-    await expect(palette.getByRole("option", { name: new RegExp(`${TEMPLATE_NAME} Draft ${templateId}`) })).toBeVisible();
+    await expect(
+      palette.getByRole("option", {
+        name: new RegExp(`${TEMPLATE_NAME} Draft ${templateId}`),
+      }),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(palette).toBeHidden();
   });

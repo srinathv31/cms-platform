@@ -17,10 +17,16 @@ import type { PdfPageText } from "@/domain/import";
  * Reflect.construct, which Turbopack doesn't rewrite. The worker imports only packages, which
  * resolve from node_modules.
  */
-const WORKER_FILE = path.join(process.cwd(), "src/server/import/convert-worker.mjs");
+const WORKER_FILE = path.join(
+  process.cwd(),
+  "src/server/import/convert-worker.mjs",
+);
 
 /** mammoth's style map for the import: Word's Title style is an H1 (it becomes the template's name). */
-export const DOCX_STYLE_MAP = ["p[style-name='Title'] => h1:fresh", "comment-reference => sup"];
+export const DOCX_STYLE_MAP = [
+  "p[style-name='Title'] => h1:fresh",
+  "comment-reference => sup",
+];
 
 export const ISOLATION_LIMITS = {
   /** The worker's V8 heap (old generation). A real 10 MB upload converts in well under this. */
@@ -31,7 +37,12 @@ export const ISOLATION_LIMITS = {
   maxHtmlChars: 40 * 1024 * 1024,
 } as const;
 
-export type IsolatedDocx = { ok: true; html: string; messages: string[]; images: number };
+export type IsolatedDocx = {
+  ok: true;
+  html: string;
+  messages: string[];
+  images: number;
+};
 export type IsolatedPdf = { ok: true; pages: PdfPageText[]; numPages: number };
 type Refused = { ok: false; code: ImportRefusalName };
 
@@ -40,15 +51,25 @@ export interface IsolationOptions {
   timeoutMs?: number;
 }
 
-export function isolatedDocx(bytes: Uint8Array, options?: IsolationOptions): Promise<IsolatedDocx | Refused> {
+export function isolatedDocx(
+  bytes: Uint8Array,
+  options?: IsolationOptions,
+): Promise<IsolatedDocx | Refused> {
   return runIsolated("docx", bytes, options) as Promise<IsolatedDocx | Refused>;
 }
 
-export function isolatedPdf(bytes: Uint8Array, options?: IsolationOptions): Promise<IsolatedPdf | Refused> {
+export function isolatedPdf(
+  bytes: Uint8Array,
+  options?: IsolationOptions,
+): Promise<IsolatedPdf | Refused> {
   return runIsolated("pdf", bytes, options) as Promise<IsolatedPdf | Refused>;
 }
 
-function runIsolated(kind: "docx" | "pdf", bytes: Uint8Array, options: IsolationOptions = {}): Promise<unknown> {
+function runIsolated(
+  kind: "docx" | "pdf",
+  bytes: Uint8Array,
+  options: IsolationOptions = {},
+): Promise<unknown> {
   const maxHeapMb = options.maxHeapMb ?? ISOLATION_LIMITS.maxHeapMb;
   const timeoutMs = options.timeoutMs ?? ISOLATION_LIMITS.timeoutMs;
   const limits = {
@@ -62,7 +83,10 @@ function runIsolated(kind: "docx" | "pdf", bytes: Uint8Array, options: Isolation
     let settled = false;
     const options: WorkerOptions = {
       workerData: { kind, bytes, limits },
-      resourceLimits: { maxOldGenerationSizeMb: maxHeapMb, maxYoungGenerationSizeMb: Math.min(32, maxHeapMb) },
+      resourceLimits: {
+        maxOldGenerationSizeMb: maxHeapMb,
+        maxYoungGenerationSizeMb: Math.min(32, maxHeapMb),
+      },
       stdout: false,
       stderr: false,
     };
@@ -71,14 +95,29 @@ function runIsolated(kind: "docx" | "pdf", bytes: Uint8Array, options: Isolation
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (problem) console.error(`Import: the ${kind} conversion was stopped`, problem);
+      if (problem)
+        console.error(`Import: the ${kind} conversion was stopped`, problem);
       void worker.terminate();
       resolve(value);
     };
-    const timer = setTimeout(() => finish({ ok: false, code: "unreadable" }, new Error(`timed out after ${timeoutMs} ms`)), timeoutMs);
+    const timer = setTimeout(
+      () =>
+        finish(
+          { ok: false, code: "unreadable" },
+          new Error(`timed out after ${timeoutMs} ms`),
+        ),
+      timeoutMs,
+    );
     worker.once("message", (message: unknown) => finish(message));
     // ERR_WORKER_OUT_OF_MEMORY (the heap limit) and anything the worker throws.
-    worker.once("error", (error) => finish({ ok: false, code: "unreadable" }, error));
-    worker.once("exit", (code) => finish({ ok: false, code: "unreadable" }, new Error(`the worker exited (${code})`)));
+    worker.once("error", (error) =>
+      finish({ ok: false, code: "unreadable" }, error),
+    );
+    worker.once("exit", (code) =>
+      finish(
+        { ok: false, code: "unreadable" },
+        new Error(`the worker exited (${code})`),
+      ),
+    );
   });
 }

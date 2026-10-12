@@ -36,7 +36,8 @@ export function firstRequiredSection(doc: PMNode): FirstSection | null {
       sectionEnd = offset;
       return;
     }
-    if (node.type.name === "paragraph") lastParagraphEnd = offset + node.nodeSize - 1;
+    if (node.type.name === "paragraph")
+      lastParagraphEnd = offset + node.nodeSize - 1;
   });
   if (headingEnd < 0) return null;
 
@@ -71,7 +72,11 @@ export function focusFirstSection(editor: Editor) {
       tr.setMeta("addToHistory", false);
       return true;
     })
-    .insertContentAt(section.headingEnd, { type: "paragraph" }, { updateSelection: false })
+    .insertContentAt(
+      section.headingEnd,
+      { type: "paragraph" },
+      { updateSelection: false },
+    )
     .focus(section.headingEnd + 1)
     .run();
 }

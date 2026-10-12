@@ -63,10 +63,17 @@ export function findPublicShorteners(text: string): ShortenerMatch[] {
     if (!domain) continue;
     const hostStart = found.index;
     const hostEnd = hostStart + host.length;
-    const scheme = SCHEME_BEFORE.exec(text.slice(Math.max(0, hostStart - 8), hostStart));
+    const scheme = SCHEME_BEFORE.exec(
+      text.slice(Math.max(0, hostStart - 8), hostStart),
+    );
     const start = hostStart - (scheme ? scheme[0].length : 0);
     const end = hostEnd + pathLength(text, hostEnd);
-    matches.push({ index: start, length: end - start, domain, text: text.slice(start, end) });
+    matches.push({
+      index: start,
+      length: end - start,
+      domain,
+      text: text.slice(start, end),
+    });
     hosts.lastIndex = end;
   }
   return matches;
@@ -86,11 +93,19 @@ const TRAILING = /[.,;:!?'"’”)\]}>]+$/u;
 /** How far a link's port, path, query or fragment runs after its host: to the next space, less trailing punctuation. */
 function pathLength(text: string, hostEnd: number): number {
   const next = text[hostEnd];
-  if (next !== "/" && next !== "?" && next !== "#" && !(next === ":" && /\d/.test(text[hostEnd + 1] ?? ""))) return 0;
+  if (
+    next !== "/" &&
+    next !== "?" &&
+    next !== "#" &&
+    !(next === ":" && /\d/.test(text[hostEnd + 1] ?? ""))
+  )
+    return 0;
   const rest = /^\S*/u.exec(text.slice(hostEnd))?.[0] ?? "";
   return rest.replace(TRAILING, "").length;
 }
 
 function listedDomain(host: string): string | undefined {
-  return PUBLIC_SHORTENER_DOMAINS.find((domain) => host === domain || host.endsWith(`.${domain}`));
+  return PUBLIC_SHORTENER_DOMAINS.find(
+    (domain) => host === domain || host.endsWith(`.${domain}`),
+  );
 }

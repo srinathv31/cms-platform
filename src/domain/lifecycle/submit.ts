@@ -18,16 +18,38 @@ import {
 } from "../channel-fields";
 import { nonGsmCharacters, smsLength } from "../messages/gsm7";
 import { findPublicShorteners } from "../messages/links";
-import { PUSH_MAX_BYTES, PUSH_PLATFORMS, pushPayloadBytes } from "../messages/push";
+import {
+  PUSH_MAX_BYTES,
+  PUSH_PLATFORMS,
+  pushPayloadBytes,
+} from "../messages/push";
 import type { MessageTypeRules } from "../platform-config/limits";
 import { refuse, type Refusal, type Refused } from "../refusals";
 import { longSampleValues, resolveMessage } from "../render/message";
-import { nextRound, reviewLink, type NumberedRound, type RoundRow } from "../rounds";
+import {
+  nextRound,
+  reviewLink,
+  type NumberedRound,
+  type RoundRow,
+} from "../rounds";
 import { utcDay } from "../dates";
 import type { ApprovalStage, VersionStage } from "../review-types";
-import type { Channel, ContractChange, JSONContent, SampleSet, Variable, VersionState } from "../types";
+import type {
+  Channel,
+  ContractChange,
+  JSONContent,
+  SampleSet,
+  Variable,
+  VersionState,
+} from "../types";
 import { withWriter } from "./drafts";
-import { unique, sentence, trimmed, teamApproversExcept, notify } from "./helpers";
+import {
+  unique,
+  sentence,
+  trimmed,
+  teamApproversExcept,
+  notify,
+} from "./helpers";
 import { REFUSALS } from "./refusals";
 import type { LifecycleResult } from "./types";
 
@@ -79,14 +101,18 @@ export interface SubmitChanges {
 }
 
 /** Either the changes to write and the effects to record, or the one-line reason it can't be done. */
-export type SubmitResult = ({ ok: true } & LifecycleResult<SubmitChanges>) | Refused;
+export type SubmitResult =
+  ({ ok: true } & LifecycleResult<SubmitChanges>) | Refused;
 
 /**
  * The SMS footer a version prints (decision 0035): a draft's is its content type's as it stands, since it
  * isn't submitted yet; every submitted version's is the one frozen into it at submit (`SubmitChanges.smsFooter`),
  * so a later change to the content type's footer never reaches a version that was already reviewed.
  */
-export function smsFooterOf(version: { state: VersionState; smsFooter: string | null }, contentTypeFooter: string | null): string | null {
+export function smsFooterOf(
+  version: { state: VersionState; smsFooter: string | null },
+  contentTypeFooter: string | null,
+): string | null {
   return version.state === "draft" ? contentTypeFooter : version.smsFooter;
 }
 
@@ -153,11 +179,21 @@ export function submit(input: SubmitInput): SubmitResult {
   const fields = fieldsOfChannels(draft.channels);
 
   const defined = new Set(draft.variables.map((v) => v.key));
-  const docs = [draft.body, ...fields.map((field) => channelFieldValue(draft.channelFields, field))];
-  const undefinedKeys = unique(docs.flatMap((doc) => chipKeys(doc))).filter((key) => !defined.has(key));
-  if (undefinedKeys.length > 0) return refuse(REFUSALS.undefinedVariables(undefinedKeys));
+  const docs = [
+    draft.body,
+    ...fields.map((field) => channelFieldValue(draft.channelFields, field)),
+  ];
+  const undefinedKeys = unique(docs.flatMap((doc) => chipKeys(doc))).filter(
+    (key) => !defined.has(key),
+  );
+  if (undefinedKeys.length > 0)
+    return refuse(REFUSALS.undefinedVariables(undefinedKeys));
 
-  const missing = fields.find((field) => field.required && isBlankField(channelFieldValue(draft.channelFields, field)));
+  const missing = fields.find(
+    (field) =>
+      field.required &&
+      isBlankField(channelFieldValue(draft.channelFields, field)),
+  );
   if (missing) return refuse(REFUSALS.fieldMissing(missing));
 
   const message = messageRefusal(draft, input.messageRules, now);
@@ -165,7 +201,9 @@ export function submit(input: SubmitInput): SubmitResult {
 
   const { number, round } = nextRound(input.versions);
   const submitted: NumberedRound = { number, round, state: "in_review" };
-  const contractChanges = baseline ? diffVariables(baseline, draft.variables) : null;
+  const contractChanges = baseline
+    ? diffVariables(baseline, draft.variables)
+    : null;
   const submitNote = trimmed(input.note);
   const stages = recordStages(input.chain);
   const firstStage = stageOf(stages, 0, input.chain);
@@ -201,7 +239,9 @@ export function submit(input: SubmitInput): SubmitResult {
       notify({
         notification: "review_requested",
         // Nobody has approved anything yet, so the first stage always has someone to ask.
-        to: (firstStage && stageRecipients(firstStage, writers)) || teamApproversExcept(...writers),
+        to:
+          (firstStage && stageRecipients(firstStage, writers)) ||
+          teamApproversExcept(...writers),
         title: `${input.submitterName} submitted ${input.templateName} ${sentence(submitted)} for review.`,
         body: submitNote,
         link: reviewLink(input.templateId, submitted),
@@ -225,33 +265,55 @@ export function submit(input: SubmitInput): SubmitResult {
  * it that no longer validates (its variable changed type since) gives way to the generated long value
  * (`longSampleValues`), so 2 and 4 always measure something, as the composer's meta line does.
  */
-function messageRefusal(draft: SubmitDraft, rules: MessageTypeRules, now: Date): Refusal | null {
+function messageRefusal(
+  draft: SubmitDraft,
+  rules: MessageTypeRules,
+  now: Date,
+): Refusal | null {
   const on = (channel: Channel) => draft.channels.includes(channel);
   if (!on("push") && !on("sms")) return null;
-  const valueOf = (field: ChannelField) => channelFieldValue(draft.channelFields, field);
+  const valueOf = (field: ChannelField) =>
+    channelFieldValue(draft.channelFields, field);
 
   if (on("sms")) {
     for (const field of channelFieldsOf("sms")) {
       const outside = nonGsmCharacters(typedText(valueOf(field)));
-      if (outside.length > 0) return REFUSALS.smsCharacters(field, outside.map((c) => c.char));
+      if (outside.length > 0)
+        return REFUSALS.smsCharacters(
+          field,
+          outside.map((c) => c.char),
+        );
     }
   }
 
-  const input = { fields: draft.channelFields, variables: draft.variables, values: longSampleValues(draft, utcDay(now)), rules };
+  const input = {
+    fields: draft.channelFields,
+    variables: draft.variables,
+    values: longSampleValues(draft, utcDay(now)),
+    rules,
+  };
   if (on("sms")) {
     const { parts } = smsLength(resolveMessage({ channel: "sms" }, input));
-    if (parts > rules.smsMaxParts) return REFUSALS.smsParts(parts, rules.smsMaxParts);
+    if (parts > rules.smsMaxParts)
+      return REFUSALS.smsParts(parts, rules.smsMaxParts);
   }
 
   for (const field of fieldsOfChannels(draft.channels)) {
     if (!field.refusesShorteners) continue;
     const links = findPublicShorteners(typedText(valueOf(field)));
-    if (links.length > 0) return REFUSALS.publicShortener(field, links.map((link) => link.domain));
+    if (links.length > 0)
+      return REFUSALS.publicShortener(
+        field,
+        links.map((link) => link.domain),
+      );
   }
 
   if (on("push")) {
     for (const platform of PUSH_PLATFORMS) {
-      const bytes = pushPayloadBytes(platform, resolveMessage({ channel: "push", platform }, input));
+      const bytes = pushPayloadBytes(
+        platform,
+        resolveMessage({ channel: "push", platform }, input),
+      );
       if (bytes > PUSH_MAX_BYTES) return REFUSALS.pushTooLarge(platform, bytes);
     }
   }
@@ -270,6 +332,7 @@ function chipKeys(doc: JSONContent | null): string[] {
 function isBlankField(doc: JSONContent | null): boolean {
   if (!doc) return true;
   if (doc.type === "variable") return false;
-  if (typeof doc.text === "string" && withoutInvisible(doc.text).trim() !== "") return false;
+  if (typeof doc.text === "string" && withoutInvisible(doc.text).trim() !== "")
+    return false;
   return (doc.content ?? []).every(isBlankField);
 }

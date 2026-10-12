@@ -5,13 +5,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DOCUMENT_THREAD, type Person } from "@/domain/review-types";
 import type { DocumentEditorHandle } from "@/editor/types";
 import type { ThreadView } from "@/server/queries/threads";
-import { GutterMarkers, markerThreads, nextMarkerIndex } from "./gutter-markers";
+import {
+  GutterMarkers,
+  markerThreads,
+  nextMarkerIndex,
+} from "./gutter-markers";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-const JORDAN: Person = { id: "jordan", name: "Jordan Ellis", initials: "JE", hue: 212 };
+const JORDAN: Person = {
+  id: "jordan",
+  name: "Jordan Ellis",
+  initials: "JE",
+  hue: 212,
+};
 
-function thread(id: string, blockId: string, patch: Partial<ThreadView> = {}, comments = 1): ThreadView {
+function thread(
+  id: string,
+  blockId: string,
+  patch: Partial<ThreadView> = {},
+  comments = 1,
+): ThreadView {
   return {
     id,
     blockId,
@@ -44,9 +60,21 @@ const THREADS: ThreadView[] = [
 
 /** Boxes by thread, in viewport coordinates (the layer's own box is at 0 in happy-dom). */
 const TOPS: Record<string, number> = { t1: 120, t2: 180, t3: 300, t4: 520 };
-const rect = (top: number, height = 20) => ({ top, height, bottom: top + height, left: 0, right: 0, width: 0 }) as DOMRect;
+const rect = (top: number, height = 20) =>
+  ({
+    top,
+    height,
+    bottom: top + height,
+    left: 0,
+    right: 0,
+    width: 0,
+  }) as DOMRect;
 
-function handle(): { ref: RefObject<DocumentEditorHandle | null>; notify: () => void; subscribe: ReturnType<typeof vi.fn> } {
+function handle(): {
+  ref: RefObject<DocumentEditorHandle | null>;
+  notify: () => void;
+  subscribe: ReturnType<typeof vi.fn>;
+} {
   let listener: (() => void) | null = null;
   const subscribe = vi.fn((fn: () => void) => {
     listener = fn;
@@ -54,7 +82,9 @@ function handle(): { ref: RefObject<DocumentEditorHandle | null>; notify: () => 
       listener = null;
     };
   });
-  const ref = createRef<DocumentEditorHandle | null>() as { current: DocumentEditorHandle | null };
+  const ref = createRef<DocumentEditorHandle | null>() as {
+    current: DocumentEditorHandle | null;
+  };
   ref.current = {
     focus: () => {},
     focusThread: () => {},
@@ -78,17 +108,38 @@ afterEach(() => {
   container.remove();
 });
 
-const markers = () => Array.from(container.querySelectorAll<HTMLButtonElement>("[data-marker]"));
+const markers = () =>
+  Array.from(container.querySelectorAll<HTMLButtonElement>("[data-marker]"));
 const tabStops = () => markers().filter((m) => m.tabIndex === 0);
 const key = (el: HTMLElement, name: string) =>
   act(() => {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: name,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   });
 
-function render(over: Partial<React.ComponentProps<typeof GutterMarkers>> = {}) {
+function render(
+  over: Partial<React.ComponentProps<typeof GutterMarkers>> = {},
+) {
   const h = handle();
-  const props = { editor: h.ref, threads: THREADS, activeThreadId: null, onActivate: vi.fn(), ...over };
-  act(() => root.render(<div style={{ position: "relative" }}><GutterMarkers {...props} /></div>));
+  const props = {
+    editor: h.ref,
+    threads: THREADS,
+    activeThreadId: null,
+    onActivate: vi.fn(),
+    ...over,
+  };
+  act(() =>
+    root.render(
+      <div style={{ position: "relative" }}>
+        <GutterMarkers {...props} />
+      </div>,
+    ),
+  );
   return { ...h, props };
 }
 
@@ -107,25 +158,48 @@ describe("GutterMarkers", () => {
   it("draws one marker per block with open threads, counting the comments on it, top to bottom", () => {
     render();
     expect(markers().map((m) => m.dataset.marker)).toEqual(["b1", "b3", "b5"]);
-    expect(markers()[0].getAttribute("aria-label")).toBe("3 comments on this block");
-    expect(markers()[1].getAttribute("aria-label")).toBe("1 comment on this block");
+    expect(markers()[0].getAttribute("aria-label")).toBe(
+      "3 comments on this block",
+    );
+    expect(markers()[1].getAttribute("aria-label")).toBe(
+      "1 comment on this block",
+    );
     expect(markers()[0].textContent).toBe("3");
   });
 
   it("says 'in unchanged blocks' for a marker that stands for collapsed blocks, with the count in the right number", () => {
     render({ collapsedKeys: new Set(["b1", "b3"]) });
-    expect(markers()[0].getAttribute("aria-label")).toBe("3 comments in unchanged blocks");
-    expect(markers()[1].getAttribute("aria-label")).toBe("1 comment in unchanged blocks");
-    expect(markers()[2].getAttribute("aria-label")).toBe("1 comment on this block");
+    expect(markers()[0].getAttribute("aria-label")).toBe(
+      "3 comments in unchanged blocks",
+    );
+    expect(markers()[1].getAttribute("aria-label")).toBe(
+      "1 comment in unchanged blocks",
+    );
+    expect(markers()[2].getAttribute("aria-label")).toBe(
+      "1 comment on this block",
+    );
   });
 
   it("puts focus back on the thread's marker when choosing it re-keys the marker", () => {
     const h = handle();
     const onActivate = vi.fn();
     const show = (threads: ThreadView[], activeThreadId: string | null) =>
-      act(() => root.render(<div style={{ position: "relative" }}><GutterMarkers editor={h.ref} threads={threads} activeThreadId={activeThreadId} onActivate={onActivate} /></div>));
+      act(() =>
+        root.render(
+          <div style={{ position: "relative" }}>
+            <GutterMarkers
+              editor={h.ref}
+              threads={threads}
+              activeThreadId={activeThreadId}
+              onActivate={onActivate}
+            />
+          </div>,
+        ),
+      );
     // t3 is hidden at first (its marker is on the line "collapsed:x"); activating reveals it on its own block.
-    const hidden = THREADS.map((t) => (t.id === "t3" ? { ...t, blockId: "collapsed:x" } : t));
+    const hidden = THREADS.map((t) =>
+      t.id === "t3" ? { ...t, blockId: "collapsed:x" } : t,
+    );
     show(hidden, null);
     const marker = markers().find((m) => m.dataset.marker === "collapsed:x")!;
     act(() => marker.focus());
@@ -174,7 +248,11 @@ describe("GutterMarkers", () => {
 
   it("marks the active thread's marker as pressed", () => {
     render({ activeThreadId: "t3" });
-    expect(markers().map((m) => m.getAttribute("aria-pressed"))).toEqual(["false", "true", "false"]);
+    expect(markers().map((m) => m.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+      "false",
+    ]);
   });
 });
 

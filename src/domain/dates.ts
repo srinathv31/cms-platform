@@ -26,20 +26,49 @@ import { plural } from "./plural";
 /** One day in milliseconds: for elapsed windows ("the last 30 days") and deadlines. Days on screen are `daysBetween`'s. */
 export const DAY_MS = 86_400_000;
 
-const SHORT = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const SHORT_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-const LONG = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
-const TIME = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
-const WEEKDAY = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
-const PHONE_DATE = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+const SHORT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+const SHORT_YEAR = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+const LONG = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+const TIME = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+const WEEKDAY = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  timeZone: "UTC",
+});
+const PHONE_DATE = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  timeZone: "UTC",
+});
 
 type When = Date | string | number;
 
-const toDate = (value: When): Date => (value instanceof Date ? value : new Date(value));
+const toDate = (value: When): Date =>
+  value instanceof Date ? value : new Date(value);
 
 /** Whether `date` falls in `now`'s UTC year; with no `now`, assumed so. */
 function sameYear(date: Date, now?: When): boolean {
-  return now === undefined || date.getUTCFullYear() === toDate(now).getUTCFullYear();
+  return (
+    now === undefined || date.getUTCFullYear() === toDate(now).getUTCFullYear()
+  );
 }
 
 /** "Oct 4", or "Jan 3, 2027" when `now` is given and the date isn't in its year. */
@@ -115,7 +144,8 @@ export function addDays(day: string, n: number): string {
 }
 
 /** Which UTC day an instant (or a calendar day) is, counted from 1970-01-01. */
-const dayNumber = (value: When): number => Math.floor(toDate(value).getTime() / DAY_MS);
+const dayNumber = (value: When): number =>
+  Math.floor(toDate(value).getTime() / DAY_MS);
 
 /**
  * Whole calendar days from `from`'s day to `to`'s day: 1 from "2026-10-09" to "2026-10-10", -1 back, 0 on
@@ -157,23 +187,38 @@ const YEAR_MS = 365 * DAY_MS;
  *
  * Seconds, minutes, hours, months and years are rounded to the nearest. "" when `value` isn't a date.
  */
-export function formatAgo(value: When, now: When, options: AgoOptions = {}): string {
+export function formatAgo(
+  value: When,
+  now: When,
+  options: AgoOptions = {},
+): string {
   const at = toDate(value);
   if (Number.isNaN(at.getTime())) return "";
   const words = agoWords(at, toDate(now), options);
-  return options.capitalize ? words.charAt(0).toUpperCase() + words.slice(1) : words;
+  return options.capitalize
+    ? words.charAt(0).toUpperCase() + words.slice(1)
+    : words;
 }
 
-function agoWords(at: Date, now: Date, { precision = "time", dateFrom }: AgoOptions): string {
+function agoWords(
+  at: Date,
+  now: Date,
+  { precision = "time", dateFrom }: AgoOptions,
+): string {
   const days = daysBetween(at, now);
   const ms = now.getTime() - at.getTime();
-  if (dateFrom !== undefined && days >= dateFrom) return formatShortDate(at, now);
+  if (dateFrom !== undefined && days >= dateFrom)
+    return formatShortDate(at, now);
   if (days === 1) return "yesterday";
-  if (days > 1) return precision === "day" || ms < MONTH_MS ? `${days} days ago` : `${longAgo(ms)} ago`;
+  if (days > 1)
+    return precision === "day" || ms < MONTH_MS
+      ? `${days} days ago`
+      : `${longAgo(ms)} ago`;
   if (precision === "day") return "today";
   if (ms < 45_000) return "just now";
   if (ms < MINUTE_MS) return `${plural(Math.round(ms / 1000), "second")} ago`;
-  if (ms < HOUR_MS) return `${plural(Math.round(ms / MINUTE_MS), "minute")} ago`;
+  if (ms < HOUR_MS)
+    return `${plural(Math.round(ms / MINUTE_MS), "minute")} ago`;
   return `${plural(Math.round(ms / HOUR_MS), "hour")} ago`;
 }
 

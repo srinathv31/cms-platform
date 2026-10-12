@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type RefObject } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import { m } from "motion/react";
 import { ease } from "@/components/motion/presets";
@@ -33,7 +40,9 @@ const FLY = { duration: FLY_MS / 1000, ease: [0.65, 0, 0.35, 1] } as const;
 
 /** The canvas panel's box: AppFrame's inset (`main[data-slot="sidebar-inset"]`). */
 function panelBox(): CSSProperties {
-  const rect = document.querySelector('[data-slot="sidebar-inset"]')?.getBoundingClientRect();
+  const rect = document
+    .querySelector('[data-slot="sidebar-inset"]')
+    ?.getBoundingClientRect();
   return rect
     ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
     : { inset: 0 };
@@ -54,7 +63,12 @@ export function GoLive({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [panel] = useState(panelBox);
-  const [fly, setFly] = useState<{ x: number; y: number; scale: number; gone: boolean } | null>(null);
+  const [fly, setFly] = useState<{
+    x: number;
+    y: number;
+    scale: number;
+    gone: boolean;
+  } | null>(null);
   const flip = useEffectEvent(onFlip);
   const done = useEffectEvent(onDone);
 
@@ -87,7 +101,11 @@ export function GoLive({
   const flying = fly !== null;
 
   return createPortal(
-    <div data-go-live="" style={panel} className="pointer-events-none fixed z-40 grid place-items-center overflow-hidden rounded-4xl">
+    <div
+      data-go-live=""
+      style={panel}
+      className="pointer-events-none fixed z-40 grid place-items-center overflow-hidden rounded-4xl"
+    >
       <p role="status" className="sr-only">
         v{versionNumber} is Active
       </p>
@@ -96,22 +114,44 @@ export function GoLive({
         className="absolute inset-0 bg-canvas/92"
         initial={{ opacity: 0 }}
         animate={{ opacity: flying ? 0 : 1 }}
-        transition={flying ? { duration: 0.3, ease: ease.outSoft } : { duration: 0.24, ease: ease.outSoft }}
+        transition={
+          flying
+            ? { duration: 0.3, ease: ease.outSoft }
+            : { duration: 0.24, ease: ease.outSoft }
+        }
       />
-      <div aria-hidden className="relative flex -translate-y-6 flex-col items-center">
-        <div ref={box} className="relative" style={{ width: RING, height: RING }}>
+      <div
+        aria-hidden
+        className="relative flex -translate-y-6 flex-col items-center"
+      >
+        <div
+          ref={box}
+          className="relative"
+          style={{ width: RING, height: RING }}
+        >
           <m.span
             className="absolute inset-0 rounded-full border border-hairline-strong"
             initial={{ opacity: 0, scale: 1 }}
             animate={{ opacity: [0, 0.7, 0], scale: 1.75 }}
-            transition={{ duration: 0.9, delay: 0.22, ease: "easeOut", times: [0, 0.2, 1] }}
+            transition={{
+              duration: 0.9,
+              delay: 0.22,
+              ease: "easeOut",
+              times: [0, 0.2, 1],
+            }}
           />
           <m.div
             className="relative"
             initial={{ opacity: 0, scale: 1.14, rotate: -6 }}
             animate={
               fly
-                ? { opacity: fly.gone ? 0 : 1, scale: fly.scale, rotate: 0, x: fly.x, y: fly.y }
+                ? {
+                    opacity: fly.gone ? 0 : 1,
+                    scale: fly.scale,
+                    rotate: 0,
+                    x: fly.x,
+                    y: fly.y,
+                  }
                 : { opacity: 1, scale: 1, rotate: 0, x: 0, y: 0 }
             }
             transition={flying ? FLY : IN}
@@ -122,16 +162,28 @@ export function GoLive({
               className="absolute top-0 left-0 rounded-full bg-canvas"
               style={{ width: RING, height: RING }}
               animate={{ opacity: flying ? 0 : 1 }}
-              transition={flying ? { duration: 0.3, ease: ease.outSoft } : { duration: 0.24, ease: ease.outSoft }}
+              transition={
+                flying
+                  ? { duration: 0.3, ease: ease.outSoft }
+                  : { duration: 0.24, ease: ease.outSoft }
+              }
             />
-            <ShareRing size={RING} tabIndex={-1} label={`v${versionNumber} is Active`} />
+            <ShareRing
+              size={RING}
+              tabIndex={-1}
+              label={`v${versionNumber} is Active`}
+            />
           </m.div>
         </div>
         <m.p
           className="display-lg mt-7 text-text"
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: flying ? 0 : 1, y: 0 }}
-          transition={flying ? { duration: 0.2 } : { duration: 0.32, delay: 0.16, ease: ease.outSoft }}
+          transition={
+            flying
+              ? { duration: 0.2 }
+              : { duration: 0.32, delay: 0.16, ease: ease.outSoft }
+          }
         >
           v{versionNumber} is Active
         </m.p>

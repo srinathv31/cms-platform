@@ -24,14 +24,20 @@ export function resolveRailView(
 ): RailView {
   if (preview.open) {
     if (preview.view === "preview") return "preview";
-    if (preview.view === "original") return hasOriginal ? "original" : "variables";
-    return preview.view === "comments" && comments.has ? "comments" : "variables";
+    if (preview.view === "original")
+      return hasOriginal ? "original" : "variables";
+    return preview.view === "comments" && comments.has
+      ? "comments"
+      : "variables";
   }
   const shown = tab ?? (comments.preferred ? "comments" : "variables");
   return shown === "comments" && comments.has ? "comments" : "variables";
 }
 
-export function useRailView(comments: RailComments, hasOriginal = false): RailView {
+export function useRailView(
+  comments: RailComments,
+  hasOriginal = false,
+): RailView {
   const preview = usePreviewState();
   const tab = useRailTab();
   return resolveRailView(preview, tab, comments, hasOriginal);

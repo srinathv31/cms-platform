@@ -24,7 +24,11 @@ export function TeamSwitcher({ spaces }: { spaces: SpaceNav[] }) {
     return (
       <div className="flex h-12 items-center gap-3 px-2">
         <div className="grid size-8 place-items-center rounded-lg border border-hairline bg-surface">
-          <Users aria-hidden strokeWidth={1.75} className="size-[18px] text-text-muted" />
+          <Users
+            aria-hidden
+            strokeWidth={1.75}
+            className="size-[18px] text-text-muted"
+          />
         </div>
         <span className="truncate text-[15px] font-medium">No team yet</span>
       </div>
@@ -40,8 +44,14 @@ export function TeamSwitcher({ spaces }: { spaces: SpaceNav[] }) {
         <div className="grid size-8 shrink-0 place-items-center rounded-lg border border-hairline bg-surface">
           <TeamIcon name={current.icon} className="size-[18px] text-text" />
         </div>
-        <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{current.name}</span>
-        <ChevronsUpDown aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-text-subtle" />
+        <span className="min-w-0 flex-1 truncate text-[15px] font-medium">
+          {current.name}
+        </span>
+        <ChevronsUpDown
+          aria-hidden
+          strokeWidth={1.75}
+          className="size-4 shrink-0 text-text-subtle"
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -61,7 +71,11 @@ export function TeamSwitcher({ spaces }: { spaces: SpaceNav[] }) {
               <TeamIcon name={s.icon} className="size-[18px] text-text-muted" />
               <span className="min-w-0 flex-1 truncate">{s.name}</span>
               {s.slug === current.slug ? (
-                <Check aria-hidden strokeWidth={2} className="size-4 text-text" />
+                <Check
+                  aria-hidden
+                  strokeWidth={2}
+                  className="size-4 text-text"
+                />
               ) : null}
             </DropdownMenuItem>
           ))}

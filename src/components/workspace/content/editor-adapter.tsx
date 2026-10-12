@@ -21,7 +21,12 @@ import { DocumentEditor } from "@/editor/components/document-editor";
 import { EditorRoot, useEditorHistory } from "@/editor/components/editor-root";
 import { VariablesPanel } from "@/editor/components/variables-panel";
 import type { JSONContent, Variable } from "@/editor/model/types";
-import type { CommentRequest, DocumentEditorHandle, EditorHistory, ThreadAnchor } from "@/editor/types";
+import type {
+  CommentRequest,
+  DocumentEditorHandle,
+  EditorHistory,
+  ThreadAnchor,
+} from "@/editor/types";
 
 export interface EditorScopeProps {
   /** The template's variable list (the consumer contract); the root owns it from the first render. */
@@ -75,7 +80,12 @@ export interface DocumentBodyProps {
 }
 
 /** The document. Its text edge sits on the column's left edge and the block-handle gutter hangs into the margin. */
-export function DocumentBody({ content, onChange, editorRef, comments }: DocumentBodyProps) {
+export function DocumentBody({
+  content,
+  onChange,
+  editorRef,
+  comments,
+}: DocumentBodyProps) {
   return (
     <DocumentEditor
       content={content}
@@ -100,7 +110,11 @@ export function VariablesSection() {
  * Hands the root's undo and redo (the last-focused field's, the document's until another has had
  * focus) to `onChange` as they change, and null when it goes. Renders nothing; place it inside the scope.
  */
-export function HistoryBridge({ onChange }: { onChange: (history: EditorHistory | null) => void }) {
+export function HistoryBridge({
+  onChange,
+}: {
+  onChange: (history: EditorHistory | null) => void;
+}) {
   const history = useEditorHistory();
   useLayoutEffect(() => {
     onChange(history);

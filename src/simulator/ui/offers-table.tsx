@@ -13,11 +13,23 @@ const KIND = {
  * Coral's offers, or its alerts: one row each, with the link's state, any upgrade badge and the last send.
  * The alerts' table has a title; the offers' is the page's.
  */
-export function OffersTable({ offers, kind = "offer" }: { offers: SimOfferCard[]; kind?: SimOfferKind }) {
+export function OffersTable({
+  offers,
+  kind = "offer",
+}: {
+  offers: SimOfferCard[];
+  kind?: SimOfferKind;
+}) {
   return (
-    <Panel title={kind === "alert" ? KIND.alert.table : undefined} label={kind === "alert" ? KIND.alert.table : undefined}>
+    <Panel
+      title={kind === "alert" ? KIND.alert.table : undefined}
+      label={kind === "alert" ? KIND.alert.table : undefined}
+    >
       <TableWrap label={KIND[kind].table}>
-        <table aria-label={KIND[kind].table} className="w-full min-w-[44rem] border-collapse">
+        <table
+          aria-label={KIND[kind].table}
+          className="w-full min-w-[44rem] border-collapse"
+        >
           <thead>
             <tr className="border-b border-(--sim-line) bg-(--sim-panel2)">
               <th className={TH}>{KIND[kind].column}</th>
@@ -31,35 +43,57 @@ export function OffersTable({ offers, kind = "offer" }: { offers: SimOfferCard[]
             {offers.map((offer) => {
               const status = linkStatus(offer.link);
               return (
-                <tr key={offer.id} className="border-b border-(--sim-line) last:border-0 hover:bg-(--sim-panel2)">
+                <tr
+                  key={offer.id}
+                  className="border-b border-(--sim-line) last:border-0 hover:bg-(--sim-panel2)"
+                >
                   <td className={TD}>
-                    <Link href={`/sim/offers/${offer.id}` as Route} className="font-medium text-(--sim-text) no-underline hover:underline">
+                    <Link
+                      href={`/sim/offers/${offer.id}` as Route}
+                      className="font-medium text-(--sim-text) no-underline hover:underline"
+                    >
                       {offer.name}
                     </Link>
-                    <p className="m-0 mt-0.5 text-[12px] text-(--sim-muted)">{offer.headline}</p>
+                    <p className="m-0 mt-0.5 text-[12px] text-(--sim-muted)">
+                      {offer.headline}
+                    </p>
                   </td>
                   <td className={TD}>
                     {offer.link ? (
                       <>
-                        <p className="m-0 text-(--sim-text)">{offer.link.templateName}</p>
-                        <Mono className="text-(--sim-muted)">{offer.link.templateId}</Mono>
+                        <p className="m-0 text-(--sim-text)">
+                          {offer.link.templateName}
+                        </p>
+                        <Mono className="text-(--sim-muted)">
+                          {offer.link.templateId}
+                        </Mono>
                       </>
                     ) : (
                       <span className="text-(--sim-muted)">None</span>
                     )}
                   </td>
-                  <td className={TD}>{offer.link ? <Mono>v{offer.link.pinnedVersion}</Mono> : <span className="text-(--sim-muted)">None</span>}</td>
+                  <td className={TD}>
+                    {offer.link ? (
+                      <Mono>v{offer.link.pinnedVersion}</Mono>
+                    ) : (
+                      <span className="text-(--sim-muted)">None</span>
+                    )}
+                  </td>
                   <td className={TD}>
                     <span className="flex flex-wrap items-center gap-1.5">
                       <Pill tone={status.tone}>{status.label}</Pill>
-                      {offer.upgrade ? <Pill tone="info">{upgradeLabel(offer.upgrade)}</Pill> : null}
+                      {offer.upgrade ? (
+                        <Pill tone="info">{upgradeLabel(offer.upgrade)}</Pill>
+                      ) : null}
                     </span>
                   </td>
                   <td className={TD}>
                     {offer.lastSend ? (
                       <>
                         <p className="m-0">{resultsHeadline(offer.lastSend)}</p>
-                        <p className="m-0 text-[12px] text-(--sim-muted)">{dayLabel(offer.lastSend.at)}</p>
+                        <p className="m-0 text-[12px] text-(--sim-muted)">
+                          {dayLabel(offer.lastSend.at)}
+                        </p>
                       </>
                     ) : (
                       <span className="text-(--sim-muted)">Never</span>

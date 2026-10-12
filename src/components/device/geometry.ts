@@ -1,4 +1,7 @@
-import { containScale, type BoxSize } from "@/components/primitives/scaled-viewport";
+import {
+  containScale,
+  type BoxSize,
+} from "@/components/primitives/scaled-viewport";
 import type { DevicePlatform, DeviceWidth } from "./types";
 
 // The phone is laid out at its real size, one device point to one CSS pixel, and then the whole of it is
@@ -33,7 +36,10 @@ export interface ScreenSize {
  *   - large 448 × 997, a Pixel 9 Pro XL or 10 Pro XL (1344 × 2992 px at 3.0: 997.3).
  *   Corners 39dp: the Pixel 8's display corner is 102 px at 2.625, the 8 Pro's 115 px at 3.0.
  */
-export const SCREEN_SIZES: Record<DevicePlatform, Record<DeviceWidth, ScreenSize>> = {
+export const SCREEN_SIZES: Record<
+  DevicePlatform,
+  Record<DeviceWidth, ScreenSize>
+> = {
   ios: {
     compact: { width: 375, height: 812, radius: 44 },
     standard: { width: 402, height: 874, radius: 62 },
@@ -47,7 +53,10 @@ export const SCREEN_SIZES: Record<DevicePlatform, Record<DeviceWidth, ScreenSize
 };
 
 /** The unit a platform's sizes are in, for labels: "402pt", "412dp". */
-export const SIZE_UNIT: Record<DevicePlatform, string> = { ios: "pt", android: "dp" };
+export const SIZE_UNIT: Record<DevicePlatform, string> = {
+  ios: "pt",
+  android: "dp",
+};
 
 /**
  * The frame round the screen, in points: a metal rim, then the black glass border. From the phones' own
@@ -68,7 +77,10 @@ export function bezelWidth(platform: DevicePlatform): number {
 }
 
 /** The whole phone at 1:1, in CSS px: the screen plus the bezel on every side. */
-export function frameSize(platform: DevicePlatform, width: DeviceWidth): BoxSize {
+export function frameSize(
+  platform: DevicePlatform,
+  width: DeviceWidth,
+): BoxSize {
   const screen = SCREEN_SIZES[platform][width];
   const bezel = 2 * bezelWidth(platform);
   return { width: screen.width + bezel, height: screen.height + bezel };
@@ -86,12 +98,20 @@ export const MIN_SCALE = 0.55;
  * would be in the same box, so the compact size reads smaller, as it is; the standard and large sizes fit
  * the box, down to `minScale` for height. Never above 1.
  */
-export function phoneScale(box: BoxSize, platform: DevicePlatform, width: DeviceWidth, minScale = MIN_SCALE): number {
+export function phoneScale(
+  box: BoxSize,
+  platform: DevicePlatform,
+  width: DeviceWidth,
+  minScale = MIN_SCALE,
+): number {
   const own = frameSize(platform, width);
   const standard = frameSize(platform, "standard");
   return containScale(
     box,
-    { width: Math.max(own.width, standard.width), height: Math.max(own.height, standard.height) },
+    {
+      width: Math.max(own.width, standard.width),
+      height: Math.max(own.height, standard.height),
+    },
     minScale,
   );
 }

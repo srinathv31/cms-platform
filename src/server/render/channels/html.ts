@@ -10,7 +10,12 @@
 // Customer output, not Stencil UI: the adapters take every raw color from PALETTE (look.ts), the one
 // constants block all three channels read.
 
-import type { RenderBlock, RenderInline, RenderTableRow, RenderText } from "@/domain/render/types";
+import type {
+  RenderBlock,
+  RenderInline,
+  RenderTableRow,
+  RenderText,
+} from "@/domain/render/types";
 import { normalizeLink } from "@/editor/model/links";
 
 // ── Type (customer output only) ──────────────────────────────────────────────
@@ -50,14 +55,19 @@ export function noBreakSpaces(line: string): string {
   const last = line.length - 1;
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i]!;
-    out += ch === " " && (i === 0 || i === last || out.endsWith(" ")) ? "\u00A0" : ch;
+    out +=
+      ch === " " && (i === 0 || i === last || out.endsWith(" "))
+        ? "\u00A0"
+        : ch;
   }
   return out;
 }
 
 /** Applies `noBreakSpaces` to each line of inline content (its runs between breaks, taken together). */
 export function keepSpaces(content: readonly RenderInline[]): RenderInline[] {
-  const out = content.map((item): RenderInline => (item.type === "text" ? { ...item } : item));
+  const out = content.map((item): RenderInline =>
+    item.type === "text" ? { ...item } : item,
+  );
   let line: RenderText[] = [];
   const flush = () => {
     const spaced = noBreakSpaces(line.map((run) => run.text).join(""));
@@ -79,7 +89,19 @@ export function keepSpaces(content: readonly RenderInline[]): RenderInline[] {
 
 // ── Flavors ──────────────────────────────────────────────────────────────────
 
-export type HtmlRole = "p" | "h1" | "h2" | "h3" | "table" | "th" | "td" | "hr" | "a" | "strong" | "em" | "u";
+export type HtmlRole =
+  | "p"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "table"
+  | "th"
+  | "td"
+  | "hr"
+  | "a"
+  | "strong"
+  | "em"
+  | "u";
 
 /** Where a block sits. Email uses it for spacing; the web stylesheet gets the same from selectors. */
 export interface Place {
@@ -138,11 +160,14 @@ export interface LinkGroup {
  * joins a link only when the runs on both sides of it carry that link; otherwise it stands outside.
  */
 export function groupByLink(content: readonly RenderInline[]): LinkGroup[] {
-  const hrefs = content.map((item) => (item.type === "text" ? normalizeLink(item.href) : null));
+  const hrefs = content.map((item) =>
+    item.type === "text" ? normalizeLink(item.href) : null,
+  );
   // For each position, the href of the next text run at or after it.
   const ahead: (string | null)[] = new Array(content.length + 1).fill(null);
   for (let i = content.length - 1; i >= 0; i -= 1) {
-    ahead[i] = content[i]!.type === "text" ? (hrefs[i] ?? null) : (ahead[i + 1] ?? null);
+    ahead[i] =
+      content[i]!.type === "text" ? (hrefs[i] ?? null) : (ahead[i + 1] ?? null);
   }
   const groups: LinkGroup[] = [];
   content.forEach((item, i) => {
@@ -164,7 +189,8 @@ function runHtml(run: RenderText, flavor: HtmlFlavor, place: Place): string {
   let html = escapeHtml(run.text);
   if (run.underline) html = `<u${flavor.attrs("u", place)}>${html}</u>`;
   if (run.italic) html = `<em${flavor.attrs("em", place)}>${html}</em>`;
-  if (run.bold) html = `<strong${flavor.attrs("strong", place)}>${html}</strong>`;
+  if (run.bold)
+    html = `<strong${flavor.attrs("strong", place)}>${html}</strong>`;
   return html;
 }
 
@@ -172,16 +198,28 @@ function runHtml(run: RenderText, flavor: HtmlFlavor, place: Place): string {
  * Inline content as HTML. An empty last line (empty content, or content that ends with a hard break)
  * holds the flavor's `emptyLine`, so every line the author made takes its line.
  */
-export function inlineHtml(content: readonly RenderInline[], flavor: HtmlFlavor, place: Place): string {
+export function inlineHtml(
+  content: readonly RenderInline[],
+  flavor: HtmlFlavor,
+  place: Place,
+): string {
   if (content.length === 0) return flavor.emptyLine;
   const spaced = flavor.spaces === "nbsp" ? keepSpaces(content) : content;
   const html = groupByLink(spaced)
     .map(({ href, items }) => {
-      const inner = items.map((item) => (item.type === "break" ? "<br>" : runHtml(item, flavor, place))).join("");
-      return href === null ? inner : `<a href="${escapeHtml(href)}"${flavor.attrs("a", place)}>${inner}</a>`;
+      const inner = items
+        .map((item) =>
+          item.type === "break" ? "<br>" : runHtml(item, flavor, place),
+        )
+        .join("");
+      return href === null
+        ? inner
+        : `<a href="${escapeHtml(href)}"${flavor.attrs("a", place)}>${inner}</a>`;
     })
     .join("");
-  return content[content.length - 1]!.type === "break" ? html + flavor.emptyLine : html;
+  return content[content.length - 1]!.type === "break"
+    ? html + flavor.emptyLine
+    : html;
 }
 
 // ── Blocks ───────────────────────────────────────────────────────────────────
@@ -193,7 +231,13 @@ export function blocksHtml(
   container: Place["in"] = "root",
 ): string {
   return blocks
-    .map((block, i) => blockHtml(block, flavor, { in: container, first: i === 0, last: i === blocks.length - 1 }))
+    .map((block, i) =>
+      blockHtml(block, flavor, {
+        in: container,
+        first: i === 0,
+        last: i === blocks.length - 1,
+      }),
+    )
     .join("\n");
 }
 
@@ -201,15 +245,31 @@ export function blocksHtml(
  * A list item's or table cell's content. With `bareParagraph` (email), a single paragraph's inline
  * content goes in directly, without a <p>: tighter markup, and no stray paragraph margins.
  */
-function flowHtml(blocks: readonly RenderBlock[], flavor: HtmlFlavor, container: "list" | "cell"): string {
+function flowHtml(
+  blocks: readonly RenderBlock[],
+  flavor: HtmlFlavor,
+  container: "list" | "cell",
+): string {
   const only = blocks[0];
-  if (flavor.bareParagraph && blocks.length === 1 && only?.type === "paragraph") {
-    return inlineHtml(only.content, flavor, { in: container, first: true, last: true });
+  if (
+    flavor.bareParagraph &&
+    blocks.length === 1 &&
+    only?.type === "paragraph"
+  ) {
+    return inlineHtml(only.content, flavor, {
+      in: container,
+      first: true,
+      last: true,
+    });
   }
   return blocksHtml(blocks, flavor, container);
 }
 
-function blockHtml(block: RenderBlock, flavor: HtmlFlavor, place: Place): string {
+function blockHtml(
+  block: RenderBlock,
+  flavor: HtmlFlavor,
+  place: Place,
+): string {
   switch (block.type) {
     case "paragraph":
       return `<p${flavor.attrs("p", place)}>${inlineHtml(block.content, flavor, place)}</p>`;
@@ -218,30 +278,41 @@ function blockHtml(block: RenderBlock, flavor: HtmlFlavor, place: Place): string
       return `<${tag}${flavor.attrs(tag, place)}>${inlineHtml(block.content, flavor, place)}</${tag}>`;
     }
     case "list": {
-      const items = block.items.map(
-        (item, i): HtmlItem => ({
-          marker: escapeHtml(item.marker),
-          content: flowHtml(item.content, flavor, "list"),
-          place: { in: "list", first: i === 0, last: i === block.items.length - 1 },
-        }),
-      );
+      const items = block.items.map((item, i): HtmlItem => ({
+        marker: escapeHtml(item.marker),
+        content: flowHtml(item.content, flavor, "list"),
+        place: {
+          in: "list",
+          first: i === 0,
+          last: i === block.items.length - 1,
+        },
+      }));
       return flavor.list(block.ordered, items, place);
     }
     case "table":
       return flavor.wrapTable(tableHtml(block.rows, flavor, place), place);
     case "callout":
-      return flavor.callout(blocksHtml(block.content, flavor, "callout"), place);
+      return flavor.callout(
+        blocksHtml(block.content, flavor, "callout"),
+        place,
+      );
     case "rule":
       return `<hr${flavor.attrs("hr", place)}>`;
   }
 }
 
-export const isHeaderRow = (row: RenderTableRow) => row.cells.length > 0 && row.cells.every((c) => c.header);
+export const isHeaderRow = (row: RenderTableRow) =>
+  row.cells.length > 0 && row.cells.every((c) => c.header);
 
-function tableHtml(rows: readonly RenderTableRow[], flavor: HtmlFlavor, place: Place): string {
+function tableHtml(
+  rows: readonly RenderTableRow[],
+  flavor: HtmlFlavor,
+  place: Place,
+): string {
   // Leading rows made only of header cells become <thead>, so screen readers announce columns.
   let headCount = 0;
-  while (headCount < rows.length - 1 && isHeaderRow(rows[headCount]!)) headCount++;
+  while (headCount < rows.length - 1 && isHeaderRow(rows[headCount]!))
+    headCount++;
 
   const rowHtml = (row: RenderTableRow, inHead: boolean) => {
     const cells = row.cells

@@ -37,7 +37,12 @@ export function seedCoralAlerts(ctx: SeedCtx) {
           number: 1,
           state: "active",
           body: emptyBody("payment-due-reminder"),
-          variables: vars.list(["first_name", "card_last4", "amount_due", "due_date"]),
+          variables: vars.list([
+            "first_name",
+            "card_last4",
+            "amount_due",
+            "due_date",
+          ]),
           channels: ["push", "sms"],
           channelFields: {
             push: {
@@ -47,15 +52,28 @@ export function seedCoralAlerts(ctx: SeedCtx) {
                 "Hi {first_name}, your minimum payment of {amount_due} is due {due_date}. Pay in the app to avoid a late fee.",
               ),
             },
-            sms: { text: linesDoc("Coral: Your minimum payment of {amount_due} is due {due_date}.", "Pay at coral.example/pay") },
+            sms: {
+              text: linesDoc(
+                "Coral: Your minimum payment of {amount_due} is due {due_date}.",
+                "Pay at coral.example/pay",
+              ),
+            },
           },
           createdBy: "maya",
           createdAt: 58,
           editSessions: 3,
           submittedBy: "maya",
           submittedAt: 53,
-          submitNote: "Payment reminders move to Stencil from the card platform's own text. Same wording, now approved.",
-          approvals: [{ actor: "jordan", decision: "approved", at: 51.5, seen: ["typical", "long", "minimum"] }],
+          submitNote:
+            "Payment reminders move to Stencil from the card platform's own text. Same wording, now approved.",
+          approvals: [
+            {
+              actor: "jordan",
+              decision: "approved",
+              at: 51.5,
+              seen: ["typical", "long", "minimum"],
+            },
+          ],
           activatedAt: 51.5,
         },
       ],
@@ -77,7 +95,12 @@ export function seedCoralAlerts(ctx: SeedCtx) {
           number: 1,
           state: "in_review",
           body: emptyBody("card-used-abroad"),
-          variables: vars.list(["card_last4", "transaction_amount", "merchant", "country"]),
+          variables: vars.list([
+            "card_last4",
+            "transaction_amount",
+            "merchant",
+            "country",
+          ]),
           channels: ["push", "sms"],
           channelFields: {
             push: {
@@ -99,7 +122,8 @@ export function seedCoralAlerts(ctx: SeedCtx) {
           editSessions: 3,
           submittedBy: "priya",
           submittedAt: 1.2,
-          submitNote: "Fraud Operations asked for a push and a text when a card is used outside the US.",
+          submitNote:
+            "Fraud Operations asked for a push and a text when a card is used outside the US.",
         },
       ],
     },
@@ -119,7 +143,11 @@ export function seedCoralAlerts(ctx: SeedCtx) {
           number: null,
           state: "draft",
           body: emptyBody("rate-change-heads-up"),
-          variables: vars.list(["first_name", "purchase_apr", "effective_date"]),
+          variables: vars.list([
+            "first_name",
+            "purchase_apr",
+            "effective_date",
+          ]),
           channels: ["push", "sms"],
           channelFields: {
             push: {

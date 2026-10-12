@@ -38,7 +38,13 @@ import type {
   SmsTooLongDetails,
 } from "./render/types";
 import type { ConsumerNoticeKind } from "./review-types";
-import type { Channel, ContractChange, Variable, VariableType, VersionState } from "./types";
+import type {
+  Channel,
+  ContractChange,
+  Variable,
+  VariableType,
+  VersionState,
+} from "./types";
 
 export type * from "@/contracts/api-v1";
 
@@ -244,14 +250,22 @@ export interface UsageDashboard {
     /** Superseded versions whose sunset is within NEARING_SUNSET_DAYS (not passed). */
     nearingSunset: UsageStatCard & {
       /** `daysAway`: whole days from today to the sunset's day, in the business time zone (1 = tomorrow). */
-      soonest: { templateName: string; versionNumber: number; daysAway: number } | null;
+      soonest: {
+        templateName: string;
+        versionNumber: number;
+        daysAway: number;
+      } | null;
     };
   };
   /** ok / (ok + error), last 30 days; for a gauge if the composition has one. */
   success: { ok: number; errors: number; pct: number | null };
   heatmap: UsageHeatmap;
   /** Horizontal bars, last 30 days, most first. `share` is 0–1 of the space's renders. */
-  byConsumer: { consumer: { id: string; name: string }; renders: number; share: number }[];
+  byConsumer: {
+    consumer: { id: string; name: string };
+    renders: number;
+    share: number;
+  }[];
   /** Consumer × template × version with any non-preview render in the last 30 days. Sorted: tagged
    * rows first (danger, warning), then renders desc. */
   rows: UsageRow[];
@@ -266,12 +280,25 @@ export interface UsageDashboard {
     other: number;
     pct: number | null; // 0–100, 1 decimal; null with no renders
     /** Which versions `other` is made of, most first: "On v1" when there is one. */
-    otherVersions: { template: { id: string; name: string }; versionNumber: number; renders: number }[];
+    otherVersions: {
+      template: { id: string; name: string };
+      versionNumber: number;
+      renders: number;
+    }[];
   };
   /** "Top templates": successful renders per template, last 30 days, most first (templates with none left out). */
-  byTemplate: { template: { id: string; name: string; teamSlug: string }; renders: number; share: number }[];
+  byTemplate: {
+    template: { id: string; name: string; teamSlug: string };
+    renders: number;
+    share: number;
+  }[];
   /** "Renders over time": TREND_WEEKS Sunday-first weeks, oldest first, the last one is this (partial) week. */
-  weekly: { weekStart: string; count: number; errors: number; channels: Record<Channel, number> }[];
+  weekly: {
+    weekStart: string;
+    count: number;
+    errors: number;
+    channels: Record<Channel, number>;
+  }[];
   /** The failure-rate line: HISTORY_DAYS UTC days, oldest first, today last (zeros included). */
   daily: { date: string; count: number; errors: number }[];
 }
@@ -304,7 +331,12 @@ export interface TemplateUsageData {
   /** ok / (ok + error), last 30 days ("Succeeded"). */
   success: { ok: number; errors: number; pct: number | null };
   /** "N% still on vX": last 30 days' successful renders on each version that is no longer Active, most first. pct 0–100 (whole). */
-  stillOn: { versionNumber: number; state: VersionState; renders: number; pct: number }[];
+  stillOn: {
+    versionNumber: number;
+    state: VersionState;
+    renders: number;
+    pct: number;
+  }[];
   /** The channels the template's content type allows, in `CHANNELS` order: the ones "Renders by channel" lists. */
   channels: Channel[];
   /** Renders (succeeded or failed) by channel, last 30 days: the dashboard's `byChannel` for this template. 0 for a channel it doesn't render to. */
@@ -314,7 +346,11 @@ export interface TemplateUsageData {
   /** "Renders by version": the series, ascending (every version with a successful render in the TREND_WEEKS window). */
   weeklyVersions: number[];
   /** TREND_WEEKS Sunday-first weeks, oldest first; `byVersion[n]` = successful renders on vn that week (0 when none). */
-  weekly: { weekStart: string; count: number; byVersion: Record<number, number> }[];
+  weekly: {
+    weekStart: string;
+    count: number;
+    byVersion: Record<number, number>;
+  }[];
   /** "Who renders it": the dashboard's consumer rows for this template (same shape, same sort). */
   rows: UsageRow[];
 }
@@ -326,7 +362,13 @@ export interface TemplateUsageVersion {
   sunsetAt: string | null;
   sunsetPassed: boolean;
   revokedAt: string | null;
-  consumers: { id: string; name: string; renders30d: number; errors30d: number; lastRenderAt: string }[];
+  consumers: {
+    id: string;
+    name: string;
+    renders30d: number;
+    errors30d: number;
+    lastRenderAt: string;
+  }[];
   tags: UsageTag[];
 }
 
@@ -362,7 +404,12 @@ export interface IntegrationPanelData {
    * The errors a consumer should handle, for a short table: 410 sunset/revoked, 422 values, 404, and the
    * message limits. `channel`: an error only that channel returns (shown when the version has it).
    */
-  errors: { status: number; code: ApiErrorCode; when: string; channel?: Channel }[];
+  errors: {
+    status: number;
+    code: ApiErrorCode;
+    when: string;
+    channel?: Channel;
+  }[];
   /**
    * "What changed since vN": one entry per OLDER released version (Superseded or Revoked), newest
    * first; the picker defaults to the first. Empty for a v1.

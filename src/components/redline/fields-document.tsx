@@ -22,9 +22,20 @@
 import { Fragment, type ReactNode } from "react";
 import { renderToReactElement } from "@tiptap/static-renderer/pm/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
-import { FieldLabel, LockedFooter } from "@/components/workspace/content/field-chrome";
-import { channelFieldsHeading, fieldName, fieldPlatformTag } from "@/domain/channel-fields";
-import type { FieldRedline, FooterRedline, RedlineBlock } from "@/domain/review-types";
+import {
+  FieldLabel,
+  LockedFooter,
+} from "@/components/workspace/content/field-chrome";
+import {
+  channelFieldsHeading,
+  fieldName,
+  fieldPlatformTag,
+} from "@/domain/channel-fields";
+import type {
+  FieldRedline,
+  FooterRedline,
+  RedlineBlock,
+} from "@/domain/review-types";
 import type { Channel } from "@/domain/types";
 import { staticHardBreak } from "@/editor/components/static-document";
 import { VariableChipView } from "@/editor/components/variable-chip";
@@ -63,14 +74,19 @@ export interface FieldsDocumentProps {
 }
 
 /** What a screen reader hears after a field's name when it changed. */
-const STATUS_WORD: Record<Exclude<FieldRedline["status"], "unchanged">, string> = {
+const STATUS_WORD: Record<
+  Exclude<FieldRedline["status"], "unchanged">,
+  string
+> = {
   added: "added",
   removed: "removed",
   changed: "changed",
 };
 
 /** The fields by channel, in the order they come. */
-function byChannel(fields: readonly FieldRedline[]): { channel: Channel; fields: FieldRedline[] }[] {
+function byChannel(
+  fields: readonly FieldRedline[],
+): { channel: Channel; fields: FieldRedline[] }[] {
   const groups: { channel: Channel; fields: FieldRedline[] }[] = [];
   for (const item of fields) {
     const last = groups[groups.length - 1];
@@ -81,14 +97,22 @@ function byChannel(fields: readonly FieldRedline[]): { channel: Channel; fields:
 }
 
 /** A field's text: its blocks (normally one paragraph) with the redline's marks, a removed block struck whole. */
-function FieldText({ blocks, variables }: { blocks: readonly RedlineBlock[]; variables: readonly Variable[] }) {
+function FieldText({
+  blocks,
+  variables,
+}: {
+  blocks: readonly RedlineBlock[];
+  variables: readonly Variable[];
+}) {
   // An empty field still has its line, as the composer's box does.
   if (blocks.length === 0) return <p />;
   const byKey = new Map(variables.map((v) => [v.key, v]));
   const extensions = [...baseExtensions({ variables }), RedlineMark];
   const content: JSONContent = {
     type: "doc",
-    content: blocks.map((block) => (block.status === "removed" ? markAllDeleted(block.node) : block.node)),
+    content: blocks.map((block) =>
+      block.status === "removed" ? markAllDeleted(block.node) : block.node,
+    ),
   };
   return renderToReactElement({
     content,
@@ -97,7 +121,12 @@ function FieldText({ blocks, variables }: { blocks: readonly RedlineBlock[]; var
       nodeMapping: {
         variable: ({ node }: { node: PMNode }) => {
           const key = (node.attrs.key as string | null) ?? null;
-          return <VariableChipView variableKey={key} variable={key ? byKey.get(key) : undefined} />;
+          return (
+            <VariableChipView
+              variableKey={key}
+              variable={key ? byKey.get(key) : undefined}
+            />
+          );
         },
         hardBreak: staticHardBreak,
       },
@@ -149,7 +178,11 @@ function Field({
   return (
     <div
       role="group"
-      aria-label={status === "unchanged" ? fieldName(field) : `${fieldName(field)}, ${STATUS_WORD[status]}`}
+      aria-label={
+        status === "unchanged"
+          ? fieldName(field)
+          : `${fieldName(field)}, ${STATUS_WORD[status]}`
+      }
       className="rl-item relative"
       data-kind="field"
       data-block-id={field.id}
@@ -161,7 +194,10 @@ function Field({
       {status === "unchanged" ? null : <Gutter status={status} />}
       <FieldLabel label={field.label} tag={fieldPlatformTag(field)} />
       {collapsed ? (
-        <p data-slot="field-unchanged" className="text-[13px] leading-5 text-text-subtle">
+        <p
+          data-slot="field-unchanged"
+          className="text-[13px] leading-5 text-text-subtle"
+        >
           Unchanged
         </p>
       ) : (
@@ -169,7 +205,11 @@ function Field({
           data-slot="field-text"
           className="ucomp-field-input min-h-11 rounded-lg border border-hairline bg-surface-tinted px-3 py-2.5 text-[15px] leading-6 text-text"
         >
-          {status === "added" ? <ins className="block no-underline">{text}</ins> : text}
+          {status === "added" ? (
+            <ins className="block no-underline">{text}</ins>
+          ) : (
+            text
+          )}
           {footer}
         </div>
       )}
@@ -191,7 +231,10 @@ export function FieldsDocument({
   if (fields.length === 0) return null;
   return (
     <div
-      className={cn("ucomp-surface ucomp-redline ucomp-fields relative", className)}
+      className={cn(
+        "ucomp-surface ucomp-redline ucomp-fields relative",
+        className,
+      )}
       data-static-document=""
       data-fields-document={layout}
       data-align={align === "start" ? "start" : undefined}
@@ -214,13 +257,17 @@ export function FieldsDocument({
             </div>
             {own.map((item) => {
               const smsFooter = item.field.channel === "sms" ? footer : null;
-              const unchanged = item.status === "unchanged" && (smsFooter?.status ?? "unchanged") === "unchanged";
+              const unchanged =
+                item.status === "unchanged" &&
+                (smsFooter?.status ?? "unchanged") === "unchanged";
               return (
                 <Field
                   key={item.field.id}
                   item={item}
                   variables={variables}
-                  collapsed={changesOnly && unchanged && item.field.id !== activeBlockId}
+                  collapsed={
+                    changesOnly && unchanged && item.field.id !== activeBlockId
+                  }
                   active={item.field.id === activeBlockId}
                   footer={smsFooter ? <FooterLine footer={smsFooter} /> : null}
                 />

@@ -2,14 +2,23 @@ import "server-only";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import type { PaletteResults, PaletteTemplateRow } from "@/domain/import-types";
-import { normalizePaletteQuery, PALETTE_QUERY_MAX, paletteTemplates } from "@/domain/palette";
+import {
+  normalizePaletteQuery,
+  PALETTE_QUERY_MAX,
+  paletteTemplates,
+} from "@/domain/palette";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { RoundRow } from "@/domain/rounds";
 import type { VersionState, Viewer } from "@/domain/types";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
-import { auditEvents, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  auditEvents,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { pickLatest } from "./library";
 import { currentName } from "./template-name";
 
@@ -39,11 +48,20 @@ export async function searchPalette(
   const parsed = Input.safeParse(input);
   if (!parsed.success) return refusal(400, REQUEST_REFUSALS.invalidSearch);
   const { space, template: currentId } = parsed.data;
-  if (!canSeeSpace(viewer, space)) return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
+  if (!canSeeSpace(viewer, space))
+    return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
 
   const query = normalizePaletteQuery(parsed.data.q ?? "");
-  const [rows, recentIds] = await Promise.all([spaceTemplates(viewer, space), recentTemplateIds(viewer)]);
-  const { recent, templates: listed } = paletteTemplates({ templates: rows, query, recentIds, currentId });
+  const [rows, recentIds] = await Promise.all([
+    spaceTemplates(viewer, space),
+    recentTemplateIds(viewer),
+  ]);
+  const { recent, templates: listed } = paletteTemplates({
+    templates: rows,
+    query,
+    recentIds,
+    currentId,
+  });
 
   return {
     ok: true,
@@ -51,7 +69,9 @@ export async function searchPalette(
     space,
     query,
     // Creating needs a team, so the cross-team space never offers it (as the Library doesn't).
-    canCreate: space !== ALL_SPACE && can(viewer, "template.create", { teamId: space }).ok,
+    canCreate:
+      space !== ALL_SPACE &&
+      can(viewer, "template.create", { teamId: space }).ok,
     current: currentId !== null && rows.some((r) => r.id === currentId),
     recent,
     templates: listed,
@@ -59,10 +79,18 @@ export async function searchPalette(
 }
 
 /** The templates the viewer can see in the space ("all": every team), in name order, with the Library's name and status. */
-async function spaceTemplates(viewer: Viewer, space: string): Promise<PaletteTemplateRow[]> {
+async function spaceTemplates(
+  viewer: Viewer,
+  space: string,
+): Promise<PaletteTemplateRow[]> {
   const name = currentName(templates.id);
   const rows = await db
-    .select({ id: templates.id, name, teamSlug: teams.slug, teamName: teams.name })
+    .select({
+      id: templates.id,
+      name,
+      teamSlug: teams.slug,
+      teamName: teams.name,
+    })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
     .where(space === ALL_SPACE ? undefined : eq(teams.slug, space))
@@ -72,7 +100,12 @@ async function spaceTemplates(viewer: Viewer, space: string): Promise<PaletteTem
 
   // Light columns only: never load `body` for a list.
   const versionRows = await db
-    .select({ templateId: versions.templateId, number: versions.number, round: versions.round, state: versions.state })
+    .select({
+      templateId: versions.templateId,
+      number: versions.number,
+      round: versions.round,
+      state: versions.state,
+    })
     .from(versions)
     .where(
       inArray(
@@ -88,7 +121,9 @@ async function spaceTemplates(viewer: Viewer, space: string): Promise<PaletteTem
   }
   return visible.map((r) => ({
     ...r,
-    status: pickLatest(byTemplate.get(r.id) ?? [])?.state ?? ("draft" as VersionState),
+    status:
+      pickLatest(byTemplate.get(r.id) ?? [])?.state ??
+      ("draft" as VersionState),
   }));
 }
 
@@ -97,8 +132,17 @@ async function recentTemplateIds(viewer: Viewer): Promise<string[]> {
   const events = await db
     .select({ templateId: auditEvents.templateId })
     .from(auditEvents)
-    .where(and(eq(auditEvents.actorId, viewer.userId), isNotNull(auditEvents.templateId)))
+    .where(
+      and(
+        eq(auditEvents.actorId, viewer.userId),
+        isNotNull(auditEvents.templateId),
+      ),
+    )
     .orderBy(desc(auditEvents.at))
     .limit(RECENT_SCAN);
-  return [...new Set(events.map((e) => e.templateId).filter((id): id is string => id !== null))];
+  return [
+    ...new Set(
+      events.map((e) => e.templateId).filter((id): id is string => id !== null),
+    ),
+  ];
 }

@@ -33,7 +33,10 @@ export interface MessageFlag {
 }
 
 /** The flags in one field's typed text, in order. Empty for a field that has none of these rules. */
-export function messageFieldFlags(field: Pick<ChannelField, "channel" | "refusesShorteners">, text: string): MessageFlag[] {
+export function messageFieldFlags(
+  field: Pick<ChannelField, "channel" | "refusesShorteners">,
+  text: string,
+): MessageFlag[] {
   const flags: MessageFlag[] = [];
   if (field.channel === "sms") {
     for (const c of nonGsmCharacters(text)) {

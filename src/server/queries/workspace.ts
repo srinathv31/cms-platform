@@ -3,7 +3,12 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { contentTypes, teams, templates, versions } from "@/server/db/schema/ucomp";
+import {
+  contentTypes,
+  teams,
+  templates,
+  versions,
+} from "@/server/db/schema/ucomp";
 import { sunsetDay } from "@/domain/business-zone";
 import type { ChannelFields } from "@/domain/channel-fields";
 import { contractBaseline } from "@/domain/lifecycle/baselines";
@@ -12,8 +17,16 @@ import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { canComment } from "@/domain/comments";
 import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
-import { asNumbered, nextRound, versionLabel as labelOf, type NumberedRound } from "@/domain/rounds";
+import type {
+  MessageTypeRules,
+  TeamSenders,
+} from "@/domain/platform-config/limits";
+import {
+  asNumbered,
+  nextRound,
+  versionLabel as labelOf,
+  type NumberedRound,
+} from "@/domain/rounds";
 import {
   contentTypeFamily,
   type Channel,
@@ -87,7 +100,10 @@ export interface WorkspaceHeaderData {
 
 /** Header data for /{team}/templates/{templateId}. 404 when the template isn't visible here. */
 export const getWorkspaceHeader = cache(
-  async (spaceSlug: string, templateId: string): Promise<WorkspaceHeaderData> => {
+  async (
+    spaceSlug: string,
+    templateId: string,
+  ): Promise<WorkspaceHeaderData> => {
     const space = await requireSpace(spaceSlug);
 
     const tpl = await db
@@ -123,14 +139,19 @@ export const getWorkspaceHeader = cache(
 
     const latest = pickLatest(list);
     const active = list.find((v) => v.state === "active");
-    const review = list.find((v) => v.state === "in_review" && v.number !== null);
+    const review = list.find(
+      (v) => v.state === "in_review" && v.number !== null,
+    );
     const zone = await getBusinessZone();
     const at = await now();
 
     const isDraft = !latest || latest.state === "draft";
     // A draft is numbered as its submit will number it: the next version, or the next round of the one sent back.
     const shown = isDraft ? nextRound(list) : asNumbered(latest);
-    const base = isDraft && latest?.basedOnVersionId ? list.find((v) => v.id === latest.basedOnVersionId) : undefined;
+    const base =
+      isDraft && latest?.basedOnVersionId
+        ? list.find((v) => v.id === latest.basedOnVersionId)
+        : undefined;
     const baseRound = base && base.number !== null ? asNumbered(base) : null;
     const versionLabel = isDraft
       ? baseRound
@@ -150,16 +171,24 @@ export const getWorkspaceHeader = cache(
       sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
       sunsetPassed: latest ? sunsetPassed(latest, at) : false,
       versionLabel,
-      basedOn: baseRound ? { label: labelOf(baseRound, { style: "sentence" }), active: baseRound.state === "active" } : null,
+      basedOn: baseRound
+        ? {
+            label: labelOf(baseRound, { style: "sentence" }),
+            active: baseRound.state === "active",
+          }
+        : null,
       activeNumber: active?.number ?? null,
       versionNumber: shown.number,
       round: shown.round,
       inReview: review ? asNumbered(review) : null,
       canEdit,
       editable,
-      draft: editable && latest ? { versionId: latest.id, rev: latest.rev } : null,
+      draft:
+        editable && latest ? { versionId: latest.id, rev: latest.rev } : null,
       canStartDraft: canEdit && planDraftStart(list).kind === "create",
-      canSubmit: latest?.state === "draft" && can(space.viewer, "version.submit", { teamId: tpl.teamId }).ok,
+      canSubmit:
+        latest?.state === "draft" &&
+        can(space.viewer, "version.submit", { teamId: tpl.teamId }).ok,
     };
   },
 );
@@ -222,7 +251,10 @@ export interface WorkspaceDocumentData {
 
 /** The document shown on the Content tab: the open draft if there is one, otherwise the latest version. */
 export const getWorkspaceDocument = cache(
-  async (spaceSlug: string, templateId: string): Promise<WorkspaceDocumentData> => {
+  async (
+    spaceSlug: string,
+    templateId: string,
+  ): Promise<WorkspaceDocumentData> => {
     const header = await getWorkspaceHeader(spaceSlug, templateId);
     const space = await requireSpace(spaceSlug);
 
@@ -277,19 +309,32 @@ export const getWorkspaceDocument = cache(
       rev: shown.rev,
       body: shown.body,
       variables: shown.variables,
-      baseline: shown.state === "draft" ? (contractBaseline(list, at)?.variables ?? null) : null,
+      baseline:
+        shown.state === "draft"
+          ? (contractBaseline(list, at)?.variables ?? null)
+          : null,
       channels: shown.channels,
       allowedChannels: tpl.allowedChannels,
       family: contentTypeFamily(tpl.allowedChannels),
-      messageRules: { smsFooter: smsFooterOf(shown, tpl.smsFooter), smsMaxParts: tpl.smsMaxParts },
+      messageRules: {
+        smsFooter: smsFooterOf(shown, tpl.smsFooter),
+        smsMaxParts: tpl.smsMaxParts,
+      },
       senders: { appName: tpl.appName, smsSender: tpl.smsSender },
       channelFields: shown.channelFields,
       sampleSets: shown.sampleSets,
       today,
-      editable: shown.state === "draft" && can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
+      editable:
+        shown.state === "draft" &&
+        can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
       threads,
       // The workspace is the team's: whoever a review stage names comments from the review screen.
-      can: { comment: canComment(space.viewer, { teamId: tpl.teamId, version: { state: shown.state, stageApproverIds: [] } }) },
+      can: {
+        comment: canComment(space.viewer, {
+          teamId: tpl.teamId,
+          version: { state: shown.state, stageApproverIds: [] },
+        }),
+      },
       importOriginal,
     };
   },

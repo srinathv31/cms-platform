@@ -19,12 +19,24 @@ import {
   ROW,
   ROW_HEIGHT,
 } from "./columns";
-import { defaultTab, parseTab, type QueueRowView, type QueueTab, type QueueTabKey } from "./format-row";
+import {
+  defaultTab,
+  parseTab,
+  type QueueRowView,
+  type QueueTab,
+  type QueueTabKey,
+} from "./format-row";
 import { TAB_BAR } from "./tab-styles";
 
 function ListHeader({ decided }: { decided: boolean }) {
   return (
-    <div aria-hidden className={cn("border-b border-hairline", decided ? FOLDS_DECIDED : FOLDS)}>
+    <div
+      aria-hidden
+      className={cn(
+        "border-b border-hairline",
+        decided ? FOLDS_DECIDED : FOLDS,
+      )}
+    >
       <div className={cn(ROW, "h-10", decided ? COLUMNS_DECIDED : COLUMNS)}>
         <span className="caps-label">Template</span>
         <span className="caps-label">Author</span>
@@ -36,7 +48,13 @@ function ListHeader({ decided }: { decided: boolean }) {
   );
 }
 
-function Decision({ decision, className }: { decision: NonNullable<QueueRowView["decision"]>; className?: string }) {
+function Decision({
+  decision,
+  className,
+}: {
+  decision: NonNullable<QueueRowView["decision"]>;
+  className?: string;
+}) {
   // "Approved" is the decision (an action); a version sent back is in the Changes requested state, which
   // only ever shows as its StatusBadge.
   return (
@@ -72,31 +90,55 @@ function QueueRow({ row, showTeam }: { row: QueueRowView; showTeam: boolean }) {
       >
         <span className="min-w-0">
           <span className="flex min-w-0 items-baseline gap-2">
-            <span className="truncate text-[15px] leading-5 font-medium" title={row.name}>
+            <span
+              className="truncate text-[15px] leading-5 font-medium"
+              title={row.name}
+            >
               {row.name}
             </span>
-            <span className="shrink-0 text-text-muted tabular-nums">{row.versionLabel}</span>
+            <span className="shrink-0 text-text-muted tabular-nums">
+              {row.versionLabel}
+            </span>
           </span>
           {showTeam || row.breaking ? (
             <span className="mt-0.5 flex h-[22px] min-w-0 items-center gap-2 text-[12px] text-text-muted">
-              {showTeam ? <span className="truncate">{row.teamName}</span> : null}
+              {showTeam ? (
+                <span className="truncate">{row.teamName}</span>
+              ) : null}
               {row.breaking ? <BreakingBadge /> : null}
             </span>
           ) : null}
-          <span className={cn("mt-0.5 truncate text-[12px] leading-4 text-text-muted", decided ? FOLDED_LINE_DECIDED : FOLDED_LINE)}>
+          <span
+            className={cn(
+              "mt-0.5 truncate text-[12px] leading-4 text-text-muted",
+              decided ? FOLDED_LINE_DECIDED : FOLDED_LINE,
+            )}
+          >
             {row.folded}
           </span>
         </span>
         <span className={cn("flex min-w-0 items-center gap-2.5", folds)}>
-          <UserAvatar initials={row.author.initials} hue={row.author.hue} size="sm" />
+          <UserAvatar
+            initials={row.author.initials}
+            hue={row.author.hue}
+            size="sm"
+          />
           <span className="truncate">{row.author.name}</span>
         </span>
-        <span className={cn("truncate text-text-muted", folds)}>{row.submitted}</span>
+        <span className={cn("truncate text-text-muted", folds)}>
+          {row.submitted}
+        </span>
         <span className={cn("min-w-0", folds)}>
           <span className="block truncate">{row.stage}</span>
-          {row.stageStep ? <span className="block truncate text-[12px] leading-4 text-text-muted">{row.stageStep}</span> : null}
+          {row.stageStep ? (
+            <span className="block truncate text-[12px] leading-4 text-text-muted">
+              {row.stageStep}
+            </span>
+          ) : null}
         </span>
-        {row.decision ? <Decision decision={row.decision} className={folds} /> : null}
+        {row.decision ? (
+          <Decision decision={row.decision} className={folds} />
+        ) : null}
       </Link>
     </li>
   );
@@ -112,13 +154,24 @@ function QueueRow({ row, showTeam }: { row: QueueRowView; showTeam: boolean }) {
  * entry rather than adding one, and goes through `history.replaceState`, which Next folds into
  * `useSearchParams`, so there is no round trip. An empty tab is one quiet line.
  */
-export function ReviewQueueTabs({ tabs, showTeam }: { tabs: QueueTab[]; showTeam: boolean }) {
-  const value: QueueTabKey = parseTab(useSearchParams().get("tab")) ?? defaultTab(tabs);
+export function ReviewQueueTabs({
+  tabs,
+  showTeam,
+}: {
+  tabs: QueueTab[];
+  showTeam: boolean;
+}) {
+  const value: QueueTabKey =
+    parseTab(useSearchParams().get("tab")) ?? defaultTab(tabs);
 
   function select(next: QueueTabKey) {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", next);
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
   }
 
   return (
@@ -127,7 +180,9 @@ export function ReviewQueueTabs({ tabs, showTeam }: { tabs: QueueTab[]; showTeam
         {tabs.map((tab) => (
           <Tab key={tab.key} value={tab.key}>
             {tab.label}
-            <span className="text-text-muted tabular-nums">{tab.rows.length}</span>
+            <span className="text-text-muted tabular-nums">
+              {tab.rows.length}
+            </span>
           </Tab>
         ))}
       </TabList>

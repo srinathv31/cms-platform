@@ -7,14 +7,20 @@ import type { ImportKind } from "@/domain/import-types";
 const ZIP = [0x50, 0x4b, 0x03, 0x04];
 const PDF = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
 
-const startsWith = (bytes: Uint8Array, magic: readonly number[]) => magic.every((b, i) => bytes[i] === b);
+const startsWith = (bytes: Uint8Array, magic: readonly number[]) =>
+  magic.every((b, i) => bytes[i] === b);
 
 /** True when `needle` (ASCII) occurs in the bytes. Zip entry names are stored as plain bytes. */
 export function hasAscii(bytes: Uint8Array, needle: string): boolean {
   const pattern = new TextEncoder().encode(needle);
   const first = pattern[0];
-  outer: for (let i = bytes.indexOf(first); i !== -1 && i <= bytes.length - pattern.length; i = bytes.indexOf(first, i + 1)) {
-    for (let j = 1; j < pattern.length; j++) if (bytes[i + j] !== pattern[j]) continue outer;
+  outer: for (
+    let i = bytes.indexOf(first);
+    i !== -1 && i <= bytes.length - pattern.length;
+    i = bytes.indexOf(first, i + 1)
+  ) {
+    for (let j = 1; j < pattern.length; j++)
+      if (bytes[i + j] !== pattern[j]) continue outer;
     return true;
   }
   return false;
@@ -24,15 +30,22 @@ export function hasAscii(bytes: Uint8Array, needle: string): boolean {
 export function decodeText(bytes: Uint8Array): string | null {
   if (bytes.includes(0)) return null;
   try {
-    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(
+      bytes,
+    );
   } catch {
     return null;
   }
 }
 
-export function sniffKind(bytes: Uint8Array, filename: string): ImportKind | null {
-  if (startsWith(bytes, ZIP)) return hasAscii(bytes, "word/document.xml") ? "docx" : null;
+export function sniffKind(
+  bytes: Uint8Array,
+  filename: string,
+): ImportKind | null {
+  if (startsWith(bytes, ZIP))
+    return hasAscii(bytes, "word/document.xml") ? "docx" : null;
   if (startsWith(bytes, PDF)) return "pdf";
-  if (/\.txt$/i.test(filename.trim()) && decodeText(bytes) !== null) return "txt";
+  if (/\.txt$/i.test(filename.trim()) && decodeText(bytes) !== null)
+    return "txt";
   return null;
 }

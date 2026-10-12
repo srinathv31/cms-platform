@@ -31,7 +31,9 @@ export interface FontFace {
 // handler is bundled, so a module-relative path would point into .next/.
 function fontFile(full: string): string {
   if (!existsSync(full)) {
-    throw new Error(`PDF font missing: ${path.relative(process.cwd(), full)}. Run npm install.`);
+    throw new Error(
+      `PDF font missing: ${path.relative(process.cwd(), full)}. Run npm install.`,
+    );
   }
   return full;
 }
@@ -44,19 +46,87 @@ export function registerFonts(): void {
   Font.register({
     family: SANS,
     fonts: [
-      { src: fontFile(path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf")), fontWeight: 400 },
-      { src: fontFile(path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/LiberationSans-Italic.ttf")), fontWeight: 400, fontStyle: "italic" },
-      { src: fontFile(path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/LiberationSans-Bold.ttf")), fontWeight: 700 },
-      { src: fontFile(path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/LiberationSans-BoldItalic.ttf")), fontWeight: 700, fontStyle: "italic" },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf",
+          ),
+        ),
+        fontWeight: 400,
+      },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/pdfjs-dist/standard_fonts/LiberationSans-Italic.ttf",
+          ),
+        ),
+        fontWeight: 400,
+        fontStyle: "italic",
+      },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/pdfjs-dist/standard_fonts/LiberationSans-Bold.ttf",
+          ),
+        ),
+        fontWeight: 700,
+      },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/pdfjs-dist/standard_fonts/LiberationSans-BoldItalic.ttf",
+          ),
+        ),
+        fontWeight: 700,
+        fontStyle: "italic",
+      },
     ],
   });
   Font.register({
     family: SERIF,
     fonts: [
-      { src: fontFile(path.join(process.cwd(), "node_modules/@expo-google-fonts/newsreader/500Medium/Newsreader_500Medium.ttf")), fontWeight: 500 },
-      { src: fontFile(path.join(process.cwd(), "node_modules/@expo-google-fonts/newsreader/500Medium_Italic/Newsreader_500Medium_Italic.ttf")), fontWeight: 500, fontStyle: "italic" },
-      { src: fontFile(path.join(process.cwd(), "node_modules/@expo-google-fonts/newsreader/700Bold/Newsreader_700Bold.ttf")), fontWeight: 700 },
-      { src: fontFile(path.join(process.cwd(), "node_modules/@expo-google-fonts/newsreader/700Bold_Italic/Newsreader_700Bold_Italic.ttf")), fontWeight: 700, fontStyle: "italic" },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/@expo-google-fonts/newsreader/500Medium/Newsreader_500Medium.ttf",
+          ),
+        ),
+        fontWeight: 500,
+      },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/@expo-google-fonts/newsreader/500Medium_Italic/Newsreader_500Medium_Italic.ttf",
+          ),
+        ),
+        fontWeight: 500,
+        fontStyle: "italic",
+      },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/@expo-google-fonts/newsreader/700Bold/Newsreader_700Bold.ttf",
+          ),
+        ),
+        fontWeight: 700,
+      },
+      {
+        src: fontFile(
+          path.join(
+            process.cwd(),
+            "node_modules/@expo-google-fonts/newsreader/700Bold_Italic/Newsreader_700Bold_Italic.ttf",
+          ),
+        ),
+        fontWeight: 700,
+        fontStyle: "italic",
+      },
     ],
   });
   // react-pdf ends every font stack with "Helvetica" and sets any character the main face lacks
@@ -97,7 +167,9 @@ let loading: Promise<void> | null = null;
  */
 export function loadFonts(): Promise<void> {
   registerFonts();
-  loading ??= Promise.all(MEASURED_FACES.map((face) => Font.load(descriptor(face)))).then(() => {
+  loading ??= Promise.all(
+    MEASURED_FACES.map((face) => Font.load(descriptor(face))),
+  ).then(() => {
     for (const face of MEASURED_FACES) {
       primeGlyphCache(loadedFont(face.family, face));
       primeGlyphCache(loadedFont(FALLBACK_FAMILY, face));
@@ -131,21 +203,26 @@ interface LoadedFont {
 // first through "\n", which react-pdf lays out at every line break (no font maps it).
 
 const primed = new WeakSet<LoadedFont>();
-const isPrivateUse = (codePoint: number) => (codePoint >= 0xe000 && codePoint <= 0xf8ff) || codePoint >= 0xf0000;
+const isPrivateUse = (codePoint: number) =>
+  (codePoint >= 0xe000 && codePoint <= 0xf8ff) || codePoint >= 0xf0000;
 
 function primeGlyphCache(font: LoadedFont): void {
   if (primed.has(font)) return;
   font.glyphForCodePoint(0x0a);
-  const order = [...font.characterSet].sort((a, b) => Number(isPrivateUse(a)) - Number(isPrivateUse(b)) || a - b);
+  const order = [...font.characterSet].sort(
+    (a, b) => Number(isPrivateUse(a)) - Number(isPrivateUse(b)) || a - b,
+  );
   for (const codePoint of order) font.glyphForCodePoint(codePoint);
   primed.add(font);
 }
 
-const faceKey = (face: FontFace) => `${face.family}|${face.weight}|${face.italic ? 1 : 0}`;
+const faceKey = (face: FontFace) =>
+  `${face.family}|${face.weight}|${face.italic ? 1 : 0}`;
 
 /** The loaded font file react-pdf sets `face` with, from `family` (the face's own, or the fallback). */
 function loadedFont(family: string, face: FontFace): LoadedFont {
-  const font = Font.getFont({ ...descriptor(face), fontFamily: family })?.data as LoadedFont | null | undefined;
+  const font = Font.getFont({ ...descriptor(face), fontFamily: family })
+    ?.data as LoadedFont | null | undefined;
   if (!font) throw new Error(`PDF font not loaded: ${family} ${faceKey(face)}`);
   return font;
 }
@@ -205,7 +282,9 @@ function drawingFont(codePoint: number, face: FontFace): LoadedFont | null {
  */
 export function hangsAtLineStart(codePoint: number, face: FontFace): boolean {
   const font = drawingFont(codePoint, face);
-  return font !== null && font.glyphForCodePoint(codePoint).codePoints.includes(0x20);
+  return (
+    font !== null && font.glyphForCodePoint(codePoint).codePoints.includes(0x20)
+  );
 }
 
 /**
@@ -221,7 +300,8 @@ export class GlyphCheck {
     for (const ch of text) {
       const codePoint = ch.codePointAt(0) ?? 0;
       if (codePoint >= 0x20 && codePoint < 0x7f) continue; // printable ASCII: every face has it
-      if (!this.#missing.has(codePoint) && !canDraw(codePoint, face)) this.#missing.set(codePoint, ch);
+      if (!this.#missing.has(codePoint) && !canDraw(codePoint, face))
+        this.#missing.set(codePoint, ch);
     }
   }
 

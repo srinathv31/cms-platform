@@ -36,11 +36,24 @@ export function Expanded({
         aria-hidden
         onClick={onToggle}
         className="absolute inset-0"
-        style={{ backdropFilter: blur, WebkitBackdropFilter: blur, background: "var(--device-dim)" }}
+        style={{
+          backdropFilter: blur,
+          WebkitBackdropFilter: blur,
+          background: "var(--device-dim)",
+        }}
       />
       <StatusBar time={null} ink="wall" cutout={cutoutWidth("ios")} />
-      <div className="absolute inset-x-0" style={{ top: pt(84), paddingInline: pt(12) }}>
-        <NotificationCard content={content} screen="expanded" textSize={settings.textSize} onToggle={onToggle} motion={fadeRise} />
+      <div
+        className="absolute inset-x-0"
+        style={{ top: pt(84), paddingInline: pt(12) }}
+      >
+        <NotificationCard
+          content={content}
+          screen="expanded"
+          textSize={settings.textSize}
+          onToggle={onToggle}
+          motion={fadeRise}
+        />
       </div>
       <HomeIndicator ink="wall" />
     </>

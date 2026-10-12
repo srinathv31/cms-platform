@@ -27,7 +27,11 @@ export function CodeBlock({
       tabIndex={0}
       role="region"
       aria-label={label}
-      style={minLines ? { minHeight: `${minLines * LINE_REM + PAD_REM}rem` } : undefined}
+      style={
+        minLines
+          ? { minHeight: `${minLines * LINE_REM + PAD_REM}rem` }
+          : undefined
+      }
       className={cn(
         "overflow-auto overscroll-contain rounded-lg border border-hairline bg-surface-sunken px-4 py-3 font-mono text-[12.5px] leading-5 text-text",
         maxHeightClass,

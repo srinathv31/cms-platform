@@ -3,12 +3,27 @@ import { Editor } from "@tiptap/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { baseExtensions } from "../schema";
 import type { JSONContent } from "./types";
-import { mergeUsage, reconcileUsage, usageFromDoc, usageFromJSON } from "./usage";
+import {
+  mergeUsage,
+  reconcileUsage,
+  usageFromDoc,
+  usageFromJSON,
+} from "./usage";
 
 const text = (value: string): JSONContent => ({ type: "text", text: value });
-const chip = (key: string): JSONContent => ({ type: "variable", attrs: { key } });
-const p = (...content: JSONContent[]): JSONContent => ({ type: "paragraph", content });
-const h = (level: number, title: string, requiredKey?: string): JSONContent => ({
+const chip = (key: string): JSONContent => ({
+  type: "variable",
+  attrs: { key },
+});
+const p = (...content: JSONContent[]): JSONContent => ({
+  type: "paragraph",
+  content,
+});
+const h = (
+  level: number,
+  title: string,
+  requiredKey?: string,
+): JSONContent => ({
   type: "heading",
   attrs: { level, requiredKey: requiredKey ?? null },
   content: [text(title)],
@@ -29,16 +44,34 @@ const DOC: JSONContent = {
     {
       type: "table",
       content: [
-        { type: "tableRow", content: [{ type: "tableHeader", content: [p(text("APR"))] }] },
-        { type: "tableRow", content: [{ type: "tableCell", content: [p(chip("purchase_apr"))] }] },
+        {
+          type: "tableRow",
+          content: [{ type: "tableHeader", content: [p(text("APR"))] }],
+        },
+        {
+          type: "tableRow",
+          content: [{ type: "tableCell", content: [p(chip("purchase_apr"))] }],
+        },
       ],
     },
   ],
 };
 
 const EXPECTED = new Map([
-  ["first_name", [{ section: null, count: 1 }, { section: "Offer details", count: 1 }]],
-  ["purchase_apr", [{ section: "Offer details", count: 2 }, { section: "Rates and fees", count: 1 }]],
+  [
+    "first_name",
+    [
+      { section: null, count: 1 },
+      { section: "Offer details", count: 1 },
+    ],
+  ],
+  [
+    "purchase_apr",
+    [
+      { section: "Offer details", count: 2 },
+      { section: "Rates and fees", count: 1 },
+    ],
+  ],
 ]);
 
 let editor: Editor | null = null;
@@ -53,16 +86,28 @@ describe("usage", () => {
   });
 
   it("gives the same numbers from a live document as from JSON", () => {
-    editor = new Editor({ element: document.createElement("div"), extensions: baseExtensions(), content: DOC });
-    expect(usageFromDoc(editor.state.doc, { sections: true })).toEqual(EXPECTED);
+    editor = new Editor({
+      element: document.createElement("div"),
+      extensions: baseExtensions(),
+      content: DOC,
+    });
+    expect(usageFromDoc(editor.state.doc, { sections: true })).toEqual(
+      EXPECTED,
+    );
   });
 
   it("drops sections for inline fields", () => {
-    expect(usageFromJSON(DOC, { sections: false }).get("purchase_apr")).toEqual([{ section: null, count: 3 }]);
+    expect(usageFromJSON(DOC, { sections: false }).get("purchase_apr")).toEqual(
+      [{ section: null, count: 3 }],
+    );
   });
 
   it("recounts after edits without re-walking unchanged blocks", () => {
-    editor = new Editor({ element: document.createElement("div"), extensions: baseExtensions(), content: DOC });
+    editor = new Editor({
+      element: document.createElement("div"),
+      extensions: baseExtensions(),
+      content: DOC,
+    });
     const first = usageFromDoc(editor.state.doc, { sections: true });
     editor.commands.insertContentAt(1, "Hello ");
     const second = usageFromDoc(editor.state.doc, { sections: true });
@@ -70,7 +115,11 @@ describe("usage", () => {
     // Renaming a section heading moves its chips to the new title.
     const headingPos = editor.state.doc.child(0).nodeSize;
     editor.commands.insertContentAt(headingPos + 1, "Special ");
-    expect(usageFromDoc(editor.state.doc, { sections: true }).get("purchase_apr")?.[0]).toEqual({
+    expect(
+      usageFromDoc(editor.state.doc, { sections: true }).get(
+        "purchase_apr",
+      )?.[0],
+    ).toEqual({
       section: "Special Offer details",
       count: 2,
     });
@@ -78,7 +127,10 @@ describe("usage", () => {
 
   it("merges fields into places, body first, and keeps unchanged entries' identity", () => {
     const body = usageFromJSON(DOC, { sections: true });
-    const subject = usageFromJSON({ type: "doc", content: [p(chip("first_name"))] }, { sections: false });
+    const subject = usageFromJSON(
+      { type: "doc", content: [p(chip("first_name"))] },
+      { sections: false },
+    );
     const merged = mergeUsage([
       { label: "Document", usage: body },
       { label: "Email subject", usage: subject },
@@ -93,7 +145,10 @@ describe("usage", () => {
       ],
     });
 
-    const again = mergeUsage([{ label: "Document", usage: body }, { label: "Email subject", usage: subject }]);
+    const again = mergeUsage([
+      { label: "Document", usage: body },
+      { label: "Email subject", usage: subject },
+    ]);
     const reconciled = reconcileUsage(merged, again);
     expect(reconciled).toBe(merged);
 

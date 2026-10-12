@@ -5,7 +5,11 @@ import { WS } from "@/components/workspace/workspace-grid";
 /** One day label and six rows (avatar, a sentence, a version chip and a time), as in the real list. */
 export function ActivitySkeleton() {
   return (
-    <div data-slot="activity" aria-hidden className={cn(WS.doc, "flex flex-col gap-8")}>
+    <div
+      data-slot="activity"
+      aria-hidden
+      className={cn(WS.doc, "flex flex-col gap-8")}
+    >
       <div>
         <div className="mb-1.5 flex h-4 items-center">
           <Skeleton className="h-3 w-14" />

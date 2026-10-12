@@ -7,9 +7,16 @@ import type { SampleSet } from "@/editor/model/types";
 import { OriginalView } from "@/components/import/original-view";
 import { channelFieldsFrom } from "@/domain/channel-fields";
 import type { ImportOriginalRef } from "@/domain/import-types";
-import type { MessageTypeRules, TeamSenders } from "@/domain/platform-config/limits";
+import type {
+  MessageTypeRules,
+  TeamSenders,
+} from "@/domain/platform-config/limits";
 import { isDocumentChannel, type Channel } from "@/domain/types";
-import { useLiveFields, useLiveSampleSets, type LiveDraft } from "@/components/workspace/session/live-draft";
+import {
+  useLiveFields,
+  useLiveSampleSets,
+  type LiveDraft,
+} from "@/components/workspace/session/live-draft";
 import {
   useFocusTarget,
   usePreviewState,
@@ -19,10 +26,18 @@ import {
 import { closePreview } from "./close-preview";
 import { renderMessagePreview } from "./message-preview";
 import { PreviewPane } from "./preview-pane";
-import { phoneClock, phoneSenders, recipientOf, senderOf } from "./preview-sender";
+import {
+  phoneClock,
+  phoneSenders,
+  recipientOf,
+  senderOf,
+} from "./preview-sender";
 import { RailHeader, railHeaderViews } from "./rail-header";
 import { findSet, resolveSetValues } from "./sample-sets/model";
-import { SampleSetSwitcher, type SampleSetSwitcherHandle } from "./sample-sets/sample-set-switcher";
+import {
+  SampleSetSwitcher,
+  type SampleSetSwitcherHandle,
+} from "./sample-sets/sample-set-switcher";
 import { usePreviewRender } from "./use-preview-render";
 
 export interface PreviewSurfaceProps {
@@ -90,12 +105,21 @@ export function PreviewSurface({
 
   // The sets as saved, then edited here. `listSets` fills in any default set the version lacks.
   const stored = useLiveSampleSets(draft);
-  const sets = useMemo(() => listSets(stored, variables, today), [stored, variables, today]);
-  const selected = findSet(sets, preview.setId) ?? findSet(sets, "typical") ?? sets[0];
-  const values = useMemo(() => resolveSetValues(selected, variables, today), [selected, variables, today]);
+  const sets = useMemo(
+    () => listSets(stored, variables, today),
+    [stored, variables, today],
+  );
+  const selected =
+    findSet(sets, preview.setId) ?? findSet(sets, "typical") ?? sets[0];
+  const values = useMemo(
+    () => resolveSetValues(selected, variables, today),
+    [selected, variables, today],
+  );
 
   // The channel the author picked, while it is on; otherwise the first channel that is.
-  const channel = channels.includes(preview.channel) ? preview.channel : (channels[0] ?? "pdf");
+  const channel = channels.includes(preview.channel)
+    ? preview.channel
+    : (channels[0] ?? "pdf");
 
   const showing = preview.open && preview.view === "preview";
   const { slots, rendering, retry } = usePreviewRender({
@@ -115,8 +139,16 @@ export function PreviewSurface({
   const platform = preview.phone.platform;
   const message = useMemo(() => {
     if (!showing || isDocumentChannel(channel)) return null;
-    const target = channel === "push" ? ({ channel, platform } as const) : ({ channel } as const);
-    return renderMessagePreview(target, { fields: channelFieldsFrom(fields), variables, values, rules: messageRules });
+    const target =
+      channel === "push"
+        ? ({ channel, platform } as const)
+        : ({ channel } as const);
+    return renderMessagePreview(target, {
+      fields: channelFieldsFrom(fields),
+      variables,
+      values,
+      rules: messageRules,
+    });
   }, [showing, channel, platform, fields, variables, values, messageRules]);
 
   const onSetsChange = useCallback(
@@ -133,11 +165,16 @@ export function PreviewSurface({
       <RailHeader
         // A Comments view that has lost its comments (the composer was cancelled on a template without threads) reads as Variables.
         value={
-          (preview.view === "comments" && commentsCount === null) || (preview.view === "original" && original === null)
+          (preview.view === "comments" && commentsCount === null) ||
+          (preview.view === "original" && original === null)
             ? "variables"
             : preview.view
         }
-        views={railHeaderViews({ preview: true, comments: commentsCount, original: original !== null })}
+        views={railHeaderViews({
+          preview: true,
+          comments: commentsCount,
+          original: original !== null,
+        })}
         originalTabRef={originalTab}
         onChange={(view) => session.selectRailView(view)}
         onClose={() => closePreview(session, { restoreFocus: true })}
@@ -181,7 +218,9 @@ export function PreviewSurface({
           clock={phoneClock(today)}
         />
       ) : null}
-      {preview.view === "original" && original ? <OriginalView original={original} today={today} /> : null}
+      {preview.view === "original" && original ? (
+        <OriginalView original={original} today={today} />
+      ) : null}
     </>
   );
 }

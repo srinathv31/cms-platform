@@ -22,9 +22,13 @@ export function recipientOf(values: VariableValues): string | null {
     const value = values[key];
     return typeof value === "string" && value.trim() ? value.trim() : null;
   };
-  const named = [text("first_name"), text("last_name")].filter((part): part is string => part !== null);
+  const named = [text("first_name"), text("last_name")].filter(
+    (part): part is string => part !== null,
+  );
   if (named.length > 0) return named.join(" ");
-  const full = Object.keys(values).find((key) => /^(?:(?:full|customer|cardholder|member)_)?name$/.test(key));
+  const full = Object.keys(values).find((key) =>
+    /^(?:(?:full|customer|cardholder|member)_)?name$/.test(key),
+  );
   return (full && text(full)) || null;
 }
 
@@ -34,8 +38,14 @@ export function recipientOf(values: VariableValues): string | null {
  * none (""): a US text can't show a brand name there, and a made-up number would pass for the real one,
  * so the phone shows a neutral "No sender" instead (the kit's `NO_SENDER`).
  */
-export function phoneSenders(senders: TeamSenders, teamName: string): PhoneSenders {
-  return { appName: senders.appName?.trim() || teamName.trim(), smsSender: senders.smsSender?.trim() || "" };
+export function phoneSenders(
+  senders: TeamSenders,
+  teamName: string,
+): PhoneSenders {
+  return {
+    appName: senders.appName?.trim() || teamName.trim(),
+    smsSender: senders.smsSender?.trim() || "",
+  };
 }
 
 /** The phone's clock: 9:41, as every phone preview shows it, on the demo clock's day ("Friday, October 9"). */

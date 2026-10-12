@@ -16,7 +16,22 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 /** Grapheme_Cluster_Break values, in the order of the classes in graphemes.ts. */
-const GCB = ["Other", "CR", "LF", "Control", "Extend", "ZWJ", "Regional_Indicator", "Prepend", "SpacingMark", "L", "V", "T", "LV", "LVT"];
+const GCB = [
+  "Other",
+  "CR",
+  "LF",
+  "Control",
+  "Extend",
+  "ZWJ",
+  "Regional_Indicator",
+  "Prepend",
+  "SpacingMark",
+  "L",
+  "V",
+  "T",
+  "LV",
+  "LVT",
+];
 const INCB = ["None", "Linker", "Consonant", "Extend"];
 const EXT_PICT = 16;
 const INCB_SHIFT = 5;
@@ -24,27 +39,38 @@ const HANGUL_FIRST = 0xac00;
 const HANGUL_LAST = 0xd7a3;
 
 const dir = process.argv[2];
-if (!dir) throw new Error("Usage: npx tsx scripts/unicode-graphemes.ts <ucd-dir>");
+if (!dir)
+  throw new Error("Usage: npx tsx scripts/unicode-graphemes.ts <ucd-dir>");
 
 function read(name: string, sub: string): string {
   const flat = path.join(dir, name);
-  return readFileSync(existsSync(flat) ? flat : path.join(dir, sub, name), "utf8");
+  return readFileSync(
+    existsSync(flat) ? flat : path.join(dir, sub, name),
+    "utf8",
+  );
 }
 
 /** Each data line's code point range and fields, comments dropped. */
-function* entries(text: string): Generator<{ first: number; last: number; fields: string[] }> {
+function* entries(
+  text: string,
+): Generator<{ first: number; last: number; fields: string[] }> {
   for (const raw of text.split("\n")) {
     const line = raw.replace(/#.*/, "").trim();
     if (!line) continue;
     const [range, ...fields] = line.split(";").map((part) => part.trim());
-    const [first, last = first] = range!.split("..").map((hex) => parseInt(hex, 16));
+    const [first, last = first] = range!
+      .split("..")
+      .map((hex) => parseInt(hex, 16));
     yield { first: first!, last: last!, fields };
   }
 }
 
 /** The Unicode version in a file's header: "# GraphemeBreakProperty-17.0.0.txt", or emoji-data's "# Version: 17.0". */
 function versionOf(text: string, file: string): string {
-  const match = new RegExp(`${file}-(\\d+\\.\\d+)\\.\\d+\\.txt|^# Version: (\\d+\\.\\d+)$`, "m").exec(text);
+  const match = new RegExp(
+    `${file}-(\\d+\\.\\d+)\\.\\d+\\.txt|^# Version: (\\d+\\.\\d+)$`,
+    "m",
+  ).exec(text);
   if (!match) throw new Error(`${file}: no version in its header`);
   return match[1] ?? match[2]!;
 }
@@ -57,9 +83,12 @@ for (const [text, file] of [
   [emojiText, "emoji-data"],
   [coreText, "DerivedCoreProperties"],
 ] as const) {
-  if (versionOf(text, file) !== version) throw new Error(`${file} isn't Unicode ${version}`);
+  if (versionOf(text, file) !== version)
+    throw new Error(`${file} isn't Unicode ${version}`);
 }
-const fullVersion = /GraphemeBreakProperty-(\d+\.\d+\.\d+)\.txt/.exec(gcbText)![1]!;
+const fullVersion = /GraphemeBreakProperty-(\d+\.\d+\.\d+)\.txt/.exec(
+  gcbText,
+)![1]!;
 
 const value = new Uint8Array(0x110000);
 for (const { first, last, fields } of entries(gcbText)) {
@@ -81,7 +110,8 @@ for (const { first, last, fields } of entries(coreText)) {
 // Hangul syllables are computed, not stored: LV every 28th from U+AC00, LVT between. Check that the data says so.
 for (let cp = HANGUL_FIRST; cp <= HANGUL_LAST; cp++) {
   const expected = GCB.indexOf((cp - HANGUL_FIRST) % 28 === 0 ? "LV" : "LVT");
-  if (value[cp] !== expected) throw new Error(`U+${cp.toString(16)} isn't the LV/LVT the formula gives`);
+  if (value[cp] !== expected)
+    throw new Error(`U+${cp.toString(16)} isn't the LV/LVT the formula gives`);
   value[cp] = 0;
 }
 
@@ -110,6 +140,15 @@ export const GRAPHEME_DATA_VERSION = "${fullVersion}";
 export const GRAPHEME_DATA =
   ${JSON.stringify(table)};
 `;
-const target = path.join(import.meta.dirname, "..", "src", "domain", "messages", "grapheme-data.ts");
+const target = path.join(
+  import.meta.dirname,
+  "..",
+  "src",
+  "domain",
+  "messages",
+  "grapheme-data.ts",
+);
 writeFileSync(target, out);
-console.log(`Wrote ${path.relative(process.cwd(), target)}: Unicode ${fullVersion}, ${runs} runs, ${table.length} characters.`);
+console.log(
+  `Wrote ${path.relative(process.cwd(), target)}: Unicode ${fullVersion}, ${runs} runs, ${table.length} characters.`,
+);

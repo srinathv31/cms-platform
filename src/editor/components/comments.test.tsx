@@ -4,23 +4,52 @@
 
 import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
-import { Activity, StrictMode, act, useEffect, useState, type Ref } from "react";
+import {
+  Activity,
+  StrictMode,
+  act,
+  useEffect,
+  useState,
+  type Ref,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { threadHighlights } from "../extensions/review-threads";
 import { isApple } from "../lib/platform";
 import type { JSONContent, Variable } from "../model/types";
 import { doc, text } from "../testing/editor";
-import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "../types";
+import type {
+  CommentRequest,
+  DocumentEditorHandle,
+  ThreadAnchor,
+} from "../types";
 import { DocumentEditor } from "./document-editor";
 import { EditorRoot } from "./editor-root";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
-const VARIABLES: Variable[] = [{ key: "first_name", label: "First name", type: "text", required: true, sample: "Maya" }];
-const para = (id: string, value: string): JSONContent => ({ type: "paragraph", attrs: { id }, content: [text(value)] });
+const VARIABLES: Variable[] = [
+  {
+    key: "first_name",
+    label: "First name",
+    type: "text",
+    required: true,
+    sample: "Maya",
+  },
+];
+const para = (id: string, value: string): JSONContent => ({
+  type: "paragraph",
+  attrs: { id },
+  content: [text(value)],
+});
 const CONTENT = doc(
-  { type: "heading", attrs: { id: "h1", level: 2, requiredKey: "offer_details" }, content: [text("Offer details")] },
+  {
+    type: "heading",
+    attrs: { id: "h1", level: 2, requiredKey: "offer_details" },
+    content: [text("Offer details")],
+  },
   para("p1", "Earn 2% cash back on every purchase."),
   para("p2", "Pay no annual fee in the first year."),
   para("p3", "Questions? Call us."),
@@ -31,7 +60,8 @@ const THREADS: ThreadAnchor[] = [
   { id: "t3", blockId: "p2", quote: "annual fee", status: "resolved" },
 ];
 
-const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
+const wait = (ms: number) =>
+  act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
 const BUBBLE_DELAY = 220; // BubbleMenu's update delay is 150 ms
 
 interface HarnessProps {
@@ -97,26 +127,41 @@ afterEach(async () => {
   document.body.innerHTML = "";
 });
 
-const liveEditor = (host: HTMLElement) => host.querySelector<HTMLElement & { editor?: Editor }>(".ucomp-doc.ProseMirror")?.editor ?? null;
+const liveEditor = (host: HTMLElement) =>
+  host.querySelector<HTMLElement & { editor?: Editor }>(
+    ".ucomp-doc.ProseMirror",
+  )?.editor ?? null;
 
 /** Position of `needle` in the document (inside one text node). */
 function at(editor: Editor, needle: string): number {
   let found = -1;
   editor.state.doc.descendants((node, pos) => {
-    if (found < 0 && node.isText && node.text!.includes(needle)) found = pos + node.text!.indexOf(needle);
+    if (found < 0 && node.isText && node.text!.includes(needle))
+      found = pos + node.text!.indexOf(needle);
     return found < 0;
   });
   return found;
 }
 
 /** Selects text the way a reader does: the page's selection, then ProseMirror's. */
-async function selectText(editor: Editor, from: number, to: number, { focus = true } = {}) {
+async function selectText(
+  editor: Editor,
+  from: number,
+  to: number,
+  { focus = true } = {},
+) {
   await act(async () => {
     const start = editor.view.domAtPos(from);
     const end = editor.view.domAtPos(to);
-    document.getSelection()?.setBaseAndExtent(start.node, start.offset, end.node, end.offset);
+    document
+      .getSelection()
+      ?.setBaseAndExtent(start.node, start.offset, end.node, end.offset);
     if (focus && editor.isEditable) editor.view.focus();
-    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, from, to)));
+    editor.view.dispatch(
+      editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, from, to),
+      ),
+    );
   });
   await wait(BUBBLE_DELAY);
 }
@@ -127,12 +172,23 @@ const toolbarButtons = () =>
     (b) => b.getAttribute("aria-label") ?? b.textContent?.trim() ?? "",
   );
 const commentButton = () =>
-  [...document.querySelectorAll<HTMLElement>('[role="toolbar"] button')].find((b) => b.textContent?.trim() === "Comment")!;
+  [...document.querySelectorAll<HTMLElement>('[role="toolbar"] button')].find(
+    (b) => b.textContent?.trim() === "Comment",
+  )!;
 
 function pressCommentShortcut() {
   const apple = isApple();
   return act(async () => {
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "m", code: "KeyM", altKey: true, metaKey: apple, ctrlKey: !apple, bubbles: true }));
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "m",
+        code: "KeyM",
+        altKey: true,
+        metaKey: apple,
+        ctrlKey: !apple,
+        bubbles: true,
+      }),
+    );
   });
 }
 
@@ -140,17 +196,33 @@ describe("highlights from props", () => {
   it("draws open threads (live and in the first paint) and moves the active mark with activeThreadId", async () => {
     const host = await mount({ threads: THREADS, activeThreadId: "t1" });
     const editor = liveEditor(host)!;
-    expect(threadHighlights(editor.state).map((h) => `${h.threadId}${h.active ? "*" : ""}:${h.kind}`)).toEqual(["t1*:text", "t2:block"]);
-    expect(host.querySelector('mark[data-thread="t1"][data-active]')?.textContent).toBe("2% cash back");
+    expect(
+      threadHighlights(editor.state).map(
+        (h) => `${h.threadId}${h.active ? "*" : ""}:${h.kind}`,
+      ),
+    ).toEqual(["t1*:text", "t2:block"]);
+    expect(
+      host.querySelector('mark[data-thread="t1"][data-active]')?.textContent,
+    ).toBe("2% cash back");
     expect(host.querySelector('[data-thread="t3"]')).toBeNull();
 
     await act(async () => setProps({ activeThreadId: "t2" }));
-    expect(host.querySelector("[data-active]")?.getAttribute("data-thread-block")).toBe("t2");
+    expect(
+      host.querySelector("[data-active]")?.getAttribute("data-thread-block"),
+    ).toBe("t2");
 
     // An equal list with a new identity changes nothing; a resolved thread loses its highlight.
-    await act(async () => setProps({ threads: THREADS.map((t) => ({ ...t })) }));
+    await act(async () =>
+      setProps({ threads: THREADS.map((t) => ({ ...t })) }),
+    );
     expect(threadHighlights(editor.state)).toHaveLength(2);
-    await act(async () => setProps({ threads: THREADS.map((t) => (t.id === "t1" ? { ...t, status: "resolved" as const } : t)) }));
+    await act(async () =>
+      setProps({
+        threads: THREADS.map((t) =>
+          t.id === "t1" ? { ...t, status: "resolved" as const } : t,
+        ),
+      }),
+    );
     expect(host.querySelector('[data-thread="t1"]')).toBeNull();
   });
 });
@@ -162,14 +234,27 @@ describe("the Comment action", () => {
     const editor = liveEditor(host)!;
     const from = at(editor, "2% cash back");
     await selectText(editor, from, from + "2% cash back".length);
-    expect(toolbarButtons()).toEqual(["Bold", "Italic", "Underline", "Link", "Comment"]);
+    expect(toolbarButtons()).toEqual([
+      "Bold",
+      "Italic",
+      "Underline",
+      "Link",
+      "Comment",
+    ]);
     const comment = commentButton();
     // An icon and its name, not an icon alone.
     expect(comment.textContent?.trim()).toBe("Comment");
-    expect(comment.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
-    expect(comment.getAttribute("aria-keyshortcuts")).toBe(isApple() ? "Meta+Alt+M" : "Control+Alt+M");
+    expect(comment.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(comment.getAttribute("aria-keyshortcuts")).toBe(
+      isApple() ? "Meta+Alt+M" : "Control+Alt+M",
+    );
     await act(async () => comment.click());
-    expect(onRequestComment).toHaveBeenCalledExactlyOnceWith({ blockId: "p1", quote: "2% cash back" });
+    expect(onRequestComment).toHaveBeenCalledExactlyOnceWith({
+      blockId: "p1",
+      quote: "2% cash back",
+    });
   });
 
   it("no Comment without onRequestComment, or for a selection across blocks", async () => {
@@ -203,13 +288,18 @@ describe("the Comment action", () => {
     const from = at(editor, "annual fee");
     await selectText(editor, from, from + "annual fee".length);
     expect(toolbarButtons()).toEqual(["Comment"]);
-    expect(document.querySelector('[role="toolbar"]')?.getAttribute("aria-label")).toBe("Comment on text");
+    expect(
+      document.querySelector('[role="toolbar"]')?.getAttribute("aria-label"),
+    ).toBe("Comment on text");
     // No editing affordances: no block handle, table control or menus.
     expect(host.querySelector(".ucomp-block-handle")).toBeNull();
 
     expect(commentButton().querySelector("svg")).not.toBeNull();
     await act(async () => commentButton().click());
-    expect(onRequestComment).toHaveBeenCalledExactlyOnceWith({ blockId: "p2", quote: "annual fee" });
+    expect(onRequestComment).toHaveBeenCalledExactlyOnceWith({
+      blockId: "p2",
+      quote: "annual fee",
+    });
 
     await selectText(editor, from, from + 6);
     expect(toolbarButtons()).toEqual(["Comment"]);
@@ -236,10 +326,17 @@ describe("the Comment action", () => {
     await selectText(editor, from, from + "every purchase".length);
     await pressCommentShortcut();
     await act(async () => {
-      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, at(editor, "Call"))));
+      editor.view.dispatch(
+        editor.state.tr.setSelection(
+          TextSelection.create(editor.state.doc, at(editor, "Call")),
+        ),
+      );
     });
     await pressCommentShortcut();
-    expect(onRequestComment.mock.calls).toEqual([[{ blockId: "p1", quote: "every purchase" }], [{ blockId: "p3" }]]);
+    expect(onRequestComment.mock.calls).toEqual([
+      [{ blockId: "p1", quote: "every purchase" }],
+      [{ blockId: "p3" }],
+    ]);
   });
 
   it("⌘⌥M does nothing when the document doesn't hold the focus or the selection", async () => {
@@ -280,7 +377,9 @@ describe("the handle's thread methods", () => {
     const host = await mount({ threads: THREADS, onRequestComment, attach });
     const editor = liveEditor(host)!;
     expect(onRequestComment).toHaveBeenCalledExactlyOnceWith({ blockId: "p3" });
-    expect(threadHighlights(editor.state).find((h) => h.active)?.threadId).toBe("t2");
+    expect(threadHighlights(editor.state).find((h) => h.active)?.threadId).toBe(
+      "t2",
+    );
     expect(seen).toHaveLength(1);
     expect(typeof unsubscribe).toBe("function");
     unsubscribe!();
@@ -288,8 +387,14 @@ describe("the handle's thread methods", () => {
 
   it("keep working while the editor is hidden (<Activity>) and re-shown", async () => {
     let handle: Required<DocumentEditorHandle> | null = null;
-    const host = await mount({ threads: THREADS, attach: (h) => void (handle = (h as Required<DocumentEditorHandle>) ?? handle) });
-    const destroyed = new Promise<void>((resolve) => liveEditor(host)!.on("destroy", () => queueMicrotask(resolve)));
+    const host = await mount({
+      threads: THREADS,
+      attach: (h) =>
+        void (handle = (h as Required<DocumentEditorHandle>) ?? handle),
+    });
+    const destroyed = new Promise<void>((resolve) =>
+      liveEditor(host)!.on("destroy", () => queueMicrotask(resolve)),
+    );
     await act(async () => setMode("hidden"));
     await vi.runOnlyPendingTimersAsync(); // TipTap's scheduled destruction of the hidden editor
     await destroyed;
@@ -302,21 +407,34 @@ describe("the handle's thread methods", () => {
     await act(async () => setMode("visible"));
     await wait(30);
     const editor = liveEditor(host)!;
-    expect(threadHighlights(editor.state).find((h) => h.active)?.threadId).toBe("t1");
-    expect(host.querySelector('mark[data-thread="t1"][data-active]')?.textContent).toBe("2% cash back");
+    expect(threadHighlights(editor.state).find((h) => h.active)?.threadId).toBe(
+      "t1",
+    );
+    expect(
+      host.querySelector('mark[data-thread="t1"][data-active]')?.textContent,
+    ).toBe("2% cash back");
   });
 
   it("subscribeBlockRects fires (once a frame) when blocks are added or move", async () => {
     let handle: Required<DocumentEditorHandle> | null = null;
-    const host = await mount({ attach: (h) => void (handle = (h as Required<DocumentEditorHandle>) ?? handle) });
+    const host = await mount({
+      attach: (h) =>
+        void (handle = (h as Required<DocumentEditorHandle>) ?? handle),
+    });
     const editor = liveEditor(host)!;
     const listener = vi.fn();
     const unsubscribe = handle!.subscribeBlockRects(listener);
     await wait(40);
     listener.mockClear();
     await act(async () => {
-      editor.commands.insertContentAt(0, { type: "paragraph", content: [text("New first line")] });
-      editor.commands.insertContentAt(0, { type: "paragraph", content: [text("Another")] });
+      editor.commands.insertContentAt(0, {
+        type: "paragraph",
+        content: [text("New first line")],
+      });
+      editor.commands.insertContentAt(0, {
+        type: "paragraph",
+        content: [text("Another")],
+      });
     });
     await wait(40);
     expect(listener).toHaveBeenCalledTimes(1);

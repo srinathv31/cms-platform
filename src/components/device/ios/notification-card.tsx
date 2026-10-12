@@ -13,7 +13,10 @@ import { textStyle } from "./type";
  * How many lines iOS gives each field, per screen. The text is never shortened: the OS cuts it on screen,
  * and these clamps are where. Lock screen: title 1, body 4. Banner: body 2. Expanded (long press): about 7.
  */
-export const IOS_LINES: Record<PushScreen, { title: number; subtitle: number; body: number }> = {
+export const IOS_LINES: Record<
+  PushScreen,
+  { title: number; subtitle: number; body: number }
+> = {
   lock: { title: 1, subtitle: 1, body: 4 },
   banner: { title: 1, subtitle: 1, body: 2 },
   expanded: { title: 2, subtitle: 2, body: 7 },
@@ -24,7 +27,12 @@ export const HIDDEN_PREVIEW_BODY = "Notification";
 
 /** A box that shows `lines` lines at most and ends the last with an ellipsis. */
 function clamp(lines: number): CSSProperties {
-  return { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: lines, overflow: "hidden" };
+  return {
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: lines,
+    overflow: "hidden",
+  };
 }
 
 const ICON = 38;
@@ -63,17 +71,35 @@ export function NotificationCard({
   const cells: ReactNode = (
     <>
       <span
-        style={stacked ? { gridColumn: 1, gridRow: 1 } : { gridColumn: 1, gridRow: "1 / span 3", alignSelf: screen === "expanded" ? "start" : "center" }}
+        style={
+          stacked
+            ? { gridColumn: 1, gridRow: 1 }
+            : {
+                gridColumn: 1,
+                gridRow: "1 / span 3",
+                alignSelf: screen === "expanded" ? "start" : "center",
+              }
+        }
         className="flex"
       >
-        <AppMark mark={content.appMark} size={ICON} corner={0.2237} label={content.appName} />
+        <AppMark
+          mark={content.appMark}
+          size={ICON}
+          corner={0.2237}
+          label={content.appName}
+        />
       </span>
       {previewsHidden ? (
         <>
-          <span style={{ ...text, ...clamp(1), ...titleCell(stacked) }} className="font-semibold">
+          <span
+            style={{ ...text, ...clamp(1), ...titleCell(stacked) }}
+            className="font-semibold"
+          >
             {content.appName}
           </span>
-          <span style={{ ...text, ...clamp(1), ...bodyCell(stacked) }}>{HIDDEN_PREVIEW_BODY}</span>
+          <span style={{ ...text, ...clamp(1), ...bodyCell(stacked) }}>
+            {HIDDEN_PREVIEW_BODY}
+          </span>
         </>
       ) : (
         <>
@@ -89,13 +115,22 @@ export function NotificationCard({
             <span
               data-field="subtitle"
               data-max-lines={lines.subtitle}
-              style={{ ...text, ...clamp(lines.subtitle), gridColumn: stacked ? "1 / -1" : "2 / -1", gridRow: stacked ? 3 : 2 }}
+              style={{
+                ...text,
+                ...clamp(lines.subtitle),
+                gridColumn: stacked ? "1 / -1" : "2 / -1",
+                gridRow: stacked ? 3 : 2,
+              }}
               className="font-semibold"
             >
               {subtitle}
             </span>
           ) : null}
-          <span data-field="body" data-max-lines={lines.body} style={{ ...text, ...clamp(lines.body), ...bodyCell(stacked) }}>
+          <span
+            data-field="body"
+            data-max-lines={lines.body}
+            style={{ ...text, ...clamp(lines.body), ...bodyCell(stacked) }}
+          >
             {content.body}
           </span>
         </>
@@ -120,7 +155,9 @@ export function NotificationCard({
     "data-slot": "notification",
     "data-screen": screen,
     style: {
-      ...glass(screen === "lock" ? "regular" : "strong", { shadow: screen === "banner" }),
+      ...glass(screen === "lock" ? "regular" : "strong", {
+        shadow: screen === "banner",
+      }),
       borderRadius: pt(screen === "expanded" ? 28 : 24),
       padding: `${pt(13)} ${pt(16)} ${pt(14)} ${pt(14)}`,
       gridTemplateColumns: `${pt(ICON)} minmax(0, 1fr) auto`,
@@ -134,7 +171,12 @@ export function NotificationCard({
   };
 
   return onToggle ? (
-    <m.button type="button" aria-expanded={screen === "expanded"} onClick={onToggle} {...shell}>
+    <m.button
+      type="button"
+      aria-expanded={screen === "expanded"}
+      onClick={onToggle}
+      {...shell}
+    >
       {cells}
     </m.button>
   ) : (
@@ -143,9 +185,13 @@ export function NotificationCard({
 }
 
 function titleCell(stacked: boolean): CSSProperties {
-  return stacked ? { gridColumn: "1 / -1", gridRow: 2, marginTop: pt(8) } : { gridColumn: 2, gridRow: 1 };
+  return stacked
+    ? { gridColumn: "1 / -1", gridRow: 2, marginTop: pt(8) }
+    : { gridColumn: 2, gridRow: 1 };
 }
 
 function bodyCell(stacked: boolean): CSSProperties {
-  return stacked ? { gridColumn: "1 / -1", gridRow: 4 } : { gridColumn: "2 / -1", gridRow: 3 };
+  return stacked
+    ? { gridColumn: "1 / -1", gridRow: 4 }
+    : { gridColumn: "2 / -1", gridRow: 3 };
 }

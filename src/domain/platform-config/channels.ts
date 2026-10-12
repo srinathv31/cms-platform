@@ -17,7 +17,11 @@ import { PLATFORM_REFUSALS } from "./refusals";
  * What turning a channel off stops, before it is committed (the confirm shows these lines):
  * "2 Active Disclosure versions stop rendering to Email." Turning one on changes nothing that renders.
  */
-export function channelOffConsequences(contentTypeName: string, channel: Channel, activeUsing: number): string[] {
+export function channelOffConsequences(
+  contentTypeName: string,
+  channel: Channel,
+  activeUsing: number,
+): string[] {
   const label = CHANNEL_LABELS[channel];
   const lines =
     activeUsing > 0
@@ -49,16 +53,21 @@ export function channelRuleRefusal(
   allowed: boolean,
   contentTypes: readonly ChannelRuleType[] = [],
 ): Refusal | null {
-  if (!(CHANNELS as readonly string[]).includes(channel)) return PLATFORM_REFUSALS.oneChannel;
+  if (!(CHANNELS as readonly string[]).includes(channel))
+    return PLATFORM_REFUSALS.oneChannel;
   const family = familyOf(contentType.allowedChannels);
   if (allowed && family !== null && channelFamily(channel) !== family) {
     const homes = contentTypes
-      .filter((type) => familyOf(type.allowedChannels) === channelFamily(channel))
+      .filter(
+        (type) => familyOf(type.allowedChannels) === channelFamily(channel),
+      )
       .map((type) => type.name)
       .sort((a, b) => a.localeCompare(b));
     return PLATFORM_REFUSALS.otherFamily(contentType.name, family, homes);
   }
-  const next = CHANNELS.filter((c) => (c === channel ? allowed : contentType.allowedChannels.includes(c)));
+  const next = CHANNELS.filter((c) =>
+    c === channel ? allowed : contentType.allowedChannels.includes(c),
+  );
   return next.length === 0 ? PLATFORM_REFUSALS.oneChannel : null;
 }
 
@@ -72,18 +81,40 @@ export function setChannelRule(input: {
   contentTypes: readonly ChannelRuleType[];
   actor: Named;
   now: Date;
-}): Ok<{ allowedChannels: Channel[]; consequences: string[]; effects: AccessEffect[] }> | Refused {
+}):
+  | Ok<{
+      allowedChannels: Channel[];
+      consequences: string[];
+      effects: AccessEffect[];
+    }>
+  | Refused {
   const { contentType, channel, allowed } = input;
   const current = contentType.allowedChannels;
-  if (!(CHANNELS as readonly string[]).includes(channel)) return refuse(PLATFORM_REFUSALS.oneChannel);
-  if (current.includes(channel) === allowed) return { ok: true, allowedChannels: current, consequences: [], effects: [] };
-  const refusal = channelRuleRefusal(contentType, channel, allowed, input.contentTypes);
+  if (!(CHANNELS as readonly string[]).includes(channel))
+    return refuse(PLATFORM_REFUSALS.oneChannel);
+  if (current.includes(channel) === allowed)
+    return {
+      ok: true,
+      allowedChannels: current,
+      consequences: [],
+      effects: [],
+    };
+  const refusal = channelRuleRefusal(
+    contentType,
+    channel,
+    allowed,
+    input.contentTypes,
+  );
   if (refusal) return refuse(refusal);
 
-  const next = CHANNELS.filter((c) => (c === channel ? allowed : current.includes(c)));
+  const next = CHANNELS.filter((c) =>
+    c === channel ? allowed : current.includes(c),
+  );
 
   const label = CHANNEL_LABELS[channel];
-  const consequences = allowed ? [] : channelOffConsequences(contentType.name, channel, input.activeUsing);
+  const consequences = allowed
+    ? []
+    : channelOffConsequences(contentType.name, channel, input.activeUsing);
   const summary = allowed
     ? `Turned on ${label} for ${contentType.name}`
     : `Turned off ${label} for ${contentType.name}` +

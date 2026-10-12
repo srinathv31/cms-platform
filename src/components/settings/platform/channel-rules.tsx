@@ -1,12 +1,19 @@
 "use client";
 
 import { useId, useRef, useState, type Ref } from "react";
-import type { ChannelRuleRow, ChannelRulesSection } from "@/domain/access-types";
+import type {
+  ChannelRuleRow,
+  ChannelRulesSection,
+} from "@/domain/access-types";
 import { channelOffConsequences } from "@/domain/platform-config/channels";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { setChannelRule } from "@/server/actions/platform";
 import { ScrollRegion } from "@/components/primitives/scroll-region";
 import { useActionRun } from "@/components/primitives/use-action-run";
@@ -20,20 +27,44 @@ import { FullRow, useFocusAfterCommit } from "./ui";
 // greyed in place with its reason (`ChannelSwitch`).
 
 /** The content type's name, then one column per channel (five: documents and messages side by side). */
-const colsFor = (channels: readonly Channel[]) => `minmax(0,1fr) repeat(${channels.length}, 4.5rem)`;
+const colsFor = (channels: readonly Channel[]) =>
+  `minmax(0,1fr) repeat(${channels.length}, 4.5rem)`;
 
-export function ChannelRulesSectionView({ section }: { section: ChannelRulesSection }) {
+export function ChannelRulesSectionView({
+  section,
+}: {
+  section: ChannelRulesSection;
+}) {
   // One turn-off strip at a time across the table.
-  const [asking, setAsking] = useState<{ contentTypeId: string; channel: Channel } | null>(null);
+  const [asking, setAsking] = useState<{
+    contentTypeId: string;
+    channel: Channel;
+  } | null>(null);
   // The matrix is two-dimensional: in a window too narrow for it (the content is under 30rem) it scrolls sideways
   // inside its own box (reflow, decision 0045).
   return (
     <ScrollRegion label="Channel rules">
-      <div data-slot="platform-section" data-section="channel-rules" role="table" aria-label="Channel rules" className="min-w-[30rem]">
-        <div role="row" className="grid items-end gap-x-4 border-b border-hairline pb-2" style={{ gridTemplateColumns: colsFor(section.channels) }}>
-          <span role="columnheader" className="caps-label">Content type</span>
+      <div
+        data-slot="platform-section"
+        data-section="channel-rules"
+        role="table"
+        aria-label="Channel rules"
+        className="min-w-[30rem]"
+      >
+        <div
+          role="row"
+          className="grid items-end gap-x-4 border-b border-hairline pb-2"
+          style={{ gridTemplateColumns: colsFor(section.channels) }}
+        >
+          <span role="columnheader" className="caps-label">
+            Content type
+          </span>
           {section.channels.map((c) => (
-            <span role="columnheader" key={c} className="caps-label text-center">
+            <span
+              role="columnheader"
+              key={c}
+              className="caps-label text-center"
+            >
               {CHANNEL_LABELS[c]}
             </span>
           ))}
@@ -43,8 +74,16 @@ export function ChannelRulesSectionView({ section }: { section: ChannelRulesSect
             key={row.contentTypeId}
             row={row}
             channels={section.channels}
-            asking={asking?.contentTypeId === row.contentTypeId ? asking.channel : null}
-            setAsking={(channel) => setAsking(channel ? { contentTypeId: row.contentTypeId, channel } : null)}
+            asking={
+              asking?.contentTypeId === row.contentTypeId
+                ? asking.channel
+                : null
+            }
+            setAsking={(channel) =>
+              setAsking(
+                channel ? { contentTypeId: row.contentTypeId, channel } : null,
+              )
+            }
           />
         ))}
       </div>
@@ -75,9 +114,15 @@ function TypeRow({
 
   return (
     <div role="rowgroup" className="border-b border-hairline">
-      <div role="row" className="grid min-h-16 items-center gap-x-4 py-2.5" style={{ gridTemplateColumns: colsFor(channels) }}>
+      <div
+        role="row"
+        className="grid min-h-16 items-center gap-x-4 py-2.5"
+        style={{ gridTemplateColumns: colsFor(channels) }}
+      >
         <div role="cell" className="min-w-0">
-          <div className="truncate text-[15px] font-medium text-text">{row.name}</div>
+          <div className="truncate text-[15px] font-medium text-text">
+            {row.name}
+          </div>
           {error ? (
             <p role="alert" className="text-[13px] text-danger-text">
               {error}
@@ -99,7 +144,13 @@ function TypeRow({
                 onChange={(next) => {
                   if (next) {
                     setAsking(null);
-                    run(() => setChannelRule({ contentTypeId: row.contentTypeId, channel, allowed: true }));
+                    run(() =>
+                      setChannelRule({
+                        contentTypeId: row.contentTypeId,
+                        channel,
+                        allowed: true,
+                      }),
+                    );
                   } else {
                     setAsking(channel);
                   }
@@ -113,11 +164,21 @@ function TypeRow({
         <FullRow span={channels.length + 1}>
           <Strip
             key={asking}
-            lines={channelOffConsequences(row.name, asking, row.activeUsing[asking])}
+            lines={channelOffConsequences(
+              row.name,
+              asking,
+              row.activeUsing[asking],
+            )}
             confirmLabel={`Turn off ${CHANNEL_LABELS[asking]}`}
             onCancel={closeAsk}
             onDone={closeAsk}
-            onConfirm={() => setChannelRule({ contentTypeId: row.contentTypeId, channel: asking, allowed: false })}
+            onConfirm={() =>
+              setChannelRule({
+                contentTypeId: row.contentTypeId,
+                channel: asking,
+                allowed: false,
+              })
+            }
             className="mb-3"
           />
         </FullRow>

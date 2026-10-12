@@ -22,7 +22,11 @@ async function Notices() {
     <PageScroll>
       <PageHeader crumbs="Coral Offers" title="Notices from Stencil" />
       {home.apiError ? <Strip tone="bad">{home.apiError.message}</Strip> : null}
-      <NoticesPanel title="Inbox" notices={home.notices} offerNames={offerNames} />
+      <NoticesPanel
+        title="Inbox"
+        notices={home.notices}
+        offerNames={offerNames}
+      />
     </PageScroll>
   );
 }

@@ -7,14 +7,33 @@ import { makeRoomBelow } from "./menu-layer";
 
 const caretAt = (top: number) => new DOMRect(100, top, 2, 20);
 
-function page({ viewport = 800, scrollable = 2000 }: { viewport?: number; scrollable?: number }) {
+function page({
+  viewport = 800,
+  scrollable = 2000,
+}: {
+  viewport?: number;
+  scrollable?: number;
+}) {
   const context = document.createElement("div");
   document.body.appendChild(context);
   const scroller = document.scrollingElement as HTMLElement;
-  Object.defineProperty(window, "innerHeight", { value: viewport, configurable: true });
-  Object.defineProperty(scroller, "scrollHeight", { value: scrollable, configurable: true });
-  Object.defineProperty(scroller, "clientHeight", { value: viewport, configurable: true });
-  Object.defineProperty(scroller, "scrollTop", { value: 0, configurable: true, writable: true });
+  Object.defineProperty(window, "innerHeight", {
+    value: viewport,
+    configurable: true,
+  });
+  Object.defineProperty(scroller, "scrollHeight", {
+    value: scrollable,
+    configurable: true,
+  });
+  Object.defineProperty(scroller, "clientHeight", {
+    value: viewport,
+    configurable: true,
+  });
+  Object.defineProperty(scroller, "scrollTop", {
+    value: 0,
+    configurable: true,
+    writable: true,
+  });
   const scrollBy = vi.fn();
   scroller.scrollBy = scrollBy as unknown as typeof scroller.scrollBy;
   return { context, scrollBy };

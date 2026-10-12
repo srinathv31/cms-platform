@@ -1,5 +1,10 @@
 import { createClient, type Client, type InValue } from "@libsql/client";
-import { expect, type APIRequestContext, type APIResponse, type PlaywrightWorkerArgs } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type APIResponse,
+  type PlaywrightWorkerArgs,
+} from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { E2E_DATABASE_URL } from "../storage";
@@ -14,7 +19,9 @@ import { E2E_DATABASE_URL } from "../storage";
 const BUSY_TIMEOUT_MS = 5_000;
 
 const isBusy = (error: unknown) =>
-  /SQLITE_BUSY|database is locked/i.test(`${(error as { code?: unknown })?.code ?? ""} ${(error as Error)?.message ?? ""}`);
+  /SQLITE_BUSY|database is locked/i.test(
+    `${(error as { code?: unknown })?.code ?? ""} ${(error as Error)?.message ?? ""}`,
+  );
 
 /** Runs a statement again, a few times with a growing pause, while the server holds the file's write lock. */
 export async function retryBusy<T>(run: () => Promise<T>): Promise<T> {
@@ -34,19 +41,25 @@ export async function retryBusy<T>(run: () => Promise<T>): Promise<T> {
  * `batch` retry a SQLITE_BUSY that still gets through.
  */
 export function openDb(): Client {
-  const client = createClient({ url: E2E_DATABASE_URL, timeout: BUSY_TIMEOUT_MS });
+  const client = createClient({
+    url: E2E_DATABASE_URL,
+    timeout: BUSY_TIMEOUT_MS,
+  });
   return new Proxy(client, {
     get(target, prop) {
       const member = Reflect.get(target, prop, target);
       if (typeof member !== "function") return member;
-      if (prop === "execute" || prop === "batch") return (...args: unknown[]) => retryBusy(() => member.apply(target, args));
+      if (prop === "execute" || prop === "batch")
+        return (...args: unknown[]) =>
+          retryBusy(() => member.apply(target, args));
       return member.bind(target);
     },
   });
 }
 
 export type Channel = "pdf" | "web" | "email" | "push" | "sms";
-export type VariableType = "text" | "currency" | "percent" | "date" | "number" | "us_state";
+export type VariableType =
+  "text" | "currency" | "percent" | "date" | "number" | "us_state";
 
 export interface Variable {
   key: string;
@@ -91,7 +104,9 @@ export async function allVersions(db: Client): Promise<SeedVersion[]> {
     FROM versions v JOIN templates t ON t.id = v.template_id
     ORDER BY v.template_id, v.number, v.round`);
   return rows.map((r) => {
-    const revoke = r.revoke ? (JSON.parse(String(r.revoke)) as { confirmedAt?: string }) : null;
+    const revoke = r.revoke
+      ? (JSON.parse(String(r.revoke)) as { confirmedAt?: string })
+      : null;
     return {
       id: String(r.id),
       templateId: String(r.template_id),
@@ -114,10 +129,15 @@ export async function allVersions(db: Client): Promise<SeedVersion[]> {
  * A document's version (PDF, Web, Email), not an alert's (Push, SMS): what the specs that render and
  * check documents pick from. The seed has both (decision 0034).
  */
-export const isDocument = (v: SeedVersion) => v.channels.some((c) => c === "pdf" || c === "web" || c === "email");
+export const isDocument = (v: SeedVersion) =>
+  v.channels.some((c) => c === "pdf" || c === "web" || c === "email");
 
 /** The first version that fits, or a failure that says what the seed is missing. */
-export function pick(versions: readonly SeedVersion[], what: string, fits: (v: SeedVersion) => boolean): SeedVersion {
+export function pick(
+  versions: readonly SeedVersion[],
+  what: string,
+  fits: (v: SeedVersion) => boolean,
+): SeedVersion {
   const found = versions.find(fits);
   if (!found) throw new Error(`The seed has no ${what}.`);
   return found;
@@ -125,7 +145,9 @@ export function pick(versions: readonly SeedVersion[], what: string, fits: (v: S
 
 /** The demo clock: real time plus the "advance N days" offset. */
 export async function demoNow(db: Client): Promise<number> {
-  const { rows } = await db.execute("SELECT value FROM settings WHERE key = 'clock_offset_days'");
+  const { rows } = await db.execute(
+    "SELECT value FROM settings WHERE key = 'clock_offset_days'",
+  );
   const days = rows[0] ? Number(JSON.parse(String(rows[0].value))) : 0;
   return Date.now() + days * 86_400_000;
 }
@@ -143,11 +165,19 @@ export async function withTemporarily<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const columns = Object.keys(set);
-  const before = (await db.execute({ sql: `SELECT ${columns.join(", ")} FROM ${table} WHERE id = ?`, args: [id] })).rows[0];
+  const before = (
+    await db.execute({
+      sql: `SELECT ${columns.join(", ")} FROM ${table} WHERE id = ?`,
+      args: [id],
+    })
+  ).rows[0];
   if (!before) throw new Error(`${table} row ${id} doesn't exist.`);
   const assign = columns.map((column) => `${column} = ?`).join(", ");
   try {
-    await db.execute({ sql: `UPDATE ${table} SET ${assign} WHERE id = ?`, args: [...columns.map((c) => set[c]), id] });
+    await db.execute({
+      sql: `UPDATE ${table} SET ${assign} WHERE id = ?`,
+      args: [...columns.map((c) => set[c]), id],
+    });
     return await fn();
   } finally {
     await db.execute({
@@ -175,15 +205,26 @@ export const LOG_COLUMNS = [
   "duration_ms",
 ] as const;
 
-export type LogRow = Record<(typeof LOG_COLUMNS)[number], string | number | null>;
+export type LogRow = Record<
+  (typeof LOG_COLUMNS)[number],
+  string | number | null
+>;
 
 /** Every render_log row for a correlation id, oldest first, every column. */
-export async function logFor(db: Client, correlationId: string): Promise<LogRow[]> {
+export async function logFor(
+  db: Client,
+  correlationId: string,
+): Promise<LogRow[]> {
   const { columns, rows } = await db.execute({
     sql: "SELECT * FROM render_log WHERE correlation_id = ? ORDER BY at, id",
     args: [correlationId],
   });
-  return rows.map((row) => Object.fromEntries(columns.map((column) => [column, row[column]])) as LogRow);
+  return rows.map(
+    (row) =>
+      Object.fromEntries(
+        columns.map((column) => [column, row[column]]),
+      ) as LogRow,
+  );
 }
 
 // ── Values ───────────────────────────────────────────────────────────────────
@@ -198,8 +239,14 @@ const VALID: Record<VariableType, string> = {
 };
 
 /** A value for every variable (optional ones too) that fits its type; `overrides` replace by key. */
-export function validValues(variables: readonly Variable[], overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { ...Object.fromEntries(variables.map((v) => [v.key, VALID[v.type]])), ...overrides };
+export function validValues(
+  variables: readonly Variable[],
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    ...Object.fromEntries(variables.map((v) => [v.key, VALID[v.type]])),
+    ...overrides,
+  };
 }
 
 /** What a value of each type must be, as the 422 message words it: "{key} must be {noun}." */
@@ -224,9 +271,11 @@ export const JUNK: Record<VariableType, unknown> = {
 
 // ── The call ─────────────────────────────────────────────────────────────────
 
-export const renderPath = (templateId: string) => `/api/v1/templates/${templateId}/render`;
+export const renderPath = (templateId: string) =>
+  `/api/v1/templates/${templateId}/render`;
 
-export const correlation = (label: string) => `e2e-render-${label}-${randomUUID().slice(0, 8)}`;
+export const correlation = (label: string) =>
+  `e2e-render-${label}-${randomUUID().slice(0, 8)}`;
 
 export interface Call {
   templateId: string;
@@ -242,7 +291,8 @@ export async function render(
   request: APIRequestContext,
   { templateId, body, consumer = "coral", correlationId, headers = {} }: Call,
 ): Promise<{ res: APIResponse; correlationId: string | null }> {
-  const cid = correlationId === null ? null : (correlationId ?? correlation("call"));
+  const cid =
+    correlationId === null ? null : (correlationId ?? correlation("call"));
   const res = await request.post(renderPath(templateId), {
     data: body,
     headers: {
@@ -254,7 +304,8 @@ export async function render(
   return { res, correlationId: cid };
 }
 
-export const previewPath = (templateId: string) => `/api/templates/${templateId}/preview`;
+export const previewPath = (templateId: string) =>
+  `/api/templates/${templateId}/preview`;
 
 /**
  * POSTs to Stencil's own preview route, which reads the person from the persona cookie (a context from
@@ -264,10 +315,14 @@ export async function preview(
   request: APIRequestContext,
   { templateId, body, correlationId, headers = {} }: Omit<Call, "consumer">,
 ): Promise<{ res: APIResponse; correlationId: string | null }> {
-  const cid = correlationId === null ? null : (correlationId ?? correlation("preview"));
+  const cid =
+    correlationId === null ? null : (correlationId ?? correlation("preview"));
   const res = await request.post(previewPath(templateId), {
     data: body,
-    headers: { ...(cid === null ? {} : { "X-Correlation-Id": cid }), ...headers },
+    headers: {
+      ...(cid === null ? {} : { "X-Correlation-Id": cid }),
+      ...headers,
+    },
   });
   return { res, correlationId: cid };
 }
@@ -286,7 +341,16 @@ export async function asPersona<T>(
     baseURL,
     storageState: {
       cookies: [
-        { name: "ucomp_persona", value: persona, domain: new URL(baseURL).hostname, path: "/", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" },
+        {
+          name: "ucomp_persona",
+          value: persona,
+          domain: new URL(baseURL).hostname,
+          path: "/",
+          expires: -1,
+          httpOnly: false,
+          secure: false,
+          sameSite: "Lax",
+        },
       ],
       origins: [],
     },
@@ -315,10 +379,25 @@ export interface ChunkedAnswer {
  */
 export function postChunked(
   url: URL,
-  { headers, megabytes, fill, head = "", tail = "" }: { headers: Record<string, string>; megabytes: number; fill: number; head?: string; tail?: string },
+  {
+    headers,
+    megabytes,
+    fill,
+    head = "",
+    tail = "",
+  }: {
+    headers: Record<string, string>;
+    megabytes: number;
+    fill: number;
+    head?: string;
+    tail?: string;
+  },
 ): Promise<ChunkedAnswer> {
   return new Promise((resolve, reject) => {
-    const req = httpRequest(url, { method: "POST", headers: { ...headers, "Transfer-Encoding": "chunked" } });
+    const req = httpRequest(url, {
+      method: "POST",
+      headers: { ...headers, "Transfer-Encoding": "chunked" },
+    });
     let sentMb = 0;
     let answered = false;
     req.on("response", (res) => {
@@ -331,7 +410,12 @@ export function postChunked(
         req.destroy(); // the rest of the body is never sent
       });
       res.on("close", () => {
-        if (!res.complete) reject(new Error(`The ${res.statusCode} answer closed before its body ended.`));
+        if (!res.complete)
+          reject(
+            new Error(
+              `The ${res.statusCode} answer closed before its body ended.`,
+            ),
+          );
       });
     });
     // Once there is an answer, the request's own errors (the server closing its side) don't matter.
@@ -358,7 +442,12 @@ export interface ApiError {
 }
 
 /** An error response: status, JSON, no-store, and the `{ error: { code, message } }` shape. Returns the error. */
-export async function expectError(res: APIResponse, status: number, code: string, message?: string | RegExp): Promise<ApiError> {
+export async function expectError(
+  res: APIResponse,
+  status: number,
+  code: string,
+  message?: string | RegExp,
+): Promise<ApiError> {
   expect(res.status(), `status for ${code}`).toBe(status);
   expect(res.headers()["content-type"]).toBe("application/json");
   expect(res.headers()["cache-control"]).toBe("no-store");
@@ -370,13 +459,26 @@ export async function expectError(res: APIResponse, status: number, code: string
   return body.error;
 }
 
-export const LABEL: Record<Channel, string> = { pdf: "PDF", web: "Web", email: "Email", push: "Push", sms: "SMS" };
+export const LABEL: Record<Channel, string> = {
+  pdf: "PDF",
+  web: "Web",
+  email: "Email",
+  push: "Push",
+  sms: "SMS",
+};
 
 /** "PDF", "PDF and Web", "PDF, Web and Email". */
 export function andList(items: readonly string[]): string {
-  return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  return items.length <= 1
+    ? (items[0] ?? "")
+    : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 /** "March 1, 2027": how the messages write a date (en-US, UTC). */
 export const longDate = (when: Date | string | number) =>
-  new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(when));
+  new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(when));

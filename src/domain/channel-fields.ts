@@ -31,7 +31,12 @@ import { assertNever } from "./assert-never";
 import type { PushPlatform } from "./messages/push";
 import { withArticle } from "./plural";
 import { PLATFORM_LABELS } from "./render/errors";
-import { CHANNELS, channelFamily, type Channel, type JSONContent } from "./types";
+import {
+  CHANNELS,
+  channelFamily,
+  type Channel,
+  type JSONContent,
+} from "./types";
 
 // ── The registry ──────────────────────────────────────────────
 
@@ -78,22 +83,66 @@ export const CHANNEL_FIELDS = {
   pdf: [],
   web: [],
   email: [
-    { key: "subject", label: "Subject", name: "email subject", shape: "line", required: true },
-    { key: "preheader", label: "Preheader", name: "email preheader", shape: "line", required: false },
+    {
+      key: "subject",
+      label: "Subject",
+      name: "email subject",
+      shape: "line",
+      required: true,
+    },
+    {
+      key: "preheader",
+      label: "Preheader",
+      name: "email preheader",
+      shape: "line",
+      required: false,
+    },
   ],
   push: [
-    { key: "title", label: "Title", name: "push title", shape: "line", required: true },
-    { key: "subtitle", label: "Subtitle", name: "push subtitle", shape: "line", required: false, platforms: ["ios"] },
-    { key: "body", label: "Body", name: "push body", shape: "paragraph", required: true, refusesShorteners: true },
+    {
+      key: "title",
+      label: "Title",
+      name: "push title",
+      shape: "line",
+      required: true,
+    },
+    {
+      key: "subtitle",
+      label: "Subtitle",
+      name: "push subtitle",
+      shape: "line",
+      required: false,
+      platforms: ["ios"],
+    },
+    {
+      key: "body",
+      label: "Body",
+      name: "push body",
+      shape: "paragraph",
+      required: true,
+      refusesShorteners: true,
+    },
   ],
-  sms: [{ key: "text", label: "Message", name: "SMS message", shape: "lines", required: true, refusesShorteners: true }],
+  sms: [
+    {
+      key: "text",
+      label: "Message",
+      name: "SMS message",
+      shape: "lines",
+      required: true,
+      refusesShorteners: true,
+    },
+  ],
 } as const satisfies { readonly [C in Channel]: readonly ChannelFieldSpec[] };
 
 /** A channel's field keys: `ChannelFieldKey<"email">` is "subject" | "preheader". */
-export type ChannelFieldKey<C extends Channel> = (typeof CHANNEL_FIELDS)[C][number]["key"];
+export type ChannelFieldKey<C extends Channel> =
+  (typeof CHANNEL_FIELDS)[C][number]["key"];
 
 /** A field's id, its channel and key: "email.subject". The workspace's and autosave's name for it. */
-export type ChannelFieldId = { [C in Channel]: `${C}.${ChannelFieldKey<C>}` }[Channel];
+export type ChannelFieldId = {
+  [C in Channel]: `${C}.${ChannelFieldKey<C>}`;
+}[Channel];
 
 /** A field with its channel and id: what the loops get. */
 export interface ChannelField extends ChannelFieldSpec {
@@ -102,16 +151,18 @@ export interface ChannelField extends ChannelFieldSpec {
 }
 
 /** Every field of every channel, in `CHANNELS` order and then the registry's. */
-export const ALL_CHANNEL_FIELDS: readonly ChannelField[] = CHANNELS.flatMap((channel) =>
-  (CHANNEL_FIELDS[channel] as readonly ChannelFieldSpec[]).map((spec) => ({
-    ...spec,
-    channel,
-    id: `${channel}.${spec.key}` as ChannelFieldId,
-  })),
+export const ALL_CHANNEL_FIELDS: readonly ChannelField[] = CHANNELS.flatMap(
+  (channel) =>
+    (CHANNEL_FIELDS[channel] as readonly ChannelFieldSpec[]).map((spec) => ({
+      ...spec,
+      channel,
+      id: `${channel}.${spec.key}` as ChannelFieldId,
+    })),
 );
 
 /** Every field id, in the same order. */
-export const CHANNEL_FIELD_IDS: readonly ChannelFieldId[] = ALL_CHANNEL_FIELDS.map((field) => field.id);
+export const CHANNEL_FIELD_IDS: readonly ChannelFieldId[] =
+  ALL_CHANNEL_FIELDS.map((field) => field.id);
 
 /**
  * Whether `id` names a channel field ("email.subject") rather than a block of a body. A review thread's
@@ -127,7 +178,9 @@ export function channelFieldsOf(channel: Channel): readonly ChannelField[] {
 }
 
 /** The fields of the channels that are on, in `CHANNELS` order whatever the order of `channels`. */
-export function fieldsOfChannels(channels: readonly Channel[]): readonly ChannelField[] {
+export function fieldsOfChannels(
+  channels: readonly Channel[],
+): readonly ChannelField[] {
   return ALL_CHANNEL_FIELDS.filter((field) => channels.includes(field.channel));
 }
 
@@ -162,7 +215,9 @@ export function channelFieldsHeading(channel: Channel): string {
 }
 
 /** The quiet tag beside a field only some push platforms show: "iPhone only". Null when every platform shows it. */
-export function fieldPlatformTag(field: Pick<ChannelFieldSpec, "platforms">): string | null {
+export function fieldPlatformTag(
+  field: Pick<ChannelFieldSpec, "platforms">,
+): string | null {
   if (field.platforms === undefined) return null;
   return `${field.platforms.map((platform) => PLATFORM_LABELS[platform]).join(" and ")} only`;
 }
@@ -174,12 +229,18 @@ export function fieldPlatformTag(field: Pick<ChannelFieldSpec, "platforms">): st
  * a save is sent and the server before one is stored (`prepareField`), so both refuse the same fields
  * with the same sentence.
  */
-export function normalizeAndCheckChannelField(field: FieldOf, doc: JSONContent): Checked {
+export function normalizeAndCheckChannelField(
+  field: FieldOf,
+  doc: JSONContent,
+): Checked {
   return normalizeAndCheckField(doc, fieldCheck(field));
 }
 
 /** The field check alone, on a stored field: null when it passes, else the problem to refuse it with. */
-export function channelFieldProblem(field: FieldOf, doc: JSONContent): FieldProblem | null {
+export function channelFieldProblem(
+  field: FieldOf,
+  doc: JSONContent,
+): FieldProblem | null {
   return fieldProblem(doc, fieldCheck(field));
 }
 
@@ -187,7 +248,11 @@ export function channelFieldProblem(field: FieldOf, doc: JSONContent): FieldProb
 export type FieldOf = Pick<ChannelField, "channel" | "shape">;
 
 function fieldCheck(field: FieldOf): FieldCheck {
-  return { lines: fieldLines(field.shape), problem: fieldProblemFor(field.channel), characters: fieldCharacters(field) };
+  return {
+    lines: fieldLines(field.shape),
+    problem: fieldProblemFor(field.channel),
+    characters: fieldCharacters(field),
+  };
 }
 
 /**
@@ -195,7 +260,9 @@ function fieldCheck(field: FieldOf): FieldCheck {
  * the invisible characters a phone draws with (the joiner in 👨‍👩‍👧, the non-joiner in a Persian name) and lose
  * only control characters; the email's fields lose both, as the document does.
  */
-export function fieldCharacters(field: Pick<ChannelField, "channel">): CharacterRules {
+export function fieldCharacters(
+  field: Pick<ChannelField, "channel">,
+): CharacterRules {
   return channelFamily(field.channel) === "message" ? "message" : "document";
 }
 
@@ -244,14 +311,21 @@ export function typedText(doc: JSONContent | null, chip = " "): string {
     case "variable":
       return chip;
     case "doc":
-      return (doc.content ?? []).map((block) => typedText(block, chip)).join("\n");
+      return (doc.content ?? [])
+        .map((block) => typedText(block, chip))
+        .join("\n");
     default:
-      return (doc.content ?? []).map((child) => typedText(child, chip)).join("");
+      return (doc.content ?? [])
+        .map((child) => typedText(child, chip))
+        .join("");
   }
 }
 
 /** Whether a field shows on a push platform: the subtitle shows only on iPhone. */
-export function fieldOnPlatform(field: Pick<ChannelFieldSpec, "platforms">, platform: PushPlatform): boolean {
+export function fieldOnPlatform(
+  field: Pick<ChannelFieldSpec, "platforms">,
+  platform: PushPlatform,
+): boolean {
   return field.platforms === undefined || field.platforms.includes(platform);
 }
 
@@ -261,7 +335,9 @@ export function fieldOnPlatform(field: Pick<ChannelFieldSpec, "platforms">, plat
  * `versions.channel_fields`: by channel, then by field key, the field's stored document. A field with no
  * value is absent, and so is a channel with none.
  */
-export type ChannelFields = { [C in Channel]?: { [K in ChannelFieldKey<C>]?: JSONContent } };
+export type ChannelFields = {
+  [C in Channel]?: { [K in ChannelFieldKey<C>]?: JSONContent };
+};
 
 /** Every field by id, null when it has no value: how the workspace holds the fields. */
 export type ChannelFieldValues = { [Id in ChannelFieldId]: JSONContent | null };
@@ -272,13 +348,21 @@ export type ChannelFieldsPatch = Partial<ChannelFieldValues>;
 type Loose = Partial<Record<Channel, Record<string, JSONContent | undefined>>>;
 
 /** The field's value, or null when it has none. */
-export function channelFieldValue(fields: ChannelFields, field: Pick<ChannelField, "channel" | "key">): JSONContent | null {
+export function channelFieldValue(
+  fields: ChannelFields,
+  field: Pick<ChannelField, "channel" | "key">,
+): JSONContent | null {
   return (fields as Loose)[field.channel]?.[field.key] ?? null;
 }
 
 /** Every field's value by id (null for none): the flat form of what a version stores. */
 export function channelFieldValues(fields: ChannelFields): ChannelFieldValues {
-  return Object.fromEntries(ALL_CHANNEL_FIELDS.map((field) => [field.id, channelFieldValue(fields, field)])) as ChannelFieldValues;
+  return Object.fromEntries(
+    ALL_CHANNEL_FIELDS.map((field) => [
+      field.id,
+      channelFieldValue(fields, field),
+    ]),
+  ) as ChannelFieldValues;
 }
 
 /**
@@ -286,9 +370,13 @@ export function channelFieldValues(fields: ChannelFields): ChannelFieldValues {
  * doesn't name are kept, and a channel left with no field goes. Returns a new object; `fields` is not
  * changed.
  */
-export function withChannelFieldValues(fields: ChannelFields, patch: ChannelFieldsPatch): ChannelFields {
+export function withChannelFieldValues(
+  fields: ChannelFields,
+  patch: ChannelFieldsPatch,
+): ChannelFields {
   const next: Loose = {};
-  for (const [channel, values] of Object.entries(fields as Loose)) next[channel as Channel] = { ...values };
+  for (const [channel, values] of Object.entries(fields as Loose))
+    next[channel as Channel] = { ...values };
   for (const field of ALL_CHANNEL_FIELDS) {
     const value = patch[field.id];
     if (value === undefined) continue;

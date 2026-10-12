@@ -7,7 +7,10 @@
 import { shift, size } from "@floating-ui/dom";
 import { isHistoryTransaction } from "@tiptap/pm/history";
 import type { PluginKey } from "@tiptap/pm/state";
-import type { SuggestionFloatingUiOptions, SuggestionOptions } from "@tiptap/suggestion";
+import type {
+  SuggestionFloatingUiOptions,
+  SuggestionOptions,
+} from "@tiptap/suggestion";
 
 const VIEWPORT_PADDING = 8;
 
@@ -23,11 +26,17 @@ export function menuBoundary(floating: Element): Element | "clippingAncestors" {
 export const MENU_FLOATING_UI: SuggestionFloatingUiOptions = {
   strategy: "fixed",
   middleware: [
-    shift(({ elements }) => ({ padding: VIEWPORT_PADDING, boundary: menuBoundary(elements.floating) })),
+    shift(({ elements }) => ({
+      padding: VIEWPORT_PADDING,
+      boundary: menuBoundary(elements.floating),
+    })),
     size({
       padding: VIEWPORT_PADDING,
       apply({ availableHeight, elements }) {
-        elements.floating.style.setProperty("--ucomp-menu-max-h", `${Math.max(160, Math.floor(availableHeight))}px`);
+        elements.floating.style.setProperty(
+          "--ucomp-menu-max-h",
+          `${Math.max(160, Math.floor(availableHeight))}px`,
+        );
       },
     }),
   ],
@@ -37,10 +46,14 @@ export const MENU_FLOATING_UI: SuggestionFloatingUiOptions = {
  * Menus open from typing only. Undo and redo can bring back a raw `{{query` or `/query`, and moving
  * the caret into one shouldn't pop a menu open either; once open, a menu follows its query.
  */
-export function showOnTyping(pluginKey: PluginKey): NonNullable<SuggestionOptions["shouldShow"]> {
+export function showOnTyping(
+  pluginKey: PluginKey,
+): NonNullable<SuggestionOptions["shouldShow"]> {
   return ({ editor, transaction }) => {
     // During `apply` the editor still holds the previous state: was this menu already open?
-    const wasActive = (pluginKey.getState(editor.state) as { active?: boolean } | undefined)?.active;
+    const wasActive = (
+      pluginKey.getState(editor.state) as { active?: boolean } | undefined
+    )?.active;
     if (wasActive) return true;
     return transaction.docChanged && !isHistoryTransaction(transaction);
   };

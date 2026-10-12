@@ -15,8 +15,15 @@ import { cx } from "../lib/cx";
 import { checkLink } from "../model/links";
 import { FOCUS_RING } from "./classes";
 
-const ICON = { className: "size-4", strokeWidth: 1.75, "aria-hidden": true } as const;
-const ACTION = cx("size-8 text-label hover:bg-hover hover:text-text", FOCUS_RING);
+const ICON = {
+  className: "size-4",
+  strokeWidth: 1.75,
+  "aria-hidden": true,
+} as const;
+const ACTION = cx(
+  "size-8 text-label hover:bg-hover hover:text-text",
+  FOCUS_RING,
+);
 
 export function LinkField({
   editor,
@@ -35,14 +42,20 @@ export function LinkField({
   // What the check refuses can't be applied, and the field says why once there is something to
   // explain (text typed, or Enter on an empty field).
   const check = checkLink(href);
-  const reason = !check.ok && (tried || href.trim() !== "") ? check.message : null;
+  const reason =
+    !check.ok && (tried || href.trim() !== "") ? check.message : null;
 
   const apply = () => {
     if (!check.ok) {
       setTried(true);
       return;
     }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: check.href }).run();
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange("link")
+      .setLink({ href: check.href })
+      .run();
     onClose();
   };
 
@@ -90,19 +103,32 @@ export function LinkField({
           // with the reason; Base UI cancels its click while disabled.
           focusableWhenDisabled
           onClick={apply}
-          className={cx(ACTION, "data-disabled:cursor-default data-disabled:text-text-subtle data-disabled:opacity-50 data-disabled:hover:bg-transparent")}
+          className={cx(
+            ACTION,
+            "data-disabled:cursor-default data-disabled:text-text-subtle data-disabled:opacity-50 data-disabled:hover:bg-transparent",
+          )}
         >
           <Check {...ICON} />
         </Button>
         {hasLink ? (
-          <Button type="button" size="icon-sm" variant="ghost" aria-label="Remove link" className={ACTION} onClick={remove}>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Remove link"
+            className={ACTION}
+            onClick={remove}
+          >
             <Unlink {...ICON} />
           </Button>
         ) : null}
       </div>
       {reason ? (
         // As wide as the row above, never wider.
-        <p id={reasonId} className="w-0 min-w-full px-1 pb-0.5 text-xs text-danger-text">
+        <p
+          id={reasonId}
+          className="w-0 min-w-full px-1 pb-0.5 text-xs text-danger-text"
+        >
           {reason}
         </p>
       ) : null}

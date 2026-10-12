@@ -12,7 +12,14 @@ vi.mock("@/server/queries/import", () => ({ getImportOriginalView: vi.fn() }));
 
 const viewer = { userId: "maya" } as Viewer;
 const view: ImportOriginalView = {
-  ref: { uploadId: "up_abcdefghjk", filename: "notes.txt", kind: "txt", size: 5, uploadedAt: "2026-10-04T13:00:00.000Z", uploadedByName: "Maya Chen" },
+  ref: {
+    uploadId: "up_abcdefghjk",
+    filename: "notes.txt",
+    kind: "txt",
+    size: 5,
+    uploadedAt: "2026-10-04T13:00:00.000Z",
+    uploadedByName: "Maya Chen",
+  },
   source: { kind: "txt", text: "hello" },
   report: {
     kind: "txt",
@@ -29,7 +36,9 @@ const view: ImportOriginalView = {
 };
 
 const get = (id = "up_abcdefghjk") =>
-  GET(new Request(`http://localhost/api/imports/${id}/view`) as NextRequest, { params: Promise.resolve({ uploadId: id }) });
+  GET(new Request(`http://localhost/api/imports/${id}/view`) as NextRequest, {
+    params: Promise.resolve({ uploadId: id }),
+  });
 
 beforeEach(() => {
   vi.mocked(getViewer).mockReset().mockResolvedValue(viewer);
@@ -51,6 +60,10 @@ describe("GET /api/imports/[uploadId]/view", () => {
     const res = await get();
     expect(res.status).toBe(404);
     expect(res.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(await res.json()).toEqual({ ok: false, code: "upload_unavailable", reason: "This file isn't available." });
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: "upload_unavailable",
+      reason: "This file isn't available.",
+    });
   });
 });

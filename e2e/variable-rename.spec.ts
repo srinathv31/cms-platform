@@ -1,8 +1,28 @@
 import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
 import { openDb } from "./api/helpers";
-import { SPRING_NAME, TEAM, click, createSpringTravel, json, reactReady, removeTemplate, rows, type SpringFixture } from "./helpers/golive";
-import { asPersona, documentEditor, expect, expectAutosaved, hydrated, liveEditor, panelRow, tap, test } from "./helpers/scenario";
+import {
+  SPRING_NAME,
+  TEAM,
+  click,
+  createSpringTravel,
+  json,
+  reactReady,
+  removeTemplate,
+  rows,
+  type SpringFixture,
+} from "./helpers/golive";
+import {
+  asPersona,
+  documentEditor,
+  expect,
+  expectAutosaved,
+  hydrated,
+  liveEditor,
+  panelRow,
+  tap,
+  test,
+} from "./helpers/scenario";
 
 // A renamed variable is one contract change (handoff review D8, decision 0022). The draft saves the rename with
 // the variable (its old key kept as its id), so after a reload the panel still flags it, the submit dialog lists
@@ -29,13 +49,20 @@ test.afterAll(async () => {
   }
 });
 
-const statusBadge = (page: Page) => page.locator('header [data-slot="badge"][data-status]').filter({ visible: true });
+const statusBadge = (page: Page) =>
+  page
+    .locator('header [data-slot="badge"][data-status]')
+    .filter({ visible: true });
 
-test("a renamed variable reaches the submit dialog and the stored contract as one rename", async ({ page }) => {
+test("a renamed variable reaches the submit dialog and the stored contract as one rename", async ({
+  page,
+}) => {
   const { templateId } = fixture!;
   await asPersona(page, "maya");
   await page.goto(`/${TEAM}/templates/${templateId}`);
-  await expect(page.getByRole("heading", { level: 1, name: SPRING_NAME })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: SPRING_NAME }),
+  ).toBeVisible();
   await hydrated(page);
 
   await test.step("Maya opens a draft of v2", async () => {
@@ -44,7 +71,10 @@ test("a renamed variable reaches the submit dialog and the stored contract as on
     await click(edit);
     await expect(statusBadge(page)).toHaveText("Draft");
     await liveEditor(page);
-    await expect(documentEditor(page)).toHaveAttribute("contenteditable", "true");
+    await expect(documentEditor(page)).toHaveAttribute(
+      "contenteditable",
+      "true",
+    );
   });
 
   await test.step("She changes First name's key to given_name: the row flags the rename", async () => {
@@ -58,9 +88,18 @@ test("a renamed variable reaches the submit dialog and the stored contract as on
     await expect(panelRow(page, "given_name")).toContainText("Key changed");
     await expectAutosaved(page);
 
-    const [draft] = await rows(db, "SELECT variables FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
-    const saved = (json(draft.variables) as { id?: string; key: string }[]).find((v) => v.key === "given_name");
-    expect(saved, "the draft keeps the variable's old key as its id").toMatchObject({ id: "first_name" });
+    const [draft] = await rows(
+      db,
+      "SELECT variables FROM versions WHERE template_id = ? AND state = 'draft'",
+      [templateId],
+    );
+    const saved = (
+      json(draft.variables) as { id?: string; key: string }[]
+    ).find((v) => v.key === "given_name");
+    expect(
+      saved,
+      "the draft keeps the variable's old key as its id",
+    ).toMatchObject({ id: "first_name" });
   });
 
   await test.step("After a reload the panel still knows it was renamed", async () => {
@@ -86,12 +125,24 @@ test("a renamed variable reaches the submit dialog and the stored contract as on
   await test.step("Submitted, v3 stores one key_renamed change", async () => {
     await tap(dialog.getByRole("button", { name: "Submit v3", exact: true }));
     await expect(dialog).toBeHidden({ timeout: 20_000 });
-    await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
+    await expect(statusBadge(page)).toHaveText("In review", {
+      timeout: 20_000,
+    });
 
-    const [v3] = await rows(db, "SELECT state, contract_changes FROM versions WHERE template_id = ? AND number = 3", [templateId]);
+    const [v3] = await rows(
+      db,
+      "SELECT state, contract_changes FROM versions WHERE template_id = ? AND number = 3",
+      [templateId],
+    );
     expect(v3.state).toBe("in_review");
     expect(json(v3.contract_changes)).toEqual([
-      { kind: "key_renamed", key: "given_name", breaking: true, from: "first_name", to: "given_name" },
+      {
+        kind: "key_renamed",
+        key: "given_name",
+        breaking: true,
+        from: "first_name",
+        to: "given_name",
+      },
     ]);
   });
 });

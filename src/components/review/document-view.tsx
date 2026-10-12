@@ -5,10 +5,18 @@ import { GutterMarkers } from "@/components/comments/gutter-markers";
 import { DocumentEditor } from "@/editor/components/document-editor";
 import { EditorRoot } from "@/editor/components/editor-root";
 import type { Variable } from "@/editor/model/types";
-import type { CommentRequest, DocumentEditorHandle, ThreadAnchor } from "@/editor/types";
+import type {
+  CommentRequest,
+  DocumentEditorHandle,
+  ThreadAnchor,
+} from "@/editor/types";
 import { isChannelFieldId } from "@/domain/channel-fields";
 import type { JSONContent } from "@/domain/types";
-import type { FieldRedline, FooterRedline, RedlineDoc } from "@/domain/review-types";
+import type {
+  FieldRedline,
+  FooterRedline,
+  RedlineDoc,
+} from "@/domain/review-types";
 import type { ChannelFamily } from "@/domain/types";
 import type { ThreadView } from "@/server/queries/threads";
 import { FieldsView } from "./fields-view";
@@ -34,7 +42,10 @@ import { RV } from "./review-grid";
  */
 
 /** The version's variables, plus any the baseline had that this one dropped (a deleted chip needs its label). */
-function labelsFor(variables: readonly Variable[], baseline: readonly Variable[] | null): Variable[] {
+function labelsFor(
+  variables: readonly Variable[],
+  baseline: readonly Variable[] | null,
+): Variable[] {
   if (!baseline) return [...variables];
   const have = new Set(variables.map((v) => v.key));
   return [...variables, ...baseline.filter((v) => !have.has(v.key))];
@@ -91,9 +102,15 @@ export function DocumentView({
   onRequestComment?: (anchor: CommentRequest) => void;
   onRequestBlockComment?: (blockId: string) => void;
 }) {
-  const labels = useMemo(() => labelsFor(variables, baselineVariables), [variables, baselineVariables]);
+  const labels = useMemo(
+    () => labelsFor(variables, baselineVariables),
+    [variables, baselineVariables],
+  );
   // The fields' markers are the threads on fields; the body's handle doesn't know them, nor theirs the body's.
-  const fieldThreads = useMemo(() => threads.filter((t) => isChannelFieldId(t.blockId)), [threads]);
+  const fieldThreads = useMemo(
+    () => threads.filter((t) => isChannelFieldId(t.blockId)),
+    [threads],
+  );
 
   return (
     <div

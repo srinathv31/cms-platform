@@ -1,7 +1,15 @@
 import "server-only";
 import { eq } from "drizzle-orm";
-import { newTemplateChannels, newTemplateContentType, type NewTemplateChanges } from "@/domain/lifecycle/drafts";
-import type { DraftFields, LifecycleResult, StarterContent } from "@/domain/lifecycle/types";
+import {
+  newTemplateChannels,
+  newTemplateContentType,
+  type NewTemplateChanges,
+} from "@/domain/lifecycle/drafts";
+import type {
+  DraftFields,
+  LifecycleResult,
+  StarterContent,
+} from "@/domain/lifecycle/types";
 import { conformToSections } from "@/domain/platform-config/sections";
 import type { Channel, ChannelFamily, RequiredSection } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
@@ -14,7 +22,10 @@ import { newId, newTemplateId } from "@/server/ids";
 // callers check permissions and build the lifecycle result; this inserts it in their transaction.
 
 /** A draft's row in `versions`. */
-export function draftRow(draft: DraftFields, ids: { id: string; templateId: string }) {
+export function draftRow(
+  draft: DraftFields,
+  ids: { id: string; templateId: string },
+) {
   return {
     id: ids.id,
     templateId: ids.templateId,
@@ -44,7 +55,14 @@ type Reader = Pick<Db, "query">;
 /** A template id nobody has. A collision on 6 Crockford characters is one in a billion; check anyway. */
 export async function freshTemplateId(reader: Reader = db): Promise<string> {
   let templateId = newTemplateId();
-  for (let i = 0; i < 4 && (await reader.query.templates.findFirst({ where: eq(templates.id, templateId) })); i++) {
+  for (
+    let i = 0;
+    i < 4 &&
+    (await reader.query.templates.findFirst({
+      where: eq(templates.id, templateId),
+    }));
+    i++
+  ) {
     templateId = newTemplateId();
   }
   return templateId;
@@ -56,8 +74,14 @@ export async function freshTemplateId(reader: Reader = db): Promise<string> {
  * and every import) gets Disclosure as seeded, an alert gets Alert. Refused when no content type is of
  * that family.
  */
-export async function newTemplateType(family: ChannelFamily, reader: Reader = db) {
-  return newTemplateContentType(family, await reader.query.contentTypes.findMany());
+export async function newTemplateType(
+  family: ChannelFamily,
+  reader: Reader = db,
+) {
+  return newTemplateContentType(
+    family,
+    await reader.query.contentTypes.findMany(),
+  );
 }
 
 /**
@@ -75,7 +99,11 @@ export function conformToContentType(
 ): StarterContent {
   return {
     ...starter,
-    body: options.sectionsFitted ? starter.body : conformToSections(starter.body, type.requiredSections, () => newId("b")),
+    body: options.sectionsFitted
+      ? starter.body
+      : conformToSections(starter.body, type.requiredSections, () =>
+          newId("b"),
+        ),
     channels: newTemplateChannels(starter.channels, type.allowedChannels),
   };
 }
@@ -93,7 +121,10 @@ export interface NewTemplateRows {
 }
 
 /** Inserts the template, its first draft and the effects (the audit event) in the caller's transaction. */
-export async function insertNewTemplate(tx: Tx, rows: NewTemplateRows): Promise<void> {
+export async function insertNewTemplate(
+  tx: Tx,
+  rows: NewTemplateRows,
+): Promise<void> {
   const { template, draft } = rows.created.changes;
   await tx.insert(templates).values({
     id: rows.templateId,

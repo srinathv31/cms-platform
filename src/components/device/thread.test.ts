@@ -12,8 +12,14 @@ describe("threadMessages", () => {
         { text: "Second", time: "9:41 AM", day: "Yesterday" },
       ],
     };
-    expect(threadMessages(content).map((m) => m.text)).toEqual(["First", "Second", "Third"]);
-    expect(threadMessages({ sender: "26725", text: "Only", time: "9:41 AM" })).toEqual([{ text: "Only", time: "9:41 AM", day: undefined }]);
+    expect(threadMessages(content).map((m) => m.text)).toEqual([
+      "First",
+      "Second",
+      "Third",
+    ]);
+    expect(
+      threadMessages({ sender: "26725", text: "Only", time: "9:41 AM" }),
+    ).toEqual([{ text: "Only", time: "9:41 AM", day: undefined }]);
   });
 });
 
@@ -25,6 +31,11 @@ describe("showsStamp", () => {
       { text: "c", time: "2:02 PM" },
       { text: "d", time: "2:02 PM", day: "Today" },
     ];
-    expect(messages.map((_, i) => showsStamp(messages, i))).toEqual([true, false, true, false]);
+    expect(messages.map((_, i) => showsStamp(messages, i))).toEqual([
+      true,
+      false,
+      true,
+      false,
+    ]);
   });
 });

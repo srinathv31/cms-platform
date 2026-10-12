@@ -6,7 +6,9 @@ import { DRAFT_SAVE_STATUS, statusOf } from "./http";
 
 describe("statusOf", () => {
   it("is 200 for a save", () => {
-    expect(statusOf({ ok: true, rev: 2, savedAt: "2026-10-04T10:00:00.000Z" })).toBe(200);
+    expect(
+      statusOf({ ok: true, rev: 2, savedAt: "2026-10-04T10:00:00.000Z" }),
+    ).toBe(200);
   });
 
   it.each([
@@ -29,6 +31,8 @@ describe("statusOf", () => {
   });
 
   it("keeps the current rev on the answer that carries it, without changing its status", () => {
-    expect(statusOf({ ...refuse(REQUEST_REFUSALS.draftChanged), rev: 9 })).toBe(409);
+    expect(statusOf({ ...refuse(REQUEST_REFUSALS.draftChanged), rev: 9 })).toBe(
+      409,
+    );
   });
 });

@@ -9,15 +9,32 @@
 //   - textblocks (paragraph, heading) go to inline-diff.ts.
 
 import type { JSONContent } from "../types";
-import { LIST_ITEMS, INNER_BLOCKS, TABLE_ROWS, align, type AlignOptions } from "./align";
+import {
+  LIST_ITEMS,
+  INNER_BLOCKS,
+  TABLE_ROWS,
+  align,
+  type AlignOptions,
+} from "./align";
 import type { Cx, Diffed } from "./context";
 import { diffTextblock } from "./inline-diff";
-import { isTextblock, family, kindKey, nodeKey, contentKey, withContent, withMark, markAll } from "./nodes";
+import {
+  isTextblock,
+  family,
+  kindKey,
+  nodeKey,
+  contentKey,
+  withContent,
+  withMark,
+  markAll,
+} from "./nodes";
 
 /** `next` with what changed since `base` marked in; `base` is the block paired with it. */
 export function diffNode(cx: Cx, base: JSONContent, next: JSONContent): Diffed {
-  if (nodeKey(cx, base) === nodeKey(cx, next)) return { node: next, changed: false };
-  if (kindKey(base) !== kindKey(next)) return { node: replaceWhole(cx, base, next), changed: true };
+  if (nodeKey(cx, base) === nodeKey(cx, next))
+    return { node: next, changed: false };
+  if (kindKey(base) !== kindKey(next))
+    return { node: replaceWhole(cx, base, next), changed: true };
   if (isTextblock(next)) return diffTextblock(cx, base, next);
   switch (next.type) {
     case "table":
@@ -33,7 +50,11 @@ export function diffNode(cx: Cx, base: JSONContent, next: JSONContent): Diffed {
 }
 
 /** A kind change: the old content back as deleted, then the new as inserted (just the new if the same). */
-function replaceWhole(cx: Cx, base: JSONContent, next: JSONContent): JSONContent {
+function replaceWhole(
+  cx: Cx,
+  base: JSONContent,
+  next: JSONContent,
+): JSONContent {
   if (family(base) !== family(next)) return markAll(next, "insert"); // never paired; kept total
   const same = contentKey(cx, base) === contentKey(cx, next);
   const mark = isTextblock(next) ? withMark : markAll;
@@ -43,7 +64,12 @@ function replaceWhole(cx: Cx, base: JSONContent, next: JSONContent): JSONContent
   ]);
 }
 
-function diffChildren(cx: Cx, base: JSONContent, next: JSONContent, opts: AlignOptions): Diffed {
+function diffChildren(
+  cx: Cx,
+  base: JSONContent,
+  next: JSONContent,
+  opts: AlignOptions,
+): Diffed {
   const before = base.content ?? [];
   const after = next.content ?? [];
   const out: JSONContent[] = [];
@@ -61,7 +87,9 @@ function diffChildren(cx: Cx, base: JSONContent, next: JSONContent, opts: AlignO
       changed ||= child.changed;
     }
   }
-  return changed ? { node: withContent(next, out), changed } : { node: next, changed: false };
+  return changed
+    ? { node: withContent(next, out), changed }
+    : { node: next, changed: false };
 }
 
 /** Cells line up by position; extra cells on either side are marked whole. */
@@ -81,5 +109,7 @@ function diffCells(cx: Cx, base: JSONContent, next: JSONContent): Diffed {
       changed ||= cell.changed;
     }
   }
-  return changed ? { node: withContent(next, out), changed } : { node: next, changed: false };
+  return changed
+    ? { node: withContent(next, out), changed }
+    : { node: next, changed: false };
 }

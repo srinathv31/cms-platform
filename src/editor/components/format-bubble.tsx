@@ -13,7 +13,13 @@ import { isNodeRangeSelection } from "@tiptap/extension-node-range";
 import { NodeSelection, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { useEditorState, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { Bold, Italic, Link2, MessageSquarePlus, Underline } from "lucide-react";
+import {
+  Bold,
+  Italic,
+  Link2,
+  MessageSquarePlus,
+  Underline,
+} from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { headingsIn } from "../extensions/required-sections";
@@ -26,7 +32,12 @@ import { LinkField } from "./link-field";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Toggle } from "@/components/ui/toggle";
 
-const MENU_OPTIONS = { placement: "top", offset: 8, flip: true, shift: { padding: 8 } } as const;
+const MENU_OPTIONS = {
+  placement: "top",
+  offset: 8,
+  flip: true,
+  shift: { padding: 8 },
+} as const;
 
 const bubbleKey = new PluginKey("formatBubble");
 
@@ -36,9 +47,16 @@ const TOGGLE = cx(
 );
 
 /** Comment: the icon and its name. Text colour, not the formatting buttons' quieter label colour: it is the action the bar is there for. */
-const COMMENT = cx("h-8 gap-1.5 rounded-md px-2 text-[13px] font-medium text-text hover:bg-hover", FOCUS_RING);
+const COMMENT = cx(
+  "h-8 gap-1.5 rounded-md px-2 text-[13px] font-medium text-text hover:bg-hover",
+  FOCUS_RING,
+);
 
-const ICON = { className: "size-4", strokeWidth: 1.75, "aria-hidden": true } as const;
+const ICON = {
+  className: "size-4",
+  strokeWidth: 1.75,
+  "aria-hidden": true,
+} as const;
 
 /** shadcn's tooltip look (ui/tooltip), on Base UI's parts so it can render inside the editor. */
 const TOOLTIP =
@@ -55,33 +73,56 @@ function canFormat(editor: Editor, state: EditorState): boolean {
   const { selection, doc } = state;
   if (!editor.isEditable || selection.empty) return false;
   // Text only: a selected chip or a dragged block range has nothing to format.
-  if (selection instanceof NodeSelection || isNodeRangeSelection(selection)) return false;
+  if (selection instanceof NodeSelection || isNodeRangeSelection(selection))
+    return false;
   // Required section headings take no formatting.
   if (headingsIn(doc, selection.from, selection.to).length) return false;
-  return doc.textBetween(selection.from, selection.to, " ", "").trim().length > 0;
+  return (
+    doc.textBetween(selection.from, selection.to, " ", "").trim().length > 0
+  );
 }
 
 /** Read-only documents can't take focus: the reader's selection is the page's, inside the document. */
 function selectionInside(dom: HTMLElement): boolean {
   const selection = dom.ownerDocument.getSelection();
-  if (!selection || selection.isCollapsed || !selection.anchorNode || !selection.focusNode) return false;
-  return dom.contains(selection.anchorNode) && dom.contains(selection.focusNode);
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !selection.anchorNode ||
+    !selection.focusNode
+  )
+    return false;
+  return (
+    dom.contains(selection.anchorNode) && dom.contains(selection.focusNode)
+  );
 }
 
 /** Hides the toolbar now (after a comment request: the host's composer takes over). */
 export function hideFormatBubble(editor: Editor) {
-  if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(bubbleKey, "hide"));
+  if (!editor.isDestroyed)
+    editor.view.dispatch(editor.state.tr.setMeta(bubbleKey, "hide"));
 }
 
 /** ⌘⌥M on Apple platforms, Ctrl+Alt+M elsewhere. */
 export function commentShortcut(): { labels: string[]; aria: string } {
-  return isApple() ? { labels: ["⌘", "⌥", "M"], aria: "Meta+Alt+M" } : { labels: ["Ctrl", "Alt", "M"], aria: "Control+Alt+M" };
+  return isApple()
+    ? { labels: ["⌘", "⌥", "M"], aria: "Meta+Alt+M" }
+    : { labels: ["Ctrl", "Alt", "M"], aria: "Control+Alt+M" };
 }
 
-export function FormatBubble({ editor, comments = null }: { editor: Editor; comments?: CommentActions | null }) {
+export function FormatBubble({
+  editor,
+  comments = null,
+}: {
+  editor: Editor;
+  comments?: CommentActions | null;
+}) {
   const [linkOpen, setLinkOpen] = useState(false);
   // Stable: BubbleMenu dispatches an options update whenever this object changes.
-  const options = useMemo(() => ({ ...MENU_OPTIONS, onHide: () => setLinkOpen(false) }), []);
+  const options = useMemo(
+    () => ({ ...MENU_OPTIONS, onHide: () => setLinkOpen(false) }),
+    [],
+  );
   const menuRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef(comments);
   useLayoutEffect(() => {
@@ -90,11 +131,20 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
 
   // Stable for the same reason as `options`; reads the latest comment actions from the ref.
   const shouldShow = useMemo(() => {
-    const visible = ({ editor: e, state, element }: { editor: Editor; state: EditorState; element: HTMLElement }) => {
+    const visible = ({
+      editor: e,
+      state,
+      element,
+    }: {
+      editor: Editor;
+      state: EditorState;
+      element: HTMLElement;
+    }) => {
       if (e.isDestroyed || state.selection.empty) return false;
       const comment = !!commentsRef.current?.target(state);
       if (!e.isEditable) return comment && selectionInside(e.view.dom);
-      if (!(e.view.hasFocus() || element.contains(document.activeElement))) return false;
+      if (!(e.view.hasFocus() || element.contains(document.activeElement)))
+        return false;
       return comment || canFormat(e, state);
     };
     return visible;
@@ -110,7 +160,11 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
     const onSelection = () => {
       if (editor.isDestroyed) return;
       const element = menuRef.current;
-      if (!element?.isConnected || shouldShow({ editor, state: editor.state, element })) return;
+      if (
+        !element?.isConnected ||
+        shouldShow({ editor, state: editor.state, element })
+      )
+        return;
       hide();
     };
     editor.on("selectionUpdate", onSelection);
@@ -125,19 +179,32 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
     if (!commentsOn) return;
     const onSelectionChange = () => {
       const element = menuRef.current;
-      if (editor.isDestroyed || editor.isEditable || !element?.isConnected) return;
+      if (editor.isDestroyed || editor.isEditable || !element?.isConnected)
+        return;
       if (!shouldShow({ editor, state: editor.state, element })) hide();
     };
     document.addEventListener("selectionchange", onSelectionChange);
-    return () => document.removeEventListener("selectionchange", onSelectionChange);
+    return () =>
+      document.removeEventListener("selectionchange", onSelectionChange);
   }, [editor, shouldShow, hide, commentsOn]);
 
   // ⌘K / Ctrl+K on selected text opens the link field.
   useViewDom(editor, (dom) => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (
+        event.key.toLowerCase() !== "k" ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey
+      )
+        return;
       const element = menuRef.current;
-      if (!element || !canFormat(editor, editor.state) || !shouldShow({ editor, state: editor.state, element })) return;
+      if (
+        !element ||
+        !canFormat(editor, editor.state) ||
+        !shouldShow({ editor, state: editor.state, element })
+      )
+        return;
       event.preventDefault();
       setLinkOpen(true);
     };
@@ -183,7 +250,8 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
         className="flex items-center gap-0.5 rounded-lg border border-hairline bg-surface p-1 shadow-pop"
         onMouseDown={(event) => {
           // Keep the editor's selection while clicking toolbar buttons.
-          if (!(event.target instanceof HTMLInputElement)) event.preventDefault();
+          if (!(event.target instanceof HTMLInputElement))
+            event.preventDefault();
         }}
       >
         {linkOpen ? (
@@ -202,7 +270,9 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
                   className={TOGGLE}
                   aria-label="Bold"
                   pressed={active.bold}
-                  onPressedChange={() => editor.chain().focus().toggleBold().run()}
+                  onPressedChange={() =>
+                    editor.chain().focus().toggleBold().run()
+                  }
                 >
                   <Bold {...ICON} />
                 </Toggle>
@@ -211,7 +281,9 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
                   className={TOGGLE}
                   aria-label="Italic"
                   pressed={active.italic}
-                  onPressedChange={() => editor.chain().focus().toggleItalic().run()}
+                  onPressedChange={() =>
+                    editor.chain().focus().toggleItalic().run()
+                  }
                 >
                   <Italic {...ICON} />
                 </Toggle>
@@ -220,7 +292,9 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
                   className={TOGGLE}
                   aria-label="Underline"
                   pressed={active.underline}
-                  onPressedChange={() => editor.chain().focus().toggleUnderline().run()}
+                  onPressedChange={() =>
+                    editor.chain().focus().toggleUnderline().run()
+                  }
                 >
                   <Underline {...ICON} />
                 </Toggle>
@@ -238,7 +312,9 @@ export function FormatBubble({ editor, comments = null }: { editor: Editor; comm
             ) : null}
             {showComment ? (
               <>
-                {active.format ? <span aria-hidden className="mx-1 h-5 w-px bg-hairline" /> : null}
+                {active.format ? (
+                  <span aria-hidden className="mx-1 h-5 w-px bg-hairline" />
+                ) : null}
                 <CommentButton onClick={comment} />
               </>
             ) : null}
@@ -258,7 +334,9 @@ function CommentButton({ onClick }: { onClick: () => void }) {
     <Tooltip.Root
       onOpenChange={(open) => {
         // The toolbar is attached to the page only while it shows, so find the wrapper on open.
-        if (open) frame.current = trigger.current?.closest<HTMLElement>(".ucomp-editor") ?? null;
+        if (open)
+          frame.current =
+            trigger.current?.closest<HTMLElement>(".ucomp-editor") ?? null;
       }}
     >
       <Tooltip.Trigger

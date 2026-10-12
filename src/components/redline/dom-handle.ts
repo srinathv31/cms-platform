@@ -33,36 +33,59 @@ export interface RedlineHandleSource {
 const attr = (value: string) => value.replace(/["\\]/g, "\\$&");
 
 /** The frame of a top-level block. */
-export function redlineBlockElement(root: HTMLElement | null, blockId: string): HTMLElement | null {
+export function redlineBlockElement(
+  root: HTMLElement | null,
+  blockId: string,
+): HTMLElement | null {
   if (!root || !blockId) return null;
-  return root.querySelector<HTMLElement>(`.ucomp-doc > [data-block-id="${attr(blockId)}"]`);
+  return root.querySelector<HTMLElement>(
+    `.ucomp-doc > [data-block-id="${attr(blockId)}"]`,
+  );
 }
 
 /**
  * Where a block is on screen: its frame; else, with Changes only, the caption or count it is hidden in
  * (found by the block's id in `data-hidden-blocks`, or by the line's own `data-collapsed` key).
  */
-export function redlineAnchorElement(root: HTMLElement | null, blockId: string): HTMLElement | null {
+export function redlineAnchorElement(
+  root: HTMLElement | null,
+  blockId: string,
+): HTMLElement | null {
   if (!root || !blockId) return null;
   return (
     redlineBlockElement(root, blockId) ??
-    root.querySelector<HTMLElement>(`.ucomp-doc > [data-collapsed="${attr(blockId)}"]`) ??
-    root.querySelector<HTMLElement>(`.ucomp-doc > [data-hidden-blocks~="${attr(blockId)}"]`)
+    root.querySelector<HTMLElement>(
+      `.ucomp-doc > [data-collapsed="${attr(blockId)}"]`,
+    ) ??
+    root.querySelector<HTMLElement>(
+      `.ucomp-doc > [data-hidden-blocks~="${attr(blockId)}"]`,
+    )
   );
 }
 
 /** A rendered element's box, or null when it isn't laid out (missing, `display: none`, a hidden route). */
 function rectOf(element: Element | null): DOMRect | null {
-  if (!element || !element.isConnected || element.getClientRects().length === 0) return null;
+  if (!element || !element.isConnected || element.getClientRects().length === 0)
+    return null;
   return element.getBoundingClientRect();
 }
 
 /** The nearest ancestor the user can scroll vertically; null when only the page scrolls. */
 function scrollContainer(element: HTMLElement): HTMLElement | null {
   const doc = element.ownerDocument;
-  for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
+  for (
+    let node = element.parentElement;
+    node && node !== doc.body && node !== doc.documentElement;
+    node = node.parentElement
+  ) {
     const { overflowY } = getComputedStyle(node);
-    if ((overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && node.scrollHeight > node.clientHeight) return node;
+    if (
+      (overflowY === "auto" ||
+        overflowY === "scroll" ||
+        overflowY === "overlay") &&
+      node.scrollHeight > node.clientHeight
+    )
+      return node;
   }
   return null;
 }
@@ -80,17 +103,28 @@ export function revealInContainer(element: HTMLElement): void {
   const box = element.getBoundingClientRect();
   const container = scrollContainer(element);
   const win = element.ownerDocument.defaultView;
-  const view = container ? container.getBoundingClientRect() : { top: 0, height: win?.innerHeight ?? 0 };
+  const view = container
+    ? container.getBoundingClientRect()
+    : { top: 0, height: win?.innerHeight ?? 0 };
   const bandTop = view.top + TOP;
   const bandHeight = view.height - TOP - BOTTOM;
   if (box.top >= bandTop && box.bottom <= bandTop + bandHeight) return;
   const offset = box.height > bandHeight ? 0 : (bandHeight - box.height) / 2;
-  const behavior: ScrollBehavior = win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  const behavior: ScrollBehavior = win?.matchMedia?.(
+    "(prefers-reduced-motion: reduce)",
+  ).matches
+    ? "auto"
+    : "smooth";
   const scroller = container ?? element.ownerDocument.scrollingElement;
-  scroller?.scrollTo({ top: scroller.scrollTop + box.top - bandTop - offset, behavior });
+  scroller?.scrollTo({
+    top: scroller.scrollTop + box.top - bandTop - offset,
+    behavior,
+  });
 }
 
-export function createRedlineHandle(source: RedlineHandleSource): DocumentEditorHandle {
+export function createRedlineHandle(
+  source: RedlineHandleSource,
+): DocumentEditorHandle {
   const anchor = source.anchor ?? redlineAnchorElement;
   const blockRect = (blockId: string) => rectOf(anchor(source.root(), blockId));
 
@@ -120,9 +154,15 @@ export function createRedlineHandle(source: RedlineHandleSource): DocumentEditor
       };
       // Blocks move when the document resizes (width, a wrapped line, the changes switching on or off) and
       // when fonts arrive; they are also added and removed.
-      const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(notify);
+      const resize =
+        typeof ResizeObserver === "undefined"
+          ? null
+          : new ResizeObserver(notify);
       resize?.observe(root);
-      const mutate = typeof MutationObserver === "undefined" ? null : new MutationObserver(notify);
+      const mutate =
+        typeof MutationObserver === "undefined"
+          ? null
+          : new MutationObserver(notify);
       mutate?.observe(root, { childList: true, subtree: true });
       const win = root.ownerDocument.defaultView;
       win?.addEventListener("resize", notify);

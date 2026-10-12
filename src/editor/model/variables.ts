@@ -5,7 +5,8 @@
 import type { VariableType, VariableValue } from "./types";
 
 /** Icon keys map to lucide icons in the React layer (components/type-icon.tsx). */
-export type VariableIconKey = "type" | "dollar-sign" | "percent" | "calendar" | "hash" | "map-pin";
+export type VariableIconKey =
+  "type" | "dollar-sign" | "percent" | "calendar" | "hash" | "map-pin";
 
 export interface VariableTypeMeta {
   label: string;
@@ -17,26 +18,96 @@ export interface VariableTypeMeta {
 }
 
 export const TYPE_META: Record<VariableType, VariableTypeMeta> = {
-  text: { label: "Text", icon: "type", exampleKey: "first_name", example: "Maya" },
-  currency: { label: "Currency", icon: "dollar-sign", exampleKey: "annual_fee", example: "1000" },
-  percent: { label: "Percent", icon: "percent", exampleKey: "purchase_apr", example: "21.99" },
-  date: { label: "Date", icon: "calendar", exampleKey: "offer_end_date", example: "2027-03-04" },
-  number: { label: "Number", icon: "hash", exampleKey: "bonus_points", example: "20000" },
-  us_state: { label: "US state", icon: "map-pin", exampleKey: "home_state", example: "NJ" },
+  text: {
+    label: "Text",
+    icon: "type",
+    exampleKey: "first_name",
+    example: "Maya",
+  },
+  currency: {
+    label: "Currency",
+    icon: "dollar-sign",
+    exampleKey: "annual_fee",
+    example: "1000",
+  },
+  percent: {
+    label: "Percent",
+    icon: "percent",
+    exampleKey: "purchase_apr",
+    example: "21.99",
+  },
+  date: {
+    label: "Date",
+    icon: "calendar",
+    exampleKey: "offer_end_date",
+    example: "2027-03-04",
+  },
+  number: {
+    label: "Number",
+    icon: "hash",
+    exampleKey: "bonus_points",
+    example: "20000",
+  },
+  us_state: {
+    label: "US state",
+    icon: "map-pin",
+    exampleKey: "home_state",
+    example: "NJ",
+  },
 };
 
 /** The 50 states plus DC, keyed by USPS code. */
 export const US_STATES: Readonly<Record<string, string>> = {
-  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
-  CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia", FL: "Florida",
-  GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana",
-  IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine",
-  MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi",
-  MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire",
-  NJ: "New Jersey", NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota",
-  OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island",
-  SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah",
-  VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin",
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
+  CA: "California",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  DC: "District of Columbia",
+  FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
   WY: "Wyoming",
 };
 
@@ -62,7 +133,16 @@ export function toKey(label: string): string {
 }
 
 /** Words a label keeps in capitals (keys are lowercase, so "purchase_apr" would otherwise read "Purchase apr"). */
-const ACRONYMS = new Set(["apr", "apy", "fdic", "id", "url", "atm", "ach", "ssn"]);
+const ACRONYMS = new Set([
+  "apr",
+  "apy",
+  "fdic",
+  "id",
+  "url",
+  "atm",
+  "ach",
+  "ssn",
+]);
 
 /** A readable label for a key: "first_name" → "First name", "purchase_apr" → "Purchase APR". */
 export function labelFromKey(key: string): string {
@@ -77,7 +157,11 @@ export function labelFromKey(key: string): string {
 
 /** A valid key: lowercase snake_case, starts with a letter. */
 export function isValidKey(key: string): boolean {
-  return key.length > 0 && key.length <= MAX_KEY_LENGTH && /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/.test(key);
+  return (
+    key.length > 0 &&
+    key.length <= MAX_KEY_LENGTH &&
+    /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/.test(key)
+  );
 }
 
 // ── Values: the one formatting module ───────────────────────────
@@ -94,7 +178,8 @@ export function isValidKey(key: string): boolean {
 // A JS number given here (an internal caller; the render route reads JSON numbers as their source
 // text) is read as its JSON text, `String(n)`: 95 is "95", and 1e21 is "1e+21", which is refused.
 
-export type ValidationResult = { ok: true; value: string } | { ok: false; message: string };
+export type ValidationResult =
+  { ok: true; value: string } | { ok: false; message: string };
 
 /**
  * The most characters one value may have, as typed or as sent, counted in Unicode code points (what JSON
@@ -140,11 +225,15 @@ export function longerThan(text: string, max: number): boolean {
  * Surrounding whitespace is ignored; blank is no value. A value over MAX_VALUE_LENGTH characters, counted
  * as given, is refused for every type, before the type's own check. A refusal carries a short message for the field.
  */
-export function validateValue(type: VariableType, value: VariableValue): ValidationResult {
+export function validateValue(
+  type: VariableType,
+  value: VariableValue,
+): ValidationResult {
   const given = String(value);
   const raw = given.trim();
   if (raw === "") return { ok: false, message: "Enter a value" };
-  if (longerThan(given, MAX_VALUE_LENGTH)) return { ok: false, message: VALUE_TOO_LONG_MESSAGE };
+  if (longerThan(given, MAX_VALUE_LENGTH))
+    return { ok: false, message: VALUE_TOO_LONG_MESSAGE };
 
   switch (type) {
     case "text":
@@ -155,11 +244,15 @@ export function validateValue(type: VariableType, value: VariableValue): Validat
       return readDecimal(type, raw);
     case "date": {
       const iso = parseDate(raw);
-      return iso === null ? { ok: false, message: "Enter a date, like 2027-03-04" } : { ok: true, value: iso };
+      return iso === null
+        ? { ok: false, message: "Enter a date, like 2027-03-04" }
+        : { ok: true, value: iso };
     }
     case "us_state": {
       const code = parseState(raw);
-      return code === null ? { ok: false, message: "Enter a US state, like NJ" } : { ok: true, value: code };
+      return code === null
+        ? { ok: false, message: "Enter a US state, like NJ" }
+        : { ok: true, value: code };
     }
   }
 }
@@ -180,7 +273,9 @@ export function formatValue(type: VariableType, value: VariableValue): string {
   switch (type) {
     case "currency":
       // The sign goes before the symbol: -$5.
-      return v.startsWith("-") ? `-$${groupThousands(v.slice(1))}` : `$${groupThousands(v)}`;
+      return v.startsWith("-")
+        ? `-$${groupThousands(v.slice(1))}`
+        : `$${groupThousands(v)}`;
     case "percent":
       return `${groupThousands(v)}%`;
     case "number":
@@ -206,7 +301,8 @@ const DECIMAL_MESSAGES: Readonly<Record<DecimalType, string>> = {
  * A decimal's digits once the sign and symbol are off: a whole part without leading zeros (commas
  * allowed only between groups of three) and an optional point followed by digits.
  */
-const DECIMAL_DIGITS = /^(?:0|[1-9][0-9]*|[1-9][0-9]{0,2}(?:,[0-9]{3})+)(?:\.[0-9]+)?$/;
+const DECIMAL_DIGITS =
+  /^(?:0|[1-9][0-9]*|[1-9][0-9]{0,2}(?:,[0-9]{3})+)(?:\.[0-9]+)?$/;
 
 function readDecimal(type: DecimalType, raw: string): ValidationResult {
   let rest = raw;
@@ -216,22 +312,33 @@ function readDecimal(type: DecimalType, raw: string): ValidationResult {
   const dollar = type === "currency" && rest.startsWith("$");
   if (dollar) rest = rest.slice(1);
 
-  if (!DECIMAL_DIGITS.test(rest)) return { ok: false, message: decimalProblem(type, rest, dollar) };
+  if (!DECIMAL_DIGITS.test(rest))
+    return { ok: false, message: decimalProblem(type, rest, dollar) };
   const digits = rest.replace(/,/g, "");
-  if (negative && /^[0.]+$/.test(digits)) return { ok: false, message: "Zero can't be negative" };
+  if (negative && /^[0.]+$/.test(digits))
+    return { ok: false, message: "Zero can't be negative" };
   return { ok: true, value: negative ? `-${digits}` : digits };
 }
 
 /** What to say about digits DECIMAL_DIGITS refused: the common slip when it's one, else the type's example. */
-function decimalProblem(type: DecimalType, rest: string, dollar: boolean): string {
-  if (dollar && rest.startsWith("-")) return "Put the minus sign before the $, like -$5";
+function decimalProblem(
+  type: DecimalType,
+  rest: string,
+  dollar: boolean,
+): string {
+  if (dollar && rest.startsWith("-"))
+    return "Put the minus sign before the $, like -$5";
   if (rest.startsWith("+")) return "Leave out the + sign";
-  if (/^[0-9.,]*[0-9][eE][+-]?[0-9]+$/.test(rest)) return "Write the number out in full, like 1000";
-  if (/^\.[0-9]+$/.test(rest)) return "Add a 0 before the decimal point, like 0.5";
-  if (/^[0-9,]+\.$/.test(rest)) return "Add digits after the decimal point, or leave it out";
+  if (/^[0-9.,]*[0-9][eE][+-]?[0-9]+$/.test(rest))
+    return "Write the number out in full, like 1000";
+  if (/^\.[0-9]+$/.test(rest))
+    return "Add a 0 before the decimal point, like 0.5";
+  if (/^[0-9,]+\.$/.test(rest))
+    return "Add digits after the decimal point, or leave it out";
   if (/^[0-9,]+(?:\.[0-9]+)?$/.test(rest)) {
     if (/^0[0-9,]/.test(rest)) return "Leave out the leading zeros";
-    if (rest.includes(",")) return "Put commas only between groups of three digits, like 1,000,000";
+    if (rest.includes(","))
+      return "Put commas only between groups of three digits, like 1,000,000";
   }
   return DECIMAL_MESSAGES[type];
 }
@@ -255,8 +362,18 @@ function groupThousands(decimal: string): string {
 
 /** The display names, January first. */
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ] as const;
 
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
@@ -264,7 +381,8 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
 /** A string of 1–4 ASCII digits as an integer (exact; the date parts only). */
 function digitsValue(digits: string): number {
   let n = 0;
-  for (let i = 0; i < digits.length; i++) n = n * 10 + (digits.charCodeAt(i) - 48);
+  for (let i = 0; i < digits.length; i++)
+    n = n * 10 + (digits.charCodeAt(i) - 48);
   return n;
 }
 
@@ -282,11 +400,18 @@ function parseDate(input: string): string | null {
 
   if ((match = input.match(/^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})$/))) {
     [, y, m, d] = match;
-  } else if ((match = input.match(/^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4})$/))) {
+  } else if (
+    (match = input.match(/^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4})$/))
+  ) {
     [, m, d, y] = match;
-  } else if ((match = input.match(/^([a-z]+)\.?\s+([0-9]{1,2}),?\s+([0-9]{4})$/i))) {
+  } else if (
+    (match = input.match(/^([a-z]+)\.?\s+([0-9]{1,2}),?\s+([0-9]{4})$/i))
+  ) {
     const word = match[1].toLowerCase();
-    const month = word.length >= 3 ? MONTH_NAMES.findIndex((name) => name.toLowerCase().startsWith(word)) : -1;
+    const month =
+      word.length >= 3
+        ? MONTH_NAMES.findIndex((name) => name.toLowerCase().startsWith(word))
+        : -1;
     if (month < 0) return null;
     [m, d, y] = [String(month + 1), match[2], match[3]];
   } else {
@@ -295,7 +420,8 @@ function parseDate(input: string): string | null {
 
   const [year, month, day] = [digitsValue(y), digitsValue(m), digitsValue(d)];
   if (year < 1 || month < 1 || month > 12 || day < 1) return null;
-  if (day > (month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1])) return null;
+  if (day > (month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1]))
+    return null;
   return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
 }
 
@@ -312,7 +438,9 @@ function parseState(input: string): string | null {
   const upper = input.toUpperCase();
   if (Object.hasOwn(US_STATES, upper)) return upper;
   const lower = input.toLowerCase().replace(/\s+/g, " ");
-  const found = Object.entries(US_STATES).find(([, name]) => name.toLowerCase() === lower);
+  const found = Object.entries(US_STATES).find(
+    ([, name]) => name.toLowerCase() === lower,
+  );
   return found ? found[0] : null;
 }
 
@@ -341,7 +469,10 @@ export function uniqueKey(base: string, taken: ReadonlySet<string>): string {
  * label starts with the query, then a label word does, then the key does, then either contains it.
  * Spaces are allowed ("end date"); they match underscores in keys. List order breaks ties.
  */
-export function filterVariables<V extends { key: string; label: string }>(variables: readonly V[], query: string): V[] {
+export function filterVariables<V extends { key: string; label: string }>(
+  variables: readonly V[],
+  query: string,
+): V[] {
   const q = query.trim().toLowerCase().replace(/\s+/g, " ");
   if (!q) return [...variables];
   const qKey = q.replace(/ /g, "_");
@@ -357,5 +488,7 @@ export function filterVariables<V extends { key: string; label: string }>(variab
     else if (label.includes(q) || key.includes(qKey)) score = 3;
     if (score >= 0) scored.push({ variable, score, index });
   });
-  return scored.sort((a, b) => a.score - b.score || a.index - b.index).map((s) => s.variable);
+  return scored
+    .sort((a, b) => a.score - b.score || a.index - b.index)
+    .map((s) => s.variable);
 }

@@ -1,6 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { StatCard, StatLabel, StatLines, StatTrend, StatValue } from "./stat-card";
+import {
+  StatCard,
+  StatLabel,
+  StatLines,
+  StatTrend,
+  StatValue,
+} from "./stat-card";
 
 // The stat card's parts: the card, the numeral with its trend, the tracked-caps label with its "i", the
 // lines under a hairline, and the trend pill.
@@ -10,12 +16,24 @@ const html = (node: React.ReactNode) => renderToStaticMarkup(node);
 describe("StatCard", () => {
   it("is the tinted card: hairline, 14px corners, 24px padding, no ring", () => {
     const out = html(<StatCard className="min-h-10">x</StatCard>);
-    for (const c of ["rounded-xl", "border-hairline", "bg-surface-tinted", "p-6", "ring-0", "min-h-10"]) expect(out).toContain(c);
+    for (const c of [
+      "rounded-xl",
+      "border-hairline",
+      "bg-surface-tinted",
+      "p-6",
+      "ring-0",
+      "min-h-10",
+    ])
+      expect(out).toContain(c);
   });
 
   it("passes a region's name and slot through", () => {
     const out = html(
-      <StatCard role="region" aria-label="Q4 2026 review" data-slot="recert-summary">
+      <StatCard
+        role="region"
+        aria-label="Q4 2026 review"
+        data-slot="recert-summary"
+      >
         x
       </StatCard>,
     );
@@ -33,18 +51,26 @@ describe("StatValue", () => {
   });
 
   it("puts the trend at the right of the numeral's row", () => {
-    const out = html(<StatValue value="94.6%" trend={<span data-trend="" />} />);
-    expect(out).toMatch(/justify-between[^>]*><div class="numeral text-text">94.6%<\/div><span data-trend="">/);
+    const out = html(
+      <StatValue value="94.6%" trend={<span data-trend="" />} />,
+    );
+    expect(out).toMatch(
+      /justify-between[^>]*><div class="numeral text-text">94.6%<\/div><span data-trend="">/,
+    );
   });
 });
 
 describe("StatLabel", () => {
   it("is a tracked-caps label", () => {
-    expect(html(<StatLabel className="mt-3">Active templates</StatLabel>)).toMatch(/class="caps-label mt-3">Active templates/);
+    expect(
+      html(<StatLabel className="mt-3">Active templates</StatLabel>),
+    ).toMatch(/class="caps-label mt-3">Active templates/);
   });
 
-  it("adds an \"i\" named by its tip", () => {
-    const out = html(<StatLabel tip="Live renders only.">Renders · 30 days</StatLabel>);
+  it('adds an "i" named by its tip', () => {
+    const out = html(
+      <StatLabel tip="Live renders only.">Renders · 30 days</StatLabel>,
+    );
     expect(out).toMatch(/<button[^>]*aria-label="Live renders only\."/);
     expect(html(<StatLabel>Succeeded</StatLabel>)).not.toContain("<button");
   });
@@ -61,8 +87,12 @@ describe("StatLines", () => {
       />,
     );
     expect(out).toContain("border-t border-hairline-strong");
-    expect(out).toMatch(/<span>Consumers<\/span><span class="text-text-muted">1<\/span>/);
-    expect(out).toMatch(/<span>Nearing sunset<\/span><span class="text-text-muted">1 version<\/span>/);
+    expect(out).toMatch(
+      /<span>Consumers<\/span><span class="text-text-muted">1<\/span>/,
+    );
+    expect(out).toMatch(
+      /<span>Nearing sunset<\/span><span class="text-text-muted">1 version<\/span>/,
+    );
   });
 });
 

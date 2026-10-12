@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import type { ContentTypeView } from "@/domain/access-types";
 import { SECTION_TITLE_MAX } from "@/domain/platform-config/limits";
-import { describeSectionsChange, removeSectionRefusal } from "@/domain/platform-config/sections";
+import {
+  describeSectionsChange,
+  removeSectionRefusal,
+} from "@/domain/platform-config/sections";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { RequiredSection } from "@/domain/types";
 import { BlockedButton } from "@/components/primitives/blocked-button";
@@ -22,7 +25,11 @@ import { Blocked, FullRow, HeaderRow, useFocusAfterCommit } from "./ui";
 
 const COLS = "minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1fr) 8.5rem";
 
-export function ContentTypesSectionView({ types }: { types: ContentTypeView[] }) {
+export function ContentTypesSectionView({
+  types,
+}: {
+  types: ContentTypeView[];
+}) {
   const [open, setOpen] = useState<string | null>(null);
   const openers = useRef(new Map<string, HTMLButtonElement | null>());
 
@@ -34,16 +41,35 @@ export function ContentTypesSectionView({ types }: { types: ContentTypeView[] })
   };
 
   return (
-    <div data-slot="platform-section" data-section="content-types" role="table" aria-label="Content types">
-      <HeaderRow cols={COLS} columns={["Content type", "Required sections", "Channels", null]} />
+    <div
+      data-slot="platform-section"
+      data-section="content-types"
+      role="table"
+      aria-label="Content types"
+    >
+      <HeaderRow
+        cols={COLS}
+        columns={["Content type", "Required sections", "Channels", null]}
+      />
       {types.map((type) => (
         <div key={type.id} role="rowgroup" className="border-b border-hairline">
-          <div role="row" className="grid min-h-16 items-center gap-x-4 py-2.5" style={{ gridTemplateColumns: COLS }}>
+          <div
+            role="row"
+            className="grid min-h-16 items-center gap-x-4 py-2.5"
+            style={{ gridTemplateColumns: COLS }}
+          >
             <div role="cell" className="min-w-0">
-              <div className="truncate text-[15px] font-medium text-text">{type.name}</div>
-              <div className="truncate text-[13px] text-text-muted">{plural(type.templates, "template")}</div>
+              <div className="truncate text-[15px] font-medium text-text">
+                {type.name}
+              </div>
+              <div className="truncate text-[13px] text-text-muted">
+                {plural(type.templates, "template")}
+              </div>
             </div>
-            <div role="cell" className="min-w-0 text-[14px] leading-snug text-text">
+            <div
+              role="cell"
+              className="min-w-0 text-[14px] leading-snug text-text"
+            >
               {type.requiredSections.map((s) => s.title).join(", ")}
             </div>
             <div role="cell" className="min-w-0 text-[14px] text-text">
@@ -64,7 +90,10 @@ export function ContentTypesSectionView({ types }: { types: ContentTypeView[] })
               ) : (
                 // A message type (an Alert) has no document, so no sections: greyed in place and still
                 // focusable, its reason the tooltip and its description.
-                <BlockedButton aria-label={`Edit ${type.name} sections`} reason={type.can.editSections.reason}>
+                <BlockedButton
+                  aria-label={`Edit ${type.name} sections`}
+                  reason={type.can.editSections.reason}
+                >
                   Edit sections
                 </BlockedButton>
               )}
@@ -87,8 +116,16 @@ interface Draft {
   title: string;
 }
 
-function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () => void }) {
-  const [rows, setRows] = useState<Draft[]>(() => type.requiredSections.map((s) => ({ ...s })));
+function SectionsEditor({
+  type,
+  onClose,
+}: {
+  type: ContentTypeView;
+  onClose: () => void;
+}) {
+  const [rows, setRows] = useState<Draft[]>(() =>
+    type.requiredSections.map((s) => ({ ...s })),
+  );
   const nextNew = useRef(1);
   const inputs = useRef(new Map<string, HTMLInputElement | null>());
   const [focusKey, setFocusKey] = useState<string | null>(null);
@@ -100,7 +137,10 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey]);
 
-  const next: RequiredSection[] = rows.map((r) => ({ key: r.key, title: r.title }));
+  const next: RequiredSection[] = rows.map((r) => ({
+    key: r.key,
+    title: r.title,
+  }));
   // The server's own check and the strip's lines, as the admin edits: nothing known to fail is sent.
   const { problem, changed, lines } = describeSectionsChange({
     contentTypeName: type.name,
@@ -128,10 +168,15 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
         onClose();
       }}
     >
-      <ol aria-label={`${type.name} required sections`} className="flex flex-col gap-2">
+      <ol
+        aria-label={`${type.name} required sections`}
+        className="flex flex-col gap-2"
+      >
         {rows.map((row, index) => (
           <li key={row.key} className="flex items-center gap-2">
-            <span className="w-5 text-right text-[13px] text-text-muted tabular-nums">{index + 1}</span>
+            <span className="w-5 text-right text-[13px] text-text-muted tabular-nums">
+              {index + 1}
+            </span>
             <Input
               ref={(el) => {
                 inputs.current.set(row.key, el);
@@ -139,13 +184,33 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
               value={row.title}
               maxLength={SECTION_TITLE_MAX}
               aria-label={`Section ${index + 1} title`}
-              onChange={(e) => setRows((list) => list.map((r) => (r.key === row.key ? { ...r, title: e.target.value } : r)))}
+              onChange={(e) =>
+                setRows((list) =>
+                  list.map((r) =>
+                    r.key === row.key ? { ...r, title: e.target.value } : r,
+                  ),
+                )
+              }
               className="flex-1 bg-surface"
             />
-            <Button variant="ghost" size="icon" aria-label={`Move ${row.title || `section ${index + 1}`} up`} aria-disabled={index === 0} onClick={() => move(index, -1)} className="aria-disabled:opacity-40">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Move ${row.title || `section ${index + 1}`} up`}
+              aria-disabled={index === 0}
+              onClick={() => move(index, -1)}
+              className="aria-disabled:opacity-40"
+            >
               <ArrowUp aria-hidden strokeWidth={1.75} />
             </Button>
-            <Button variant="ghost" size="icon" aria-label={`Move ${row.title || `section ${index + 1}`} down`} aria-disabled={index === rows.length - 1} onClick={() => move(index, 1)} className="aria-disabled:opacity-40">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Move ${row.title || `section ${index + 1}`} down`}
+              aria-disabled={index === rows.length - 1}
+              onClick={() => move(index, 1)}
+              className="aria-disabled:opacity-40"
+            >
               <ArrowDown aria-hidden strokeWidth={1.75} />
             </Button>
             <Blocked reason={removeBlocked}>
@@ -158,7 +223,9 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
                 onClick={() => {
                   if (removeBlocked) return;
                   setRows((list) => list.filter((r) => r.key !== row.key));
-                  setFocusKey(rows[index + 1]?.key ?? rows[index - 1]?.key ?? null);
+                  setFocusKey(
+                    rows[index + 1]?.key ?? rows[index - 1]?.key ?? null,
+                  );
                 }}
               >
                 <X aria-hidden strokeWidth={1.75} />
@@ -186,7 +253,9 @@ function SectionsEditor({ type, onClose }: { type: ContentTypeView; onClose: () 
         confirmLabel="Save sections"
         blocked={!changed || !!problem}
         message={problem?.reason ?? null}
-        onConfirm={() => updateContentType({ contentTypeId: type.id, requiredSections: next })}
+        onConfirm={() =>
+          updateContentType({ contentTypeId: type.id, requiredSections: next })
+        }
         onCancel={onClose}
         onDone={onClose}
         className="bg-transparent p-0"

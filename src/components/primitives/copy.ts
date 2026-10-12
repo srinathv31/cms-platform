@@ -17,7 +17,10 @@ export async function copyText(text: string): Promise<boolean> {
 }
 
 function copyThroughTextarea(text: string): boolean {
-  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const focused =
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
   const el = document.createElement("textarea");
   el.value = text;
   el.setAttribute("readonly", "");

@@ -31,7 +31,15 @@ export const MOBILE_FRAME_WIDTH = MOBILE_WIDTH + MOBILE_BEZEL;
  * (the frame is the viewport plus its bezel, so the document is exactly 390px). The document scrolls
  * inside the frame either way, so the well itself doesn't.
  */
-export function WebOutput({ html, device, host }: { html: string; device: PreviewDevice; host?: string }) {
+export function WebOutput({
+  html,
+  device,
+  host,
+}: {
+  html: string;
+  device: PreviewDevice;
+  host?: string;
+}) {
   if (device === "mobile") {
     return (
       <div className={cn("h-full min-h-80", WELL_INSET)}>
@@ -40,7 +48,11 @@ export function WebOutput({ html, device, host }: { html: string; device: Previe
           style={{ width: MOBILE_FRAME_WIDTH }}
           className="mx-auto h-full max-w-full rounded-[2rem] border border-hairline-strong bg-surface p-2"
         >
-          <BufferedFrame html={html} title="Web preview" className="h-full overflow-hidden rounded-3xl" />
+          <BufferedFrame
+            html={html}
+            title="Web preview"
+            className="h-full overflow-hidden rounded-3xl"
+          />
         </div>
       </div>
     );
@@ -64,12 +76,21 @@ export function WebOutput({ html, device, host }: { html: string; device: Previe
  * The strip along the top of a browser window: three muted dots and an address pill. Decoration (the
  * preview has no real address), so it is hidden from assistive tech.
  */
-export function BrowserChrome({ host, className }: { host?: string; className?: string }) {
+export function BrowserChrome({
+  host,
+  className,
+}: {
+  host?: string;
+  className?: string;
+}) {
   return (
     <div
       aria-hidden
       data-slot="browser-chrome"
-      className={cn("flex h-8 shrink-0 items-center gap-3 border-b border-hairline bg-surface-tinted px-3", className)}
+      className={cn(
+        "flex h-8 shrink-0 items-center gap-3 border-b border-hairline bg-surface-tinted px-3",
+        className,
+      )}
     >
       <div className="flex shrink-0 items-center gap-1.5">
         <span className="size-2 rounded-full bg-hairline-strong" />

@@ -42,7 +42,11 @@ export function ChannelTabs({
     <Segmented
       label="Channel"
       value={value}
-      options={channels.map((id) => ({ value: id, label: CHANNEL_LABELS[id], done: viewed ? viewed.includes(id) : undefined }))}
+      options={channels.map((id) => ({
+        value: id,
+        label: CHANNEL_LABELS[id],
+        done: viewed ? viewed.includes(id) : undefined,
+      }))}
       onChange={onChange}
       doneLabel="Viewed"
       className={className}
@@ -60,7 +64,15 @@ export function DevicePicker({
   onChange: (device: PreviewDevice) => void;
   className?: string;
 }) {
-  return <Segmented label="Device" value={value} options={DEVICES} onChange={onChange} className={className} />;
+  return (
+    <Segmented
+      label="Device"
+      value={value}
+      options={DEVICES}
+      onChange={onChange}
+      className={className}
+    />
+  );
 }
 
 /**
@@ -70,7 +82,13 @@ export function DevicePicker({
  * caller passes `null` while the pane shows an error (the last good render is still in memory, but it
  * isn't what the author is looking at) as well as before the first render.
  */
-export function DownloadPdfButton({ output, className }: { output: PreviewOutput | null; className?: string }) {
+export function DownloadPdfButton({
+  output,
+  className,
+}: {
+  output: PreviewOutput | null;
+  className?: string;
+}) {
   const pdf = output?.kind === "pdf" ? output : null;
   return (
     <Button

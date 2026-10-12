@@ -1,4 +1,11 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Client, InValue } from "@libsql/client";
@@ -16,7 +23,11 @@ import { seedPeople } from "@/server/seed/people";
 import { seedPlatform } from "@/server/seed/platform";
 import { seedTeams } from "@/server/seed/teams";
 import { buildStarter } from "@/server/starters";
-import { draftRev, loadPersona, freshDatabasePerTest } from "@/server/testing/review-fixtures";
+import {
+  draftRev,
+  loadPersona,
+  freshDatabasePerTest,
+} from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 
 // Migration 0008 (review rounds) on a database as it stood before it: migrated through 0007, with
@@ -47,12 +58,15 @@ let maya: Viewer;
 function migrationsThrough0007(): string {
   const folder = mkdtempSync(join(tmpdir(), "ucomp-migrations-0007-"));
   mkdirSync(join(folder, "meta"));
-  const journal = JSON.parse(readFileSync(join(MIGRATIONS, "meta/_journal.json"), "utf8")) as {
+  const journal = JSON.parse(
+    readFileSync(join(MIGRATIONS, "meta/_journal.json"), "utf8"),
+  ) as {
     entries: { idx: number; tag: string }[];
   };
   journal.entries = journal.entries.filter((e) => e.idx <= 7);
   expect(journal.entries.at(-1)?.tag).toBe("0007_sunset_business_zone");
-  for (const { tag } of journal.entries) copyFileSync(join(MIGRATIONS, `${tag}.sql`), join(folder, `${tag}.sql`));
+  for (const { tag } of journal.entries)
+    copyFileSync(join(MIGRATIONS, `${tag}.sql`), join(folder, `${tag}.sql`));
   writeFileSync(join(folder, "meta/_journal.json"), JSON.stringify(journal));
   return folder;
 }
@@ -61,7 +75,11 @@ function migrationsThrough0007(): string {
 async function insertOld(table: string, row: Record<string, unknown>) {
   const columns = Object.keys(row);
   const value = (v: unknown): InValue =>
-    v instanceof Date ? v.getTime() : v !== null && typeof v === "object" ? JSON.stringify(v) : (v as InValue);
+    v instanceof Date
+      ? v.getTime()
+      : v !== null && typeof v === "object"
+        ? JSON.stringify(v)
+        : (v as InValue);
   await libsql.execute({
     sql: `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
     args: columns.map((c) => value(row[c])),
@@ -72,16 +90,24 @@ async function insertOld(table: string, row: Record<string, unknown>) {
  * Rows as the seed builds them, written in the shape the database has now (0007): a column a later
  * migration adds (a team's app name, a content type's SMS footer) is left out, as it was then.
  */
-async function insertAsBuilt<T extends SQLiteTable>(table: T, rows: readonly T["$inferInsert"][]) {
+async function insertAsBuilt<T extends SQLiteTable>(
+  table: T,
+  rows: readonly T["$inferInsert"][],
+) {
   const name = getTableName(table);
-  const existing = new Set((await libsql.execute(`PRAGMA table_info(${name})`)).rows.map((r) => String(r.name)));
+  const existing = new Set(
+    (await libsql.execute(`PRAGMA table_info(${name})`)).rows.map((r) =>
+      String(r.name),
+    ),
+  );
   const columns = Object.entries(getTableColumns(table));
   for (const row of rows) {
     const values: Record<string, unknown> = {};
     for (const [key, column] of columns) {
       const value = (row as Record<string, unknown>)[key];
       if (value === undefined || !existing.has(column.name)) continue;
-      values[column.name] = value === null ? null : column.mapToDriverValue(value);
+      values[column.name] =
+        value === null ? null : column.mapToDriverValue(value);
     }
     await insertOld(name, values);
   }
@@ -91,11 +117,32 @@ async function insertAsBuilt<T extends SQLiteTable>(table: T, rows: readonly T["
  * A template and its versions as the old numbering left them: `numbered` in order, each submitted by
  * Maya, then an open draft started from the last of them.
  */
-async function oldTemplate(id: string, numbered: { number: number; state: "active" | "superseded" | "changes_requested" }[]) {
+async function oldTemplate(
+  id: string,
+  numbered: {
+    number: number;
+    state: "active" | "superseded" | "changes_requested";
+  }[],
+) {
   const created = daysAgo(40);
-  await insertAsBuilt(schema.templates, [{ id, teamId: "coral-offers", contentTypeId: "ct_disclosure", createdBy: "maya", createdAt: created }]);
-  const starter = buildStarter({ family: "document", starterKey: "card_offer_terms" }, { scope: id, now: created });
-  const { draft } = createDraft({ starter, createdBy: "maya", now: created }).changes;
+  await insertAsBuilt(schema.templates, [
+    {
+      id,
+      teamId: "coral-offers",
+      contentTypeId: "ct_disclosure",
+      createdBy: "maya",
+      createdAt: created,
+    },
+  ]);
+  const starter = buildStarter(
+    { family: "document", starterKey: "card_offer_terms" },
+    { scope: id, now: created },
+  );
+  const { draft } = createDraft({
+    starter,
+    createdBy: "maya",
+    now: created,
+  }).changes;
   const content = {
     name: draft.name,
     body: draft.body,
@@ -124,7 +171,8 @@ async function oldTemplate(id: string, numbered: { number: number; state: "activ
       submitted_by: "maya",
       submitted_at: at,
       activated_at: v.state === "changes_requested" ? null : at,
-      superseded_at: v.state === "superseded" ? daysAgo(30 - (i + 1) * 5) : null,
+      superseded_at:
+        v.state === "superseded" ? daysAgo(30 - (i + 1) * 5) : null,
     });
     previous = versionId;
   }
@@ -144,44 +192,52 @@ async function oldTemplate(id: string, numbered: { number: number; state: "activ
 const { versions } = schema;
 const rowsOf = (templateId: string) =>
   db
-    .select({ id: versions.id, number: versions.number, round: versions.round, state: versions.state })
+    .select({
+      id: versions.id,
+      number: versions.number,
+      round: versions.round,
+      state: versions.state,
+    })
     .from(versions)
     .where(eq(versions.templateId, templateId))
     .orderBy(asc(versions.createdAt));
 
 // The database every test starts from: migrated to 0007, filled the old way, then migrated on to now.
-freshDatabasePerTest(async (built) => {
-  libsql = built.$client;
-  before = migrationsThrough0007();
-  await migrate(built, { migrationsFolder: before });
+freshDatabasePerTest(
+  async (built) => {
+    libsql = built.$client;
+    before = migrationsThrough0007();
+    await migrate(built, { migrationsFolder: before });
 
-  // The people, teams and chain, from the seed (none of these tables changed in 0008; later migrations add
-  // columns to teams and content types, which these rows go in without).
-  const ctx = createContext(BASE.getTime());
-  seedPeople(ctx);
-  seedTeams(ctx);
-  seedPlatform(ctx);
-  const { sink } = ctx;
-  await insertAsBuilt(schema.users, sink.users);
-  await insertAsBuilt(schema.teams, sink.teams);
-  await insertAsBuilt(schema.memberships, sink.memberships);
-  await insertAsBuilt(schema.membershipRoles, sink.membershipRoles);
-  await insertAsBuilt(schema.contentTypes, sink.contentTypes);
-  await insertAsBuilt(schema.approvalStages, sink.approvalStages);
+    // The people, teams and chain, from the seed (none of these tables changed in 0008; later migrations add
+    // columns to teams and content types, which these rows go in without).
+    const ctx = createContext(BASE.getTime());
+    seedPeople(ctx);
+    seedTeams(ctx);
+    seedPlatform(ctx);
+    const { sink } = ctx;
+    await insertAsBuilt(schema.users, sink.users);
+    await insertAsBuilt(schema.teams, sink.teams);
+    await insertAsBuilt(schema.memberships, sink.memberships);
+    await insertAsBuilt(schema.membershipRoles, sink.membershipRoles);
+    await insertAsBuilt(schema.contentTypes, sink.contentTypes);
+    await insertAsBuilt(schema.approvalStages, sink.approvalStages);
 
-  // Sent back the old way: v1 Active, then v2 sent back (it kept its number), and a draft from it.
-  await oldTemplate("UC-SENTBK", [
-    { number: 1, state: "active" },
-    { number: 2, state: "changes_requested" },
-  ]);
-  // Released twice: v1 Superseded, v2 Active, and a draft from v2.
-  await oldTemplate("UC-SH1PED", [
-    { number: 1, state: "superseded" },
-    { number: 2, state: "active" },
-  ]);
+    // Sent back the old way: v1 Active, then v2 sent back (it kept its number), and a draft from it.
+    await oldTemplate("UC-SENTBK", [
+      { number: 1, state: "active" },
+      { number: 2, state: "changes_requested" },
+    ]);
+    // Released twice: v1 Superseded, v2 Active, and a draft from v2.
+    await oldTemplate("UC-SH1PED", [
+      { number: 1, state: "superseded" },
+      { number: 2, state: "active" },
+    ]);
 
-  await migrate(built, { migrationsFolder: MIGRATIONS });
-}, { migrate: false });
+    await migrate(built, { migrationsFolder: MIGRATIONS });
+  },
+  { migrate: false },
+);
 
 beforeAll(async () => {
   ({ db, libsql } = await import("@/server/db/client"));
@@ -194,12 +250,16 @@ afterAll(() => {
 
 describe("migration 0008: review rounds", () => {
   it("makes every numbered row round 1, keeps its number, and leaves the draft without either", async () => {
-    expect((await rowsOf("UC-SENTBK")).map((v) => [v.number, v.round, v.state])).toEqual([
+    expect(
+      (await rowsOf("UC-SENTBK")).map((v) => [v.number, v.round, v.state]),
+    ).toEqual([
       [1, 1, "active"],
       [2, 1, "changes_requested"],
       [null, null, "draft"],
     ]);
-    expect((await rowsOf("UC-SH1PED")).map((v) => [v.number, v.round, v.state])).toEqual([
+    expect(
+      (await rowsOf("UC-SH1PED")).map((v) => [v.number, v.round, v.state]),
+    ).toEqual([
       [1, 1, "superseded"],
       [2, 1, "active"],
       [null, null, "draft"],
@@ -207,8 +267,15 @@ describe("migration 0008: review rounds", () => {
   });
 
   it("replaces the one-row-per-number index with one row per round and one released row per number", async () => {
-    const indexes = (await libsql.execute("PRAGMA index_list(versions)")).rows.map((r) => String(r.name));
-    expect(indexes).toEqual(expect.arrayContaining(["versions_template_number_round", "versions_one_released"]));
+    const indexes = (
+      await libsql.execute("PRAGMA index_list(versions)")
+    ).rows.map((r) => String(r.name));
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        "versions_template_number_round",
+        "versions_one_released",
+      ]),
+    );
     expect(indexes).not.toContain("versions_template_number");
   });
 
@@ -225,19 +292,43 @@ describe("migration 0008: review rounds", () => {
       updated_at: BASE,
     };
     // v2 is Active: a later round of it can't be released too.
-    await expect(insertOld("versions", { ...row, id: "v_second_released", number: 2, round: 2, state: "superseded" })).rejects.toThrow(
+    await expect(
+      insertOld("versions", {
+        ...row,
+        id: "v_second_released",
+        number: 2,
+        round: 2,
+        state: "superseded",
+      }),
+    ).rejects.toThrow(
       /UNIQUE constraint failed: versions\.template_id, versions\.number(?!, versions\.round)/,
     );
-    await expect(insertOld("versions", { ...row, id: "v_same_round", number: 1, round: 1, state: "changes_requested" })).rejects.toThrow(
+    await expect(
+      insertOld("versions", {
+        ...row,
+        id: "v_same_round",
+        number: 1,
+        round: 1,
+        state: "changes_requested",
+      }),
+    ).rejects.toThrow(
       /UNIQUE constraint failed: versions\.template_id, versions\.number, versions\.round/,
     );
     // A sent-back round beside the released row is what rounds are for.
-    await insertOld("versions", { ...row, id: "v_sent_back_round", number: 2, round: 2, state: "changes_requested" });
+    await insertOld("versions", {
+      ...row,
+      id: "v_sent_back_round",
+      number: 2,
+      round: 2,
+      state: "changes_requested",
+    });
     await libsql.execute("DELETE FROM versions WHERE id = 'v_sent_back_round'");
   });
 
   it("runs the later migrations over the same rows: no channel fields yet, and a document's versions without an SMS footer", async () => {
-    const { rows } = await libsql.execute("SELECT channel_fields, sms_footer FROM versions WHERE template_id = 'UC-SH1PED' ORDER BY created_at");
+    const { rows } = await libsql.execute(
+      "SELECT channel_fields, sms_footer FROM versions WHERE template_id = 'UC-SH1PED' ORDER BY created_at",
+    );
     expect(rows.map((r) => [r.channel_fields, r.sms_footer])).toEqual([
       ["{}", null],
       ["{}", null],
@@ -248,9 +339,21 @@ describe("migration 0008: review rounds", () => {
   it("continues the number an old send-back left above every released one, and numbers the next release after the last", async () => {
     vi.mocked(getViewer).mockResolvedValue(maya);
     // Before rounds this submission would have been v3: now it is v2's next round.
-    expect(await submitVersion({ templateId: "UC-SENTBK", rev: await draftRev(db, "UC-SENTBK") })).toEqual({ ok: true, number: 2, round: 2 });
-    expect(await submitVersion({ templateId: "UC-SH1PED", rev: await draftRev(db, "UC-SH1PED") })).toEqual({ ok: true, number: 3, round: 1 });
-    expect((await rowsOf("UC-SENTBK")).map((v) => [v.number, v.round, v.state])).toEqual([
+    expect(
+      await submitVersion({
+        templateId: "UC-SENTBK",
+        rev: await draftRev(db, "UC-SENTBK"),
+      }),
+    ).toEqual({ ok: true, number: 2, round: 2 });
+    expect(
+      await submitVersion({
+        templateId: "UC-SH1PED",
+        rev: await draftRev(db, "UC-SH1PED"),
+      }),
+    ).toEqual({ ok: true, number: 3, round: 1 });
+    expect(
+      (await rowsOf("UC-SENTBK")).map((v) => [v.number, v.round, v.state]),
+    ).toEqual([
       [1, 1, "active"],
       [2, 1, "changes_requested"],
       [2, 2, "in_review"],

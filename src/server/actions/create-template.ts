@@ -8,11 +8,23 @@ import { z } from "zod";
 import { db } from "@/server/db/client";
 import { teams } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
-import { conformToContentType, freshTemplateId, insertNewTemplate, newTemplateType } from "@/server/templates/create";
-import { STARTER_KEYS, buildStarter, type StarterChoice } from "@/server/starters";
+import {
+  conformToContentType,
+  freshTemplateId,
+  insertNewTemplate,
+  newTemplateType,
+} from "@/server/templates/create";
+import {
+  STARTER_KEYS,
+  buildStarter,
+  type StarterChoice,
+} from "@/server/starters";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
-import { JUST_CREATED_COOKIE, JUST_CREATED_MAX_AGE } from "@/domain/arrival-cookies";
+import {
+  JUST_CREATED_COOKIE,
+  JUST_CREATED_MAX_AGE,
+} from "@/domain/arrival-cookies";
 import { createDraft } from "@/domain/lifecycle/drafts";
 import { check, refuse, serverAction } from "./kit";
 
@@ -25,8 +37,16 @@ const team = { teamSlug: z.string().min(1).max(64) };
 
 /** A starter of the kind chosen: a Document's starter keys, or an Alert's (`STARTER_KEYS`). */
 const CreateTemplateInput = z.discriminatedUnion("family", [
-  z.object({ ...team, family: z.literal("document"), starterKey: z.enum(STARTER_KEYS.document) }),
-  z.object({ ...team, family: z.literal("message"), starterKey: z.enum(STARTER_KEYS.message) }),
+  z.object({
+    ...team,
+    family: z.literal("document"),
+    starterKey: z.enum(STARTER_KEYS.document),
+  }),
+  z.object({
+    ...team,
+    family: z.literal("message"),
+    starterKey: z.enum(STARTER_KEYS.message),
+  }),
 ]);
 
 /**
@@ -40,13 +60,17 @@ const CreateTemplateInput = z.discriminatedUnion("family", [
  * who can't create on the team, a kind no content type makes) is the answer instead, and nothing is
  * written.
  */
-export async function createTemplate(input: { teamSlug: string } & StarterChoice): Promise<ActionResult> {
+export async function createTemplate(
+  input: { teamSlug: string } & StarterChoice,
+): Promise<ActionResult> {
   return serverAction(input, {
     input: CreateTemplateInput,
     // The team is looked up only to know which team the permission is checked on. An unknown team
     // has no id, so the check refuses it the same way as a team the viewer can't write to.
     authorize: async ({ viewer, input }) => {
-      const team = await db.query.teams.findFirst({ where: eq(teams.slug, input.teamSlug) });
+      const team = await db.query.teams.findFirst({
+        where: eq(teams.slug, input.teamSlug),
+      });
       check(viewer, "template.create", { teamId: team?.id ?? null });
       if (!team) refuse(REQUEST_REFUSALS.teamGone);
       return team;
@@ -56,7 +80,10 @@ export async function createTemplate(input: { teamSlug: string } & StarterChoice
       if (!chosen.ok) refuse(chosen);
       const { contentType } = chosen;
       const templateId = await freshTemplateId(tx);
-      const starter = conformToContentType(buildStarter(input, { scope: templateId, now: at }), contentType);
+      const starter = conformToContentType(
+        buildStarter(input, { scope: templateId, now: at }),
+        contentType,
+      );
       await insertNewTemplate(tx, {
         templateId,
         teamId: team.id,

@@ -25,7 +25,11 @@ import type { ContractChange } from "./types";
 /** What going live means when nothing was Active before. */
 export const FIRST_LIVE = "Consumers can start using it right away.";
 
-export function consequences(action: ConsequenceAction, usage: readonly ConsumerUsage[], now: Date): string[] {
+export function consequences(
+  action: ConsequenceAction,
+  usage: readonly ConsumerUsage[],
+  now: Date,
+): string[] {
   switch (action.kind) {
     case "approve":
       return approveLines(action, usage, now);
@@ -39,9 +43,14 @@ export function consequences(action: ConsequenceAction, usage: readonly Consumer
       const v = `v${action.number}`;
       const users = consumersOf(usage, action.number);
       const pending = action.pending === true;
-      const lines = users.length === 0 ? [noConsumer(v)] : users.map((u) => failsNow(u, v, now, pending));
+      const lines =
+        users.length === 0
+          ? [noConsumer(v)]
+          : users.map((u) => failsNow(u, v, now, pending));
       if (action.activeNumber === action.number) {
-        lines.push(`${pending ? "Once confirmed, no" : "No"} version will be Active until a new one is approved.`);
+        lines.push(
+          `${pending ? "Once confirmed, no" : "No"} version will be Active until a new one is approved.`,
+        );
       }
       return lines;
     }
@@ -66,8 +75,13 @@ function approveLines(
     if (users.length === 0) return [live, noConsumer(prev)];
     const mapping = mappingLines(users, action);
     const ends = from.sunsetAt;
-    if (ends === null) return [live, `${keepRendering(users, prev)}.`, ...mapping];
-    return [live, ...users.map((u) => keepsWorking(u, prev, ends, now)), ...mapping];
+    if (ends === null)
+      return [live, `${keepRendering(users, prev)}.`, ...mapping];
+    return [
+      live,
+      ...users.map((u) => keepsWorking(u, prev, ends, now)),
+      ...mapping,
+    ];
   }
 
   const prev = `v${action.previousNumber}`;
@@ -82,14 +96,24 @@ function approveLines(
   const mapping = mappingLines(users, action);
 
   // Pinned: nothing changes for them until they relink.
-  if (sunsetAt === null) return [`${superseded}; ${keepRendering(users, prev)}.`, ...mapping];
-  return [`${superseded}.`, ...users.map((u) => keepsWorking(u, prev, sunsetAt, now)), ...mapping];
+  if (sunsetAt === null)
+    return [`${superseded}; ${keepRendering(users, prev)}.`, ...mapping];
+  return [
+    `${superseded}.`,
+    ...users.map((u) => keepsWorking(u, prev, sunsetAt, now)),
+    ...mapping,
+  ];
 }
 
 /** What each consumer of the version it moves from has to map first: a line per consumer, when the contract breaks. */
-function mappingLines(users: readonly Usage[], action: Extract<ConsequenceAction, { kind: "approve" }>): string[] {
+function mappingLines(
+  users: readonly Usage[],
+  action: Extract<ConsequenceAction, { kind: "approve" }>,
+): string[] {
   const keys = action.breakingKeys ?? [];
-  return keys.length > 0 ? users.map((u) => hasToMap(u, keys, action.newNumber)) : [];
+  return keys.length > 0
+    ? users.map((u) => hasToMap(u, keys, action.newNumber))
+    : [];
 }
 
 /**
@@ -110,14 +134,19 @@ export function breakingKeysOf(changes: readonly ContractChange[]): string[] {
 // ── Sentences ────────────────────────────────────────────────────────────────
 
 /** "Coral has to map `annual_fee` before it moves to v3." The keys are in backticks, as the contract lines have them. */
-function hasToMap(u: Usage, keys: readonly string[], newNumber: number): string {
+function hasToMap(
+  u: Usage,
+  keys: readonly string[],
+  newNumber: number,
+): string {
   return `${u.consumerName} has to map ${joinList(keys.map((key) => `\`${key}\``))} before it moves to v${newNumber}.`;
 }
 
 /** "Coral keeps rendering v1 until it relinks", "Coral and Harbor keep rendering v1 until they relink". */
 function keepRendering(users: readonly Usage[], v: string): string {
   const names = joinList(users.map((u) => u.consumerName));
-  const [keep, they] = users.length === 1 ? ["keeps", "it relinks"] : ["keep", "they relink"];
+  const [keep, they] =
+    users.length === 1 ? ["keeps", "it relinks"] : ["keep", "they relink"];
   return `${names} ${keep} rendering ${v} until ${they}`;
 }
 
@@ -133,7 +162,12 @@ function noConsumer(v: string): string {
 }
 
 /** "Coral still renders v1 (last render today). It will keep working until March 1, 2027." */
-function keepsWorking(u: Usage, v: string, sunsetAt: string, now: Date): string {
+function keepsWorking(
+  u: Usage,
+  v: string,
+  sunsetAt: string,
+  now: Date,
+): string {
   return `${u.consumerName} still renders ${v} (last render ${ago(u.lastRenderAt, now)}). It will keep working until ${formatLongDate(new Date(sunsetAt))}.`;
 }
 
@@ -169,7 +203,10 @@ interface Usage {
 }
 
 /** The consumers rendering one version, one entry each, most renders first (then most recent, then by name). */
-function consumersOf(usage: readonly ConsumerUsage[], versionNumber: number): Usage[] {
+function consumersOf(
+  usage: readonly ConsumerUsage[],
+  versionNumber: number,
+): Usage[] {
   const byConsumer = new Map<string, Usage>();
   for (const row of usage) {
     if (row.versionNumber !== versionNumber) continue;
@@ -180,7 +217,10 @@ function consumersOf(usage: readonly ConsumerUsage[], versionNumber: number): Us
         ? {
             ...seen,
             renders30d: seen.renders30d + row.renders30d,
-            lastRenderAt: row.lastRenderAt > seen.lastRenderAt ? row.lastRenderAt : seen.lastRenderAt,
+            lastRenderAt:
+              row.lastRenderAt > seen.lastRenderAt
+                ? row.lastRenderAt
+                : seen.lastRenderAt,
           }
         : {
             consumerId: row.consumerId,

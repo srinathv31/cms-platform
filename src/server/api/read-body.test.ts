@@ -31,6 +31,9 @@ describe("readBodyCapped", () => {
   });
 
   it("no body is an empty one", async () => {
-    expect(await readBodyCapped(null, 10)).toEqual({ ok: true, bytes: new Uint8Array(0) });
+    expect(await readBodyCapped(null, 10)).toEqual({
+      ok: true,
+      bytes: new Uint8Array(0),
+    });
   });
 });

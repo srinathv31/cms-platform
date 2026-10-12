@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { COMPOSER_THREAD_ID, blockTextOf, fieldTextOf, useReviewThreads, type ComposerOutcome } from "@/components/comments";
+import {
+  COMPOSER_THREAD_ID,
+  blockTextOf,
+  fieldTextOf,
+  useReviewThreads,
+  type ComposerOutcome,
+} from "@/components/comments";
 import { channelFieldValues, isChannelFieldId } from "@/domain/channel-fields";
 import { commentAnchors } from "@/domain/comments";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
@@ -31,31 +37,58 @@ export function useReviewComments({
   const editorRef = useRef<DocumentEditorHandle>(null);
   const fieldsRef = useRef<DocumentEditorHandle>(null);
   const handleOf = useCallback(
-    (blockId: string | undefined) => (blockId !== undefined && isChannelFieldId(blockId) ? fieldsRef.current : editorRef.current),
+    (blockId: string | undefined) =>
+      blockId !== undefined && isChannelFieldId(blockId)
+        ? fieldsRef.current
+        : editorRef.current,
     [],
   );
-  const { threads, threadsForEditor, editorActiveThreadId, activeThreadId, setActive, composer, openComposer, closeComposer, mutate } =
-    useReviewThreads(initial);
+  const {
+    threads,
+    threadsForEditor,
+    editorActiveThreadId,
+    activeThreadId,
+    setActive,
+    composer,
+    openComposer,
+    closeComposer,
+    mutate,
+  } = useReviewThreads(initial);
   const openThreads = threads.filter((t) => t.status === "open").length;
 
   // Where a thread's anchor sits (the fields, then the body's blocks: `commentAnchors`), so a new thread slots
   // into reading order at once.
   const blockPosition = useMemo(() => {
-    const blocks = (version.body.content ?? []).flatMap((block) => (typeof block.attrs?.id === "string" ? [block.attrs.id] : []));
-    const order = new Map(commentAnchors(blocks, version.channels).map((id, i) => [id, i] as const));
+    const blocks = (version.body.content ?? []).flatMap((block) =>
+      typeof block.attrs?.id === "string" ? [block.attrs.id] : [],
+    );
+    const order = new Map(
+      commentAnchors(blocks, version.channels).map((id, i) => [id, i] as const),
+    );
     return (blockId: string) => order.get(blockId) ?? null;
   }, [version.body, version.channels]);
 
   // The start of a block's text, or a field's name and text, for the card about a whole block or field (it has no quote to show).
-  const labels = useMemo(() => new Map(version.variables.map((v) => [v.key, v.label])), [version.variables]);
-  const fieldValues = useMemo(() => channelFieldValues(version.channelFields), [version.channelFields]);
+  const labels = useMemo(
+    () => new Map(version.variables.map((v) => [v.key, v.label])),
+    [version.variables],
+  );
+  const fieldValues = useMemo(
+    () => channelFieldValues(version.channelFields),
+    [version.channelFields],
+  );
   const blockText = useCallback(
-    (blockId: string) => fieldTextOf(fieldValues, blockId, labels) ?? blockTextOf(version.body, blockId, labels),
+    (blockId: string) =>
+      fieldTextOf(fieldValues, blockId, labels) ??
+      blockTextOf(version.body, blockId, labels),
     [version.body, fieldValues, labels],
   );
 
   // A click on the quote the comment box is about (its temporary highlight) isn't a thread.
-  const onThreadClick = useCallback((id: string) => id !== COMPOSER_THREAD_ID && setActive(id), [setActive]);
+  const onThreadClick = useCallback(
+    (id: string) => id !== COMPOSER_THREAD_ID && setActive(id),
+    [setActive],
+  );
 
   /** What had focus when the comment box opened: it gets focus back when the box closes. */
   const opener = useRef<HTMLElement | null>(null);
@@ -66,7 +99,10 @@ export function useReviewComments({
   const requestComment = useCallback(
     (anchor: CommentRequest) => {
       const active = document.activeElement;
-      opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+      opener.current =
+        active instanceof HTMLElement && active !== document.body
+          ? active
+          : null;
       openComposer(anchor);
     },
     [openComposer],
@@ -80,12 +116,17 @@ export function useReviewComments({
       opener.current = null;
       if (outcome === "posted") return;
       // The opener can be gone (the selection's Comment button closes with the box): the document is the next best place.
-      requestAnimationFrame(() => (el?.isConnected ? el.focus() : editorRef.current?.focus()));
+      requestAnimationFrame(() =>
+        el?.isConnected ? el.focus() : editorRef.current?.focus(),
+      );
     },
     [closeComposer],
   );
   // Whichever shows the anchor answers: for a block the editor, or (Show changes on) the redline's own; for a field, the fields'.
-  const requestBlockComment = useCallback((blockId: string) => handleOf(blockId)?.requestComment(blockId), [handleOf]);
+  const requestBlockComment = useCallback(
+    (blockId: string) => handleOf(blockId)?.requestComment(blockId),
+    [handleOf],
+  );
   /** The Preview was opened: the comment box is about the document, and the person is on the tab they pressed, so focus stays there. */
   const dismissComposer = useCallback(() => {
     opener.current = null;
@@ -112,7 +153,8 @@ export function useReviewComments({
       setActive(id);
       if (!id) return;
       const thread = threads.find((t) => t.id === id);
-      if (!thread || thread.blockId === DOCUMENT_THREAD || thread.orphaned) return;
+      if (!thread || thread.blockId === DOCUMENT_THREAD || thread.orphaned)
+        return;
       focusPending.current = id;
       showDocument();
       askForFocus((n) => n + 1);
@@ -125,14 +167,18 @@ export function useReviewComments({
     if (!id) return;
     focusPending.current = null;
     // The comment box's own id has no thread yet: `threadsForEditor` gives it the anchor it is open on.
-    handleOf(threadsForEditor.find((t) => t.id === id)?.blockId)?.focusThread(id);
+    handleOf(threadsForEditor.find((t) => t.id === id)?.blockId)?.focusThread(
+      id,
+    );
   });
 
   // The block the redline tints: where the open comment box is, else the active thread's block.
   const activeBlockId = useMemo(() => {
     if (composer) return composer.blockId;
     const thread = threads.find((t) => t.id === activeThreadId);
-    return thread && thread.blockId !== DOCUMENT_THREAD && !thread.orphaned ? thread.blockId : null;
+    return thread && thread.blockId !== DOCUMENT_THREAD && !thread.orphaned
+      ? thread.blockId
+      : null;
   }, [composer, threads, activeThreadId]);
 
   return {

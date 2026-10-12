@@ -1,9 +1,15 @@
 // The network half of autosave: PUT one patch to /api/drafts/[versionId] and read the answer.
 
-import { ALL_CHANNEL_FIELDS, normalizeAndCheckChannelField } from "@/domain/channel-fields";
+import {
+  ALL_CHANNEL_FIELDS,
+  normalizeAndCheckChannelField,
+} from "@/domain/channel-fields";
 import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
 import type { DraftPatch, DraftSaveResponse } from "@/domain/types";
-import { DOCUMENT_MESSAGES, normalizeAndCheckBody } from "@/editor/model/document-check";
+import {
+  DOCUMENT_MESSAGES,
+  normalizeAndCheckBody,
+} from "@/editor/model/document-check";
 import type { Send } from "./autosave-scheduler";
 
 /**
@@ -20,8 +26,11 @@ export const KEEPALIVE_LIMIT_BYTES = 60_000;
 function isSaveResponse(value: unknown): value is DraftSaveResponse {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v.ok === true) return typeof v.rev === "number" && typeof v.savedAt === "string";
-  return v.ok === false && typeof v.code === "string" && typeof v.reason === "string";
+  if (v.ok === true)
+    return typeof v.rev === "number" && typeof v.savedAt === "string";
+  return (
+    v.ok === false && typeof v.code === "string" && typeof v.reason === "string"
+  );
 }
 
 /**
@@ -35,16 +44,22 @@ function refusal(patch: DraftPatch): DraftSaveResponse | null {
   let problem = patch.body ? normalizeAndCheckBody(patch.body).problem : null;
   for (const field of ALL_CHANNEL_FIELDS) {
     const value = patch[field.id];
-    if (!problem && value) problem = normalizeAndCheckChannelField(field, value).problem;
+    if (!problem && value)
+      problem = normalizeAndCheckChannelField(field, value).problem;
   }
-  return problem ? refuse(REQUEST_REFUSALS.invalidInput(DOCUMENT_MESSAGES[problem])) : null;
+  return problem
+    ? refuse(REQUEST_REFUSALS.invalidInput(DOCUMENT_MESSAGES[problem]))
+    : null;
 }
 
 /**
  * A `Send` that talks to the route. Rejects when there is no usable answer (offline, a 5xx, a body
  * that isn't one of the route's answers), which the scheduler treats as worth retrying.
  */
-export function createFetchSend(versionId: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): Send {
+export function createFetchSend(
+  versionId: string,
+  fetchImpl: typeof fetch = (...args) => fetch(...args),
+): Send {
   const url = `/api/drafts/${encodeURIComponent(versionId)}`;
 
   return async (patch, { keepalive }) => {
@@ -57,12 +72,16 @@ export function createFetchSend(versionId: string, fetchImpl: typeof fetch = (..
       headers: { "Content-Type": "application/json" },
       body,
       cache: "no-store",
-      keepalive: keepalive && new TextEncoder().encode(body).length <= KEEPALIVE_LIMIT_BYTES,
+      keepalive:
+        keepalive &&
+        new TextEncoder().encode(body).length <= KEEPALIVE_LIMIT_BYTES,
     });
-    if (response.status >= 500) throw new Error(`Save failed with status ${response.status}`);
+    if (response.status >= 500)
+      throw new Error(`Save failed with status ${response.status}`);
 
     const json: unknown = await response.json();
-    if (!isSaveResponse(json)) throw new Error("Save returned an unexpected response");
+    if (!isSaveResponse(json))
+      throw new Error("Save returned an unexpected response");
     return json;
   };
 }

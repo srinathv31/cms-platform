@@ -110,10 +110,10 @@ change, and don't write copy or UI that claims more ("this is exactly what custo
 The text is never shortened in the data: the OS cuts it on screen, and the kit cuts it the same way, with
 `line-clamp` at each platform's line counts:
 
-| | Lock screen | Banner / heads-up | Expanded |
-| --- | --- | --- | --- |
-| iOS (`IOS_LINES`, [ios/notification-card.tsx](ios/notification-card.tsx)) | title 1, subtitle 1, body 4 | title 1, subtitle 1, body 2 | title 2, subtitle 2, body 7 |
-| Android (`ANDROID_LINES`, [android/notification-card.tsx](android/notification-card.tsx)) | title 1, body 1 | title 1, body 1 | title 1, body 8 |
+|                                                                                           | Lock screen                 | Banner / heads-up           | Expanded                    |
+| ----------------------------------------------------------------------------------------- | --------------------------- | --------------------------- | --------------------------- |
+| iOS (`IOS_LINES`, [ios/notification-card.tsx](ios/notification-card.tsx))                 | title 1, subtitle 1, body 4 | title 1, subtitle 1, body 2 | title 2, subtitle 2, body 7 |
+| Android (`ANDROID_LINES`, [android/notification-card.tsx](android/notification-card.tsx)) | title 1, body 1             | title 1, body 1             | title 1, body 8             |
 
 [measure.ts](measure.ts) then reads the rendered phone: each clamped field is `[data-field][data-max-lines]`, and
 a DOM Range finds the last character before the ellipsis. `onMeasure` gets a `PushMeasure`:
@@ -160,14 +160,14 @@ phone has their proportions: 431 × 903 (0.477) and 455 × 958 (0.475). The came
 
 What that gives, measured in the running app:
 
-| Container | iPhone (standard) | Android (standard) |
-| --- | --- | --- |
-| Preview well, 1440 × 900 | 0.717, 309 × 647 | 0.675, 307 × 647 |
-| Preview well, 1280 × 800 | 0.606, 261 × 547 | 0.571, 260 × 547 |
+| Container                        | iPhone (standard)           | Android (standard)           |
+| -------------------------------- | --------------------------- | ---------------------------- |
+| Preview well, 1440 × 900         | 0.717, 309 × 647            | 0.675, 307 × 647             |
+| Preview well, 1280 × 800         | 0.606, 261 × 547            | 0.571, 260 × 547             |
 | Preview well, 1000 × 700 overlay | 0.55, the well scrolls 74px | 0.55, the well scrolls 104px |
-| Review's Preview, 1440 × 900 | 0.589 | 0.555 |
-| Coral's drawer, 1440 × 900 | 0.722 | 0.681 |
-| Coral's drawer, 1280 × 800 | 0.611 | 0.576 |
+| Review's Preview, 1440 × 900     | 0.589                       | 0.555                        |
+| Coral's drawer, 1440 × 900       | 0.722                       | 0.681                        |
+| Coral's drawer, 1280 × 800       | 0.611                       | 0.576                        |
 
 **The screen's content** is laid out for the real screen's height, where each OS puts it: iOS's date and clock
 near the top and its notifications rising from the bottom, the stack just above the flashlight and camera;
@@ -211,25 +211,25 @@ region. The clickable notification takes the app's focus ring; a long text messa
 
 ## Layout
 
-| Path | What it holds |
-| --- | --- |
-| [index.ts](index.ts) | The public surface. |
-| [types.ts](types.ts) | Settings, content and measurement types. |
-| [push-preview.tsx](push-preview.tsx), [sms-preview.tsx](sms-preview.tsx) | The two entry points: the frame, then the platform's skin. |
-| [screen-preview.tsx](screen-preview.tsx) | `ScreenPreview`: the frame and the system chrome around any app's content (Coral's web page). |
-| [thread.ts](thread.ts) | A text thread: its messages oldest first, which print their time, and opening on the newest. |
-| [labels.ts](labels.ts) | `pushScreenLabel` (Banner or Heads-up), the skins' names, the SMS caption and the no-sender placeholder. |
-| [phone-frame.tsx](phone-frame.tsx) | The generic frame, its scale to fit (`ScaledBox`), the camera cutout, the figure. |
-| [phone-skeleton.tsx](phone-skeleton.tsx) | `PhoneSkeleton`: the frame with an empty screen, for a loading state, at the size and place of the phone that replaces it. |
-| [status-bar.tsx](status-bar.tsx) | Each platform's status bar and its home indicator or gesture handle, generic glyphs. |
-| [wallpaper.tsx](wallpaper.tsx) | The wallpaper, drawn from `--device-wall-*`, shared by both platforms. |
-| [app-mark.tsx](app-mark.tsx), [silhouette.tsx](silhouette.tsx) | The sending app's monogram tile; an unknown sender's avatar. |
-| [geometry.ts](geometry.ts) | `pt()`, screen sizes per platform and width with their sources, the bezel, `frameSize`, `phoneScale` and `MIN_SCALE`. |
-| [measure.ts](measure.ts) | Truncation measurement and `useMeasure`. |
-| [links.ts](links.ts) | Which runs of a text message read as links. |
-| [fonts.ts](fonts.ts) | Inter and Google Sans Flex (OFL) via `next/font`, scoped to the kit's root. |
-| [ios/](ios) | The iOS-style skin: `LockScreen`, `Banner` (on `HomeScreen`), `Expanded`, `MessagesThread`, the notification card, its type ramp and glass. |
-| [android/](android) | The Android-style skin: `AndroidLockScreen`, `HeadsUp` (on its home screen), `Shade`, `AndroidMessagesThread`, the notification card, the Material type ramp and the short date. |
+| Path                                                                     | What it holds                                                                                                                                                                    |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [index.ts](index.ts)                                                     | The public surface.                                                                                                                                                              |
+| [types.ts](types.ts)                                                     | Settings, content and measurement types.                                                                                                                                         |
+| [push-preview.tsx](push-preview.tsx), [sms-preview.tsx](sms-preview.tsx) | The two entry points: the frame, then the platform's skin.                                                                                                                       |
+| [screen-preview.tsx](screen-preview.tsx)                                 | `ScreenPreview`: the frame and the system chrome around any app's content (Coral's web page).                                                                                    |
+| [thread.ts](thread.ts)                                                   | A text thread: its messages oldest first, which print their time, and opening on the newest.                                                                                     |
+| [labels.ts](labels.ts)                                                   | `pushScreenLabel` (Banner or Heads-up), the skins' names, the SMS caption and the no-sender placeholder.                                                                         |
+| [phone-frame.tsx](phone-frame.tsx)                                       | The generic frame, its scale to fit (`ScaledBox`), the camera cutout, the figure.                                                                                                |
+| [phone-skeleton.tsx](phone-skeleton.tsx)                                 | `PhoneSkeleton`: the frame with an empty screen, for a loading state, at the size and place of the phone that replaces it.                                                       |
+| [status-bar.tsx](status-bar.tsx)                                         | Each platform's status bar and its home indicator or gesture handle, generic glyphs.                                                                                             |
+| [wallpaper.tsx](wallpaper.tsx)                                           | The wallpaper, drawn from `--device-wall-*`, shared by both platforms.                                                                                                           |
+| [app-mark.tsx](app-mark.tsx), [silhouette.tsx](silhouette.tsx)           | The sending app's monogram tile; an unknown sender's avatar.                                                                                                                     |
+| [geometry.ts](geometry.ts)                                               | `pt()`, screen sizes per platform and width with their sources, the bezel, `frameSize`, `phoneScale` and `MIN_SCALE`.                                                            |
+| [measure.ts](measure.ts)                                                 | Truncation measurement and `useMeasure`.                                                                                                                                         |
+| [links.ts](links.ts)                                                     | Which runs of a text message read as links.                                                                                                                                      |
+| [fonts.ts](fonts.ts)                                                     | Inter and Google Sans Flex (OFL) via `next/font`, scoped to the kit's root.                                                                                                      |
+| [ios/](ios)                                                              | The iOS-style skin: `LockScreen`, `Banner` (on `HomeScreen`), `Expanded`, `MessagesThread`, the notification card, its type ramp and glass.                                      |
+| [android/](android)                                                      | The Android-style skin: `AndroidLockScreen`, `HeadsUp` (on its home screen), `Shade`, `AndroidMessagesThread`, the notification card, the Material type ramp and the short date. |
 
 A third skin would follow the same shape: its views, type ramp and line counts in a folder, its sizes in
 [geometry.ts](geometry.ts), its tokens and face in tokens.css and [fonts.ts](fonts.ts), and a branch in the two

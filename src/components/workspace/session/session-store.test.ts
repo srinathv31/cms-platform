@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWorkspaceSession, INITIAL_PHONE, INITIAL_PREVIEW } from "./session-store";
+import {
+  createWorkspaceSession,
+  INITIAL_PHONE,
+  INITIAL_PREVIEW,
+} from "./session-store";
 
 describe("workspace session", () => {
   it("holds changes made before the autosave host connects, then hands them over merged", () => {
@@ -77,7 +81,9 @@ describe("workspace session", () => {
     it("asks the connected host to send what it has, and resolves when it has", async () => {
       const session = createWorkspaceSession();
       let finish = () => {};
-      const flush = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+      const flush = vi.fn(
+        () => new Promise<void>((resolve) => (finish = resolve)),
+      );
       session.bind({ versionId: "v_1", rev: 0 });
       session.attach(vi.fn(), flush);
 
@@ -117,7 +123,10 @@ describe("workspace session", () => {
       expect(save).not.toHaveBeenCalled();
 
       session.attach(save, flush);
-      expect(save).toHaveBeenCalledWith({ name: "First", "email.subject": null });
+      expect(save).toHaveBeenCalledWith({
+        name: "First",
+        "email.subject": null,
+      });
       expect(calls).toEqual(["save", "flush"]);
       await Promise.resolve();
       expect(done).toBe(false);
@@ -162,7 +171,13 @@ describe("workspace session", () => {
         channel: "pdf",
         setId: "typical",
         device: "desktop",
-        phone: { platform: "ios", appearance: "light", previewsHidden: false, textSize: "default", width: "standard" },
+        phone: {
+          platform: "ios",
+          appearance: "light",
+          previewsHidden: false,
+          textSize: "default",
+          width: "standard",
+        },
         pushScreen: "lock",
       });
       expect(session.getPreview()).toBe(INITIAL_PREVIEW);
@@ -172,7 +187,10 @@ describe("workspace session", () => {
       const session = createWorkspaceSession();
       session.setPreview({ view: "variables" });
       session.openPreview();
-      expect(session.getPreview()).toMatchObject({ open: true, view: "preview" });
+      expect(session.getPreview()).toMatchObject({
+        open: true,
+        view: "preview",
+      });
 
       session.closePreview();
       expect(session.getPreview().open).toBe(false);
@@ -182,7 +200,10 @@ describe("workspace session", () => {
       const session = createWorkspaceSession();
       session.openPreview();
       session.setPreview({ channel: "email", setId: "long", device: "mobile" });
-      session.setPreview({ phone: { ...INITIAL_PHONE, platform: "android", appearance: "dark" }, pushScreen: "expanded" });
+      session.setPreview({
+        phone: { ...INITIAL_PHONE, platform: "android", appearance: "dark" },
+        pushScreen: "expanded",
+      });
       session.closePreview();
       session.openPreview();
       expect(session.getPreview()).toEqual({
@@ -359,7 +380,12 @@ describe("the imported original", () => {
     const session = createWorkspaceSession();
     session.setPreview({ channel: "web", setId: "edge" });
     session.openOriginal();
-    expect(session.getPreview()).toMatchObject({ open: true, view: "original", channel: "web", setId: "edge" });
+    expect(session.getPreview()).toMatchObject({
+      open: true,
+      view: "original",
+      channel: "web",
+      setId: "edge",
+    });
     session.closePreview();
     expect(session.getPreview().open).toBe(false);
   });
@@ -386,7 +412,10 @@ describe("the imported original", () => {
 });
 
 describe("revert to when the page opened", () => {
-  const body = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+  const body = (text: string) => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  });
 
   function setup() {
     const session = createWorkspaceSession();
@@ -395,8 +424,14 @@ describe("revert to when the page opened", () => {
     session.attach(save);
     const content = vi.fn();
     const name = vi.fn();
-    session.addRestoreTarget({ opening: { body: body("Opening"), channels: ["pdf"] }, restore: content });
-    session.addRestoreTarget({ opening: { name: "Card agreement" }, restore: name });
+    session.addRestoreTarget({
+      opening: { body: body("Opening"), channels: ["pdf"] },
+      restore: content,
+    });
+    session.addRestoreTarget({
+      opening: { name: "Card agreement" },
+      restore: name,
+    });
     return { session, save, content, name };
   }
 
@@ -420,7 +455,10 @@ describe("revert to when the page opened", () => {
 
     const previous = session.revert();
     expect(previous).toEqual({ body: body("Edited"), name: "Renamed" });
-    expect(save).toHaveBeenCalledWith({ body: body("Opening"), name: "Card agreement" });
+    expect(save).toHaveBeenCalledWith({
+      body: body("Opening"),
+      name: "Card agreement",
+    });
     // Each part gets what changed, and everything as it now stands.
     expect(content).toHaveBeenCalledWith(
       { body: body("Opening"), name: "Card agreement" },
@@ -441,7 +479,10 @@ describe("revert to when the page opened", () => {
 
     expect(session.restore(previous, since)).toBe(true);
     expect(save).toHaveBeenCalledWith({ body: body("Edited") });
-    expect(content).toHaveBeenCalledWith({ body: body("Edited") }, { body: body("Edited"), channels: ["pdf"], name: "Card agreement" });
+    expect(content).toHaveBeenCalledWith(
+      { body: body("Edited") },
+      { body: body("Edited"), channels: ["pdf"], name: "Card agreement" },
+    );
     expect(session.getCanRevert()).toBe(true);
   });
 
@@ -451,10 +492,16 @@ describe("revert to when the page opened", () => {
     save.mockClear();
     expect(session.getOwnedFields()).toBe("body,channels,name");
 
-    const previous = session.replace({ body: body("v3"), channels: ["pdf", "email"] });
+    const previous = session.replace({
+      body: body("v3"),
+      channels: ["pdf", "email"],
+    });
     const since = session.getEditGeneration();
     expect(previous).toEqual({ body: body("Edited"), channels: ["pdf"] });
-    expect(save).toHaveBeenCalledWith({ body: body("v3"), channels: ["pdf", "email"] });
+    expect(save).toHaveBeenCalledWith({
+      body: body("v3"),
+      channels: ["pdf", "email"],
+    });
     expect(content).toHaveBeenLastCalledWith(
       { body: body("v3"), channels: ["pdf", "email"] },
       { body: body("v3"), channels: ["pdf", "email"], name: "Card agreement" },
@@ -463,7 +510,10 @@ describe("revert to when the page opened", () => {
     expect(session.getCanRevert()).toBe(true);
 
     expect(session.restore(previous!, since)).toBe(true);
-    expect(save).toHaveBeenLastCalledWith({ body: body("Edited"), channels: ["pdf"] });
+    expect(save).toHaveBeenLastCalledWith({
+      body: body("Edited"),
+      channels: ["pdf"],
+    });
 
     // A field nothing on screen can show isn't replaced.
     expect(session.replace({ sampleSets: [] })).toBeNull();
@@ -507,8 +557,14 @@ describe("revert to when the page opened", () => {
       session.bind({ versionId: "v_1", rev: 0 });
       session.attach(save);
       const content = vi.fn();
-      const removeContent = session.addRestoreTarget({ opening: { body: body("Opening") }, restore: content });
-      session.addRestoreTarget({ opening: { name: "Card agreement" }, restore: vi.fn() });
+      const removeContent = session.addRestoreTarget({
+        opening: { body: body("Opening") },
+        restore: content,
+      });
+      session.addRestoreTarget({
+        opening: { name: "Card agreement" },
+        restore: vi.fn(),
+      });
 
       session.save({ body: body("Edited") });
       const previous = session.revert()!;
@@ -529,8 +585,14 @@ describe("revert to when the page opened", () => {
       const save = vi.fn();
       session.bind({ versionId: "v_1", rev: 0 });
       session.attach(save);
-      const removeContent = session.addRestoreTarget({ opening: { body: body("Opening") }, restore: vi.fn() });
-      session.addRestoreTarget({ opening: { name: "Card agreement" }, restore: vi.fn() });
+      const removeContent = session.addRestoreTarget({
+        opening: { body: body("Opening") },
+        restore: vi.fn(),
+      });
+      session.addRestoreTarget({
+        opening: { name: "Card agreement" },
+        restore: vi.fn(),
+      });
 
       session.save({ name: "Renamed" });
       const previous = session.revert()!;
@@ -579,7 +641,12 @@ describe("revert to when the page opened", () => {
       const before = session.getEditGeneration();
       session.publishStatus({ status: "saving" });
       session.publishStatus({ status: "saved" });
-      session.setHistory({ canUndo: true, canRedo: false, undo: vi.fn(), redo: vi.fn() });
+      session.setHistory({
+        canUndo: true,
+        canRedo: false,
+        undo: vi.fn(),
+        redo: vi.fn(),
+      });
       session.setRailOpen(true);
       session.openPreview();
       session.bind({ versionId: "v_1", rev: 7 });
@@ -590,14 +657,20 @@ describe("revert to when the page opened", () => {
   it("starts over for a new version, and stops offering once the page's part is gone", () => {
     const session = createWorkspaceSession();
     session.bind({ versionId: "v_1", rev: 0 });
-    const remove = session.addRestoreTarget({ opening: { body: body("Opening") }, restore: vi.fn() });
+    const remove = session.addRestoreTarget({
+      opening: { body: body("Opening") },
+      restore: vi.fn(),
+    });
     session.save({ body: body("Edited") });
     expect(session.getCanRevert()).toBe(true);
 
     remove();
     expect(session.getCanRevert()).toBe(false);
 
-    session.addRestoreTarget({ opening: { body: body("Opening") }, restore: vi.fn() });
+    session.addRestoreTarget({
+      opening: { body: body("Opening") },
+      restore: vi.fn(),
+    });
     expect(session.getCanRevert()).toBe(true);
     session.bind({ versionId: "v_2", rev: 0 });
     expect(session.getCanRevert()).toBe(false);
@@ -606,7 +679,10 @@ describe("revert to when the page opened", () => {
 
 // Submit holds the page still from its click until its dialog closes (handoff review I8).
 describe("an inert page", () => {
-  const body = (text: string) => ({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] });
+  const body = (text: string) => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  });
 
   function setup() {
     const session = createWorkspaceSession();
@@ -615,7 +691,10 @@ describe("an inert page", () => {
     session.bind({ versionId: "v_1", rev: 0 });
     session.attach(save, flush);
     const content = vi.fn();
-    session.addRestoreTarget({ opening: { body: body("Opening"), channels: ["pdf"] }, restore: content });
+    session.addRestoreTarget({
+      opening: { body: body("Opening"), channels: ["pdf"] },
+      restore: content,
+    });
     return { session, save, flush, content };
   }
 
@@ -674,7 +753,9 @@ describe("an inert page", () => {
     expect(session.getEditGeneration()).toBe(since);
 
     letGo();
-    expect(session.replace({ body: body("v3") })).toEqual({ body: body("Opening") });
+    expect(session.replace({ body: body("v3") })).toEqual({
+      body: body("Opening"),
+    });
   });
 });
 
@@ -700,7 +781,9 @@ describe("a tab that failed", () => {
     const second = session.failTab();
     first();
     first();
-    expect(session.getTabFailed(), "the second view is still on screen").toBe(true);
+    expect(session.getTabFailed(), "the second view is still on screen").toBe(
+      true,
+    );
     second();
     expect(session.getTabFailed()).toBe(false);
   });

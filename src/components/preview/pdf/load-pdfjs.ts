@@ -43,10 +43,13 @@ async function start(): Promise<PdfRuntime> {
   const pdfjs = await import("pdfjs-dist");
   // The bundler sees `new Worker(new URL(…, import.meta.url))` and emits the worker as its own
   // file. The worker build is a self-contained ES module, hence `type: "module"`.
-  const webWorker = new Worker(new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url), {
-    type: "module",
-    name: "pdfjs",
-  });
+  const webWorker = new Worker(
+    new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url),
+    {
+      type: "module",
+      name: "pdfjs",
+    },
+  );
   workerFailed = new Promise<never>((_, reject) => {
     webWorker.addEventListener(
       "error",
@@ -60,7 +63,10 @@ async function start(): Promise<PdfRuntime> {
     );
   });
   workerFailed.catch(() => {});
-  const worker = pdfjs.PDFWorker.create({ port: webWorker, verbosity: pdfjs.VerbosityLevel.ERRORS });
+  const worker = pdfjs.PDFWorker.create({
+    port: webWorker,
+    verbosity: pdfjs.VerbosityLevel.ERRORS,
+  });
   return { pdfjs, worker };
 }
 
@@ -72,7 +78,10 @@ export interface OpenedPdf {
 }
 
 /** Opens a PDF from bytes on the session worker. Pass a COPY: pdf.js transfers (detaches) the buffer. */
-export function openPdf({ pdfjs, worker }: PdfRuntime, bytes: Uint8Array): OpenedPdf {
+export function openPdf(
+  { pdfjs, worker }: PdfRuntime,
+  bytes: Uint8Array,
+): OpenedPdf {
   const params: DocumentInitParameters & { isEvalSupported: false } = {
     data: bytes,
     worker,
@@ -84,6 +93,8 @@ export function openPdf({ pdfjs, worker }: PdfRuntime, bytes: Uint8Array): Opene
   };
   const task = pdfjs.getDocument(params);
   // A dead worker never answers, so the load fails instead of waiting forever.
-  const loaded = workerFailed ? Promise.race([task.promise, workerFailed]) : task.promise;
+  const loaded = workerFailed
+    ? Promise.race([task.promise, workerFailed])
+    : task.promise;
   return { task, loaded };
 }

@@ -52,16 +52,27 @@ test.beforeAll(async () => {
   );
   if (!row) throw new Error(`The seed has no ${NAME}. Run npm run db:reset.`);
   templateId = String(row.id);
-  const drafts = await rowsOf(db, "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
-  if (drafts.length > 0) throw new Error(`${NAME} already has a draft. Run npm run db:reset.`);
+  const drafts = await rowsOf(
+    db,
+    "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
+    [templateId],
+  );
+  if (drafts.length > 0)
+    throw new Error(`${NAME} already has a draft. Run npm run db:reset.`);
 });
 
 test.afterAll(async () => {
   if (!db) return;
   try {
-    const drafts = await rowsOf(db, "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
+    const drafts = await rowsOf(
+      db,
+      "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
+      [templateId],
+    );
     for (const draft of drafts) {
-      await rowsOf(db, "DELETE FROM audit_events WHERE version_id = ?", [draft.id]);
+      await rowsOf(db, "DELETE FROM audit_events WHERE version_id = ?", [
+        draft.id,
+      ]);
       await rowsOf(db, "DELETE FROM versions WHERE id = ?", [draft.id]);
     }
   } finally {
@@ -70,12 +81,20 @@ test.afterAll(async () => {
 });
 
 const header = (page: Page) => page.locator("header").filter({ visible: true });
-const statusMenu = (page: Page) => page.locator('[data-slot="status-row"] button[aria-haspopup="menu"]').filter({ visible: true });
-const revertItem = (page: Page) => page.getByRole("menuitem", { name: /^Revert to v2/ });
-const revertToast = (page: Page) => page.locator("[data-sonner-toast]").filter({ hasText: "Reverted to v2" });
-const toastUndo = (page: Page) => revertToast(page).getByRole("button", { name: "Undo", exact: true });
+const statusMenu = (page: Page) =>
+  page
+    .locator('[data-slot="status-row"] button[aria-haspopup="menu"]')
+    .filter({ visible: true });
+const revertItem = (page: Page) =>
+  page.getByRole("menuitem", { name: /^Revert to v2/ });
+const revertToast = (page: Page) =>
+  page.locator("[data-sonner-toast]").filter({ hasText: "Reverted to v2" });
+const toastUndo = (page: Page) =>
+  revertToast(page).getByRole("button", { name: "Undo", exact: true });
 const tab = (page: Page, label: "Content" | "Versions") =>
-  page.getByRole("navigation", { name: "Template" }).getByRole("link", { name: label });
+  page
+    .getByRole("navigation", { name: "Template" })
+    .getByRole("link", { name: label });
 const canvas = (page: Page) => page.locator('[data-slot="canvas-scroll"]');
 const canvasTop = (page: Page) => canvas(page).evaluate((el) => el.scrollTop);
 
@@ -83,7 +102,9 @@ async function openDraft(page: Page) {
   await asPersona(page, "eli");
   await page.goto(`/${TEAM}/templates/${templateId}`);
   await hydrated(page);
-  await expect(header(page).getByText("Based on v2", { exact: true })).toBeVisible();
+  await expect(
+    header(page).getByText("Based on v2", { exact: true }),
+  ).toBeVisible();
   await liveEditor(page);
 }
 
@@ -95,7 +116,11 @@ async function typeAtEndOfFirstParagraph(page: Page, text: string) {
   await untilUncovered(paragraph, end);
   await paragraph.click({ position: end, delay: 90 });
   await page.keyboard.press("End");
-  await expect.poll(async () => (await caret(page)).focused, { message: "the document takes focus" }).toBe(true);
+  await expect
+    .poll(async () => (await caret(page)).focused, {
+      message: "the document takes focus",
+    })
+    .toBe(true);
   await typeSlowly(page, ` ${text}`);
   await expect(documentEditor(page)).toContainText(text);
 }
@@ -113,20 +138,25 @@ const frames = (page: Page, count = 4) =>
     (n) =>
       new Promise<void>((resolve) => {
         let left = n;
-        const tick = () => (--left <= 0 ? resolve() : requestAnimationFrame(tick));
+        const tick = () =>
+          --left <= 0 ? resolve() : requestAnimationFrame(tick);
         requestAnimationFrame(tick);
       }),
     count,
   );
 
-test("Revert to v2 takes out what was typed, and Undo straight away puts it back, without scrolling", async ({ page }) => {
+test("Revert to v2 takes out what was typed, and Undo straight away puts it back, without scrolling", async ({
+  page,
+}) => {
   await asPersona(page, "eli");
   await page.goto(`/${TEAM}/templates/${templateId}`);
   await hydrated(page);
   const edit = page.getByRole("button", { name: "Edit", exact: true });
   await expect(edit).toBeVisible();
   await tap(edit);
-  await expect(header(page).getByText("Based on v2", { exact: true })).toBeVisible();
+  await expect(
+    header(page).getByText("Based on v2", { exact: true }),
+  ).toBeVisible();
   await liveEditor(page);
 
   await typeAtEndOfFirstParagraph(page, BEFORE);
@@ -141,11 +171,16 @@ test("Revert to v2 takes out what was typed, and Undo straight away puts it back
   await revertToV2(page);
   await expect(documentEditor(page)).not.toContainText(BEFORE);
   await frames(page);
-  expect(Math.abs((await canvasTop(page)) - top), "Revert to v2 doesn't scroll the page").toBeLessThanOrEqual(SLACK);
+  expect(
+    Math.abs((await canvasTop(page)) - top),
+    "Revert to v2 doesn't scroll the page",
+  ).toBeLessThanOrEqual(SLACK);
   await expectAutosaved(page);
 
   // Undo is an outline button (N11): Submit for review is the screen's one black button.
-  const submitFill = await page.getByRole("button", { name: "Submit for review" }).evaluate((el) => getComputedStyle(el).backgroundColor);
+  const submitFill = await page
+    .getByRole("button", { name: "Submit for review" })
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
   await expect(toastUndo(page)).not.toHaveCSS("background-color", submitFill);
   await expect(toastUndo(page)).toHaveCSS("border-top-width", "1px");
 
@@ -153,11 +188,16 @@ test("Revert to v2 takes out what was typed, and Undo straight away puts it back
   await expect(documentEditor(page)).toContainText(BEFORE);
   await expect(revertToast(page)).toHaveCount(0);
   await frames(page);
-  expect(Math.abs((await canvasTop(page)) - top), "Undo doesn't scroll the page").toBeLessThanOrEqual(SLACK);
+  expect(
+    Math.abs((await canvasTop(page)) - top),
+    "Undo doesn't scroll the page",
+  ).toBeLessThanOrEqual(SLACK);
   await expectAutosaved(page);
 });
 
-test("typing after Revert to v2 takes the Undo away, so it can't wipe what was typed", async ({ page }) => {
+test("typing after Revert to v2 takes the Undo away, so it can't wipe what was typed", async ({
+  page,
+}) => {
   await openDraft(page);
   await expect(documentEditor(page)).toContainText(BEFORE);
 
@@ -177,7 +217,9 @@ test("typing after Revert to v2 takes the Undo away, so it can't wipe what was t
   await expect(documentEditor(page)).not.toContainText(BEFORE);
 });
 
-test("switching tabs after Revert to v2 takes the Undo away, and the content shown is what is saved", async ({ page }) => {
+test("switching tabs after Revert to v2 takes the Undo away, and the content shown is what is saved", async ({
+  page,
+}) => {
   await openDraft(page);
   await expect(documentEditor(page)).toContainText(AFTER);
 
@@ -186,7 +228,9 @@ test("switching tabs after Revert to v2 takes the Undo away, and the content sho
   await expect(toastUndo(page)).toBeVisible();
 
   await tap(tab(page, "Versions"));
-  await expect(page).toHaveURL(new RegExp(`/${TEAM}/templates/${templateId}/versions$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/${TEAM}/templates/${templateId}/versions$`),
+  );
   await expect(revertToast(page)).toHaveCount(0);
 
   await tap(tab(page, "Content"));
@@ -204,21 +248,39 @@ test("switching tabs after Revert to v2 takes the Undo away, and the content sho
 // What Revert to v2 reads is a GET route, not a server action (handoff review A6), and it answers by the persona
 // cookie: Eli's session gets v2, and a request without it is refused. (Until real sign-in, a request with no cookie
 // acts as the default persona, Maya, who holds no role on Deposits.)
-test("the version Revert reads is a GET route that a request without Eli's session is refused", async ({ page, playwright, baseURL }) => {
+test("the version Revert reads is a GET route that a request without Eli's session is refused", async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
   await openDraft(page);
-  const [draft] = await rowsOf(db, "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'", [templateId]);
+  const [draft] = await rowsOf(
+    db,
+    "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
+    [templateId],
+  );
   const read = `/api/templates/${templateId}/base-version?draft=${String(draft!.id)}`;
 
   const own = await page.request.get(read);
   expect(own.status()).toBe(200);
-  expect(await own.json()).toMatchObject({ ok: true, base: { number: 2, name: NAME } });
+  expect(await own.json()).toMatchObject({
+    ok: true,
+    base: { number: 2, name: NAME },
+  });
 
   const noSession = await playwright.request.newContext({ baseURL });
   try {
     const refused = await noSession.get(read);
     expect(refused.status()).toBe(403);
-    expect(await refused.json()).toEqual({ ok: false, code: "generic", reason: expect.stringMatching(/\S/) });
-    expect((await noSession.post(read)).status(), "it isn't a POST endpoint").toBe(405);
+    expect(await refused.json()).toEqual({
+      ok: false,
+      code: "generic",
+      reason: expect.stringMatching(/\S/),
+    });
+    expect(
+      (await noSession.post(read)).status(),
+      "it isn't a POST endpoint",
+    ).toBe(405);
   } finally {
     await noSession.dispose();
   }
