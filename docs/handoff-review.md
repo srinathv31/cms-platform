@@ -877,7 +877,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### T1 · High: main fails e2e: the undo/redo merge added a layout shift
 
 - **Status:** Fixed. Undo and redo now render from the server, greyed out until there is history, ahead of the save status, so the status gaining its "Revert to v1" menu on hydration (the 4px shift the check measured) moves nothing ([decision 0003](decisions/0003-undo-redo-always-shown.md)).
-- **Where:** `src/components/workspace/save-status.tsx` line 51; `e2e/principles.spec.ts` line 271
+- **Where:** `src/components/workspace/save-status.tsx` line 51; `e2e/helpers/principles.ts` line 267 (the layout-shift check in `checkScreen`)
 - **What happens:** 4 of 241 Playwright tests fail on the project's own zero-layout-shift check, all on the template workspace and its dialogs. Each reports a 0.000004 shift at about 400 ms from the `span.inline-flex.items-center.gap-1.5` that wraps the save status and the new undo/redo buttons.
 - **Fix:** Reserve the undo/redo buttons' space from the first paint, or render them disabled until history is ready (the "disabled, not hidden" rule).
 - **Evidence:** measured

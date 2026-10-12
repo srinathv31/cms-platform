@@ -222,7 +222,7 @@ implementation of `/api/v1` (a Spring Boot service, for example) takes only `UCO
   sweep's `sunset_passed` notice in Coral's inbox), `e2e/coral-alerts.spec.ts` (Jordan approves Card Used Abroad;
   Coral links it, sends to an iPhone and an Android customer, and each phone shows the push, with or without the
   subtitle, and the text with its footer; a second send drops a heads-up in), `e2e/demo-script.spec.ts`, and
-  the "Simulator (foreign system)" block in `e2e/principles.spec.ts` (axe and layout shift on each `/sim` page).
+  the "Simulator (foreign system)" block in `e2e/principles-views-simulator.spec.ts` (axe and layout shift on each `/sim` page).
   The drivers and the snapshot and restore of `sim_*` rows are in `e2e/helpers/golive.ts`.
   `e2e/api/consumer.spec.ts` calls the GET routes the way Coral does.
 - The e2e helpers open `data/ucomp.db` directly (`openDb` in `e2e/api/helpers.ts`) and write to `sim_*` rows. When
