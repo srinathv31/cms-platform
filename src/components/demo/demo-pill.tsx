@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Clapperboard, FlaskConical, RotateCcw } from "lucide-react";
+import { useActionRun } from "@/components/primitives/use-action-run";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -60,22 +61,31 @@ function clearCardDismissals() {
   window.dispatchEvent(new Event("ucomp:card-dismissed"));
 }
 
+/** A tool's refusal (a reset on a database that isn't a local file), at the tool. */
+function Refusal({ reason }: { reason: string | null }) {
+  return reason ? (
+    <p role="alert" className="text-[13px] text-danger-text">
+      {reason}
+    </p>
+  ) : null;
+}
+
 /**
- * Demo-only tools: a dashed pill, deliberately unlike the product's own controls.
+ * Demo-only tools: a dashed pill, deliberately unlike the product's own controls. They are mounted only when
+ * the server runs in demo mode (`DemoPillHole`).
  * `clock` is a server-rendered readout passed in as a slot.
  */
 export function DemoPill({ clock }: { clock: React.ReactNode }) {
-  const [pending, startTransition] = useTransition();
+  const reset = useActionRun();
+  const clockRun = useActionRun();
+  const pending = reset.pending || clockRun.pending;
   const [days, setDays] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Controlled, so the drawer closes when the presenter leaves for the simulator: the product's layout stays
   // mounted behind it (Next keeps visited routes alive), and "Back to Stencil" must not land on an open drawer.
   const [open, setOpen] = useState(false);
 
-  const advance = (n: number) =>
-    startTransition(async () => {
-      await advanceClockAction(n);
-    });
+  const advance = (n: number) => clockRun.run(() => advanceClockAction(n));
 
   const custom = Number(days);
   const customValid = Number.isInteger(custom) && custom >= 1 && custom <= 3650;
@@ -130,9 +140,7 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
                   onClick={() => {
                     // Before the action: it redirects, so nothing after it is sure to run.
                     clearCardDismissals();
-                    startTransition(async () => {
-                      await resetDemoAction();
-                    });
+                    reset.run(() => resetDemoAction());
                   }}
                 >
                   Reset
@@ -140,6 +148,7 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          <Refusal reason={reset.error} />
         </Section>
 
         <Section label="Clock">
@@ -194,6 +203,7 @@ export function DemoPill({ clock }: { clock: React.ReactNode }) {
               Advance
             </Button>
           </form>
+          <Refusal reason={clockRun.error} />
         </Section>
 
         <Section label="Consumer simulator">

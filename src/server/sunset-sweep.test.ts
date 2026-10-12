@@ -32,6 +32,8 @@ vi.mock("@/server/clock", () => ({
   }),
 }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
+// Advance clock is a demo tool, which refuses unless the server runs in demo mode.
+vi.mock("@/server/config", () => ({ DEMO_MODE: true }));
 
 const {
   auditEvents,

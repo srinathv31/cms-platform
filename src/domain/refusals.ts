@@ -7,7 +7,7 @@
 //
 // Each area keeps its own table next to its rules (`REASONS` in permissions.ts, `REFUSALS` in
 // lifecycle/refusals.ts, `COMMENT_REFUSALS`, `ACCESS_REFUSALS`, `PLATFORM_REFUSALS`, `STAGE_REFUSALS`,
-// `OUTPUT_REFUSALS` in review-outputs.ts, `IMPORT_REFUSALS` in import-types.ts), and
+// `OUTPUT_REFUSALS` in review-outputs.ts, `IMPORT_REFUSALS` in import-types.ts, `DEMO_REFUSALS` in demo.ts), and
 // `REQUEST_REFUSALS` below holds what the server refuses before any rule runs. Every entry is built with
 // `refusal(code, sentence)`; `RefusalCode` is the union of every table's codes, and refusals.test.ts
 // checks that no two entries share one. Server actions, the on-demand reads and Stencil's own route
@@ -18,6 +18,7 @@ import type { ACCESS_REFUSALS } from "./access/refusals";
 import { formatCount } from "./numbers";
 import type { STAGE_REFUSALS } from "./approval-chain";
 import type { COMMENT_REFUSALS } from "./comments";
+import type { DEMO_REFUSALS } from "./demo";
 import type { IMPORT_REFUSALS } from "./import-types";
 import type { REFUSALS } from "./lifecycle/refusals";
 import type { REASONS } from "./permissions";
@@ -190,5 +191,6 @@ export type RefusalCode =
   | CodesOf<typeof PLATFORM_REFUSALS>
   | CodesOf<typeof OUTPUT_REFUSALS>
   | CodesOf<typeof IMPORT_REFUSALS>
+  | CodesOf<typeof DEMO_REFUSALS>
   | CodesOf<typeof REQUEST_REFUSALS>
   | ClientRefusalCode;
