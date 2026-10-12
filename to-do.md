@@ -41,12 +41,12 @@ the merge of each wave, and wave 4.
 | A (item 4) | `src/lib/serialized-writes.ts`, `src/server/effects.ts`, `src/server/drafts/apply-patch.ts`, `src/server/import/create.ts`, `src/server/queries/access.ts`, `queries/platform.ts`, `queries/audit.ts`, `queries/spaces.ts` (a shared `requireCan`), `src/editor/paste/markdown.ts`, `next.config.ts` (headers), `src/app/api/v1/consumers/[consumerId]/notices/route.ts`, `src/app/api/templates/[templateId]/preview/route.ts`, `src/server/render/render-template.ts` (no log row for `unknown_consumer`), their tests | `package.json`, `src/server/actions/*` |
 | B (item 8) | `docs/decisions/` (new records 0051 upward, taken at final rebase), `docs/architecture.md` "Data" (links only) | any code |
 | C (item 10) | a new config module under src/server (`DEMO_MODE`), `src/server/actions/demo.ts`, `actions/persona.ts`, `src/server/reset.ts`, `src/components/demo/`, their tests, the server README's "Demo-only paths" | `effects.ts`, `viewer.ts`, `clock.ts` (lane F extends the config module later) |
-| D (item 11, pins) | `package.json` (`cross-env`, exact pins for `@react-pdf/renderer` and `pdfjs-dist`, a `pretypecheck`), `package-lock.json`, `README.md`, `.gitignore`, `.claude/skills/`, `.agents/`, path handling in `src/server/import/store.ts`, `src/server/render/channels/pdf-fonts.ts`, `e2e/storage.ts` | source outside those three path sites |
-| E (corpus gaps, if promoted) | `src/server/render/golden/focused-cases.ts`, `golden/cases/`, `golden/README.md`, `docs/render-spec.md` §13 case count | the adapters |
+| D (item 11, pins) | `package.json` (`cross-env`, exact pins for `@react-pdf/renderer` and `pdfjs-dist`, a `pretypecheck`), `package-lock.json`, `README.md`, path handling in `src/server/import/store.ts`, `src/server/render/channels/pdf-fonts.ts`, `e2e/storage.ts` | source outside those three path sites; `.claude/skills/` and `.agents/` (they stay tracked) |
+| E (corpus gaps) | `src/server/render/golden/focused-cases.ts`, `golden/cases/`, `golden/README.md`, `docs/render-spec.md` §13 case count | the adapters |
 | F (item 3) | `src/server/**` except `render/`, `db/schema`, `seed/`; `src/lib/fresh-database.ts`; `src/app/api/**` as callers; server tests; `src/server/README.md`; `docs/architecture.md` "How requests flow" | `src/components/**`, `src/editor/**`, `src/domain/**` beyond type moves agreed in 2a |
 | G (item 5, components) | `src/components/workspace/content/content-workspace.tsx`, `comments/thread-list.tsx`, `workspace/content/rail.tsx`, new hooks beside them, tests for `preview/pdf/pdf-controller.ts` and `settings/platform/approval-chains.tsx`, `src/components/README.md` "Layout" rows for those files | `src/server/**` |
 | H (item 5, editor) | `src/editor/components/block-menu.tsx`, `components/document-editor.tsx`, new files beside them, `src/editor/README.md` "Files" | `src/editor/model/**` |
-| I (item 5, render) | `src/server/render/golden/content.ts` (split into four), `src/server/render/channels/pdf-text.ts` (`breakLines`), `golden/README.md` | `focused-cases.ts` and `cases/` (lane E, if it ran, is merged first) |
+| I (item 5, render) | `src/server/render/golden/content.ts` (split into four), `src/server/render/channels/pdf-text.ts` (`breakLines`), `golden/README.md` | `focused-cases.ts` and `cases/` (lane E is merged first) |
 | K (item 5, seed) | `src/server/seed/templates/build.ts` and new emitters beside it, `seed.test.ts` | anything else under `src/server` |
 | J (item 6) | a new brief under `docs/reference/` | code |
 | L1 to L7 (item 2) | one README each (`src/app`, `src/components`, `src/domain`, `src/editor`, `src/server`, `src/simulator`, `src/contracts`), plus the "Phase N" and build-history comments in that layer's code, plus that README's "how to read a file here" paragraph from item 9; L7 also owns `docs/architecture.md`, `docs/render-spec.md`, `AGENTS.md`, `docs/README.md`, `docs/reference/ui-checklist.md` | another lane's README |
@@ -66,12 +66,13 @@ the merge of each wave, and wave 4.
   at most three e2e runs at once on the Mac mini or timing specs flake. Read pass or fail from Playwright's summary
   line and `test-results/.last-run.json`, never from `$?` after a pipe.
 - Agents cannot run `npm run db:reset` in auto mode; the orchestrator seeds each worktree (`db:migrate` is enough
-  for `npm run build`). The owner merges; agents open PRs.
-- Land a wave through one integration branch with a merge commit per PR, conflicts resolved keeping both sides,
-  one full e2e, one PR. Edit an accepted decision record with an "Amended YYYY-MM-DD:" line, never a rewrite.
-- Model mix: Sonnet for the mechanical lanes (A, C, D, E, G, H, I, K, L, M); Opus for lane F's design day (2a) and
-  for lane B with the owner; one adversarial reviewer on lane F's integration PR, since the big PRs in October each
-  hid a real Medium bug.
+  for `npm run build`). Lane agents push branches and open no PRs.
+- Land a wave through one integration branch with a merge commit per lane branch, conflicts resolved keeping both
+  sides, one full e2e, one PR; the owner reads it and says when to merge (a merge commit, never a squash). Edit an
+  accepted decision record with an "Amended YYYY-MM-DD:" line, never a rewrite.
+- Model mix: the orchestrator picks per lane (Haiku for lookups, Sonnet for well-scoped changes, Opus for design,
+  concurrency, security and review), never Fable; one adversarial reviewer on each wave's integration PR, since the
+  big PRs in October each hid a real Medium bug.
 
 ## Wave 0
 
@@ -125,7 +126,8 @@ the merge of each wave, and wave 4.
     year, a sequence, a check digit), keep it separate from the primary key and from the consumer-facing
     `templateId` in `/api/v1` unless the business wants consumers to use it too; the schema already has no template
     name column (decision 0016), so a `display_id` column with a unique index is the natural home. Gather the
-    requirement before the session so the decision covers both ids at once.
+    requirement before the session so the decision covers both ids at once. Owner's call (2026-10-12): what makes
+    an id readable is for the product owner; it goes in the handoff package's open questions.
 
 ### Item 10. Demo tools behind a demo flag (lane C)
 
@@ -141,16 +143,16 @@ the merge of each wave, and wave 4.
 ### Item 11. Windows readiness, with the dependency pins (lane D)
 
 - [ ] Every work laptop is Windows. `cross-env` for the POSIX-only npm scripts (`golden:update`, and the documented
-      `E2E_WORKERS=1 …`, `E2E_PORT=3000 …` prefixes, with a PowerShell note in README.md); stop tracking the 14
-      symlinks under `.claude/skills/` and the 286 vendored files under `.agents/` (keep `skills-lock.json`); a
+      `E2E_WORKERS=1 …`, `E2E_PORT=3000 …` prefixes, with a PowerShell note in README.md); a
       `pretypecheck` that removes a stale `.next/dev/types`; check path handling in `src/server/import/store.ts`,
       `src/server/render/channels/pdf-fonts.ts` and `e2e/storage.ts` on a Windows checkout (M-31, M-32, T8).
 - [ ] In the same `package.json` change: exact pins for `@react-pdf/renderer` and `pdfjs-dist`, since the PDF
       adapter depends on their internals (M-19), with a comment saying why.
-- Why: a symlink becomes a one-line text file on a Windows checkout without developer mode, and an env-prefixed
-  script fails in cmd.exe and PowerShell.
+- Owner's call (2026-10-12): `.claude/skills/` and `.agents/` stay tracked. The owner uses them, and the handoff
+  copies the source into a new repository rather than moving this one, so they are simply left out of the copy.
+- Why: an env-prefixed script fails in cmd.exe and PowerShell.
 
-### Golden corpus gaps (lane E, a candidate the owner has not promoted yet)
+### Golden corpus gaps (lane E, promoted 2026-10-12)
 
 - [ ] The corpus is the Java engine's acceptance test, the work is pure Node with no rework risk, and a hole here
       becomes a bug the Java team ships and then a dispute about which engine is right. Add `error-invalid-values-only`,
@@ -290,9 +292,10 @@ The backend-agnostic Next.js app and the BFF seam are the same piece of work.
       it); the monitoring note that streamed pages answer 200 on not-found (below); what the enterprise pipeline
       must run (Prettier check, typecheck, lint, docs:check, test, build, e2e at `E2E_WORKERS=2`); the Windows notes;
       and the nine full reports under `docs/quality-review-2026-10-12/`.
-- [ ] Repo hygiene at transfer time: the reference images still in git history (G4), the three git author identities
-      (a `.mailmap` or a rewrite), and the local addresses in `next.config.ts`'s `allowedDevOrigins` (an uncommitted
-      local change today).
+- [ ] What to leave out when copying: the repository itself does not move (owner's call, 2026-10-12); the source is
+      copied into a new repository, so git history (G4) and the author identities don't travel. Leave out the
+      vendored `.agents/` and `.claude/` folders and the local addresses in `next.config.ts`'s `allowedDevOrigins`
+      (an uncommitted local change today).
 
 ## Product owner's calls (go in the handoff package, not solved here)
 
