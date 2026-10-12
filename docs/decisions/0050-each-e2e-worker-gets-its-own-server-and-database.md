@@ -43,9 +43,10 @@ template show up in another's assertions.
 
 ## Consequences
 
-- **Time:** on a 12-core machine shared with other work, the 379 tests took 4.3 minutes at 4 workers (twice) and
-  11.0 minutes with `E2E_WORKERS=1`, all passing. The run is now bounded by its longest file: `principles.spec.ts`
-  (2.7 minutes) and then `phase-1.spec.ts` (1.1 minutes). The config prints files over a minute
+- **Time:** on a 12-core machine, the 379 tests took 11.0 minutes with `E2E_WORKERS=1` and 4.3 minutes at 4
+  workers, then 3.0 minutes at 4 workers (twice) once `principles.spec.ts` (2.7 minutes on its own) was split into
+  five `principles-*.spec.ts` files of under a minute each. The longest file is now `phase-1.spec.ts` (1.1 minutes).
+  The config prints files over a minute
   (`reportSlowTests`); a file that grows past a quarter of the run is worth splitting, as more workers don't help it.
 - **Cost:** each worker is one more Node server (`next start`, 250 to 570 MB resident during a run, plus about 90 MB for the `npm exec` that wraps it)
   and one more Chromium, plus one more `db:reset` before the run starts. Four workers need about 3 GB and four
