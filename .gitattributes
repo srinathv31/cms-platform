@@ -1,0 +1,38 @@
+# Line endings. Every text file is LF in the repository and in every working copy, whatever
+# `core.autocrlf` says. A Windows checkout with autocrlf on would otherwise turn the render goldens
+# (byte-exact, the Java engine's acceptance test) and every file Prettier checks red. Prettier's own
+# `endOfLine` default is "lf", so the two agree.
+* text=auto eol=lf
+
+# Byte-exact fixtures: tests read these from disk and compare them with what the code produces, so
+# git never converts them, in either direction. None holds a CR today; `-text` is what lets one that
+# should (a clipboard capture from Word on Windows has CRLFs) be committed as it is. Keep this list
+# in step with the "Byte-exact fixtures" group in .prettierignore.
+/src/server/render/golden/cases/** -text
+/src/editor/paste/__fixtures__/** -text
+/e2e/fixtures/import/** -text
+/src/domain/messages/GraphemeBreakTest.txt -text
+
+# Binary files: never converted, never diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.webm binary
+*.mp4 binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary

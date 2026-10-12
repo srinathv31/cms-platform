@@ -14,8 +14,8 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 2    | 6      | 5   | 13    |
-| Partly fixed | 0        | 3    | 3      | 2   | 8     |
+| Open         | 0        | 2    | 5      | 5   | 12    |
+| Partly fixed | 0        | 3    | 4      | 2   | 9     |
 | Fixed        | 1        | 21   | 31     | 33  | 86    |
 | Deferred     | 1        | 2    | 1      | 0   | 4     |
 
@@ -932,7 +932,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T8 · Medium: Runtime paths assume the dev machine
 
-- **Status:** Open
+- **Status:** Partly fixed. The uploads folder is configurable (`UPLOADS_DIR`, absolute or relative; `resolveUploadsRoot` in `src/server/import/store.ts`), and the three path sites (`store.ts`, `pdf-fonts.ts`, `e2e/storage.ts`) hold up on Windows, with tests that run the Windows path rules on any machine. Still open: the PDF fonts are read from `node_modules` under the working directory, and `db:migrate` needs `tsx`; both wait for the deployment work in [T4](#t4--high-no-ci-node-pin-or-environment-template) and the enterprise font.
 - **Where:** `src/server/render/channels/pdf-fonts.ts` line 47
 - **What happens:** PDF fonts are read from `process.cwd()/node_modules/...`, uploads go to `./data/uploads`, and `db:migrate` needs `tsx` from devDependencies. All three break in a standard container.
 - **Fix:** Copy fonts into the app, make the uploads location configurable, and compile the migration script.

@@ -6,7 +6,8 @@
 // docs/archive is history and isn't checked; links into it are. Run with `npm run docs:check`.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { repoPath } from "../src/lib/repo-path";
 
 const ROOT = process.cwd();
 
@@ -52,7 +53,7 @@ const problems: Problem[] = [];
 const counts = { docs: 0, links: 0, paths: 0, codeRefs: 0, readmes: 0 };
 
 function report(file: string, line: number, message: string) {
-  problems.push({ file: relative(ROOT, file), line, message });
+  problems.push({ file: repoPath(ROOT, file), line, message });
 }
 
 // Every file git would commit (tracked, or untracked and not ignored), and every folder that holds one. Paths are
@@ -79,14 +80,15 @@ for (const path of files) {
 }
 
 function exists(absolute: string): boolean {
-  const path = relative(ROOT, absolute).replace(/\/$/, "");
+  // git lists paths with "/", so the path is spelled that way on Windows too.
+  const path = repoPath(ROOT, absolute);
   return files.has(path) || folders.has(path);
 }
 
 // Yields the lines outside fenced code blocks, with their 1-based line numbers.
 function* proseLines(text: string): Generator<[number, string]> {
   let fence: { char: string; length: number } | null = null;
-  const lines = text.split("\n");
+  const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const marker = /^ {0,3}(`{3,}|~{3,})/.exec(lines[i]);
     if (marker) {
@@ -184,7 +186,7 @@ function checkMarkdown(file: string) {
 }
 
 function checkCodeComments(file: string) {
-  const lines = readFileSync(file, "utf8").split("\n");
+  const lines = readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((line, i) => {
     for (const ref of line.matchAll(DOCS_REF_IN_CODE)) {
       counts.codeRefs++;

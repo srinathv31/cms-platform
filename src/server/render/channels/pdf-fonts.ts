@@ -29,6 +29,11 @@ export interface FontFace {
 // Each path is a literal joined to process.cwd() (the project root under `next dev`, `next start`
 // and vitest), so the build's file tracing sees exactly which files the route reads. The route
 // handler is bundled, so a module-relative path would point into .next/.
+//
+// On Windows `path.join` gives `C:\work\stencil\node_modules\…`. Keep that native path: react-pdf
+// reads a string `src` as a file unless it looks like a URL (`scheme://…` or `//host/…`), and fetches
+// it over the network if it does, so a `file:` URL or a path rewritten with `//` must never reach it
+// (pdf-fonts-paths.test.ts).
 function fontFile(full: string): string {
   if (!existsSync(full)) {
     throw new Error(

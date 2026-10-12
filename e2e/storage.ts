@@ -1,4 +1,5 @@
 import path from "node:path";
+import { filePathOfUrl, fileUrlOfPath } from "../src/lib/file-url";
 
 // Where e2e keeps its data: its own database file and uploads folder per worker, never the demo's
 // (`data/ucomp.db`, `data/uploads`). A run starts one server per worker (`playwright.config.ts`), each on its own
@@ -17,10 +18,14 @@ import path from "node:path";
 
 const fromEnv = (name: string) => process.env[name] || undefined;
 
-/** `file:/abs/path` whatever the working directory; a non-file URL (libsql://…) passes through. */
+/**
+ * The `file:` URL with an absolute path, whatever the working directory; a non-file URL (libsql://…) passes
+ * through. The path is spelled so libSQL opens it on Windows too (`file:C:/work/stencil/data/e2e-0.db`; see
+ * `src/lib/file-url.ts`).
+ */
 function absoluteFileUrl(url: string): string {
-  if (!url.startsWith("file:")) return url;
-  return `file:${path.resolve(process.cwd(), url.slice("file:".length))}`;
+  const file = filePathOfUrl(url);
+  return file === null ? url : fileUrlOfPath(file);
 }
 
 /** The port of the first server; the others follow it (`E2E_GATE_PORT`, 3100 by default). */
