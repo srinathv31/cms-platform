@@ -1169,17 +1169,26 @@ const glyphs = make("pdf-error-glyphs", "Characters the PDF font cannot draw", {
   ),
 });
 
-const errorValues = make("error-invalid-values", "Values that do not fit", {
-  variables: [
-    first,
-    variable("purchase_apr", "Purchase APR", "percent", true, "21.99"),
-    variable("annual_fee", "Annual fee", "currency", true, "95"),
-    variable("cash_fee", "Cash fee", "currency", true, "5"),
-    variable("promo", "Promo", "text", false, ""),
-  ],
-  values: { purchase_apr: "1,00", annual_fee: "007", cash_fee: num("1e3") },
-  body: doc(para("This document is never rendered.")),
-});
+/**
+ * One required value is missing and three others are invalid: the code is `missing_variables` (it wins
+ * whenever anything is missing), its message lists the missing keys and then each invalid sentence, and
+ * `details` carries both lists. The twin with nothing missing is `error-invalid-values-only`.
+ */
+const errorMissingAndInvalid = make(
+  "error-missing-and-invalid-values",
+  "Values that do not fit",
+  {
+    variables: [
+      first,
+      variable("purchase_apr", "Purchase APR", "percent", true, "21.99"),
+      variable("annual_fee", "Annual fee", "currency", true, "95"),
+      variable("cash_fee", "Cash fee", "currency", true, "5"),
+      variable("promo", "Promo", "text", false, ""),
+    ],
+    values: { purchase_apr: "1,00", annual_fee: "007", cash_fee: num("1e3") },
+    body: doc(para("This document is never rendered.")),
+  },
+);
 
 /**
  * Nothing is missing, so the code is `invalid_values` (not `missing_variables`): one sentence per invalid key,
@@ -1833,7 +1842,7 @@ export const FOCUSED_CASES: FocusedCase[] = [
   valuesFormats,
   valuesAtLimit,
   glyphs,
-  errorValues,
+  errorMissingAndInvalid,
   errorInvalidValuesOnly,
   errorValueTooLong,
   wideTable,
