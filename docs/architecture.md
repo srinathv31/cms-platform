@@ -214,7 +214,9 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
 - [next.config.ts](../next.config.ts): `cacheComponents: true`, `typedRoutes: true`, dev indicators off, and libSQL
   kept out of the bundle (`serverExternalPackages`). Partial prefetching stays off: on 16.3.8 it re-requests every
   link's route tree in a loop in this app. The "router prefetch" tests in `e2e/phase-1.spec.ts` guard against it.
-- Environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`; `UCOMP_API_ORIGIN` (where Coral sends requests;
+- Environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`; `DEMO_MODE` (the demo tools: reset, clock advance,
+  persona switcher and the Demo pill; off unless set, read when the server starts,
+  [decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md), parsed in [config.ts](../src/server/config.ts)); `UCOMP_API_ORIGIN` (where Coral sends requests;
   default this server over loopback) and `PORT`. E2E reads `E2E_PORT` and `E2E_GATE_PORT`.
 - Uploaded originals are stored under `data/uploads/`. PDF fonts are read from `node_modules` at render time.
 
@@ -223,7 +225,9 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
 Facts about the code today. Each line goes away in the PR that fixes it.
 
 - No real authentication: the persona cookie, failing open to Maya, identifies every request.
-- Demo controls are ungated: reset, advance clock, and persona switch work in any build, for anyone.
+- The demo controls (reset, advance clock, persona switch) run only with `DEMO_MODE` set, which a deployment never
+  sets ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)). They still go when real sign-in lands. Until then the persona cookie still decides who
+  acts, whether or not the switcher is there.
 - A consumer is identified by the `X-Consumer-Id` header alone, with no credential or rate limit.
 - Access deadlines (recertification, inactivity) apply, and passed sunsets reach the audit log and consumers' notices, only when the sweeps
   run: on a clock advance, a persona switch, or an access action. There is no scheduled job. (A sunset still stops

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "demo": "next build && next start",
+    "demo": "next build && cross-env DEMO_MODE=1 next start",
     "lint": "eslint",
     "pretypecheck": "node -e \"require('node:fs').rmSync('.next/dev/types', { recursive: true, force: true })\"",
     "typecheck": "next typegen && tsc --noEmit",

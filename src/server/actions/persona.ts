@@ -5,11 +5,13 @@ import { redirect } from "next/navigation";
 import { refresh, revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { eq } from "drizzle-orm";
+import { demoToolsRefusal } from "@/domain/demo";
 import { canSeeSpace, defaultSpace } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
 import { runAccessSweep } from "@/server/access-sweep";
 import { now } from "@/server/clock";
+import { DEMO_MODE } from "@/server/config";
 import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema/ucomp";
 import { runSunsetSweep } from "@/server/sunset-sweep";
@@ -29,13 +31,17 @@ function firstSegment(path: string): string | null {
  * the sign-in restarts their inactivity clock (`users.last_active_at`). The sunset sweep runs too, so
  * the audit log records any sunset the clock has passed.
  * Stay on the same URL if the new persona can see it, otherwise go to their default space. A demo
- * tool, so it checks no permission and doesn't run on the server action kit; a persona that isn't one
- * is refused.
+ * tool, so it checks no permission and doesn't run on the server action kit: it checks the demo flag
+ * (`DEMO_MODE`, decision 0051; off, it answers `demo_mode_off` and sets nothing), and a persona that
+ * isn't one is refused.
  */
 export async function switchPersona(
   personaId: string,
   currentPath: string,
 ): Promise<ActionResult> {
+  const off = demoToolsRefusal(DEMO_MODE);
+  if (off) return off;
+
   const personas = await getPersonas();
   if (
     typeof currentPath !== "string" ||
