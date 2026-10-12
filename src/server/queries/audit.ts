@@ -1,6 +1,5 @@
 import "server-only";
 import { cache } from "react";
-import { notFound } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
 import {
   AUDIT_PAGE_LIMIT,
@@ -49,6 +48,7 @@ import {
 import { refusal, type ReadRefusal } from "@/server/api/reads";
 import { formatAgo, formatDateTime, utcDay } from "@/domain/dates";
 import { getPeople, iso, personOf, type People } from "./review-shared";
+import { requireCan } from "./require-can";
 import { requireSpace } from "./spaces";
 import { currentName } from "./template-name";
 
@@ -108,10 +108,9 @@ const auditPageFor = cache(
       if (values[i] !== null) filters[key] = values[i]!;
     });
     const space = await requireSpace(spaceSlug);
-    if (
-      !can(space.viewer, "audit.view", { teamId: space.teamId ?? ALL_SPACE }).ok
-    )
-      notFound();
+    requireCan(space.viewer, "audit.view", {
+      teamId: space.teamId ?? ALL_SPACE,
+    });
     const { data } = await readAudit(
       {
         slug: space.slug,

@@ -120,9 +120,10 @@ decisions were in the product; they are recoverable from the `archive/design-moc
   ([app-frame.tsx](../components/app-shell/app-frame.tsx)): sidebar, top bar and canvas, with the
   viewer-dependent parts streamed as holes, and the Demo pill.
 - [[team]/layout.tsx](<./(product)/[team]/layout.tsx>) runs `TeamGuard` (`requireSpaceFromParams` in
-  [queries/spaces.ts](../server/queries/spaces.ts)): an unknown slug calls `notFound()`
-  ([not-found.tsx](<./(product)/not-found.tsx>)); a team the viewer can't see redirects to their default space or
-  `/request-access`. It renders `children` and the `modal` slot. Pages guard themselves too, through their
+  [queries/spaces.ts](../server/queries/spaces.ts)): an unknown slug and a team the viewer can't see both call
+  `notFound()` ([not-found.tsx](<./(product)/not-found.tsx>), whose Back to library goes to `/`, the viewer's own
+  space or `/request-access`; [decision 0052](../../docs/decisions/0052-a-page-you-may-not-read-is-not-found.md)).
+  It renders `children` and the `modal` slot. Pages guard themselves too, through their
   queries.
 - **The `@modal` slot.** A soft navigation to `/[team]/settings/[section]` is intercepted by
   [@modal/(.)settings](<./(product)/[team]/@modal/(.)settings/layout.tsx>), which opens `SettingsShell`

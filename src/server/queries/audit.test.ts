@@ -91,19 +91,14 @@ describe("getAuditPage: who sees what", () => {
     }
   });
 
-  it("hides the page from people without audit.view, and All teams from a Team Admin", async () => {
+  it("is Not found without audit.view, in All teams for a Team Admin, and in a team the viewer can't see", async () => {
+    const notFound = isNextError("NEXT_HTTP_ERROR_FALLBACK;404");
     as("maya");
-    await expect(getAuditPage("coral-offers", {})).rejects.toSatisfy(
-      isNextError("NEXT_HTTP_ERROR_FALLBACK;404"),
-    );
+    await expect(getAuditPage("coral-offers", {})).rejects.toSatisfy(notFound);
     as("alex");
-    await expect(getAuditPage("all", {})).rejects.toSatisfy(
-      isNextError("NEXT_REDIRECT"),
-    );
+    await expect(getAuditPage("all", {})).rejects.toSatisfy(notFound);
     as("alex");
-    await expect(getAuditPage("deposits", {})).rejects.toSatisfy(
-      isNextError("NEXT_REDIRECT"),
-    );
+    await expect(getAuditPage("deposits", {})).rejects.toSatisfy(notFound);
   });
 
   it("writes rows with a sentence, labels and demo-clock times", async () => {
