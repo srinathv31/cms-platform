@@ -255,3 +255,6 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   split the screens into files of about the same duration so they can run in parallel. They are read-only and can
   run against a dev server: `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts --workers=1`.
 - **Docs:** `npm run docs:check` ([scripts/docs-check.ts](../scripts/docs-check.ts)).
+- **Formatting:** Prettier with its default configuration (`.prettierrc` is `{}`). `npm run format` rewrites files;
+  `npm run format:check` fails on a file it would change. `.prettierignore` lists what Prettier skips, by group:
+  build output, the byte-exact fixtures and render goldens, generated code, and the frozen documents.

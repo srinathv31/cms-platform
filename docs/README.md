@@ -40,6 +40,8 @@ the root [README.md](../README.md).
 - Link files with relative links, and name paths exactly. `npm run docs:check` fails on links and headings that don't
   resolve, backticked paths (`src/…`, `@/…`, `docs/…`, `e2e/…`, `scripts/…`) that don't exist, `docs/` paths in code
   comments that don't exist, and a folder under `src/` without a README.
+- Prettier formats these Markdown files too: run `npm run format` before you commit. It skips `docs/archive/` and the
+  dated quality review, which are never edited.
 - Write plainly: short sentences, present tense, Oxford comma, no filler. [src/editor/README.md](../src/editor/README.md)
   is a good model for depth.
 - Don't copy what a file's header comment already says. Summarize, and link the file.

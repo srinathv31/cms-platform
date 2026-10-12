@@ -37,5 +37,9 @@ npm run typecheck
 npm run lint
 npm test         # vitest
 npm run docs:check   # links, paths and READMEs in the docs
+npm run format:check   # Prettier, default configuration; `npm run format` fixes what it reports
 npm run build && npm run e2e   # Playwright, against the production build (4 workers, each with its own server and data/e2e-<n>.db)
 ```
+
+The formatting commit is listed in [.git-blame-ignore-revs](.git-blame-ignore-revs), so `git blame` can skip it. GitHub
+does this by itself; for a local clone run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once.

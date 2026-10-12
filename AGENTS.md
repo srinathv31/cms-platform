@@ -21,16 +21,18 @@ is [docs/README.md](docs/README.md). Ignore `docs/archive/`: it records how the 
 | `npm run lint`                              | ESLint, including the import boundaries below.                                                                                                                                                                                                                                                         |
 | `npm test`                                  | Vitest, about 10 seconds. Never touches `data/ucomp.db`. Tests run in a random order; a failure prints the seed to replay it with.                                                                                                                                                                     |
 | `npm run docs:check`                        | Fails on broken doc links and paths, and on a `src/` folder without a README.                                                                                                                                                                                                                          |
+| `npm run format`                            | Prettier with its default configuration (`.prettierrc` is `{}`): rewrites every file it covers. `.prettierignore` lists what it skips and why. A second run can still change a few files, so run it again until `format:check` passes.                                                                 |
+| `npm run format:check`                      | Fails on a file Prettier would change. Run `npm run format` to fix it.                                                                                                                                                                                                                                 |
 | `npm run golden:update`                     | Regenerates the render golden files after an intended change to render output. Read the diff.                                                                                                                                                                                                          |
 | `npm run build`                             | The production build. It is the only check that enforces the Cache Components rules.                                                                                                                                                                                                                   |
 | `npm run e2e`                               | Playwright against the production build, in parallel: `E2E_WORKERS` workers (default 4), each with its own server (port 3100 and up), `data/e2e-<n>.db` and `data/e2e-uploads-<n>`, never the demo's. About 4.5 minutes (11 with one worker); `E2E_WORKERS=1` for one server (also for a single spec). |
 | `npx playwright test --project=demo`        | Opt-in: plays the whole demo script (`e2e/demo-script.spec.ts`) and the scenario specs paced for a recording. `npm run e2e` never runs the script.                                                                                                                                                     |
 | `npm run db:generate`, `npm run db:migrate` | Generate a migration from the schema; apply migrations.                                                                                                                                                                                                                                                |
 
-Before you finish: `npm run typecheck`, `npm run lint`, `npm test`, and `npm run docs:check`. Add `npm run build`
-when you changed a page, a layout, a route handler, or anything a server component reads. Don't run `npm run db:reset`
-in someone's working copy without asking: it wipes the demo database. `npm run e2e` resets only its own database and
-uploads folder, so it is safe for the demo.
+Before you finish: `npm run typecheck`, `npm run lint`, `npm test`, `npm run docs:check`, and `npm run format:check`.
+Add `npm run build` when you changed a page, a layout, a route handler, or anything a server component reads. Don't run
+`npm run db:reset` in someone's working copy without asking: it wipes the demo database. `npm run e2e` resets only its
+own database and uploads folder, so it is safe for the demo.
 
 ## Layers and boundaries
 

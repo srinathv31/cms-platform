@@ -255,7 +255,7 @@ route handlers, not server actions, because actions run one at a time per client
 3. Write the streamed component in `src/components/<feature>/`. It awaits `params`, calls a query in
    `src/server/queries/` (which resolves the viewer and, under `[team]`, `requireSpace`), and uses `now()`.
 4. Add the route to the route lists in [helpers/principles.ts](../../e2e/helpers/principles.ts) with the personas
-   that can see it, then run `npm run typecheck` and `npm run lint`.
+   that can see it, then run `npm run typecheck`, `npm run lint` and `npm run format:check`.
 
 Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/page.tsx>) with
 [versions-content.tsx](../components/versions/versions-content.tsx), or
