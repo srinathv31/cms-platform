@@ -13,6 +13,8 @@
 // Text is HTML-escaped; `{{key}}` is left exactly as written (the paste's chip transform turns it
 // into a chip afterwards), and its underscores never read as emphasis. Pure string work: no DOM.
 
+import { CONTROL_CHARACTERS } from "../model/characters";
+
 const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
 const EMPTY_HEADING = /^ {0,3}#{1,6}[ \t]*$/;
 const RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
@@ -46,9 +48,13 @@ export function looksLikeMarkdown(text: string): boolean {
   return INLINE_MARKDOWN.test(text);
 }
 
-/** Markdown → schema HTML (p, h1–h3, ul/ol/li, table/tr/th/td, strong, em, a, br, hr). */
+/**
+ * Markdown → schema HTML (p, h1–h3, ul/ol/li, table/tr/th/td, strong, em, a, br, hr). Control characters
+ * go first (tab, LF and CR stay), as the document drops them anyway: the inline pass sets pieces aside as
+ * `\u0000N\u0000` placeholders, and a NUL in the text would read as one.
+ */
 export function markdownToHtml(markdown: string): string {
-  return blocksToHtml(splitLines(markdown));
+  return blocksToHtml(splitLines(markdown.replace(CONTROL_CHARACTERS, "")));
 }
 
 // ── Blocks ───────────────────────────────────────────────────────
