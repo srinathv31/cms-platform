@@ -236,10 +236,12 @@ Facts about the code today. Each line goes away in the PR that fixes it.
 - **Unit:** Vitest, `npm test`, about 10 seconds for the whole suite. Tests sit beside their code. The environment
   is `node`; a test that needs a DOM starts with `// @vitest-environment happy-dom`. Database tests use temporary
   files and never touch `data/ucomp.db`. Each layer README covers its own helpers.
-- **End to end:** Playwright, `npm run e2e`, against the production build on port 3100, so run `npm run build`
-  first. When nothing is listening there, it runs `npm run db:reset` and starts `next start`. The helpers in
-  `e2e/api/helpers.ts` open `data/ucomp.db` directly and write to it, so `DATABASE_URL` can't isolate a run. To keep
-  your local demo data, run the suite from a copy of the working tree. The full suite takes about 12 minutes.
+- **End to end:** Playwright, `npm run e2e`, against the production build, so run `npm run build` first. Spec files
+  run in parallel, `E2E_WORKERS` at a time (4 by default), each worker with its own `next start` (port 3100 and
+  up), database (`data/e2e-<n>.db`) and uploads folder, so no run touches `data/ucomp.db`
+  ([decision 0050](decisions/0050-each-e2e-worker-gets-its-own-server-and-database.md)). Playwright runs
+  `npm run db:reset` and starts the servers when nothing is listening on their ports. The full suite takes about
+  4.5 minutes at 4 workers, 11 with one.
   Functional specs click at test speed. The whole-demo script (`e2e/demo-script.spec.ts`) and the recording pacing
   are opt-in: `npx playwright test --project=demo` plays the script with a cursor, paced clicks and a video
   ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).

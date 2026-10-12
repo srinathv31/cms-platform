@@ -300,17 +300,24 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](./(product)/[team]/audit/export/route.test.ts)) mocks the viewer and the
   query the same way; the delivery file route has none.
-- **Pages:** no unit tests; Playwright covers them. Specs run serially against the production build on port
-  3100. When nothing is listening there, `playwright.config.ts` starts it after `npm run db:reset`, with e2e's own
-  database and uploads folder (`E2E_DATABASE_URL`, default `file:./data/e2e.db`; `E2E_UPLOADS_DIR`, default
-  `./data/e2e-uploads`), passed as the server's `DATABASE_URL` and `UPLOADS_DIR`. The demo's `data/ucomp.db` and
-  `data/uploads` are never touched. [e2e/storage.ts](../../e2e/storage.ts) reads the two values once; `openDb()` in
-  `e2e/api/helpers.ts` and the cleanup helpers use it, so server and specs share the files, and `openDb()` waits out
-  and retries the server's `SQLITE_BUSY`. `resetDemoData()` (`e2e/helpers/access.ts`), which a spec calls from
-  `afterAll` when it cannot put its changes back by hand, re-seeds those same files. To check against a running dev
-  server without a reset, start that server with the same two variables (`DATABASE_URL=file:./data/e2e.db UPLOADS_DIR=./data/e2e-uploads npm run dev`, after
-  an `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts --workers=1`. To
-  point the specs at the demo database instead, set `E2E_DATABASE_URL=file:./data/ucomp.db` and
+- **Pages:** no unit tests; Playwright covers them. Spec files run in parallel against the production build, one
+  server per worker ([decision 0050](../../docs/decisions/0050-each-e2e-worker-gets-its-own-server-and-database.md)):
+  `E2E_WORKERS` sets the count (4 by default; `--workers` on the command line wins), and the tests inside one file
+  still run in order. Worker `n` (Playwright's `TEST_PARALLEL_INDEX`) uses the server on `E2E_GATE_PORT + n` (3100
+  by default), the database `data/e2e-n.db` and the uploads folder `data/e2e-uploads-n`. `playwright.config.ts`
+  starts each server after an `npm run db:reset` on its own `DATABASE_URL` and `UPLOADS_DIR`; the demo's
+  `data/ucomp.db` and `data/uploads` are never touched. [e2e/storage.ts](../../e2e/storage.ts) derives the
+  worker's port, database and folder from its index, and the config (which each worker loads too) takes the worker's
+  `baseURL` from it, so a spec just uses `page.goto("/…")`. `openDb()` in `e2e/api/helpers.ts` and the cleanup
+  helpers read the same values, so server and specs share the files, and `openDb()` waits out and retries the
+  server's `SQLITE_BUSY`. `resetDemoData()` (`e2e/helpers/access.ts`), which a spec calls from `afterAll` when it
+  cannot put its changes back by hand, re-seeds the worker's own files. For one spec file, `E2E_WORKERS=1` (or
+  `--workers=1`) starts one server instead of four. The run is serial, on one server, when it cannot be split: with
+  `E2E_PORT` (a server you started yourself), with `E2E_DATABASE_URL` or `E2E_UPLOADS_DIR` set, and in the opt-in
+  `demo` and `stills-1280` projects. To check against a running dev server without a reset, start that server with
+  the worker-0 values (`DATABASE_URL=file:./data/e2e-0.db UPLOADS_DIR=./data/e2e-uploads-0 npm run dev`, after an
+  `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts`. To point the
+  specs at the demo database instead, set `E2E_DATABASE_URL=file:./data/ucomp.db` and
   `E2E_UPLOADS_DIR=./data/uploads`.
 - **Pace and recording:** a functional spec clicks, types and drags at test speed. The helpers in `e2e/helpers/`
   (`tap`, `typeSlowly`, `dragRowTo`) carry no pause and no recording code; waits are on a condition, never a
