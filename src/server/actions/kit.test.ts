@@ -221,31 +221,28 @@ describe("serverAction", () => {
     expect(await stored("kit_returned")).toBeUndefined();
   });
 
-  it("retries a transaction SQLite answered busy, and the retry's write lands once", async () => {
+  it("runs the transaction once: SQLite answering busy fails the action, and nothing is written", async () => {
+    // The database client already waited for its turn (src/lib/serialized-writes.ts); a retry would wait again.
+    const busy = Object.assign(new Error("database is locked"), {
+      code: "SQLITE_BUSY",
+    });
     let attempts = 0;
-    const result = await write(
-      { key: "kit_busy", value: "second try" },
-      {
-        transaction: async (tx, { input }) => {
-          attempts += 1;
-          await tx
-            .insert(settings)
-            .values({ key: input.key, value: input.value });
-          if (attempts === 1)
-            throw Object.assign(new Error("database is locked"), {
-              code: "SQLITE_BUSY",
-            });
-          return { ok: true, key: input.key };
+    await expect(
+      write(
+        { key: "kit_busy", value: "x" },
+        {
+          transaction: async (tx, { input }) => {
+            attempts += 1;
+            await tx
+              .insert(settings)
+              .values({ key: input.key, value: input.value });
+            throw busy;
+          },
         },
-      },
-    );
-    expect(result).toEqual({ ok: true, key: "kit_busy" });
-    expect(attempts).toBe(2);
-    expect(await stored("kit_busy")).toBe("second try");
-    expect(
-      now,
-      "the clock is read once, not per attempt",
-    ).toHaveBeenCalledTimes(1);
+      ),
+    ).rejects.toBe(busy);
+    expect(attempts).toBe(1);
+    expect(await stored("kit_busy")).toBeUndefined();
   });
 
   it("throws a bug, from the transaction or from authorize, and writes nothing", async () => {

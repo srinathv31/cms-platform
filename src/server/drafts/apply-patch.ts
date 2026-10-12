@@ -23,6 +23,7 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { prepareBody, prepareField } from "@/server/documents/prepare";
+import { inTransaction } from "@/server/effects";
 import { newId } from "@/server/ids";
 import {
   DRAFT_EDITED,
@@ -80,29 +81,6 @@ export async function accessRefusal(
   return editRefusal(viewer, version);
 }
 
-function isBusy(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const { code, cause } = error as { code?: unknown; cause?: unknown };
-  return code === "SQLITE_BUSY" || (cause !== undefined && isBusy(cause));
-}
-
-/**
- * Two saves in flight at once (two tabs, or a save during another write) make the second
- * `BEGIN IMMEDIATE` fail with SQLITE_BUSY, because the local file has no busy timeout. Nothing has
- * run when that happens, so waiting a few milliseconds and trying again is safe. The retry then
- * sees the first save's rev and answers `conflict`. Against Turso this never triggers.
- */
-async function retryWhenBusy<T>(run: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await run();
-    } catch (error) {
-      if (attempt >= 5 || !isBusy(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 15 * 2 ** attempt));
-    }
-  }
-}
-
 export interface ApplyPatchArgs {
   viewer: Viewer;
   versionId: string;
@@ -153,122 +131,120 @@ export async function applyDraftPatch(
 
   const changed = changedFields({ ...patch, name });
 
-  const transaction = () =>
-    db.transaction(async (tx) => {
-      // libSQL starts write transactions as BEGIN IMMEDIATE, so the reads below see the same rev the update will.
-      const row = await tx
-        .select({
-          rev: versions.rev,
-          state: versions.state,
-          writers: versions.writers,
-          channelFields: versions.channelFields,
-          templateId: versions.templateId,
-          teamId: templates.teamId,
-          allowedChannels: contentTypes.allowedChannels,
-        })
-        .from(versions)
-        .innerJoin(templates, eq(templates.id, versions.templateId))
-        .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
-        .where(eq(versions.id, versionId))
-        .limit(1)
-        .then((rows) => rows[0]);
+  // Run once: a save stuck behind another write fails after the client's wait (`inTransaction`).
+  return inTransaction(db, async (tx) => {
+    // libSQL starts write transactions as BEGIN IMMEDIATE, so the reads below see the same rev the update will.
+    const row = await tx
+      .select({
+        rev: versions.rev,
+        state: versions.state,
+        writers: versions.writers,
+        channelFields: versions.channelFields,
+        templateId: versions.templateId,
+        teamId: templates.teamId,
+        allowedChannels: contentTypes.allowedChannels,
+      })
+      .from(versions)
+      .innerJoin(templates, eq(templates.id, versions.templateId))
+      .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
+      .where(eq(versions.id, versionId))
+      .limit(1)
+      .then((rows) => rows[0]);
 
-      if (!row) return fail(REQUEST_REFUSALS.versionGone);
-      const forbidden = editRefusal(viewer, row);
-      if (forbidden) return forbidden;
+    if (!row) return fail(REQUEST_REFUSALS.versionGone);
+    const forbidden = editRefusal(viewer, row);
+    if (forbidden) return forbidden;
 
-      if (row.state !== "draft") return fail(REQUEST_REFUSALS.versionNotDraft);
+    if (row.state !== "draft") return fail(REQUEST_REFUSALS.versionNotDraft);
 
-      // One audit row per editing session: the same actor, draft and session key.
-      const existing = await tx
-        .select({
-          id: auditEvents.id,
-          at: auditEvents.at,
-          details: auditEvents.details,
-        })
-        .from(auditEvents)
-        .where(
-          and(
-            eq(auditEvents.action, DRAFT_EDITED),
-            eq(auditEvents.versionId, versionId),
-            eq(auditEvents.sessionKey, patch.sessionKey),
-            eq(auditEvents.actorId, viewer.userId),
-          ),
-        )
-        .limit(1)
-        .then((rows) => rows[0]);
+    // One audit row per editing session: the same actor, draft and session key.
+    const existing = await tx
+      .select({
+        id: auditEvents.id,
+        at: auditEvents.at,
+        details: auditEvents.details,
+      })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.action, DRAFT_EDITED),
+          eq(auditEvents.versionId, versionId),
+          eq(auditEvents.sessionKey, patch.sessionKey),
+          eq(auditEvents.actorId, viewer.userId),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0]);
 
-      // A request that is behind is a conflict, unless this session wrote the current rev itself:
-      // then it is only missing its own saves (a lost response) and it is safe to carry on from the
-      // current rev. A request that is ahead is always a conflict.
-      if (
-        patch.rev !== row.rev &&
-        !sessionOwnsRev(existing ?? null, row.rev, patch.rev)
-      ) {
-        return fail(REQUEST_REFUSALS.draftChanged, row.rev);
-      }
+    // A request that is behind is a conflict, unless this session wrote the current rev itself:
+    // then it is only missing its own saves (a lost response) and it is safe to carry on from the
+    // current rev. A request that is ahead is always a conflict.
+    if (
+      patch.rev !== row.rev &&
+      !sessionOwnsRev(existing ?? null, row.rev, patch.rev)
+    ) {
+      return fail(REQUEST_REFUSALS.draftChanged, row.rev);
+    }
 
-      const channelsRefused = patch.channels
-        ? draftChannelsRefusal(patch.channels, row.allowedChannels)
-        : null;
-      if (channelsRefused) return fail(channelsRefused);
+    const channelsRefused = patch.channels
+      ? draftChannelsRefusal(patch.channels, row.allowedChannels)
+      : null;
+    if (channelsRefused) return fail(channelsRefused);
 
-      // Whoever saves an edit wrote the version, so they can't decide it (maker-checker).
-      const set: SQLiteUpdateSetSource<typeof versions> = {
-        rev: sql`${versions.rev} + 1`,
-        updatedAt: at,
-        writers: withWriter(row.writers, viewer.userId),
-      };
-      if (name !== undefined) set.name = name;
-      if (body !== undefined) set.body = body;
-      if (patch.variables !== undefined) set.variables = patch.variables;
-      if (patch.channels !== undefined) set.channels = patch.channels;
-      // Laid over the stored fields, read in this transaction: the ones the patch doesn't name are kept.
-      if (fieldsChanged)
-        set.channelFields = withChannelFieldValues(row.channelFields, fields);
-      if (patch.sampleSets !== undefined) set.sampleSets = patch.sampleSets;
+    // Whoever saves an edit wrote the version, so they can't decide it (maker-checker).
+    const set: SQLiteUpdateSetSource<typeof versions> = {
+      rev: sql`${versions.rev} + 1`,
+      updatedAt: at,
+      writers: withWriter(row.writers, viewer.userId),
+    };
+    if (name !== undefined) set.name = name;
+    if (body !== undefined) set.body = body;
+    if (patch.variables !== undefined) set.variables = patch.variables;
+    if (patch.channels !== undefined) set.channels = patch.channels;
+    // Laid over the stored fields, read in this transaction: the ones the patch doesn't name are kept.
+    if (fieldsChanged)
+      set.channelFields = withChannelFieldValues(row.channelFields, fields);
+    if (patch.sampleSets !== undefined) set.sampleSets = patch.sampleSets;
 
-      // The rev and state in the WHERE make this a compare-and-set, whatever the transaction mode.
-      // `row.rev` is `patch.rev` except in the lost-response case above.
-      const updated = await tx
-        .update(versions)
-        .set(set)
-        .where(
-          and(
-            eq(versions.id, versionId),
-            eq(versions.rev, row.rev),
-            eq(versions.state, "draft"),
-          ),
-        )
-        .returning({ rev: versions.rev });
-      const saved = updated[0];
-      if (!saved) return fail(REQUEST_REFUSALS.draftChanged, row.rev);
+    // The rev and state in the WHERE make this a compare-and-set, whatever the transaction mode.
+    // `row.rev` is `patch.rev` except in the lost-response case above.
+    const updated = await tx
+      .update(versions)
+      .set(set)
+      .where(
+        and(
+          eq(versions.id, versionId),
+          eq(versions.rev, row.rev),
+          eq(versions.state, "draft"),
+        ),
+      )
+      .returning({ rev: versions.rev });
+    const saved = updated[0];
+    if (!saved) return fail(REQUEST_REFUSALS.draftChanged, row.rev);
 
-      const merged = mergeDraftEdit(existing ?? null, changed, at, saved.rev);
-      if (existing) {
-        await tx
-          .update(auditEvents)
-          .set(merged)
-          .where(eq(auditEvents.id, existing.id));
-      } else {
-        await tx.insert(auditEvents).values({
-          id: newId("ae"),
-          ...merged,
-          actorId: viewer.userId,
-          teamId: row.teamId,
-          templateId: row.templateId,
-          versionId,
-          action: DRAFT_EDITED,
-          sessionKey: patch.sessionKey,
-        });
-      }
+    const merged = mergeDraftEdit(existing ?? null, changed, at, saved.rev);
+    if (existing) {
+      await tx
+        .update(auditEvents)
+        .set(merged)
+        .where(eq(auditEvents.id, existing.id));
+    } else {
+      await tx.insert(auditEvents).values({
+        id: newId("ae"),
+        ...merged,
+        actorId: viewer.userId,
+        teamId: row.teamId,
+        templateId: row.templateId,
+        versionId,
+        action: DRAFT_EDITED,
+        sessionKey: patch.sessionKey,
+      });
+    }
 
-      return {
-        ok: true,
-        rev: saved.rev,
-        savedAt: at.toISOString(),
-      } satisfies DraftSaveResponse;
-    });
-
-  return retryWhenBusy(transaction);
+    return {
+      ok: true,
+      rev: saved.rev,
+      savedAt: at.toISOString(),
+    } satisfies DraftSaveResponse;
+  });
 }

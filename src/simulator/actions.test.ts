@@ -40,7 +40,6 @@ vi.mock("@/simulator/db", async () => {
   return {
     simLibsql: temp.libsql,
     simDb: temp.db,
-    withBusyRetry: <T>(write: () => Promise<T>) => write(),
     __files: temp.__files,
   };
 });

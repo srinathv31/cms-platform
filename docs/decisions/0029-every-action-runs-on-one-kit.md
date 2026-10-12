@@ -4,6 +4,9 @@ Status: Accepted
 Amended 2026-10-11: the last Consequences line no longer holds: the autosave route, import and the audit export now
 refuse in the same `{ ok: false, code, reason }` shape ([0041](0041-routes-refuse-in-the-actions-shape.md), A3);
 only `/api/v1` waits for the Java API.
+Amended 2026-10-12: `inTransaction` no longer retries a busy database. The database client is the one place a write
+waits (5 s for its turn), and a write that still can't go fails the action (`src/lib/serialized-writes.ts`, M-1 of
+the October 12 review).
 Date: 2026-10-09
 
 ## Context
