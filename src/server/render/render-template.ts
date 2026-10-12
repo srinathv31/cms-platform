@@ -48,6 +48,7 @@ import { writeRenderLog } from "./log";
 //     refused at 4. A preview may name a round (`round`, `?round=` on the review screen); the consumer
 //     route has no round to pass.
 //   3 preview: viewer sees the team → 403 preview_forbidden; consumer: registered → 403 unknown_consumer
+//     (not logged: a caller that isn't a consumer writes nothing)
 //   4 version rules (consumers only) → 409 / 410
 //   5 channel: content type allows it → 422 channel_not_allowed; version has it → 422 channel_not_enabled
 //   6–9 the engine (engine.ts): values → 422 missing_variables / invalid_values; the document check,
@@ -55,7 +56,8 @@ import { writeRenderLog } from "./log";
 //     can act on (a stored document the check or the resolver refuses, or characters the PDF's
 //     fonts can't draw; see `renderFailure`); a push or SMS over its limit → 422
 //     push_payload_too_large / sms_too_long
-//  10 one render_log row, ok or error. Never values: the channel, a push's platform and the error code only.
+//  10 one render_log row, ok or error, for every request that reached 3, but a caller that isn't a
+//     consumer. Never values: the channel, a push's platform and the error code only.
 
 export interface RenderInput {
   templateId: string;
@@ -186,6 +188,16 @@ export async function runRender(
         );
   if (!version) return fail(versionNotFound(template.id, input.version));
 
+  // 3, for a consumer: a registered one. A caller that isn't is refused here, unlogged, so anonymous
+  // calls never queue a write behind the process's write lock.
+  if (!input.preview) {
+    const consumerId = input.consumerId ?? "";
+    const consumer = await db.query.consumers.findFirst({
+      where: eq(consumers.id, consumerId),
+    });
+    if (!consumer) return fail(unknownConsumer(consumerId));
+  }
+
   // 3–9, then 10: every request that got this far is logged, whatever the outcome.
   const result = await renderVersion(
     db,
@@ -299,13 +311,7 @@ async function renderVersion(
     if (version.state === "superseded")
       newerVersion = await activeNumber(db, template.id);
   } else {
-    // 3. A registered consumer.
-    const consumerId = input.consumerId ?? "";
-    const consumer = await db.query.consumers.findFirst({
-      where: eq(consumers.id, consumerId),
-    });
-    if (!consumer) return fail(unknownConsumer(consumerId));
-
+    // 3 (a registered consumer) was checked by `runRender`, before anything is logged.
     // 4. Version rules. Consumers always pin a number, so `version.number` is set here.
     const check = checkVersion({
       version: {

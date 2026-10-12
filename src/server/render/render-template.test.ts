@@ -702,7 +702,7 @@ describe("runRender: the title is the rendered version's name", () => {
   });
 });
 
-describe("runRender: refusals before the version is known are not logged", () => {
+describe("runRender: refusals before the version is known, and a caller that isn't a consumer, are not logged", () => {
   it("unknown template (404)", async () => {
     const { result, rows } = await render({ template: "UC-ZZZZZZ" });
     expect(failed(result)).toEqual({
@@ -754,10 +754,10 @@ describe("runRender: refusals before the version is known are not logged", () =>
     expect(failed(anonymous.result).code).toBe("consumer_required");
     expect(anonymous.rows).toHaveLength(0);
   });
-});
 
-describe("runRender: consumer, channel and value errors are logged", () => {
-  it("unknown consumer (403)", async () => {
+  // A caller that isn't a registered consumer writes nothing, so anonymous calls can't queue writes
+  // behind the process's write lock.
+  it("a consumer that isn't registered (403), for a version that is there", async () => {
     const { result, rows } = await render({
       template: "balance-transfer",
       version: 2,
@@ -767,13 +767,11 @@ describe("runRender: consumer, channel and value errors are logged", () => {
       code: "unknown_consumer",
       message: 'Consumer "acme" isn\'t registered.',
     });
-    expect(rows[0]).toMatchObject({
-      consumerId: "acme",
-      outcome: "error",
-      errorCode: "unknown_consumer",
-    });
+    expect(rows).toHaveLength(0);
   });
+});
 
+describe("runRender: consumer, channel and value errors are logged", () => {
   it("a channel the version hasn't turned on (422)", async () => {
     const { result, rows } = await render({
       template: "balance-transfer",

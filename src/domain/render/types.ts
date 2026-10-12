@@ -476,9 +476,9 @@ export interface RenderErrorBody {
 // ── render_log ───────────────────────────────────────────────────────────────
 
 /**
- * One row per render that reached a known template and version (requests rejected before that are
- * not logged). The ONLY fields written; there is deliberately no place for values, the request body,
- * or rendered output.
+ * One row per render that reached a known template and version (requests rejected before that, and a
+ * caller that isn't a registered consumer, are not logged). The ONLY fields written; there is
+ * deliberately no place for values, the request body, or rendered output.
  */
 export interface RenderLogEntry {
   templateId: string;
