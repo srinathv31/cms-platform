@@ -72,5 +72,5 @@ write the Unix way, in front of a command.
 - **Symlinks.** The 14 links under `.claude/skills/` point into `.agents/` (agent tooling, which nothing in the app
   reads). Without symlink support, git writes each as a one-line text file. Ignore them, or turn on Developer Mode and set
   `git config core.symlinks true` before cloning.
-- **Recording tools.** `npm run gate:media` and `e2e/qa/contact-sheet.mjs` were built on macOS: they call `ffmpeg` at a
-  Homebrew path (set `FFMPEG` to override it) and `sips`. The rest of e2e doesn't need either.
+- **Recording is macOS-only.** `npm run gate:media` records the demo video and stills for presentations (it calls
+  Homebrew's `ffmpeg` and `sips`); nothing else needs it.
