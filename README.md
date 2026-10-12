@@ -19,8 +19,10 @@ Open [http://localhost:3000](http://localhost:3000). `npm run db:reset` also put
 To see the app the way users get it, with routes prerendered and links prefetched, run the production build:
 
 ```bash
-npm run demo   # next build && next start
+npm run demo   # next build && next start, with the demo tools on
 ```
+
+The Demo pill (reset, clock, simulator link) and the persona switcher are demo tools. `npm run dev`, `npm run demo` and the e2e suite turn them on (`DEMO_MODE=1`). A `next start` you run by hand has neither unless you set `DEMO_MODE=1`, and a deployment that sets nothing never has them ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).
 
 To present Stencil to a new audience, follow the step-by-step [demo script](docs/guides/demo-script.md).
 

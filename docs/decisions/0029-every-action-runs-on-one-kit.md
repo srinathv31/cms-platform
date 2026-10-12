@@ -4,6 +4,8 @@ Status: Accepted
 Amended 2026-10-11: the last Consequences line no longer holds: the autosave route, import and the audit export now
 refuse in the same `{ ok: false, code, reason }` shape ([0041](0041-routes-refuse-in-the-actions-shape.md), A3);
 only `/api/v1` waits for the Java API.
+Amended 2026-10-12: the demo tools check the demo flag (`demo_mode_off`) and `resetDemoAction` answers an
+`ActionResult`; they still check no permission and stay outside the kit ([0051](0051-the-demo-tools-run-only-in-demo-mode.md)).
 Date: 2026-10-09
 
 ## Context

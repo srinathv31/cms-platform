@@ -15,9 +15,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
 | Open         | 0        | 2    | 6      | 5   | 13    |
-| Partly fixed | 0        | 3    | 3      | 2   | 8     |
+| Partly fixed | 1        | 3    | 3      | 2   | 9     |
 | Fixed        | 1        | 21   | 31     | 33  | 86    |
-| Deferred     | 1        | 2    | 1      | 0   | 4     |
+| Deferred     | 0        | 2    | 1      | 0   | 3     |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), PR #66 (N26 and N27), and PRs #67–#72 (A1, T3, T5, T7 and N20).
 
@@ -334,10 +334,10 @@ The sign-in work also touches findings filed elsewhere. [A1](#a1--high-the-publi
 
 They leave with the persona switcher.
 
-| Finding                                                                            | What removing them has to get right                                                                                                                                                                |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [S1 · Critical](#s1--critical-demo-reset-and-clock-actions-are-public-and-ungated) | Remove the reset and clock actions and the demo pill, or gate them behind one `DEMO_MODE` flag that production never sets. Either way, `resetDemo()` refuses any database that isn't a local file. |
-| [A7 · Medium](#a7--medium-the-http-date-header-carries-the-demo-clock)             | The HTTP `Date` header goes back to real time. If a demo mode survives, its clock travels in its own header.                                                                                       |
+| Finding                                                                            | What removing them has to get right                                                                                                                                          |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [S1 · Critical](#s1--critical-demo-reset-and-clock-actions-are-public-and-ungated) | Gated behind `DEMO_MODE` ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)); with real sign-in, remove the reset and clock actions and the demo pill. |
+| [A7 · Medium](#a7--medium-the-http-date-header-carries-the-demo-clock)             | The HTTP `Date` header goes back to real time. If a demo mode survives, its clock travels in its own header.                                                                 |
 
 ### The Java API
 
@@ -376,7 +376,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S1 · Critical: Demo reset and clock actions are public and ungated
 
-- **Status:** Deferred. The owner will remove or hide the demo tools before production.
+- **Status:** Partly fixed. The reset, the clock advance, the persona switcher and the Demo pill run only when `DEMO_MODE` is set (off unless it is; read when the server starts, parsed in `src/server/config.ts`), and `resetDemo()` refuses any database that isn't a local `file:` one, flag or no flag ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)). Left: the tools themselves, which leave with real sign-in, and the persona cookie ([S2](#s2--high-identity-fails-open-to-the-default-persona)), which still decides who acts.
 - **Where:** `src/server/actions/demo.ts` line 14; `src/server/reset.ts` line 23
 - **What happens:** `resetDemoAction` drops every table, re-seeds and empties the uploads folder. `advanceClockAction` moves the clock up to 3,650 days, runs the access sweep, and every later audit timestamp uses the moved clock. Both are `"use server"` endpoints with no permission or environment check, callable without a cookie. `resetDemo()` also runs against any `DATABASE_URL`, including a remote `libsql://` database.
 - **Fix:** One `DEMO_MODE` flag from a validated config module, checked inside each action and in the layout that mounts the demo pill. Make `resetDemo()` refuse non-`file:` URLs.

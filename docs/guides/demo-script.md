@@ -51,6 +51,8 @@ Stencil is one controlled place to author, approve and publish customer content.
    npm run demo
    ```
 
+   `npm run demo` starts the server with the demo tools on (`DEMO_MODE=1`). A server started any other way has no Demo pill and no persona switcher.
+
 2. Open `http://localhost:3000`. You land in Maya's Library (Maya is the default persona).
 3. Do one full practice run, then reset. The acts build on each other.
 
