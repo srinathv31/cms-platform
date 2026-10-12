@@ -14,8 +14,8 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 2    | 6      | 5   | 13    |
-| Partly fixed | 0        | 3    | 3      | 2   | 8     |
+| Open         | 0        | 1    | 5      | 5   | 11    |
+| Partly fixed | 0        | 4    | 4      | 2   | 10    |
 | Fixed        | 1        | 21   | 31     | 33  | 86    |
 | Deferred     | 1        | 2    | 1      | 0   | 4     |
 
@@ -408,7 +408,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S5 · High: Consumer identity is a self-asserted header
 
-- **Status:** Open
+- **Status:** Partly fixed. A caller that isn't a registered consumer (`unknown_consumer`) writes no `render_log` row, so anonymous calls queue no writes, and the notices route answers 403 `consumer_mismatch` for any path but the caller's own, so no answer says which consumer ids exist. Credentials and rate limits wait for the gateway.
 - **Where:** `src/server/queries/consumer-api.ts` line 62; `src/app/api/v1/consumers/[consumerId]/notices/route.ts` line 27
 - **What happens:** `X-Consumer-Id` has no secret. The notices check (header must equal the path) looks like authorization, but the caller sets both. Every anonymous render of an existing template writes a `render_log` row through the process-wide write lock, so flooding the endpoint makes autosaves and approvals wait up to 15 seconds and then fail. None of this is documented as a prototype limit.
 - **Fix:** Client credentials (OAuth client-credentials or mTLS) at the gateway or BFF, rate limits, and no log rows for unauthenticated callers. State it in the contract.
@@ -850,7 +850,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B4 · Medium: SQLite workarounds are spread through the code
 
-- **Status:** Open
+- **Status:** Partly fixed. Waiting is contained in the database client: `createAppClient` (`src/lib/serialized-writes.ts`) is the one place a write waits, 5 s for its turn, and nothing retries above it; the copies in `effects.ts`, `drafts/apply-patch.ts` and the simulator's `withBusyRetry` are gone, and import runs on `inTransaction` too. `rowid` ordering, `strftime` day buckets and the in-memory filtering remain.
 - **Where:** `src/server/effects.ts` line 222; `src/server/queries/library.ts` line 59
 - **What happens:** A process-wide write lock, three busy-retry copies (and one transaction with none), `rowid` ordering for audit and notifications, `strftime` day buckets, and in-memory filtering: the library loads every version of every team, and the audit page loads the whole log.
 - **Fix:** Contain retries in the DB client, order by ULID or sequence, filter in SQL.
