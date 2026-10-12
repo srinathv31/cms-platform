@@ -390,7 +390,7 @@ submit, and a footer that changed between the two versions struck and inserted (
   review, go live, sunset, revoke, roles, access, import, Copilot); `e2e/alerts.spec.ts` follows an alert from the
   composer and its live phone through submit, a field-redlined review, a comment on a field and Compare;
   `e2e/phase-1.spec.ts`, `e2e/navigation.spec.ts`,
-  and `e2e/principles.spec.ts` cover the shell, Back and Forward, and the settings modal. The auto fixture in
+  and `e2e/principles-*.spec.ts` cover the shell, Back and Forward, and the settings modal. The auto fixture in
   [e2e/helpers/scenario.ts](../../e2e/helpers/scenario.ts) fails a test on any console error.
 - Specs select by accessible name and by `data-slot` and `data-status` attributes: grep `e2e/` before you rename
   one. On the default port, `npm run e2e` runs `npm run db:reset` before starting the server, which resets the
