@@ -231,6 +231,7 @@ The engine runs the same check before resolving (pipeline stage 7). A stored doc
 - A tab becomes one space (normalized at save, and again by the resolver).
 - Line break characters in a text node become hard breaks (normalized at save, and again by the resolver). In a variable's display text and in the email subject and preheader they become one space (section 8).
 - Every other character is kept exactly as typed, including U+00A0 (no-break space) and the other Unicode spaces.
+- **Scripts and direction.** Text of every script is written in the order it was typed (logical order). The value length limit (section 5), a heading's underline and the padding of a table cell's lines in plain text (section 10) count code points, never UTF-16 units or display width. The engine sets no text direction: no `dir` attribute, no direction marks (they are invisible characters, removed above), and `lang` stays `en` whatever the text. Right-to-left text (Arabic, Hebrew) and runs that mix directions are laid out by the client's own bidirectional algorithm. A character the PDF's fonts can't draw fails the PDF (section 11); the Node engine's fonts have no Arabic, Hebrew or CJK glyphs, so a document holding any of them is refused for the PDF while web and email render it. The golden case `characters-scripts` pins this for web and email.
 
 ### Spaces
 
@@ -764,6 +765,7 @@ src/server/render/golden/
   "templateId": "UC-GOLDEN",
   "templateName": "Nested lists",
   "versionNumber": 1,                       // or null for a draft
+  "round": 2,                               // optional: the round a preview names ("v3 · Round 2"); absent: none
   "at": "2027-03-04T12:00:00.000Z",         // render time: the PDF's dates
   "variables": [ { "key", "label", "type", "required", "sample" }, … ],
   "values": { "purchase_apr": 21.90, … },   // as a request sends them; JSON numbers are read from their source text
@@ -802,7 +804,7 @@ A case runs the engine (stages 6 to 9) on its input once per channel it lists, i
 - The PDF has zero missing glyphs, and its dates equal `at` to the second.
 - A second run gives identical files and identical PDF bytes; and two fresh processes rendering every case in opposite orders give identical outputs (`determinism.test.ts`, section 12).
 
-**Updating:** `npm run golden:update` rewrites `expected/` and `node/` (deleting stale files) and the hand-built cases' `input.json` from `focused-cases.ts`. `npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]` freezes a seeded version as a new `input.json`, which is never rewritten. Otherwise the test run (`npm test`) fails on a missing, extra or differing file, or a hand-built `input.json` out of step with `focused-cases.ts`. There are 60 cases: 52 hand-built (13 of them `error-*`, one `pdf-error-*`, one `push-error-*`, one `sms-error-*`, and 16 for push and SMS in all) and 8 `seed-*`. The import script is `scripts/golden-import.ts`.
+**Updating:** `npm run golden:update` rewrites `expected/` and `node/` (deleting stale files) and the hand-built cases' `input.json` from `focused-cases.ts`. `npm run golden:import -- <templateId|seedKey> <version|draft> <sampleSet> [case-name]` freezes a seeded version as a new `input.json`, which is never rewritten. Otherwise the test run (`npm test`) fails on a missing, extra or differing file, or a hand-built `input.json` out of step with `focused-cases.ts`. There are 67 cases: 59 hand-built (17 of them `error-*`, one `pdf-error-*`, one `push-error-*`, one `sms-error-*`, and 18 for push and SMS in all) and 8 `seed-*`. The import script is `scripts/golden-import.ts`.
 
 **How Java consumes them:** the Java build reads the same `cases/` directory. For each case it renders `input.json` with its own engine and checks: `renderdoc.json`, `email.json`, `links.json`, `error.json`, `pdf.meta.json`, `push.*.json` and `sms*.json` (when present) as JSON; `web.html`, `email.html`, `email.txt` and `content.txt` byte for byte; its own PDF's extracted content against the PDF view (`content.ts` `VIEWS.pdf`, compared as `compareContent` does, each table cell read on its own) and its link annotations against `links.json`; zero missing glyphs. It ignores `node/`.
 

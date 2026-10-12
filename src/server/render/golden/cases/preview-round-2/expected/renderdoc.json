@@ -1,0 +1,39 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Round two of a rate notice",
+  "versionNumber": 3,
+  "round": 2,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Your rate is changing"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hi "
+        },
+        {
+          "type": "text",
+          "text": "Maya",
+          "variable": "first_name"
+        },
+        {
+          "type": "text",
+          "text": ", the new rate starts on March 4."
+        }
+      ]
+    }
+  ]
+}

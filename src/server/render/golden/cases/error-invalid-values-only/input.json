@@ -1,0 +1,90 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Values that do not fit, none missing",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "purchase_apr",
+      "label": "Purchase APR",
+      "type": "percent",
+      "required": true,
+      "sample": "21.99"
+    },
+    {
+      "key": "annual_fee",
+      "label": "Annual fee",
+      "type": "currency",
+      "required": true,
+      "sample": "95"
+    },
+    {
+      "key": "opened_on",
+      "label": "Opened on",
+      "type": "date",
+      "required": true,
+      "sample": "2027-03-04"
+    },
+    {
+      "key": "home_state",
+      "label": "Home state",
+      "type": "us_state",
+      "required": true,
+      "sample": "NJ"
+    },
+    {
+      "key": "points",
+      "label": "Points",
+      "type": "number",
+      "required": false,
+      "sample": "20000"
+    },
+    {
+      "key": "nickname",
+      "label": "Nickname",
+      "type": "text",
+      "required": false,
+      "sample": "Maya"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "purchase_apr": "1,00",
+    "annual_fee": 1e3,
+    "opened_on": "2027-02-29",
+    "home_state": "N.J.",
+    "points": "007",
+    "nickname": true,
+    "not_a_variable": "ignored"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "This document is never rendered."
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {},
+  "channels": [
+    "pdf",
+    "web",
+    "email"
+  ]
+}

@@ -20,9 +20,9 @@ The rules live in `docs/render-spec.md` (section 13 is the golden file contract,
 determinism). This README covers how to work with the files.
 
 Contents: [Layout](#layout) · [A case's files](#a-cases-files) · [Case names](#case-names) ·
-[The tests](#the-tests) · [Generating](#generating) · [When to regenerate](#when-to-regenerate) ·
-[Reviewing a golden diff](#reviewing-a-golden-diff) · [Adding a case](#adding-a-case) ·
-[How Java uses them](#how-java-uses-them) · [Gotchas](#gotchas)
+[What the cases pin](#what-the-cases-pin) · [The tests](#the-tests) · [Generating](#generating) ·
+[When to regenerate](#when-to-regenerate) · [Reviewing a golden diff](#reviewing-a-golden-diff) ·
+[Adding a case](#adding-a-case) · [How Java uses them](#how-java-uses-them) · [Gotchas](#gotchas)
 
 ## Layout
 
@@ -82,6 +82,9 @@ cases/<slug>/
 JSON files are compared as parsed JSON (key order and whitespace don't matter); `.html` and `.txt`
 files byte for byte.
 
+A preview of an unreleased round ("v3 · Round 2") puts `round` in `input.json`, after `versionNumber`: the
+RenderDoc then carries it, and the PDF's subject (`pdf.meta.json`) and footer name it. Without it, no `round`.
+
 A case renders only the channels it lists (`channels`), in the order PDF, web, email, push (iPhone, then
 Android), SMS. A refusal before the adapter (values, the document check, the resolver) ends the case, so a
 refused body reads "The PDF couldn't be rendered. …", and a refused subject or preheader (only email checks
@@ -102,6 +105,24 @@ The prefix is an assertion: `parity.test.ts` checks it.
 | anything else | A hand-built case from `focused-cases.ts` that renders in every channel it lists. The first word groups it: `lists-`, `spaces-`, `characters-`, `table-`, `push-`, `sms-`, `alert-`, … |
 
 Slugs are lowercase letters, digits and dashes.
+
+## What the cases pin
+
+Each hand-built case pins one rule or group of rules from `docs/render-spec.md`; its comment in
+`focused-cases.ts` says which. `ls cases` is the full list; this groups it.
+
+| Group                                 | Cases                                                                                                                                                                                                                                                                                                                                                                                                                      | Rules (spec section)           |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| Lists                                 | `lists-default-numbering`, `lists-author-styles`, `lists-start-numbers`, `lists-mixed`                                                                                                                                                                                                                                                                                                                                     | markers and numbering (7)      |
+| Spaces, breaks, blank lines           | `spaces-and-breaks`, `spaces-leading-no-break`, `spaces-leading-mixed`, `blank-lines`, `optional-variables`                                                                                                                                                                                                                                                                                                                | 4, and removal (8)             |
+| Characters                            | `unicode-nfc-zero-width`, `characters-soft-hyphen`, `characters-direction-and-variation`, `characters-scripts` (right-to-left and CJK text, so web and email only: the PDF's fonts can't draw them)                                                                                                                                                                                                                        | 4                              |
+| Values                                | `values-formats`, `values-1000-code-points` (a value at the length limit, web and email only)                                                                                                                                                                                                                                                                                                                              | 5                              |
+| Links, tables, structure              | `links`, `tables`, `table-12-columns`, `callouts-and-rules`, `headings-and-marks`, `escaping`, `ordinary-structures`, `email-subject-preheader`, `pagination` (the Node PDF's layout only)                                                                                                                                                                                                                                 | 6, 8, 10                       |
+| A preview of a round                  | `preview-round-2`                                                                                                                                                                                                                                                                                                                                                                                                          | 9, 10 (PDF)                    |
+| Push and SMS                          | `alert-push-and-sms`, `push-subtitle-ios-only`, `push-emoji-and-joiners`, `sms-gsm7-plain`, `sms-gsm7-extension`, `sms-ucs2-from-value`, `sms-boundary-*`, `sms-emoji-*`, `sms-conjunct-*`, `sms-footer`                                                                                                                                                                                                                   | 10                             |
+| Refused before any channel (`error-`) | values: `error-missing-variables`, `error-invalid-values` (also misses a value, so `missing_variables`), `error-invalid-values-only`, `error-value-too-long`; the document: `error-heading-level`, `error-list-start`, `error-list-too-deep`, `error-numbering-style`, `error-table-*`, `error-unknown-node`, `error-heading-in-cell-list`; a channel's fields: `error-email-field`, `error-push-field`, `error-sms-field` | 3, 5, 11                       |
+| Refused by one channel                | `pdf-error-glyphs`, `push-error-too-large`, `sms-error-too-long`                                                                                                                                                                                                                                                                                                                                                           | 10, 11                         |
+| From the seed                         | `seed-*`                                                                                                                                                                                                                                                                                                                                                                                                                   | a realistic disclosure, frozen |
 
 ## The tests
 
@@ -200,6 +221,9 @@ A hand-built case pins one rule or group of rules:
    `message(slug, templateName, { channels: ["push"] | ["sms"] | ["push", "sms"], channelFields, smsFooter? })`,
    with no body: `channelFields` is `{ push: { title, subtitle?, body }, sms: { text } }`, each a `line(…)`
    (an SMS's line breaks are `br`).
+   Other options of `make`: `versionNumber` (`null` for a draft), `round` (a preview's round), and `channels`.
+   A case with text the PDF's fonts can't draw that must still render (Arabic, Hebrew, CJK) lists
+   `["web", "email"]`.
 2. Values go in as a request sends them: strings for text, `num("21.90")` for a JSON number written
    exactly as typed.
 3. Add the case to `FOCUSED_CASES`.

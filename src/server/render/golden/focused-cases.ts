@@ -67,6 +67,8 @@ function make(
     values?: Record<string, unknown>;
     channelFields?: ChannelFields;
     versionNumber?: number | null;
+    /** The round a preview of an unreleased version names ("v3 · Round 2"). Absent: none. */
+    round?: number;
     /** Default: the document channels, PDF, web and email. */
     channels?: Channel[];
     smsFooter?: string;
@@ -79,6 +81,7 @@ function make(
       templateName,
       versionNumber:
         parts.versionNumber === undefined ? 1 : parts.versionNumber,
+      ...(parts.round === undefined ? {} : { round: parts.round }),
       at: GOLDEN_AT,
       variables: parts.variables ?? [],
       values: parts.values ?? {},
@@ -578,6 +581,70 @@ const formatCharacters = make(
   },
 );
 
+/**
+ * Right-to-left and CJK text, which the PDF's fonts can't draw (it would refuse with `render_failed`, spec
+ * section 11), so the case renders web and email only. The engine writes the characters as typed, in typed
+ * order, and leaves direction to the client: no `dir`, and no direction marks (they are invisible characters,
+ * removed). What it does decide, and Java must too:
+ *   - NFC at resolve: Hebrew points typed shin dot before qamats come out qamats first (canonical order),
+ *     decomposed Hangul jamo compose into syllables, kana with a combining dakuten into one letter;
+ *   - lengths in code points, never UTF-16 units or display width: a heading's underline and the padding of a
+ *     table cell's shorter lines in the email's plain text (𠮷, U+20BB7, is one code point and two units);
+ *   - the ideographic space (U+3000) a Japanese paragraph is indented with is content, kept as typed.
+ */
+const scripts = make("characters-scripts", "Right-to-left and CJK text", {
+  channels: ["web", "email"],
+  variables: [
+    first,
+    variable("balance", "Balance", "currency", true, "-1234.50"),
+  ],
+  // An Arabic name inside Latin text, and a Latin sign and symbol inside Arabic text.
+  values: { first_name: "ماريا", balance: "-1234.50" },
+  body: doc(
+    h(1, t("Other scripts")),
+    h(2, t("العربية")),
+    para("يجب أن يكون الحد الأدنى للدفع 35.00 دولارًا بحلول 4 مارس 2027."),
+    p(t("مرحبًا "), v("first_name"), t("، رصيدك هو "), v("balance"), t(".")),
+    p(
+      t("Dear "),
+      v("first_name"),
+      t(", your balance is "),
+      v("balance"),
+      t("."),
+    ),
+    para(
+      "Mixed direction: your reference is مرجع 4417-AB (انظر المرفق) and the call is 800-555-0100.",
+    ),
+    ul(item("قائمة عربية"), item("A list item with عربي inside")),
+    h(2, t("עברית")),
+    para("התשלום המינימלי הוא 35.00 דולר עד 4 במרץ 2027."),
+    // Shin, shin dot (U+05C1), qamats (U+05B8): NFC puts the qamats (class 18) before the dot (class 24).
+    para("Typed out of order: שָׁלוֹם."),
+    h(2, t("中文")),
+    para("最低还款额为 35.00 美元，应于 2027 年 3 月 4 日前支付。"),
+    h(2, t("日本語")),
+    // Ideographic space (U+3000) indents the paragraph. Ka and a combining dakuten (U+3099) become ga.
+    para(
+      "　お支払い期日は2027年3月4日です。「最低支払額」は35.00ドルです。ガイドをご覧ください。",
+    ),
+    // 9 code points, 10 UTF-16 units (𠮷 is outside the Basic Multilingual Plane).
+    h(2, t("𠮷野家のカード規約")),
+    h(2, t("한국어")),
+    // Hangul jamo (U+1112 U+1161 U+11AB, U+1100 U+1173 U+11AF) compose into two syllables.
+    para("최소 결제 금액은 35.00달러입니다. 한글 안내를 확인하세요."),
+    table(
+      row(head("Language"), head("Greeting")),
+      row(cell("العربية"), cell("مرحبًا بكم")),
+      row(cell("עברית"), cell("ברוכים הבאים")),
+      row(cell("中文"), cell("欢迎")),
+      row(cell("日本語"), cell("ようこそ")),
+      row(cell("한국어"), cell("환영합니다")),
+      row(td(p(t("A"), br, t("𠮷野家"))), cell("x")),
+    ),
+    ol({}, item("中文列表"), item("日本語のリスト"), item("한국어 목록")),
+  ),
+});
+
 /** Paragraphs and a heading led by no-break spaces keep their indent in every channel (D4). */
 const leadingNoBreak = make(
   "spaces-leading-no-break",
@@ -1051,6 +1118,40 @@ const valuesFormats = make("values-formats", "Variable value formats", {
   ),
 });
 
+/** `count` code points made of `pattern` repeated; the cut falls between code points, never inside an emoji. */
+const codePoints = (pattern: string, count: number) => {
+  const unit = Array.from(pattern);
+  return Array.from({ length: count }, (_, i) => unit[i % unit.length]).join(
+    "",
+  );
+};
+
+/**
+ * The longest value allowed: 1,000 code points, printed in full (never cut). It holds emoji, so its UTF-16
+ * length is over 1,000: an engine that counts `length()` refuses it. An optional value of 1,500 spaces is
+ * absent, not too long (the absent check comes first), so its paragraph is removed. The PDF can't draw the
+ * emoji, so the case renders web and email only. Its refused twin, a value one code point longer, is
+ * `error-value-too-long`.
+ */
+const valuesAtLimit = make("values-1000-code-points", "A value at the limit", {
+  channels: ["web", "email"],
+  variables: [
+    variable("memo", "Memo", "text", true, "x"),
+    variable("spacer", "Spacer", "text", false, ""),
+  ],
+  values: {
+    memo: codePoints("Note \u{1F600} ", 1000),
+    spacer: " ".repeat(1500),
+  },
+  body: doc(
+    h(1, t("A value at the limit")),
+    para("Before."),
+    p(v("spacer")),
+    p(t("Memo: "), v("memo")),
+    para("After."),
+  ),
+});
+
 // ── Cases that must fail ─────────────────────────────────────────────────────
 
 const glyphs = make("pdf-error-glyphs", "Characters the PDF font cannot draw", {
@@ -1079,6 +1180,67 @@ const errorValues = make("error-invalid-values", "Values that do not fit", {
   values: { purchase_apr: "1,00", annual_fee: "007", cash_fee: num("1e3") },
   body: doc(para("This document is never rendered.")),
 });
+
+/**
+ * Nothing is missing, so the code is `invalid_values` (not `missing_variables`): one sentence per invalid key,
+ * in the version's variable order, each type's noun once. An optional variable is checked when it has a
+ * value; a key the version doesn't list is ignored; a JSON number with an exponent and a JSON boolean are
+ * invalid, and the number is read from its source text.
+ */
+const errorInvalidValuesOnly = make(
+  "error-invalid-values-only",
+  "Values that do not fit, none missing",
+  {
+    variables: [
+      first,
+      variable("purchase_apr", "Purchase APR", "percent", true, "21.99"),
+      variable("annual_fee", "Annual fee", "currency", true, "95"),
+      variable("opened_on", "Opened on", "date", true, "2027-03-04"),
+      variable("home_state", "Home state", "us_state", true, "NJ"),
+      variable("points", "Points", "number", false, "20000"),
+      variable("nickname", "Nickname", "text", false, "Maya"),
+    ],
+    values: {
+      first_name: "Maya",
+      purchase_apr: "1,00",
+      annual_fee: num("1e3"),
+      opened_on: "2027-02-29",
+      home_state: "N.J.",
+      points: "007",
+      nickname: true,
+      not_a_variable: "ignored",
+    },
+    body: doc(para("This document is never rendered.")),
+  },
+);
+
+/**
+ * The length limit (spec section 5, decision 0011): at most 1,000 code points as sent, before any trimming.
+ *   reference  exactly 1,000 code points of emoji (2,000 UTF-16 units): passes, so it is not listed
+ *   memo       1,001 code points with emoji: refused
+ *   balance    1,001 characters that are no amount: the length sentence wins, the type isn't checked
+ *   account    a valid number of 1,000 digits and a trailing space, 1,001 as sent: refused, not trimmed first
+ * `details.invalid` carries `maxLength` for each refused key.
+ */
+const errorValueTooLong = make(
+  "error-value-too-long",
+  "Values over the length limit",
+  {
+    variables: [
+      variable("reference", "Reference", "text", true, "x"),
+      variable("memo", "Memo", "text", true, "x"),
+      variable("balance", "Balance", "currency", true, "95"),
+      variable("account", "Account", "number", true, "1"),
+    ],
+    values: {
+      reference: "\u{1F600}".repeat(1000),
+      memo: codePoints("Note \u{1F600} ", 1000) + "!",
+      balance: "x".repeat(1001),
+      account: "7".repeat(1000) + " ",
+    },
+    body: doc(para("This document is never rendered.")),
+  },
+);
 
 const wideTable = make("error-table-too-wide", "A table of 13 columns", {
   body: doc(
@@ -1234,6 +1396,24 @@ const ordinaryStructures = make("ordinary-structures", "Ordinary structures", {
       br,
       t("\u200b"),
     ),
+  ),
+});
+
+// ── A preview of a round ─────────────────────────────────────────────────────
+
+/**
+ * A CMS preview of an unreleased round whose label names it ("v3 · Round 2", src/domain/rounds.ts): the
+ * RenderDoc carries `round`, and the PDF's subject and footer name it. The web page and the email don't
+ * show it. (A consumer's render never carries a round.)
+ */
+const previewRound2 = make("preview-round-2", "Round two of a rate notice", {
+  versionNumber: 3,
+  round: 2,
+  variables: [first],
+  values: { first_name: "Maya" },
+  body: doc(
+    h(1, t("Your rate is changing")),
+    p(t("Hi "), v("first_name"), t(", the new rate starts on March 4.")),
   ),
 });
 
@@ -1587,6 +1767,48 @@ const smsTooLong = message("sms-error-too-long", "SMS over 10 parts", {
   channelFields: { sms: { text: line(v("note"), v("note")) } },
 });
 
+/**
+ * A push's title, subtitle and body hold text and variables only, with no line breaks (spec section 2, "Field
+ * shapes"). The body here has a hard break, so the push is refused before either platform renders, in the
+ * push's words: render_failed, reason "document".
+ */
+const errorPushField = message(
+  "error-push-field",
+  "A push body with a hard break",
+  {
+    channels: ["push"],
+    channelFields: {
+      push: {
+        title: line(t("Your rate is changing")),
+        subtitle: line(t("Coral Card")),
+        body: line(t("The new rate starts"), br, t("on March 4.")),
+      },
+    },
+  },
+);
+
+/**
+ * An SMS keeps its line breaks but takes no marks. The bold run here (JSON can carry what the editor
+ * can't type) refuses the message in the SMS's words, though the hard break beside it is allowed.
+ */
+const errorSmsField = message(
+  "error-sms-field",
+  "An SMS message with a bold run",
+  {
+    channels: ["sms"],
+    channelFields: {
+      sms: {
+        text: line(
+          t("Coral Offers: your rate is "),
+          t("changing", bold),
+          br,
+          t("Pay at coral.example/pay"),
+        ),
+      },
+    },
+  },
+);
+
 export const FOCUSED_CASES: FocusedCase[] = [
   listsDefault,
   listsStyles,
@@ -1600,6 +1822,7 @@ export const FOCUSED_CASES: FocusedCase[] = [
   unicode,
   softHyphen,
   formatCharacters,
+  scripts,
   links,
   tables,
   twelveColumns,
@@ -1608,8 +1831,11 @@ export const FOCUSED_CASES: FocusedCase[] = [
   escaping,
   emailFields,
   valuesFormats,
+  valuesAtLimit,
   glyphs,
   errorValues,
+  errorInvalidValuesOnly,
+  errorValueTooLong,
   wideTable,
   deepLists,
   cellTable,
@@ -1623,6 +1849,7 @@ export const FOCUSED_CASES: FocusedCase[] = [
   errorMissingVariables,
   errorCellListHeading,
   ordinaryStructures,
+  previewRound2,
   pagination(),
   alertBoth,
   pushSubtitle,
@@ -1637,6 +1864,8 @@ export const FOCUSED_CASES: FocusedCase[] = [
   smsEmojiBoundary,
   smsFooter,
   smsTooLong,
+  errorPushField,
+  errorSmsField,
   pushJoiners,
   smsJoiners,
   smsConjunct,
