@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import {
   consumerMismatch,
-  consumerNotFound,
   NOTICE_LIMIT,
   parseLimit,
   QUERY_MESSAGES,
@@ -16,7 +15,6 @@ import {
 } from "@/server/api/http";
 import { now } from "@/server/clock";
 import {
-  findConsumer,
   listNotices,
   noticeEpoch,
   requireConsumer,
@@ -26,7 +24,9 @@ import {
 // consumer, oldest first, paged with an opaque cursor. Contract: ApiNoticeList in src/contracts/api-v1.ts.
 //
 // X-Consumer-Id must be registered and must be the consumer in the path. The headers are read before
-// anything touches the database (request-time under Cache Components).
+// anything touches the database (request-time under Cache Components). A path naming any other id is
+// `consumer_mismatch`, whether or not that id is registered, so a caller learns nothing about which
+// consumers exist.
 
 export const GET = withDemoDate(async function get(
   request: NextRequest,
@@ -39,8 +39,6 @@ export const GET = withDemoDate(async function get(
 
   const caller = await requireConsumer(consumerHeader);
   if (!caller.ok) return errorResponse(caller.error, correlationId);
-  if (!(await findConsumer(consumerId)))
-    return errorResponse(consumerNotFound(consumerId), correlationId);
   if (caller.consumer.id !== consumerId)
     return errorResponse(consumerMismatch(consumerId), correlationId);
 

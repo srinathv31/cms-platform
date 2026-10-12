@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 
-/** Redirects unknown or off-limits teams. Renders nothing; pages guard themselves too. */
+/** Not found for an unknown team or one the viewer can't see. Renders nothing; pages guard themselves too. */
 async function TeamGuard({ params }: { params: Promise<{ team: string }> }) {
   await requireSpaceFromParams(params);
   return null;

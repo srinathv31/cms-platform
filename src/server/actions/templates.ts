@@ -66,9 +66,8 @@ export async function startDraft(input: {
       if (!found) refuse(REQUEST_REFUSALS.templateGone);
       return found;
     },
-    // A write that meets another one takes its turn (src/lib/serialized-writes.ts), and `inTransaction`
-    // retries a lock held by another process past the busy timeout. The retry re-reads, so it sees a
-    // draft another press made meanwhile.
+    // A write that meets another one takes its turn (src/lib/serialized-writes.ts), and the transaction
+    // reads the versions inside it, so the second press sees the draft the first one made.
     transaction: async (tx, { viewer, found, now: at }) => {
       const list = await tx
         .select({

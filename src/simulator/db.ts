@@ -14,7 +14,8 @@ const globalForSim = globalThis as unknown as {
 };
 
 // Same file as UCOMP's client, so its writes take turns on the same process-wide lock and it waits
-// the same way for another process's lock (see `src/lib/serialized-writes.ts`).
+// the same way for another process's lock (see `src/lib/serialized-writes.ts`). That client is the one
+// place a write waits; a write that still fails there is not retried.
 export const simLibsql =
   globalForSim.__simLibsqlSerialized ??
   createAppClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
@@ -23,26 +24,3 @@ if (process.env.NODE_ENV !== "production")
   globalForSim.__simLibsqlSerialized = simLibsql;
 
 export const simDb = drizzle(simLibsql, { schema: sim });
-
-function isBusy(error: unknown): boolean {
-  const text = `${(error as { code?: unknown })?.code ?? ""} ${(error as Error)?.message ?? ""}`;
-  return /SQLITE_BUSY|database is locked/i.test(text);
-}
-
-/**
- * Runs a write, retrying briefly while UCOMP's client holds the file lock (a render writes
- * render_log on the same SQLite file).
- */
-export async function withBusyRetry<T>(
-  write: () => Promise<T>,
-  tries = 6,
-): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await write();
-    } catch (error) {
-      if (attempt >= tries || !isBusy(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 40 * attempt));
-    }
-  }
-}

@@ -11,7 +11,7 @@ import {
   simNoticeReads,
   simOffers,
 } from "@/server/db/schema/sim";
-import { simDb, withBusyRetry } from "./db";
+import { simDb } from "./db";
 import { isSimFieldPath } from "./fields";
 import { blockedSentence, missingRequired, valuesFor } from "./mapping";
 import { customerRecord, loadBatch, offerRecord } from "./queries";
@@ -122,12 +122,10 @@ export async function linkTemplate(input: {
     mapping: kept,
     linkedAt: new Date(),
   };
-  await withBusyRetry(() =>
-    simDb
-      .insert(simLinks)
-      .values({ id: `lnk_${randomPart(10)}`, offerId, ...row })
-      .onConflictDoUpdate({ target: simLinks.offerId, set: row }),
-  );
+  await simDb
+    .insert(simLinks)
+    .values({ id: `lnk_${randomPart(10)}`, offerId, ...row })
+    .onConflictDoUpdate({ target: simLinks.offerId, set: row });
   refresh();
   return { ok: true };
 }
@@ -162,12 +160,10 @@ export async function saveMapping(input: {
   if (bad) return fail(`${bad[1]} isn't one of Coral's fields.`);
 
   const next: Record<string, string | null> = { ...link.mapping, ...mapping };
-  await withBusyRetry(() =>
-    simDb
-      .update(simLinks)
-      .set({ mapping: cleanMapping(next) })
-      .where(eq(simLinks.id, link.id)),
-  );
+  await simDb
+    .update(simLinks)
+    .set({ mapping: cleanMapping(next) })
+    .where(eq(simLinks.id, link.id));
   refresh();
   return { ok: true };
 }
@@ -302,7 +298,7 @@ export async function sendToCustomers(input: {
     output: r.rendered.ok ? r.rendered.data.output : null,
     at: r.at,
   }));
-  await withBusyRetry(() => simDb.insert(simDeliveries).values(rows));
+  await simDb.insert(simDeliveries).values(rows);
 
   const batch = await loadBatch(batchId);
   refresh();
@@ -323,9 +319,7 @@ export async function markNoticesRead(input: {
     noticeId,
     readAt,
   }));
-  await withBusyRetry(() =>
-    simDb.insert(simNoticeReads).values(rows).onConflictDoNothing(),
-  );
+  await simDb.insert(simNoticeReads).values(rows).onConflictDoNothing();
   refresh();
   return { ok: true };
 }

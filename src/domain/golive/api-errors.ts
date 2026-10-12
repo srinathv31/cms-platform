@@ -23,15 +23,10 @@ export function apiBadRequest(message: string): ApiError {
   return { code: "bad_request", message };
 }
 
-/** 404: the path names a consumer that isn't registered. "Consumer acme doesn't exist." */
-export function consumerNotFound(consumerId: string): ApiError {
-  return {
-    code: "consumer_not_found",
-    message: `Consumer ${consumerId} doesn't exist.`,
-  };
-}
-
-/** 403: X-Consumer-Id isn't the consumer in the path. "X-Consumer-Id doesn't match consumer coral." */
+/**
+ * 403: X-Consumer-Id isn't the consumer in the path, registered or not (no answer says which ids exist).
+ * "X-Consumer-Id doesn't match consumer coral."
+ */
 export function consumerMismatch(consumerId: string): ApiError {
   return {
     code: "consumer_mismatch",

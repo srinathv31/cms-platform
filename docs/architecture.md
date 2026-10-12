@@ -140,7 +140,8 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
    or a PDF. A message channel skips the body: `renderMessage` (`src/domain/render/message.ts`, the function the
    browser preview runs too) resolves its fields and renders a push for the requested `platform` or an SMS with the
    version's footer (frozen at submit; a draft's is the content type's), refused (422) past 4,096 bytes or 10 parts.
-5. One `render_log` row, success or error. It never stores the values.
+5. One `render_log` row, success or error, except for a caller that isn't a registered consumer. It never stores
+   the values.
 
 The golden files run the same engine on frozen inputs, so a golden file is exactly what the API returns.
 
@@ -182,7 +183,7 @@ at Turso instead. Two schema files:
 Conventions: JSON columns are typed with domain types; timestamps are millisecond integers read as `Date`, and become
 ISO strings at the read-model boundary. Unique indexes, partial where they need to be, allow one row per number
 and round, one released version per number, and one open draft and one Active version per template. Every write in the process takes turns on one lock (`createAppClient` in `src/lib/serialized-writes.ts`),
-and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migrations`; the
+the one place a write waits (5 s for its turn); a write that still can't go fails, and nothing retries it. Migrations are in `src/server/db/migrations`; the
 [server README](../src/server/README.md#database) says how to add one.
 
 ## Time, identity, and demo data
@@ -214,6 +215,11 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
 - [next.config.ts](../next.config.ts): `cacheComponents: true`, `typedRoutes: true`, dev indicators off, and libSQL
   kept out of the bundle (`serverExternalPackages`). Partial prefetching stays off: on 16.3.8 it re-requests every
   link's route tree in a loop in this app. The "router prefetch" tests in `e2e/phase-1.spec.ts` guard against it.
+  `headers()` sends static security headers on every response: `nosniff`, `Referrer-Policy: same-origin`, framing
+  by the same origin only (`X-Frame-Options: SAMEORIGIN`; Coral's customer view frames its stored deliveries) and a
+  `Permissions-Policy` that turns off camera, microphone, location, payment and USB. No `Content-Security-Policy`
+  there: a header set in `headers()` replaces a route's own, and the rendered HTML keeps its scriptless one.
+  `e2e/security-headers.spec.ts` checks them.
 - Environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`; `DEMO_MODE` (the demo tools: reset, clock advance,
   persona switcher and the Demo pill; off unless set, read when the server starts,
   [decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md), parsed in [config.ts](../src/server/config.ts)); `UCOMP_API_ORIGIN` (where Coral sends requests;
@@ -229,6 +235,9 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   sets ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)). They still go when real sign-in lands. Until then the persona cookie still decides who
   acts, whether or not the switcher is there.
 - A consumer is identified by the `X-Consumer-Id` header alone, with no credential or rate limit.
+- No Content-Security-Policy for scripts: Next's inline scripts need a per-request nonce, which needs dynamic
+  rendering and fights the static shells Cache Components builds. A hash-based policy, `'strict-dynamic'`, or none
+  is a decision still to make. `Strict-Transport-Security` belongs to the TLS terminator in front of the app.
 - Access deadlines (recertification, inactivity) apply, and passed sunsets reach the audit log and consumers' notices, only when the sweeps
   run: on a clock advance, a persona switch, or an access action. There is no scheduled job. (A sunset still stops
   renders on time: the render rule reads the clock.)

@@ -163,6 +163,20 @@ describe("markdownToHtml", () => {
     ).toBe("<p>One</p><hr><p>Quoted</p><p>## not a heading</p>");
   });
 
+  // The parser sets inline pieces aside as `\u0000N\u0000` placeholders, so a NUL in the text read as one
+  // and threw. Control characters go before parsing (tab, LF and CR stay), as the document would drop them.
+  it("text with control characters: they go, and the rest parses (a NUL used to throw)", () => {
+    expect(markdownToHtml("a\u00000\u0000b **x**")).toBe(
+      "<p>a0b <strong>x</strong></p>",
+    );
+    expect(
+      markdownToHtml("\u0000\u0007# Title\u001F\n\n- one\u007F\u0085"),
+    ).toBe("<h1>Title</h1><ul><li><p>one</p></li></ul>");
+    expect(markdownToHtml("one\ttab\r\ntwo  \r\nthree")).toBe(
+      "<p>one\ttab two<br>three</p>",
+    );
+  });
+
   it("a Copilot answer", () => {
     const answer = [
       "## Offer details",
@@ -307,6 +321,20 @@ describe("Markdown paste in the document", () => {
         .content!.slice(0, 2)
         .map((n) => n.content?.map((c) => c.type)),
     ).toEqual([["text", "variable"], ["text"]]);
+  });
+
+  it("Markdown with a NUL in it lands, without the control characters", async () => {
+    const { editor } = mount("body");
+    pastePlainText(editor, "a\u00000\u0000b **x**");
+    await flush();
+    expect(editor.getJSON().content![0]).toEqual({
+      type: "paragraph",
+      attrs: expect.anything(),
+      content: [
+        { type: "text", text: "a0b " },
+        { type: "text", text: "x", marks: [{ type: "bold" }] },
+      ],
+    });
   });
 
   it("a paste as plain text (Shift) keeps the Markdown as text", () => {

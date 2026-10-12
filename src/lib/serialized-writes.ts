@@ -25,6 +25,15 @@ import {
 // UCOMP's client and the simulator's, which open the same file. Plain reads don't wait. Other
 // processes (the e2e helpers, a second server on the same file) are covered by the client's busy
 // `timeout`, which makes SQLite itself wait for their lock instead of failing at once.
+//
+// This is the only place the app waits for the database, and the worst case is short:
+//   - a write waits at most WRITE_TURN_WAIT_MS (5 s) for its turn in this process, then
+//   - SQLite waits at most BUSY_TIMEOUT_MS (5 s) for a lock another process holds on the file,
+// and past either the write fails with SQLITE_BUSY. Nothing above retries it: `inTransaction`
+// (src/server/effects.ts) runs a transaction once, so a server action, an autosave or a sweep stuck
+// behind a long write fails within about 10 s (5 s when no other process opens the file), and the
+// person sees the failure instead of a spinner. Don't add a busy retry above this: every attempt
+// would wait its full turn again.
 
 /**
  * The clients' busy `timeout`: how long SQLite waits for another process's lock on the local file
@@ -32,8 +41,8 @@ import {
  */
 export const BUSY_TIMEOUT_MS = 5_000;
 
-/** How long a write waits for its turn before failing as SQLITE_BUSY (which callers already retry). */
-const DEFAULT_WAIT_MS = 15_000;
+/** How long a write waits for its turn in this process before failing as SQLITE_BUSY. Nothing retries it. */
+export const WRITE_TURN_WAIT_MS = 5_000;
 
 interface WriteLock {
   /** Settles when the last queued writer has released. */
@@ -145,7 +154,7 @@ export function serializeWrites(
   client: Client,
   options: { waitMs?: number } = {},
 ): Client {
-  const waitMs = options.waitMs ?? DEFAULT_WAIT_MS;
+  const waitMs = options.waitMs ?? WRITE_TURN_WAIT_MS;
   const lock = sharedLock();
 
   async function inTurn<T>(run: () => Promise<T>): Promise<T> {

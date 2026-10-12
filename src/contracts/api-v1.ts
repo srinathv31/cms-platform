@@ -53,8 +53,7 @@ export type ApiErrorCode =
   | "push_payload_too_large" // 422: the push's notification JSON is over 4,096 bytes on its platform
   | "sms_too_long" // 422: the SMS is over 10 parts
   | "render_failed"
-  // Phase 5: the notices endpoint
-  | "consumer_not_found" // 404: the path names a consumer that isn't registered
+  // The notices endpoint
   | "consumer_mismatch"; // 403: X-Consumer-Id isn't the consumer in the path
 
 export interface ApiError {
@@ -326,7 +325,8 @@ export interface ApiJsonSchemaProperty {
  * A sunset_passed notice is written by Stencil's sunset sweep, which runs after the sunset rather than at
  * it, so it can arrive some time after `sunsetAt`. Renders of the version fail from `sunsetAt` either way.
  * - `X-Consumer-Id` must equal `{consumerId}` → else 403 consumer_mismatch
- *   ("X-Consumer-Id doesn't match consumer coral."). An unregistered `{consumerId}` → 404 consumer_not_found.
+ *   ("X-Consumer-Id doesn't match consumer coral."), whether or not `{consumerId}` is registered: the
+ *   answer never tells a caller which consumer ids exist.
  * - `after` (optional): the `nextCursor` of an earlier page. Without it the list starts at the
  *   consumer's oldest notice.
  * - `templateId` (optional): one template's notices. A cursor keeps to the filter it was made with.

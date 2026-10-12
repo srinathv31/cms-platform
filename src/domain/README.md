@@ -136,7 +136,7 @@ actor, ids, and `now`. It returns either a refusal, `{ ok: false, code, reason }
 name their rows instead (`request`, `membership`, `recert`, `requiredSections`). Nothing is written here. The
 server writes it all in one transaction: every action runs on `serverAction`
 ([server/actions/kit.ts](../server/actions/kit.ts)), whose transaction is `inTransaction` from
-[server/effects.ts](../server/effects.ts), which retries `SQLITE_BUSY`.
+[server/effects.ts](../server/effects.ts), run once.
 `writeEffects` (same file) writes `LifecycleEffect`s and decides who receives them; `writeAccessEffects` and
 `applyMembershipChange` in [server/access-effects.ts](../server/access-effects.ts) do the same for access. The
 caller in `approveVersion` ([actions/review.ts](../server/actions/review.ts)), shortened:

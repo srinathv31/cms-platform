@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ACCESS_REFUSALS } from "@/domain/access/refusals";
-import { PermissionError, REASONS } from "@/domain/permissions";
+import { REASONS } from "@/domain/permissions";
 import type { Db } from "@/server/db/client";
 import {
   loadPersona,
@@ -34,6 +34,7 @@ vi.mock("next/server", () => ({ connection: vi.fn(async () => undefined) }));
 
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 const DAY = 86_400_000;
+const NOT_FOUND = /NEXT_HTTP_ERROR_FALLBACK;404/;
 
 let db: Db;
 
@@ -167,10 +168,23 @@ describe("access read models", () => {
       reinstate:
         "Maya signs in to Coral Offers again as Author. The inactivity count restarts today.",
     });
+    // Not a Team Admin: the section is Not found, as every section the viewer may not read (requireCan).
     await as("maya");
-    await expect(getMembersSection("coral-offers")).rejects.toBeInstanceOf(
-      PermissionError,
-    );
+    await expect(getMembersSection("coral-offers")).rejects.toThrow(NOT_FOUND);
+  });
+
+  it("every Team section is Not found for someone who isn't the team's Team Admin", async () => {
+    await as("maya");
+    for (const read of [
+      getMembersSection,
+      getAccessRequestsSection,
+      getRecertificationSection,
+      getInactivitySection,
+    ])
+      await expect(read("coral-offers"), read.name).rejects.toThrow(NOT_FOUND);
+    await as("alex");
+    await expect(getMembersSection("deposits")).rejects.toThrow(NOT_FOUND);
+    await expect(getMembersSection("coral-offers")).resolves.toBeTruthy();
   });
 
   it("Recertification and Inactivity sections, and the recert card once requests are decided", async () => {

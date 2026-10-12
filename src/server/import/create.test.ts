@@ -23,6 +23,7 @@ import {
   IMPORT_REFUSALS,
   type ImportResponse,
 } from "@/domain/import-types";
+import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { DOCUMENT_MESSAGES } from "@/editor/model/document-check";
 import { prepareBody } from "@/server/documents/prepare";
@@ -254,6 +255,24 @@ describe("importTemplate", () => {
         .set({ allowedChannels: disclosure!.allowedChannels })
         .where(eq(contentTypes.id, disclosure!.id));
     }
+  });
+
+  it("refuses, rather than fails, when no content type makes documents: 409 no_content_type, nothing written", async () => {
+    // Every content type makes alerts only, so there is no document type to import into.
+    await db.update(contentTypes).set({ allowedChannels: ["push", "sms"] });
+    const rows = async () => ({
+      templates: await db.select({ id: templates.id }).from(templates),
+      uploads: await db.select({ id: uploads.id }).from(uploads),
+    });
+    const before = await rows();
+    const res = await run("maya", {
+      name: "notes.txt",
+      bytes: fixture("spring_offer_notes.txt"),
+    });
+    expect(res).toEqual({ ok: false, ...REFUSALS.noContentType("document") });
+    expect(importStatus(res)).toBe(409);
+    expect(await rows()).toEqual(before);
+    expect(readdirSync(root)).toEqual([]);
   });
 
   it("checks the permission first: no create rights, or an unknown team, is 403 with the reason", async () => {
