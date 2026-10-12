@@ -43,5 +43,5 @@ to copy.
 - A link to a team the viewer has lost reads Not found; Request access is one click away through Back to library.
 - The settings modal still sends a section the viewer's group may not open back to the Library before any query
   runs (`SettingsPanel`); `requireCan` is the guard behind it.
-- `assertCan` and `PermissionError` in `src/domain/permissions.ts` have no caller left outside their own test: the
-  reads use `requireCan`, and the actions refuse through the kit's `check()`.
+- `assertCan` and `PermissionError` had no caller left once the reads used `requireCan` and the actions refused
+  through the kit's `check()`, so they are deleted from `src/domain/permissions.ts`.

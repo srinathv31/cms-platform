@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALL_SPACE,
-  PermissionError,
   REASONS,
-  assertCan,
   can,
   canSeeSpace,
   defaultSpace,
@@ -952,26 +950,7 @@ describe("spaces", () => {
   });
 });
 
-describe("assertCan", () => {
-  it("throws a PermissionError carrying the code and the reason", () => {
-    let error: unknown;
-    try {
-      assertCan(jordan, "version.decide", { ...coral, submittedBy: "jordan" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(PermissionError);
-    expect(error).toMatchObject({
-      ...OWN_VERSION,
-      action: "version.decide",
-      message: OWN_VERSION.reason,
-    });
-  });
-
-  it("returns quietly when allowed", () => {
-    expect(() => assertCan(maya, "draft.edit", coral)).not.toThrow();
-  });
-
+describe("REASONS", () => {
   it("keeps every reason short and plain, ending with a period", () => {
     for (const { reason } of Object.values(REASONS))
       expect(reason).toMatch(/^[A-Z][^.]{0,60}\.( [A-Z][^.]{0,60}\.)?$/);
