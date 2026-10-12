@@ -17,7 +17,7 @@ import { settled } from "./helpers/settled";
 test.use({ trace: "off" });
 
 const PERSONA_COOKIE = "ucomp_persona";
-const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v3 in review, so it has a review screen (seed ids: see principles.spec.ts)
+const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v3 in review, so it has a review screen (seed ids: see helpers/principles.ts)
 
 const SCREENS: { name: string; url: string; persona: string }[] = [
   { name: "the Library", url: "/coral-offers/library", persona: "maya" },

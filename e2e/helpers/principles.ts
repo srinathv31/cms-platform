@@ -1,8 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { viewEveryOutput } from "./helpers/review";
-import { settled } from "./helpers/settled";
+import { settled } from "./settled";
 
 // Phase 7 principle checks, on every route, as the persona(s) that can see it:
 //
@@ -24,14 +22,14 @@ import { settled } from "./helpers/settled";
 //
 // Next 16 keeps visited routes mounted but hidden, so every query looks at visible elements only.
 // Read-only: nothing here changes data. Run against the dev server:
-//   E2E_PORT=3000 npx playwright test e2e/principles.spec.ts --workers=1
-
-// The preview iframes are sandboxed: Playwright's trace injects scripts into frames and Chrome logs "Blocked script execution".
-test.use({ trace: "off" });
+//   E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts --workers=1
+//
+// The checks and the route matrix live here; the specs that run them are e2e/principles-*.spec.ts, split by what they cover
+// so that files run in parallel in about the same time each.
 
 const PERSONA_COOKIE = "ucomp_persona";
-const ALLOWED_PLACEHOLDER = "Type / for blocks";
-const STATUS_WORDS = ["Draft", "In review", "Changes requested", "Active", "Superseded", "Sunset", "Revoked"];
+export const ALLOWED_PLACEHOLDER = "Type / for blocks";
+export const STATUS_WORDS = ["Draft", "In review", "Changes requested", "Active", "Superseded", "Sunset", "Revoked"];
 
 // ── What the page reports about itself ───────────────────────────────────────
 
@@ -47,7 +45,7 @@ interface PageFindings {
 }
 
 /** Runs in the page. Everything it looks at is visible: hidden (kept-mounted) routes do not count. */
-function inspectPage(args: { foreign: boolean; allowed: string; words: string[] }): PageFindings {
+export function inspectPage(args: { foreign: boolean; allowed: string; words: string[] }): PageFindings {
   const { foreign, allowed, words } = args;
   const visible = (el: Element): boolean => {
     const html = el as HTMLElement;
@@ -153,7 +151,7 @@ function inspectPage(args: { foreign: boolean; allowed: string; words: string[] 
 // ── Page plumbing ────────────────────────────────────────────────────────────
 
 /** Before any script of the document: a buffered layout-shift observer. */
-function installCls() {
+export function installCls() {
   const w = window as unknown as { __cls: { value: number; shifts: string[] } };
   w.__cls = { value: 0, shifts: [] };
   try {
@@ -177,7 +175,7 @@ function installCls() {
   }
 }
 
-const profileButton = (page: Page) => page.getByRole("button", { name: /profile and persona/ });
+export const profileButton = (page: Page) => page.getByRole("button", { name: /profile and persona/ });
 
 async function asPersona(page: Page, id: string) {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:3000";
@@ -185,7 +183,7 @@ async function asPersona(page: Page, id: string) {
 }
 
 /** The page has stopped moving: hydrated, streams resolved, skeletons gone, the live editor mounted if there is one. */
-async function settle(page: Page, opts: { shell?: boolean } = {}) {
+export async function settle(page: Page, opts: { shell?: boolean } = {}) {
   if (opts.shell !== false) {
     await page.waitForFunction(() => {
       const el = document.querySelector("button[aria-label$='profile and persona']");
@@ -208,7 +206,7 @@ async function settle(page: Page, opts: { shell?: boolean } = {}) {
 }
 
 /** Opens a route as a persona and fails on a server error: another agent may be mid-edit, so wait and go again. */
-async function open(page: Page, url: string, persona: string, opts: { shell?: boolean } = {}) {
+export async function open(page: Page, url: string, persona: string, opts: { shell?: boolean } = {}) {
   await asPersona(page, persona);
   // Four tries, 4, 8 and 12 seconds apart.
   await expect(async () => {
@@ -224,7 +222,7 @@ interface Axe {
   passes: number;
 }
 
-async function runAxe(page: Page): Promise<Axe> {
+export async function runAxe(page: Page): Promise<Axe> {
   // Base UI's focus guards (visually hidden, aria-hidden, tabindex 0) only pass focus on. axe lets them through
   // only when it decides a modal is open, by probing five fixed points for a full-screen layer, and a menu's
   // backdrop has a hole over its trigger: the team switcher's trigger sits on one probe at 1440×900.
@@ -246,7 +244,7 @@ async function cls(page: Page) {
 }
 
 /** The five checks, softly, so one run reports everything a screen gets wrong. */
-async function checkScreen(page: Page, label: string, opts: { foreign?: boolean } = {}) {
+export async function checkScreen(page: Page, label: string, opts: { foreign?: boolean } = {}) {
   const foreign = !!opts.foreign;
   const found = await page.evaluate(inspectPage, { foreign, allowed: ALLOWED_PLACEHOLDER, words: STATUS_WORDS });
 
@@ -269,75 +267,39 @@ async function checkScreen(page: Page, label: string, opts: { foreign?: boolean 
   expect.soft(shift?.shifts ?? [], `${label}: CLS 0 (excluding shifts after input)`).toEqual([]);
 }
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(installCls);
-});
-
 // ── The routes ───────────────────────────────────────────────────────────────
 
 // Personas: maya (author), jordan (approver), alex (team admin, Coral Offers), dana (viewer, Legal
 // reviewer), priya (author Coral, viewer Deposits), riley (Platform Admin), taylor (Auditor), morgan (no access).
 // The seed's template ids: the seed draws them in a fixed order, and its own test pins them (seed.test.ts, "keeps
 // the template ids e2e specs … name"). The first test below checks each is still the template named here.
-const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v1 superseded, v2 active, v3 round 1 sent back, v3 round 2 in review
-const BALANCE = "UC-D6KSGY"; // Balance Transfer Intro: v1 superseded, v2 active
-const FEE_WAIVER = "UC-NYP7F0"; // Annual Fee Waiver: v1 round 1 changes requested, and a draft
-const HOLIDAY = "UC-WGGRJH"; // Holiday Points Promo: v1 revoked, v2 active
-const RATE_CHANGE = "UC-PAS9A0"; // Rate Change Notice: v1 active
-const DEPOSIT = "UC-A4S1YT"; // Deposits, Everyday Checking: v1 active
-const HIGH_YIELD = "UC-ZKZSRZ"; // Deposits, High-Yield Savings: v1 superseded, v2 approved on round 3 after two send-backs
-const STATEMENT = "UC-8Y49K2"; // Card Statements, Statement Insert — Rate Change: v1 active
+export const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v1 superseded, v2 active, v3 round 1 sent back, v3 round 2 in review
+export const BALANCE = "UC-D6KSGY"; // Balance Transfer Intro: v1 superseded, v2 active
+export const FEE_WAIVER = "UC-NYP7F0"; // Annual Fee Waiver: v1 round 1 changes requested, and a draft
+export const HOLIDAY = "UC-WGGRJH"; // Holiday Points Promo: v1 revoked, v2 active
+export const RATE_CHANGE = "UC-PAS9A0"; // Rate Change Notice: v1 active
+export const DEPOSIT = "UC-A4S1YT"; // Deposits, Everyday Checking: v1 active
+export const HIGH_YIELD = "UC-ZKZSRZ"; // Deposits, High-Yield Savings: v1 superseded, v2 approved on round 3 after two send-backs
+export const STATEMENT = "UC-8Y49K2"; // Card Statements, Statement Insert — Rate Change: v1 active
 // Coral Offers' alerts (push and SMS, decision 0034).
-const PAYMENT_DUE = "UC-EFXFMS"; // Payment Due Reminder: v1 active
-const CARD_ABROAD = "UC-397J2A"; // Card Used Abroad: v1 in review (Priya's)
-const HEADS_UP = "UC-FYN38M"; // Rate Change Heads-up: a draft
+export const PAYMENT_DUE = "UC-EFXFMS"; // Payment Due Reminder: v1 active
+export const CARD_ABROAD = "UC-397J2A"; // Card Used Abroad: v1 in review (Priya's)
+export const HEADS_UP = "UC-FYN38M"; // Rate Change Heads-up: a draft
 
-const SEEDED: Record<string, string> = {
-  [COLLECT]: "Cash Back Welcome Bonus — Terms",
-  [BALANCE]: "Balance Transfer Intro — Terms",
-  [FEE_WAIVER]: "Annual Fee Waiver — Terms",
-  [HOLIDAY]: "Holiday Points Promo — Terms",
-  [RATE_CHANGE]: "Rate Change Notice",
-  [DEPOSIT]: "Everyday Checking — Fee Schedule",
-  [HIGH_YIELD]: "High-Yield Savings — Rate Disclosure",
-  [STATEMENT]: "Statement Insert — Rate Change",
-  [PAYMENT_DUE]: "Payment Due Reminder",
-  [CARD_ABROAD]: "Card Used Abroad",
-  [HEADS_UP]: "Rate Change Heads-up",
-};
-
-test("the template ids this spec names are the seed's", async () => {
-  const db = openDb();
-  try {
-    const found: Record<string, string> = {};
-    for (const id of Object.keys(SEEDED)) {
-      const { rows } = await db.execute({
-        // The newest numbered row, or the draft of a template that has nothing else.
-        sql: "SELECT name FROM versions WHERE template_id = ? ORDER BY number IS NULL, number DESC, round DESC LIMIT 1",
-        args: [id],
-      });
-      if (rows[0]) found[id] = String(rows[0].name);
-    }
-    expect(found, "each id is the seeded template of that name (npm run db:reset, or update the ids)").toEqual(SEEDED);
-  } finally {
-    db.close();
-  }
-});
-
-interface Route {
+export interface Route {
   url: string;
   personas: string[];
 }
 
-const LIBRARY: Route[] = [
+export const LIBRARY: Route[] = [
   { url: "/coral-offers/library", personas: ["maya", "jordan", "alex", "dana", "riley", "taylor"] },
   { url: "/deposits/library", personas: ["priya", "riley"] },
   { url: "/card-statements/library", personas: ["riley", "taylor"] },
   { url: "/all/library", personas: ["riley", "taylor"] },
 ];
 
-const WORKSPACE_TABS = ["", "/versions", "/usage", "/activity"];
-const WORKSPACE: Route[] = [
+export const WORKSPACE_TABS = ["", "/versions", "/usage", "/activity"];
+export const WORKSPACE: Route[] = [
   // All four tabs on the template with every kind of version, as the author, an approver and an observer.
   ...WORKSPACE_TABS.map((tab) => ({ url: `/coral-offers/templates/${COLLECT}${tab}`, personas: ["maya", "jordan", "taylor"] })),
   // And every tab on a second template, with a superseded and a sunset history.
@@ -360,7 +322,7 @@ const WORKSPACE: Route[] = [
   { url: `/coral-offers/templates/${CARD_ABROAD}`, personas: ["priya"] },
 ];
 
-const REVIEW: Route[] = [
+export const REVIEW: Route[] = [
   { url: "/coral-offers/review", personas: ["jordan", "alex", "maya"] },
   // Recently decided: the round Jordan sent back ("v3 · Round 1").
   { url: "/coral-offers/review?tab=decided", personas: ["jordan"] },
@@ -375,7 +337,7 @@ const REVIEW: Route[] = [
   { url: `/coral-offers/review/${PAYMENT_DUE}/1`, personas: ["jordan"] },
 ];
 
-const USAGE: Route[] = [
+export const USAGE: Route[] = [
   { url: "/coral-offers/usage", personas: ["maya", "jordan", "alex", "riley"] },
   { url: "/coral-offers/usage?tab=consumers", personas: ["jordan", "riley"] },
   { url: "/all/usage?tab=consumers", personas: ["riley"] },
@@ -383,28 +345,31 @@ const USAGE: Route[] = [
   { url: "/all/usage", personas: ["riley", "taylor"] },
 ];
 
-const AUDIT: Route[] = [
+export const AUDIT: Route[] = [
   { url: "/coral-offers/audit", personas: ["alex", "riley", "taylor"] },
   { url: "/deposits/audit", personas: ["riley"] },
   { url: "/all/audit", personas: ["riley", "taylor"] },
 ];
 
 // The settings sections as hard navigations (reload or a shared link): the dialog over the library.
-const TEAM_SECTIONS = ["members", "access-requests", "recertification", "inactivity"];
-const PLATFORM_SECTIONS = ["teams", "content-types", "channel-rules", "approval-chains", "time-zone"];
-const SETTINGS_HARD: Route[] = [
+export const TEAM_SECTIONS = ["members", "access-requests", "recertification", "inactivity"];
+export const PLATFORM_SECTIONS = ["teams", "content-types", "channel-rules", "approval-chains", "time-zone"];
+export const SETTINGS_HARD: Route[] = [
   ...TEAM_SECTIONS.map((s) => ({ url: `/coral-offers/settings/${s}`, personas: ["alex"] })),
   ...PLATFORM_SECTIONS.map((s) => ({ url: `/coral-offers/settings/${s}`, personas: ["riley"] })),
   { url: "/all/settings/teams", personas: ["riley"] },
 ];
 
-const REQUEST_ACCESS: Route[] = [{ url: "/request-access", personas: ["morgan"] }];
+export const REQUEST_ACCESS: Route[] = [{ url: "/request-access", personas: ["morgan"] }];
 
-function describeRoutes(group: string, routes: Route[]) {
-  test.describe(group, () => {
+/** The `test` of the spec that calls it, so the tests are declared on whatever `test` that spec imports. */
+type Declares = Pick<typeof test, "describe"> & ((title: string, body: (args: { page: Page }) => Promise<void>) => void);
+
+export function describeRoutes(declare: Declares, group: string, routes: Route[]) {
+  declare.describe(group, () => {
     for (const route of routes) {
       for (const persona of route.personas) {
-        test(`${route.url} as ${persona}`, async ({ page }) => {
+        declare(`${route.url} as ${persona}`, async ({ page }) => {
           await open(page, route.url, persona);
           // The persona must actually be allowed here: a redirect elsewhere means this row of the matrix is wrong.
           expect(new URL(page.url()).pathname, "the route shows for this persona (no redirect)").toBe(route.url.split("?")[0]);
@@ -415,267 +380,10 @@ function describeRoutes(group: string, routes: Route[]) {
   });
 }
 
-describeRoutes("Library", LIBRARY);
-describeRoutes("Template workspace (Content, Versions, Usage, Activity)", WORKSPACE);
-describeRoutes("Review queue and review screen", REVIEW);
-describeRoutes("Usage dashboard", USAGE);
-describeRoutes("Audit", AUDIT);
-describeRoutes("Settings (hard navigation)", SETTINGS_HARD);
-describeRoutes("Request access", REQUEST_ACCESS);
-
-// ── The settings modal (soft navigation, through the sidebar footer) ─────────
-
-test.describe("Settings modal", () => {
-  const cases: { persona: string; space: string; sections: string[] }[] = [
-    { persona: "alex", space: "coral-offers", sections: TEAM_SECTIONS },
-    { persona: "riley", space: "coral-offers", sections: PLATFORM_SECTIONS },
-  ];
-  for (const { persona, space, sections } of cases) {
-    test(`modal sections as ${persona}`, async ({ page }) => {
-      await open(page, `/${space}/library`, persona);
-      await page.locator('[data-slot="sidebar-footer"]').getByRole("link", { name: "Settings" }).click({ delay: 90 });
-      const dialog = page.getByRole("dialog").filter({ has: page.getByRole("navigation", { name: "Settings sections" }) });
-      await expect(dialog).toBeVisible();
-      await settle(page);
-      for (const section of sections) {
-        const link = dialog.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: new RegExp(`^${section.replace("-", "[ -]")}`, "i") });
-        await link.click({ delay: 90 });
-        await expect(link).toHaveAttribute("aria-current", /page|true/);
-        await settle(page);
-        await checkScreen(page, `settings modal "${section}" as ${persona}`);
-      }
-    });
-  }
-});
-
-// ── The simulator: a foreign system (axe, CLS and placeholders only) ─────────
-
-test.describe("Simulator (foreign system)", () => {
-  const SIM = [
-    "/sim",
-    "/sim/customers",
-    "/sim/deliveries",
-    "/sim/notices",
-    "/sim/offers/offer_spring_travel",
-    "/sim/offers/offer_cash_back",
-    "/sim/offers/offer_cash_back/link",
-    "/sim/offers/alert_payment_due",
-    "/sim/offers/alert_card_abroad/link",
-  ];
-  for (const url of SIM) {
-    test(`${url}`, async ({ page }) => {
-      await open(page, url, "maya", { shell: false });
-      expect(new URL(page.url()).pathname).toBe(url);
-      await checkScreen(page, url, { foreign: true });
-    });
-  }
-});
-
-// ── Views inside a page: tabs and filters ────────────────────────────────────
-
-test.describe("Views inside a page", () => {
-  const TAB_PAGES: { url: string; persona: string }[] = [
-    { url: "/coral-offers/review", persona: "jordan" },
-    { url: "/all/review", persona: "riley" },
-    { url: `/coral-offers/templates/${FEE_WAIVER}`, persona: "maya" }, // the rail's views (Variables, Comments, ...)
-    { url: `/coral-offers/review/${COLLECT}/3`, persona: "jordan" },
-    { url: `/coral-offers/review/${CARD_ABROAD}/1`, persona: "jordan" }, // an alert: its fields, then the phone
-    { url: "/coral-offers/usage", persona: "jordan" }, // Overview, Consumers
-  ];
-  for (const { url, persona } of TAB_PAGES) {
-    test(`every tab of ${url} as ${persona}`, async ({ page }) => {
-      await open(page, url, persona);
-      const names = await page
-        .getByRole("tab")
-        .filter({ visible: true })
-        .evaluateAll((tabs) => tabs.map((t) => (t.getAttribute("aria-label") ?? t.textContent ?? "").replace(/\s+/g, " ").trim()));
-      expect(names.length, "the page has tabs").toBeGreaterThan(0);
-      for (const name of names) {
-        const tab = page.getByRole("tab").filter({ visible: true }).filter({ hasText: name.replace(/\s*\d+$/, "") }).first();
-        await click(tab);
-        await expect(tab).toHaveAttribute("aria-selected", "true");
-        await settled(page);
-        await checkScreen(page, `${url} as ${persona}, tab "${name}"`);
-      }
-    });
-  }
-
-  test("every status filter of the Library (Maya)", async ({ page }) => {
-    await open(page, "/coral-offers/library", "maya");
-    const filters = page.getByRole("group", { name: "Filter by status" }).getByRole("button").filter({ visible: true });
-    const count = await filters.count();
-    expect(count, "the Library has status filters").toBeGreaterThan(0);
-    for (let i = 0; i < count; i++) {
-      const label = ((await filters.nth(i).textContent()) ?? "").trim();
-      await click(filters.nth(i));
-      await expect(filters.nth(i)).toHaveAttribute("aria-pressed", "true");
-      await settled(page);
-      await checkScreen(page, `Library filtered by "${label}" as maya`);
-    }
-  });
-});
-
-// ── The checks themselves must be able to fail ───────────────────────────────
-
-test.describe("The checks catch what they should", () => {
-  test("a stray status word, a second primary button and a placeholder are all found", async ({ page }) => {
-    await open(page, "/coral-offers/library", "maya");
-    const clean = await page.evaluate(inspectPage, { foreign: false, allowed: ALLOWED_PLACEHOLDER, words: STATUS_WORDS });
-    expect(clean.canvasPrimary, "the Library's one primary button is seen").toHaveLength(1);
-    expect(await page.locator('main [data-slot="badge"][data-status]').filter({ visible: true }).count(), "the Library shows StatusBadges").toBeGreaterThan(0);
-    await page.evaluate(() => {
-      const main = document.querySelector('main[data-slot="sidebar-inset"]')!;
-      main.insertAdjacentHTML(
-        "beforeend",
-        '<span id="x1">Superseded</span><button id="x2" class="bg-primary">Second</button><input id="x3" placeholder="Enter a name">',
-      );
-    });
-    const dirty = await page.evaluate(inspectPage, { foreign: false, allowed: ALLOWED_PLACEHOLDER, words: STATUS_WORDS });
-    expect(dirty.canvasPrimary.length, "a second primary button is counted").toBe(2);
-    expect(dirty.strayStatus.join()).toContain("Superseded");
-    expect(dirty.placeholders.join()).toContain("Enter a name");
-    expect((await runAxe(page)).passes, "axe checked something").toBeGreaterThan(0);
-  });
-});
-
-// ── Dialogs, sheets, strips, popovers: each with a confirm is checked for at most one primary ──
-
 /** Lets an opened layer finish its entrance (focus lands a frame after it opens), then runs the checks. */
-async function checkOpened(page: Page, label: string) {
+export async function checkOpened(page: Page, label: string) {
   await settled(page);
   await checkScreen(page, label);
 }
 
-const click = (target: Locator) => target.click({ delay: 90 });
-
-test.describe("Dialogs, sheets, strips and popovers", () => {
-  test("New template gallery (Library, Maya)", async ({ page }) => {
-    await open(page, "/coral-offers/library", "maya");
-    await click(page.getByRole("button", { name: "New template" }));
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await checkOpened(page, "New template gallery as maya");
-  });
-
-  test("Submit for review dialog (a draft, Maya)", async ({ page }) => {
-    await open(page, `/coral-offers/templates/${FEE_WAIVER}`, "maya");
-    await click(page.getByRole("button", { name: "Submit for review" }));
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await checkOpened(page, "Submit for review dialog as maya");
-  });
-
-  test("Approve and Request changes dialogs (review screen, Jordan)", async ({ page }) => {
-    await open(page, `/coral-offers/review/${COLLECT}/3`, "jordan");
-    const decision = page.locator('aside[aria-label="Decision"]').filter({ visible: true });
-    await viewEveryOutput(page);
-    await click(decision.getByRole("button", { name: "Approve", exact: true }));
-    await expect(page.getByRole("dialog", { name: /^Approve v3/ })).toBeVisible();
-    await checkOpened(page, "Approve dialog as jordan");
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: /^Approve v3/ })).toBeHidden();
-    await click(decision.getByRole("button", { name: "Request changes", exact: true }));
-    await expect(page.getByRole("dialog", { name: /Request changes/ })).toBeVisible();
-    await checkOpened(page, "Request changes dialog as jordan");
-  });
-
-  test("Review history, unfolded (Versions, Priya)", async ({ page }) => {
-    await open(page, `/deposits/templates/${HIGH_YIELD}/versions`, "priya");
-    const entry = page.locator('[data-slot="version-entry"][data-version="2"]').filter({ visible: true });
-    await expect(entry.locator('[data-slot="approved-on-round"]')).toHaveText("Approved on round 3");
-    const fold = entry.getByRole("button", { name: "v2 review history (3 rounds)", exact: true });
-    await expect(fold).toHaveText("Review history (3 rounds)");
-    await expect(fold).toHaveAttribute("aria-expanded", "false");
-    await click(fold);
-    await expect(fold).toHaveAttribute("aria-expanded", "true");
-    await expect(entry.locator('[data-slot="review-history"] li[data-round]')).toHaveCount(3);
-    await checkOpened(page, "Review history unfolded as priya");
-  });
-
-  test("Revoke dialog (Versions, Jordan)", async ({ page }) => {
-    await open(page, `/coral-offers/templates/${COLLECT}/versions`, "jordan");
-    const revoke = page.getByRole("button", { name: /^Revoke v\d/ }).filter({ visible: true }).first();
-    test.skip((await revoke.count()) === 0, "no version can be revoked in the current data");
-    await click(revoke);
-    await expect(page.getByRole("dialog", { name: /^Revoke v\d/ })).toBeVisible();
-    await checkOpened(page, "Revoke dialog as jordan");
-  });
-
-  test("Integration sheet (Jordan and Maya)", async ({ page }) => {
-    for (const persona of ["jordan", "maya"]) {
-      await open(page, `/coral-offers/templates/${RATE_CHANGE}`, persona);
-      await click(page.getByRole("button", { name: /^Share .* — integration details$/ }).filter({ visible: true }));
-      await expect(page.getByRole("dialog").filter({ hasText: "Integration" })).toBeVisible();
-      await checkOpened(page, `Integration sheet as ${persona}`);
-    }
-  });
-
-  test("Copilot prompt (Variables, Maya)", async ({ page }) => {
-    await open(page, `/coral-offers/templates/${FEE_WAIVER}`, "maya");
-    await click(page.getByRole("tab", { name: "Variables", exact: true }).filter({ visible: true }));
-    await click(page.getByRole("button", { name: "Copilot prompt" }).filter({ visible: true }));
-    await expect(page.getByRole("dialog", { name: "Prompt for Copilot" })).toBeVisible();
-    await checkOpened(page, "Copilot prompt as maya");
-  });
-
-  test("Preview mode (the rail widens, Maya)", async ({ page }) => {
-    await open(page, `/coral-offers/templates/${COLLECT}`, "maya");
-    await click(page.getByRole("button", { name: "Preview", exact: true }));
-    // The render streams into the frame: the output is there once the well has stopped being busy and holds a frame.
-    const well = page.locator('[data-slot="preview-well"]');
-    await expect(well.locator("iframe, canvas").first()).toBeAttached({ timeout: 20_000 });
-    await expect(well).not.toHaveAttribute("aria-busy", "true", { timeout: 20_000 });
-    await checkOpened(page, "Preview mode as maya");
-  });
-
-  test("Command palette (Maya)", async ({ page }) => {
-    await open(page, "/coral-offers/library", "maya");
-    await page.keyboard.press("ControlOrMeta+k");
-    await expect(page.getByRole("dialog", { name: "Search" })).toBeVisible();
-    await checkOpened(page, "Command palette as maya");
-  });
-
-  test("Settings consequence strips (Alex: remove a member; Riley: a channel rule)", async ({ page }) => {
-    await open(page, "/coral-offers/settings/members", "alex");
-    const dialog = page.getByRole("dialog").filter({ has: page.getByRole("navigation", { name: "Settings sections" }) });
-    await expect(dialog).toBeVisible();
-    await click(dialog.getByRole("button", { name: "Remove", exact: true }).filter({ visible: true }).first());
-    await expect(dialog.locator('[data-slot="consequence-strip"]').filter({ visible: true })).toBeVisible();
-    await checkOpened(page, "Remove-member strip as alex");
-
-    await open(page, "/coral-offers/settings/channel-rules", "riley");
-    await click(dialog.getByRole("switch", { name: "Disclosure on Email" }));
-    await expect(dialog.locator('[data-slot="consequence-strip"]').filter({ visible: true })).toBeVisible();
-    await checkOpened(page, "Channel-rule strip as riley");
-  });
-
-  test("The Demo drawer and its Reset confirm", async ({ page }) => {
-    await open(page, "/coral-offers/library", "maya");
-    await click(page.getByRole("button", { name: "Demo", exact: true }));
-    const drawer = page.getByRole("dialog", { name: "Demo" });
-    await expect(drawer).toBeVisible();
-    await checkOpened(page, "Demo drawer as maya");
-    await click(drawer.getByRole("button", { name: "Reset demo" }));
-    await expect(page.getByRole("alertdialog")).toBeVisible();
-    await checkOpened(page, "Reset demo confirm as maya");
-    // Nothing is reset: the confirm is only looked at, then cancelled.
-    await click(page.getByRole("alertdialog").getByRole("button", { name: "Cancel" }));
-  });
-
-  test("Bell, Help, profile menu and team switcher", async ({ page }) => {
-    await open(page, "/coral-offers/library", "jordan");
-    await click(page.getByRole("button", { name: /^Notifications/ }));
-    await expect(page.getByRole("dialog", { name: "Notifications" })).toBeVisible();
-    await checkOpened(page, "Notifications popover as jordan");
-    await page.keyboard.press("Escape");
-    await click(page.getByRole("button", { name: "Help" }));
-    await checkOpened(page, "Help popover as jordan");
-    await page.keyboard.press("Escape");
-    await click(profileButton(page));
-    await expect(page.getByRole("menu")).toBeVisible();
-    await checkOpened(page, "Profile and persona menu as jordan");
-    await page.keyboard.press("Escape");
-    await open(page, "/all/library", "riley");
-    await click(page.getByRole("button", { name: "Switch team" }));
-    await expect(page.getByRole("menu")).toBeVisible();
-    await checkOpened(page, "Team switcher as riley");
-  });
-});
+export const click = (target: Locator) => target.click({ delay: 90 });

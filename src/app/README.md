@@ -254,8 +254,8 @@ route handlers, not server actions, because actions run one at a time per client
    `<Stream fallback={<Skeleton with the final geometry />}>`.
 3. Write the streamed component in `src/components/<feature>/`. It awaits `params`, calls a query in
    `src/server/queries/` (which resolves the viewer and, under `[team]`, `requireSpace`), and uses `now()`.
-4. Add the route to [principles.spec.ts](../../e2e/principles.spec.ts) with the personas that can see it, then
-   run `npm run typecheck` and `npm run lint`.
+4. Add the route to the route lists in [helpers/principles.ts](../../e2e/helpers/principles.ts) with the personas
+   that can see it, then run `npm run typecheck` and `npm run lint`.
 
 Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page.tsx) with
 [versions-content.tsx](../components/versions/versions-content.tsx), or
@@ -316,7 +316,7 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
   `E2E_PORT` (a server you started yourself), with `E2E_DATABASE_URL` or `E2E_UPLOADS_DIR` set, and in the opt-in
   `demo` and `stills-1280` projects. To check against a running dev server without a reset, start that server with
   the worker-0 values (`DATABASE_URL=file:./data/e2e-0.db UPLOADS_DIR=./data/e2e-uploads-0 npm run dev`, after an
-  `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles.spec.ts`. To point the
+  `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts`. To point the
   specs at the demo database instead, set `E2E_DATABASE_URL=file:./data/ucomp.db` and
   `E2E_UPLOADS_DIR=./data/uploads`.
 - **Pace and recording:** a functional spec clicks, types and drags at test speed. The helpers in `e2e/helpers/`
@@ -328,7 +328,7 @@ Copy [versions/page.tsx](./(product)/[team]/templates/[templateId]/versions/page
 
 | Spec | Covers |
 | --- | --- |
-| `e2e/principles.spec.ts` | Every product screen as each persona that can see it, the settings modal sections, every `/sim` page, and the tabs and filters inside pages. Checks: one primary button per canvas or dialog, status words only in `StatusBadge`, no placeholders, no serious axe violations, CLS 0. The simulator gets only the last three. |
+| `e2e/principles-*.spec.ts` | Every product screen as each persona that can see it, the settings modal sections, every `/sim` page, the tabs and filters inside pages, and the dialogs, sheets and popovers. Five files, of about the same duration so they run in parallel: `principles-library-review` (Library, review screens, Request access), `principles-workspace`, `principles-usage-audit-settings`, `principles-views-simulator` and `principles-dialogs`. The checks and the route lists are in `e2e/helpers/principles.ts`. Checks: one primary button per canvas or dialog, status words only in `StatusBadge`, no placeholders, no serious axe violations, CLS 0. The simulator gets only the last three. |
 | `e2e/phase-1.spec.ts` | Shell, personas, Library, workspace header, router prefetch. |
 | `e2e/navigation.spec.ts` | Back and Forward, history entries, canvas scroll, the settings modal over the Library. |
 | `e2e/palette.spec.ts` | The ⌘K palette: no page carries the template catalog, typing searches on the server, and a persona switch shows none of the last persona's answers. |

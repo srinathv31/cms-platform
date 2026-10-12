@@ -249,8 +249,9 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   output for a set of documents and checks that web, email, and PDF show the same content. Any change to render
   output fails `npm test` until it is regenerated with `npm run golden:update` and the diff is read. They are also
   the acceptance test for a second render engine.
-- **Principles:** `e2e/principles.spec.ts` checks every screen as every persona that can see it: one primary
-  button per canvas or dialog, status words only in `StatusBadge`, no placeholder text, no serious axe violations,
-  and zero layout shift. It is read-only and can run against a dev server:
-  `E2E_PORT=3000 npx playwright test e2e/principles.spec.ts --workers=1`.
+- **Principles:** the `e2e/principles-*.spec.ts` files check every screen as every persona that can see it: one
+  primary button per canvas or dialog, status words only in `StatusBadge`, no placeholder text, no serious axe
+  violations, and zero layout shift. The checks and the route list are in `e2e/helpers/principles.ts`; the specs
+  split the screens into files of about the same duration so they can run in parallel. They are read-only and can
+  run against a dev server: `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts --workers=1`.
 - **Docs:** `npm run docs:check` ([scripts/docs-check.ts](../scripts/docs-check.ts)).

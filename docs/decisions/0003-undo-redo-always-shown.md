@@ -4,6 +4,7 @@ Status: Accepted
 Amended 2026-10-11: the save status keeps the width of its widest state ("Saving…", in `SaveIndicator`), so the
 chevron after it no longer moves as a save lands, which the second Consequences line below says it does; only a long
 error message can still lengthen it (handoff review N10, PR #54).
+Amended 2026-10-11: the principle checks moved from the single principles spec into `e2e/helpers/principles.ts`, run by the `e2e/principles-*.spec.ts` files, and the link below follows them (split of the principles spec).
 Date: 2026-10-08
 
 ## Context
@@ -12,7 +13,7 @@ The draft's status row carries undo and redo buttons beside "Saved"
 ([save-status.tsx](../../src/components/workspace/save-status.tsx)). They first appeared only once there was history,
 and the status gains a menu chevron ("Revert to v1") once the Content tab is on screen, which the server can't know.
 Both changed the row after hydration, and the zero-layout-shift check in
-[e2e/principles.spec.ts](../../e2e/principles.spec.ts) failed on every draft started from an earlier version
+[e2e/helpers/principles.ts](../../e2e/helpers/principles.ts) failed on every draft started from an earlier version
 ([T1](../handoff-review.md#t1--high-main-fails-e2e-the-undoredo-merge-added-a-layout-shift)).
 
 ## Decision

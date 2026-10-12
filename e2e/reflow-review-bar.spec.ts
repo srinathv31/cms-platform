@@ -13,7 +13,7 @@ import { settled } from "./helpers/settled";
 
 test.use({ trace: "off" });
 
-const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v3 in review, so it has a review screen (seed ids: see principles.spec.ts)
+const COLLECT = "UC-J530DX"; // Cash Back Welcome Bonus: v3 in review, so it has a review screen (seed ids: see helpers/principles.ts)
 
 async function open(page: Page) {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:3100";

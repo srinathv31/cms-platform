@@ -11,7 +11,7 @@ import type { WorkspaceSession } from "./session/session-store";
 
 // The draft's undo and redo buttons hold their place from the first paint: the server renders both,
 // greyed out, before the save status, so neither the editor's history arriving nor the status changing
-// moves anything (the zero-layout-shift check in e2e/principles.spec.ts).
+// moves anything (the zero-layout-shift check in e2e/helpers/principles.ts).
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

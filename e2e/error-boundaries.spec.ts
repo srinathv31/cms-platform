@@ -105,7 +105,7 @@ async function settle(page: Page, frame: boolean) {
   await settled(page);
 }
 
-/** No serious or critical axe violation, as in principles.spec.ts. */
+/** No serious or critical axe violation, as in helpers/principles.ts. */
 async function expectNoSeriousViolations(page: Page) {
   const axe = await new AxeBuilder({ page }).exclude("nextjs-portal").exclude("[data-base-ui-focus-guard]").analyze();
   const serious = axe.violations
