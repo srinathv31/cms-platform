@@ -8,6 +8,7 @@ import {
   type Transaction,
   type TransactionMode,
 } from "@libsql/client";
+import { filePathOfUrl } from "@/lib/file-url";
 
 // One writer at a time per process, for a local SQLite file.
 //
@@ -213,7 +214,7 @@ export function createAppClient(
   config: Pick<Config, "url" | "authToken">,
 ): Client {
   // A fresh clone has no ./data (it's gitignored), and SQLite can't create the file in a missing folder.
-  if (config.url.startsWith("file:"))
-    mkdirSync(dirname(config.url.slice("file:".length)), { recursive: true });
+  const file = filePathOfUrl(config.url);
+  if (file !== null) mkdirSync(dirname(file), { recursive: true });
   return serializeWrites(createClient({ ...config, timeout: BUSY_TIMEOUT_MS }));
 }
