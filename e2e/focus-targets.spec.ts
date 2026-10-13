@@ -1,15 +1,10 @@
 import path from "node:path";
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate as removeImported } from "./helpers/cleanup";
 import {
   SPRING_NAME,
   TEAM,
   click,
-  createSpringTravel,
   reactReady,
-  removeTemplate,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -25,6 +20,7 @@ import {
   typeSlowly,
 } from "./helpers/scenario";
 import { settled } from "./helpers/settled";
+import { Changes } from "./helpers/state";
 
 // Where focus goes after an Esc, a submit, or the rail's header row swapping (handoff review I15). Each control
 // that code sends focus to registers itself with the workspace session, and nothing finds one by its label or
@@ -50,25 +46,14 @@ const FILE = path.join(
   "spring-offer.docx",
 );
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
-/** Set once the import has made its template, so afterAll removes it even when the test fails half way. */
-let imported: string | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-    if (imported) await removeImported(db, imported);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const previewToggle = (page: Page) =>
   page.getByRole("button", { name: "Preview", exact: true });
@@ -212,7 +197,8 @@ test("an imported template's Original tab: focus follows the rail's header row b
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/, {
       timeout: 30_000,
     });
-    imported = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
+    // As soon as the import has made its template, so afterAll removes it (and its upload) even when the test fails half way.
+    changes.ownTemplate(/\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1]);
     await liveEditor(page);
     await expect(rail(page)).toHaveAttribute("data-view", "original");
     // From the rail, Esc puts the widened view away (where focus goes then depends on what had it on arrival).

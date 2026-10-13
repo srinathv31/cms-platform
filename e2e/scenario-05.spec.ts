@@ -1,36 +1,28 @@
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
 import { sunsetInstant } from "@/domain/business-zone";
-import { expectError, longDate, openDb } from "./api/helpers";
+import { expectError, longDate } from "./api/helpers";
 import {
   CUSTOMERS,
   SPRING_NAME,
   SPRING_OFFER_NAME,
   TEAM,
   backToUcomp,
-  clockDay,
   click,
   coralRender,
-  createSpringTravel,
   dropDemoNoise,
   escapeRe,
   expectFailed,
-  json,
   linkSpringOffer,
   openDemoDrawer,
   openOffer,
   openOfferTab,
   openSimulator,
   reactReady,
-  restore,
   resultsHeadline,
   resultsRows,
-  rows,
   selectCustomers,
   send,
   switchPersona,
-  takeSnapshot,
-  type Snapshot,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -52,6 +44,15 @@ import {
   untilUncovered,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import {
+  Changes,
+  clockDay,
+  consumerNotices,
+  findVersion,
+  simDeliveries,
+  simLink,
+  versionById,
+} from "./helpers/state";
 
 // Phase 5 gate: demo scenario 5 ("Breaking change, pin and sunset"), start to finish.
 //
@@ -88,31 +89,19 @@ const coralDay = (day: string) =>
     timeZone: "UTC",
   }).format(new Date(day));
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
-let snapshot: Snapshot;
 
 test.beforeAll(async () => {
-  db = openDb();
-  snapshot = await takeSnapshot(db);
-  fixture = await createSpringTravel(db);
-  await linkSpringOffer(db, fixture);
+  // The Demo pill moves the clock; the other specs run on the real day.
+  await changes.watchClock();
+  fixture = await changes.createSpringTravel();
+  await linkSpringOffer(fixture);
 });
 
 test.afterEach(({ problems }) => dropDemoNoise(problems));
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    // The clock first and always: the other specs run on the real day.
-    if (snapshot)
-      await restore(db, snapshot, {
-        templates: fixture ? [fixture.templateId] : [],
-      });
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 // ── The screens (product) ────────────────────────────────────────────────────
 
@@ -211,13 +200,9 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       );
       expect(res.status(), "Coral renders the Active v2").toBe(200);
       expect(res.headers()["x-stencil-version"]).toBe("2");
-      const [link] = await rows(
-        db,
-        "SELECT * FROM sim_links WHERE offer_id = 'offer_spring_travel'",
-      );
-      expect(link).toMatchObject({
-        template_id: templateId,
-        pinned_version: 2,
+      expect(await simLink("offer_spring_travel")).toMatchObject({
+        templateId,
+        pinnedVersion: 2,
       });
     });
 
@@ -337,43 +322,31 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
         timeout: 20_000,
       });
 
-      const [v3] = await rows(
-        db,
-        "SELECT * FROM versions WHERE template_id = ? AND number = 3",
-        [templateId],
-      );
+      const v3 = await findVersion({ templateId, number: 3 });
       expect(v3).toMatchObject({
         state: "in_review",
-        submitted_by: "maya",
-        submit_note: NOTE_V3,
+        submittedBy: "maya",
+        submitNote: NOTE_V3,
       });
-      v3Id = String(v3.id);
-      const changes = json(v3.contract_changes) as {
+      v3Id = v3!.id;
+      const contractChanges = (v3!.contractChanges ?? []) as {
         kind: string;
         key: string;
         breaking: boolean;
       }[];
       expect(
-        changes.filter((c) => c.breaking).map((c) => [c.kind, c.key]),
+        contractChanges.filter((c) => c.breaking).map((c) => [c.kind, c.key]),
         "one breaking change: the new required variable",
       ).toEqual([["added", "annual_fee"]]);
-      expect(
-        (
-          json(v3.variables) as {
-            key: string;
-            required: boolean;
-            type: string;
-          }[]
-        ).find((v) => v.key === "annual_fee"),
-      ).toMatchObject({ required: true, type: "currency" });
+      expect(v3!.variables.find((v) => v.key === "annual_fee")).toMatchObject({
+        required: true,
+        type: "currency",
+      });
       // v2 is untouched until v3 is approved.
-      expect(
-        (
-          await rows(db, "SELECT state, sunset_at FROM versions WHERE id = ?", [
-            v2Id,
-          ])
-        )[0],
-      ).toMatchObject({ state: "active", sunset_at: null });
+      expect(await versionById(v2Id)).toMatchObject({
+        state: "active",
+        sunsetAt: null,
+      });
     });
 
     // ── 2. Jordan approves, with a sunset for v2 ─────────────────────────────
@@ -440,7 +413,7 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
         dialog.getByText("Set a sunset date for v2", { exact: true }),
       );
       await expect(toggle).toBeChecked();
-      sunsetDay = await clockDay(db, SUNSET_DAYS);
+      sunsetDay = await clockDay(SUNSET_DAYS);
       await click(dialog.getByRole("button", { name: /^Sunset date/ }));
       await pickDay(page, sunsetDay);
       await expect(
@@ -477,34 +450,26 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
     });
 
     await test.step("2.3 The database: v3 Active, v2 Superseded with its sunset, Coral told", async () => {
-      const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
-        v2Id,
-      ]);
-      const [v3] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
-        v3Id,
-      ]);
-      expect(v3.state).toBe("active");
-      expect(v2.state).toBe("superseded");
+      const v2 = await versionById(v2Id);
+      const v3 = await versionById(v3Id);
+      expect(v3?.state).toBe("active");
+      expect(v2?.state).toBe("superseded");
       expect(
-        v2.sunset_at,
+        v2?.sunsetAt,
         "sunset at the start of the chosen day, Eastern",
       ).toBe(sunsetInstant(sunsetDay, "America/New_York").getTime());
-      expect(v2.sunset_set_by).toBe("jordan");
+      expect(v2?.sunsetSetBy).toBe("jordan");
 
-      const notices = await rows(
-        db,
-        "SELECT * FROM consumer_notices WHERE template_id = ? ORDER BY created_at, id",
-        [templateId],
-      );
+      const notices = await consumerNotices({ templateId });
       expect(
         notices.length,
         "Coral rendered v2, so Coral is told",
       ).toBeGreaterThanOrEqual(1);
       expect(
-        notices.every((n) => n.consumer_id === "coral"),
+        notices.every((n) => n.consumerId === "coral"),
         "only Coral rendered it",
       ).toBe(true);
-      expect(JSON.stringify(notices.map((n) => json(n.payload)))).toContain(
+      expect(JSON.stringify(notices.map((n) => n.payload))).toContain(
         SPRING_NAME,
       );
     });
@@ -557,24 +522,20 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       await resultsHeadline(page).scrollIntoViewIfNeeded();
       await shoot(page, "send-on-v2");
 
-      const sent = await rows(
-        db,
-        "SELECT * FROM sim_deliveries WHERE template_id = ? ORDER BY id",
-        [templateId],
-      );
+      const sent = await simDeliveries({ templateId });
       expect(sent).toHaveLength(6);
       for (const delivery of sent)
         expect(delivery).toMatchObject({
           status: "delivered",
-          version_number: 2,
-          newer_version: 3,
+          versionNumber: 2,
+          newerVersion: 3,
         });
     });
 
     // ── 4. Advance the clock 15 days: the sunset has passed ──────────────────
 
     await test.step("4. The Demo pill advances the clock 15 days: Coral's send fails with the sunset message", async () => {
-      const before = await clockDay(db);
+      const before = await clockDay();
       const drawer = await openDemoDrawer(page);
       await beat(page, 600);
       await click(
@@ -584,9 +545,9 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
         }),
       );
       await expect
-        .poll(() => clockDay(db), { message: "the clock moved" })
+        .poll(() => clockDay(), { message: "the clock moved" })
         .not.toBe(before);
-      expect(await clockDay(db)).toBe(
+      expect(await clockDay()).toBe(
         new Date(Date.parse(`${before}T00:00:00Z`) + ADVANCE_DAYS * 86_400_000)
           .toISOString()
           .slice(0, 10),
@@ -623,14 +584,10 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       await shoot(page, "send-after-sunset");
 
       // The API's own words, stored by Coral as received.
-      const failed = await rows(
-        db,
-        "SELECT * FROM sim_deliveries WHERE template_id = ? AND status = 'failed'",
-        [templateId],
-      );
+      const failed = await simDeliveries({ templateId, status: "failed" });
       expect(failed).toHaveLength(6);
       for (const delivery of failed)
-        expect(json(delivery.error)).toMatchObject({
+        expect(delivery.error).toMatchObject({
           status: 410,
           code: "version_sunset",
           message,
@@ -662,10 +619,10 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
         page.getByRole("heading", { level: 1, name: "Relink to v3" }),
       ).toBeVisible();
 
-      const changes = page.getByRole("table", { name: "Changes" });
-      await expect(changes).toBeVisible();
-      await expect(changes).toContainText("annual_fee");
-      await expect(changes).toContainText("Added");
+      const changesTable = page.getByRole("table", { name: "Changes" });
+      await expect(changesTable).toBeVisible();
+      await expect(changesTable).toContainText("annual_fee");
+      await expect(changesTable).toContainText("Added");
       const newValues = page.getByRole("table", { name: "New values" });
       const annualFee = newValues.getByRole("combobox", {
         name: "Annual fee",
@@ -692,15 +649,12 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
         /\/sim\/offers\/offer_spring_travel\?tab=send$/,
       );
 
-      const [link] = await rows(
-        db,
-        "SELECT * FROM sim_links WHERE offer_id = 'offer_spring_travel'",
-      );
+      const link = await simLink("offer_spring_travel");
       expect(link).toMatchObject({
-        template_id: templateId,
-        pinned_version: 3,
+        templateId,
+        pinnedVersion: 3,
       });
-      expect(json(link.mapping)).toMatchObject({
+      expect(link?.mapping).toMatchObject({
         annual_fee: "offer.annualFee",
         first_name: "customer.firstName",
       });
@@ -742,17 +696,13 @@ test.describe("scenario 5: breaking change, pin and sunset", () => {
       await shoot(page, "send-on-v3");
       await page.keyboard.press("Escape");
 
-      const latest = await rows(
-        db,
-        "SELECT * FROM sim_deliveries WHERE template_id = ? AND version_number = 3",
-        [templateId],
-      );
+      const latest = await simDeliveries({ templateId, versionNumber: 3 });
       expect(latest).toHaveLength(6);
       for (const delivery of latest)
         expect(delivery).toMatchObject({
           status: "delivered",
           error: null,
-          newer_version: null,
+          newerVersion: null,
         });
     });
 

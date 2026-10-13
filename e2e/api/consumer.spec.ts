@@ -1,4 +1,3 @@
-import type { Client } from "@libsql/client";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -9,10 +8,14 @@ import type {
 } from "@/contracts/api-v1";
 import { sunsetDay } from "@/domain/business-zone";
 import {
-  JUNK,
   allVersions,
+  consumerNotices,
+  noticeSeqs,
+  versionById,
+} from "../helpers/state";
+import {
+  JUNK,
   expectError,
-  openDb,
   pick,
   type SeedVersion,
   type VariableType,
@@ -28,20 +31,10 @@ import {
 // Read-only: nothing is written. Nothing is hardcoded by id: templates are found by state. Other agents
 // may add templates or notices while this runs, so lists are checked for what the seed guarantees.
 
-let db: Client;
-
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(() => {
-  db.close();
-});
-
 const CORAL = { "X-Consumer-Id": "coral" };
 const RELEASED = ["active", "superseded", "revoked"];
 
-const versions = () => allVersions(db);
+const versions = () => allVersions();
 
 async function get(
   request: APIRequestContext,
@@ -55,11 +48,8 @@ async function get(
 async function samplesOf(
   versionId: string,
 ): Promise<{ key: string; type: VariableType; sample: string }[]> {
-  const { rows } = await db.execute({
-    sql: "SELECT variables FROM versions WHERE id = ?",
-    args: [versionId],
-  });
-  return JSON.parse(String(rows[0]!.variables)) as {
+  const version = await versionById(versionId);
+  return version!.variables as {
     key: string;
     type: VariableType;
     sample: string;
@@ -456,16 +446,6 @@ async function walkNotices(
   }
 }
 
-/** Each notice's place in the outbox (consumer_notices.seq), in the order given; ids no longer stored are left out. */
-async function seqs(ids: string[]): Promise<number[]> {
-  const { rows } = await db.execute({
-    sql: `SELECT id, seq FROM consumer_notices WHERE id IN (${ids.map(() => "?").join(",")})`,
-    args: ids,
-  });
-  const byId = new Map(rows.map((r) => [String(r.id), Number(r.seq)]));
-  return ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
-}
-
 const increasing = (values: number[]) =>
   values.every((v, i) => i === 0 || v > values[i - 1]!);
 
@@ -480,10 +460,9 @@ test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
     expect(body.consumerId).toBe("coral");
     expect(body.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(typeof body.hasMore).toBe("boolean");
-    const { rows } = await db.execute(
-      "SELECT id FROM consumer_notices WHERE consumer_id = 'coral'",
+    const coral = new Set(
+      (await consumerNotices({ consumerId: "coral" })).map((n) => n.id),
     );
-    const coral = new Set(rows.map((r) => String(r.id)));
     expect(body.notices.length).toBeGreaterThan(0);
     for (const n of body.notices) {
       expect(coral.has(n.id), n.id).toBe(true);
@@ -494,7 +473,7 @@ test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
       );
     }
     expect(
-      increasing(await seqs(body.notices.map((n) => n.id))),
+      increasing(await noticeSeqs(body.notices.map((n) => n.id))),
       "in seq order",
     ).toBe(true);
 
@@ -536,15 +515,14 @@ test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
     ).toBe(true);
     const walked = pages.flatMap((p) => p.notices.map((n) => n.id));
     expect(new Set(walked).size, "no notice twice").toBe(walked.length);
-    const { rows } = await db.execute(
-      "SELECT id FROM consumer_notices WHERE consumer_id = 'coral'",
+    const stored = new Set(
+      (await consumerNotices({ consumerId: "coral" })).map((n) => n.id),
     );
-    const stored = new Set(rows.map((r) => String(r.id)));
     const earlier = all.map((n) => n.id);
     expect(walked.filter((id) => earlier.includes(id))).toEqual(
       earlier.filter((id) => stored.has(id)),
     );
-    expect(increasing(await seqs(walked)), "in seq order").toBe(true);
+    expect(increasing(await noticeSeqs(walked)), "in seq order").toBe(true);
 
     // The last cursor is where a poll resumes: nothing older comes back.
     const resumed = await walkNotices(request, "limit=50", end);

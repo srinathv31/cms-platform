@@ -1,6 +1,4 @@
-import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   CUSTOMERS,
   TEAM,
@@ -9,15 +7,9 @@ import {
   escapeRe,
   openSimulator,
   reactReady,
-  restore,
   resultsHeadline,
-  rows,
-  run,
   selectCustomers,
   send,
-  takeSnapshot,
-  type Row,
-  type Snapshot,
 } from "./helpers/golive";
 import {
   asPersona,
@@ -29,6 +21,7 @@ import {
   test,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import { Changes, findVersion, renderLog } from "./helpers/state";
 
 // Coral receives alerts: the push and SMS demo moment, start to finish.
 //
@@ -68,68 +61,34 @@ const MARCUS = {
   purchase: "$23.75 at Barcelona Tapas Bar & Grill in Spain",
 };
 
-let db: Client;
-let snapshot: Snapshot;
-let abroad: { templateId: string; versionId: string; number: number; row: Row };
-/** The ids in each table the approval writes to, before the run. */
-let before: Record<string, Set<string>>;
-const APPROVAL_TABLES = [
-  "approvals",
-  "audit_events",
-  "notifications",
-  "consumer_notices",
-] as const;
+const changes = new Changes();
+let abroad: { templateId: string; versionId: string; number: number };
 
 test.beforeAll(async () => {
-  db = openDb();
-  const [row] = await rows(
-    db,
-    `SELECT v.* FROM versions v JOIN templates t ON t.id = v.template_id WHERE t.team_id = ? AND v.name = ? AND v.state = 'in_review'`,
-    [TEAM, ALERT_NAME],
-  );
-  if (!row)
+  const version = await findVersion({
+    teamSlug: TEAM,
+    name: ALERT_NAME,
+    state: "in_review",
+  });
+  if (!version || version.number === null)
     throw new Error(
       `This spec needs the fresh seed (npm run db:reset): ${ALERT_NAME} in review.`,
     );
   abroad = {
-    templateId: String(row.template_id),
-    versionId: String(row.id),
-    number: Number(row.number),
-    row,
+    templateId: version.templateId,
+    versionId: version.id,
+    number: version.number,
   };
-  snapshot = await takeSnapshot(db);
-  before = {};
-  for (const table of APPROVAL_TABLES)
-    before[table] = new Set(
-      (await rows(db, `SELECT id FROM ${table}`)).map((r) => String(r.id)),
-    );
+  // The approval writes a decision, audit events, notifications and notices, and moves the version; Coral's
+  // side (its link, deliveries and the render log rows of those sends) goes first on the way back. The clock is
+  // never moved here.
+  await changes.watchTemplate(abroad.templateId);
+  await changes.watchSimulator({ offers: [CORAL_ALERT_ID] });
 });
 
 test.afterEach(({ problems }) => dropDemoNoise(problems));
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (snapshot)
-      await restore(db, snapshot, { offers: [CORAL_ALERT_ID], clock: false });
-    if (abroad && before) {
-      for (const table of APPROVAL_TABLES) {
-        const now = await rows(db, `SELECT id FROM ${table}`);
-        for (const { id } of now)
-          if (!before[table].has(String(id)))
-            await run(db, `DELETE FROM ${table} WHERE id = ?`, [id]);
-      }
-      const columns = Object.keys(abroad.row).filter((c) => c !== "id");
-      await run(
-        db,
-        `UPDATE versions SET ${columns.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`,
-        [...columns.map((c) => abroad.row[c] as InValue), abroad.versionId],
-      );
-    }
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 // ── The screens ──────────────────────────────────────────────────────────────
 
@@ -299,15 +258,13 @@ test.describe("Coral receives alerts", () => {
         grid.getByRole("row").filter({ hasText: MARCUS.name }),
       ).toContainText("GSM-7 · 2 parts");
       // The render log names the phone each push was for (a setting of the request, never a value).
-      const pushes = await rows(
-        db,
-        "SELECT platform, COUNT(*) AS n FROM render_log WHERE template_id = ? AND channel = 'push' AND is_preview = 0 GROUP BY platform ORDER BY platform",
-        [templateId],
+      const pushes = (await renderLog({ templateId, isPreview: false })).filter(
+        (entry) => entry.channel === "push",
       );
-      expect(pushes.map((r) => [r.platform, Number(r.n)])).toEqual([
-        ["android", 1],
-        ["ios", 1],
-      ]);
+      expect(
+        pushes.map((entry) => entry.platform).sort(),
+        "one push for each phone",
+      ).toEqual(["android", "ios"]);
     });
 
     await test.step("4. Olivia's iPhone: the push on the lock screen, with its subtitle; the text with its footer", async () => {

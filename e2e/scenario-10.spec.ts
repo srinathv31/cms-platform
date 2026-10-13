@@ -1,7 +1,4 @@
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate } from "./helpers/cleanup";
 import {
   asPersona,
   beat,
@@ -21,6 +18,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { Changes } from "./helpers/state";
 
 // Phase 7a gate: demo scenario 10 ("Copilot prompt").
 //
@@ -41,7 +39,7 @@ import {
 // The clipboard is the browser's own (the context is granted clipboard-read and clipboard-write): Copy
 // prompt is read back from it, and the answer is written to it and pasted with Cmd+V.
 //
-// Self-contained: creates one template; afterAll removes it by id. Console and page errors fail it.
+// Self-contained: creates one template; afterAll removes it by id (`Changes.ownTemplate`). Console and page errors fail it.
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
@@ -60,22 +58,9 @@ const ANSWER = [
   "- No foreign transaction fee",
 ].join("\n");
 
-let db: Client;
-/** Set once the template exists, so afterAll removes it even when the test fails half way. */
-let templateId: string | null = null;
+const changes = new Changes();
 
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (templateId) await removeTemplate(db, templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const copilotRow = (page: Page) =>
   page
@@ -132,7 +117,9 @@ test("scenario 10: Maya copies the Copilot prompt, then pastes back text with {{
     await expect(gallery).toBeVisible();
     await tap(gallery.getByRole("button", { name: /Card offer terms/ }));
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
-    templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
+    const templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
+    // Registered as soon as the id is known, so the template is removed even when the test fails half way.
+    changes.ownTemplate(templateId);
 
     await expect(nameField(page)).toBeFocused();
     // The page is live (the document's editor has taken over from the server's markup) before the first keystroke.

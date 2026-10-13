@@ -1,10 +1,8 @@
 import { readFile } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
 import {
-  allVersions,
   correlation,
   expectError,
-  openDb,
   preview,
   render,
   validValues,
@@ -35,6 +33,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { allVersions, renderLog } from "./helpers/state";
 
 // Phase 3 gate: demo scenario 2 ("Create"), all five steps, as Maya, from the Library.
 //
@@ -781,90 +780,79 @@ test.describe("scenario 2: create, preview, submit", () => {
     });
 
     await test.step("5.3 The render API: a consumer is refused v1, a preview is not", async () => {
-      const db = openDb();
-      try {
-        const version = (await allVersions(db)).find(
-          (v) => v.templateId === templateId && v.number === 1,
-        );
-        expect(version, "v1 is in the database").toBeDefined();
-        expect(version!.state).toBe("in_review");
-        const values = validValues(version!.variables);
+      const version = (await allVersions()).find(
+        (v) => v.templateId === templateId && v.number === 1,
+      );
+      expect(version, "v1 is in the database").toBeDefined();
+      expect(version!.state).toBe("in_review");
+      const values = validValues(version!.variables);
 
-        const consumerCall = await render(request, {
-          templateId,
-          consumer: "coral",
-          correlationId: correlation("scenario02-consumer"),
-          body: { version: 1, channel: "pdf", values },
-        });
-        await expectError(
-          consumerCall.res,
-          409,
-          "version_not_released",
-          "Version 1 is in review. No version is active yet.",
-        );
+      const consumerCall = await render(request, {
+        templateId,
+        consumer: "coral",
+        correlationId: correlation("scenario02-consumer"),
+        body: { version: 1, channel: "pdf", values },
+      });
+      await expectError(
+        consumerCall.res,
+        409,
+        "version_not_released",
+        "Version 1 is in review. No version is active yet.",
+      );
 
-        const previewCall = await preview(request, {
-          templateId,
-          correlationId: correlation("scenario02-preview"),
-          headers: { Cookie: "ucomp_persona=maya" },
-          body: { version: 1, channel: "web", values },
-        });
-        expect(
-          previewCall.res.status(),
-          "a preview of a version in review",
-        ).toBe(200);
-        expect(previewCall.res.headers()["content-type"]).toContain(
-          "text/html",
-        );
+      const previewCall = await preview(request, {
+        templateId,
+        correlationId: correlation("scenario02-preview"),
+        headers: { Cookie: "ucomp_persona=maya" },
+        body: { version: 1, channel: "web", values },
+      });
+      expect(previewCall.res.status(), "a preview of a version in review").toBe(
+        200,
+      );
+      expect(previewCall.res.headers()["content-type"]).toContain("text/html");
 
-        // render_log: every preview is tagged and has no consumer; the one consumer attempt is the one refusal.
-        const { rows } = await db.execute({
-          sql: "SELECT * FROM render_log WHERE template_id = ? ORDER BY at, id",
-          args: [templateId],
-        });
-        const consumerRows = rows.filter((row) => Number(row.is_preview) === 0);
-        const previewRows = rows.filter((row) => Number(row.is_preview) === 1);
-        expect(
-          consumerRows,
-          "exactly one render that was not a preview",
-        ).toHaveLength(1);
-        expect(consumerRows[0]).toMatchObject({
-          consumer_id: "coral",
-          version_number: 1,
-          channel: "pdf",
-          error_code: "version_not_released",
-          correlation_id: consumerCall.correlationId,
-        });
-        expect(
-          previewRows.length,
-          "the previews in this scenario",
-        ).toBeGreaterThanOrEqual(8);
-        expect(
-          previewRows.filter((row) => row.consumer_id !== null),
-          "a preview has no consumer",
-        ).toEqual([]);
-        expect(
-          new Set(previewRows.map((row) => row.channel)),
-          "previews of every channel",
-        ).toEqual(new Set(["pdf", "web", "email"]));
-        expect(
-          previewRows.filter((row) => row.outcome !== "ok"),
-          "no preview was refused",
-        ).toEqual([]);
-        // And no value anywhere in the log.
-        const logged = JSON.stringify(rows);
-        for (const value of [
-          TYPICAL_NAME,
-          LONG_NAME,
-          EDITED_NAME,
-          TYPICAL_APR.replace("%", ""),
-          LONG_APR.replace("%", ""),
-          LATE_WORD,
-        ])
-          expect(logged).not.toContain(value);
-      } finally {
-        db.close();
-      }
+      // render_log: every preview is tagged and has no consumer; the one consumer attempt is the one refusal.
+      const logged = await renderLog({ templateId });
+      const consumerRows = logged.filter((row) => !row.isPreview);
+      const previewRows = logged.filter((row) => row.isPreview);
+      expect(
+        consumerRows,
+        "exactly one render that was not a preview",
+      ).toHaveLength(1);
+      expect(consumerRows[0]).toMatchObject({
+        consumerId: "coral",
+        versionNumber: 1,
+        channel: "pdf",
+        errorCode: "version_not_released",
+        correlationId: consumerCall.correlationId,
+      });
+      expect(
+        previewRows.length,
+        "the previews in this scenario",
+      ).toBeGreaterThanOrEqual(8);
+      expect(
+        previewRows.filter((row) => row.consumerId !== null),
+        "a preview has no consumer",
+      ).toEqual([]);
+      expect(
+        new Set(previewRows.map((row) => row.channel)),
+        "previews of every channel",
+      ).toEqual(new Set(["pdf", "web", "email"]));
+      expect(
+        previewRows.filter((row) => row.outcome !== "ok"),
+        "no preview was refused",
+      ).toEqual([]);
+      // And no value anywhere in the log.
+      const everything = JSON.stringify(logged);
+      for (const value of [
+        TYPICAL_NAME,
+        LONG_NAME,
+        EDITED_NAME,
+        TYPICAL_APR.replace("%", ""),
+        LONG_APR.replace("%", ""),
+        LATE_WORD,
+      ])
+        expect(everything).not.toContain(value);
     });
   });
 });
