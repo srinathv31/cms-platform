@@ -1675,11 +1675,11 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect(await getWorkspaceHeader("coral-offers", templateId)).toMatchObject({
       status: "revoked",
       activeNumber: null,
-      canStartDraft: true,
+      can: expect.objectContaining({ startDraft: { ok: true } }),
     });
     as("sam");
     expect(
-      (await getWorkspaceHeader("coral-offers", templateId)).canStartDraft,
+      (await getWorkspaceHeader("coral-offers", templateId)).can.startDraft.ok,
       "a viewer can't edit",
     ).toBe(false);
 
@@ -1723,7 +1723,8 @@ describe("after the Active version is revoked (handoff review D1)", () => {
       basedOn: { label: "v2", active: false },
       versionNumber: 3,
       round: 1,
-      canStartDraft: false,
+      // The draft is open: the header offers Submit, not Edit.
+      can: expect.objectContaining({ submit: { ok: true } }),
     });
   });
 
@@ -1842,7 +1843,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
     expect(await getWorkspaceHeader("coral-offers", templateId)).toMatchObject({
       status: "active",
       activeNumber: 3,
-      canStartDraft: true,
+      can: expect.objectContaining({ startDraft: { ok: true } }),
     });
   });
 

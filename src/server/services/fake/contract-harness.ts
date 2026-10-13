@@ -69,20 +69,6 @@ export function fakeContractHarness(opts: { base: Date }): ContractHarness {
     async consumerNotices(consumerId, templateId) {
       return fakeConsumerNotices(state!, consumerId, templateId);
     },
-    probe: {
-      async auditEvents({ versionId }) {
-        return state!.auditEvents
-          .filter((e) => e.versionId === versionId)
-          .map((e) => ({
-            action: e.action,
-            at: e.at.toISOString(),
-            actorId: e.actorId,
-            teamId: e.teamId,
-            templateId: e.templateId,
-            versionId: e.versionId,
-            details: e.details,
-          }));
-      },
-    },
+    probe: {},
   };
 }

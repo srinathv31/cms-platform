@@ -7,8 +7,9 @@
 // block ids (decision 0065). The backend stores what it is handed, after checking it; the Java API doesn't port
 // the importer or the starter catalog.
 //
-// Typed for step 2b; each method still runs in src/server/actions/, src/server/import/ or src/server/queries/
-// until its package moves it (plan.md).
+// The workspace's two reads run behind the seam (local; their facts are in ./workspace.ts). The rest are typed
+// for step 2b; each still runs in src/server/actions/, src/server/import/ or src/server/queries/ until its
+// package moves it (plan.md).
 
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { Channel, JSONContent, SampleSet, Variable } from "@/domain/types";
@@ -18,6 +19,7 @@ import type {
   RequestContext,
   Unsettled,
 } from "./types";
+import type { WorkspaceDocumentFacts, WorkspaceHeaderFacts } from "./workspace";
 
 /** A new template's first draft, as the BFF built and prepared it. */
 export interface DraftContent {
@@ -84,17 +86,24 @@ export interface TemplateService {
     },
   ): Promise<ReadResult<Unsettled<"P4c: the palette's results">>>;
 
-  /** The workspace header (name, state, what the viewer may do). */
+  /**
+   * The workspace header, on every tab: the version the workspace shows (its name, state and sunset), its
+   * labels' facts, and what the viewer may do there (`workspaceActions`). Refuses 404 `template_unavailable`
+   * when the template doesn't exist or the viewer may not see its team (the two read the same, decision 0052).
+   */
   workspaceHeader(
     ctx: RequestContext,
     input: { templateId: string },
-  ): Promise<ReadResult<Unsettled<"P4a: the workspace header's facts">>>;
+  ): Promise<ReadResult<WorkspaceHeaderFacts>>;
 
-  /** The draft (or latest version) the workspace edits or shows. */
+  /**
+   * The document the Content tab edits or shows (the open draft, else the latest round), with its margin's
+   * threads and what the viewer may do with it. Refuses as `workspaceHeader`.
+   */
   workspaceDocument(
     ctx: RequestContext,
     input: { templateId: string },
-  ): Promise<ReadResult<Unsettled<"P4a: the workspace document's facts">>>;
+  ): Promise<ReadResult<WorkspaceDocumentFacts>>;
 
   /** The SHARE panel's facts: what a consumer sends and gets (its worded examples are the BFF's). */
   integration(

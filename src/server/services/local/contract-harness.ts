@@ -1,7 +1,5 @@
-import { eq, sql } from "drizzle-orm";
 import { beforeAll, beforeEach } from "vitest";
 import type { Db } from "@/server/db/client";
-import { auditEvents } from "@/server/db/schema/ucomp";
 import { listNotices } from "@/server/queries/consumer-api";
 import { runSunsetSweep } from "@/server/sunset-sweep";
 import {
@@ -66,23 +64,6 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
       });
       return page.notices;
     },
-    probe: {
-      async auditEvents({ versionId }) {
-        const rows = await db!
-          .select()
-          .from(auditEvents)
-          .where(eq(auditEvents.versionId, versionId))
-          .orderBy(sql`rowid`);
-        return rows.map((e) => ({
-          action: e.action,
-          at: e.at.toISOString(),
-          actorId: e.actorId,
-          teamId: e.teamId,
-          templateId: e.templateId,
-          versionId: e.versionId,
-          details: e.details,
-        }));
-      },
-    },
+    probe: {},
   };
 }

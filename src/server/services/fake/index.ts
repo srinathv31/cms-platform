@@ -1,21 +1,21 @@
 import type { AccessService } from "../access";
-import type { AuditService } from "../audit";
-import type { CommentService } from "../comments";
 import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
 
-import { notMovedArea } from "../not-moved";
+import { notMoved, notMovedArea } from "../not-moved";
 import type { Clock, ImplementationOptions, TestHooks } from "../options";
 import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
 import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
+import { fakeActivity } from "./activity";
 import { fakeIdentity } from "./identity";
 import { fakeNotifications } from "./notifications";
 import { fakeReview } from "./review";
 import type { FakeState } from "./state";
 import { FakeStore } from "./store";
+import { fakeThreads } from "./threads";
 import { fakeVersions } from "./versions";
 
 // The in-memory fake of the service interfaces (decision 0068): the real domain rules over arrays instead of a
@@ -53,11 +53,21 @@ export function fakeServices(
     versions: fakeVersions(deps),
     templates: notMovedArea<TemplateService>("templates"),
     drafts: notMovedArea<DraftService>("drafts"),
-    comments: notMovedArea<CommentService>("comments"),
+    comments: {
+      add: notMoved("comments.add"),
+      reply: notMoved("comments.reply"),
+      resolve: notMoved("comments.resolve"),
+      reopen: notMoved("comments.reopen"),
+      ...fakeThreads(deps),
+    },
     access: notMovedArea<AccessService>("access"),
     platform: notMovedArea<PlatformService>("platform"),
     notifications: fakeNotifications(deps),
-    audit: notMovedArea<AuditService>("audit"),
+    audit: {
+      page: notMoved("audit.page"),
+      exportRows: notMoved("audit.exportRows"),
+      ...fakeActivity(deps),
+    },
     usage: notMovedArea<UsageService>("usage"),
     render: notMovedArea<RenderService>("render"),
     demo: notMovedArea<DemoService>("demo"),

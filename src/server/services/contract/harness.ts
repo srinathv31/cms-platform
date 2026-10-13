@@ -10,9 +10,10 @@ import type { RequestContext, Services } from "../types";
 // A case acts only through the service interfaces, from the seeded world (the same people, teams and template
 // ids in every implementation: the seed, or for Java the fixture the seed exports, loaded at the same base
 // instant). It sets the backend's clock to an exact instant before it acts (`setClock`; for Java its test-only
-// clock, decision 0068), and observes what a command wrote through reads: the service reads that exist, the
-// consumer notices `/api/v1` serves, and, until their areas move, the probe. It compares state before and
-// after a command, never finds a write by its instant.
+// clock, decision 0068), and observes what a command wrote through reads: the service reads (a template's audit
+// rows through `audit.activity`, notifications through `notifications.list`), the consumer notices `/api/v1`
+// serves, and, until their areas move, the probe. It compares state before and after a command, never finds a
+// write by its instant.
 
 /** The implementation under test, as one case sees it. A fresh, seeded backend for every test. */
 export interface ContractHarness {
@@ -42,24 +43,9 @@ export interface ContractHarness {
   readonly probe: ContractProbe;
 }
 
-/** An audit row, as facts. */
-export interface ProbeAuditEvent {
-  action: string;
-  /** ISO. */
-  at: string;
-  actorId: string | null;
-  teamId: string | null;
-  templateId: string | null;
-  versionId: string | null;
-  details: Record<string, unknown> | null;
-}
-
 /**
  * Reads what a command wrote that no service read serves yet: SQL for the local implementation, the arrays for
- * the fake, test endpoints for Java. Replaced by `audit.activity` when it moves (plan P4a). Notifications are read
- * through `notifications.list`.
+ * the fake, test endpoints for Java. Nothing today: a template's audit rows are read through `audit.activity`,
+ * notifications through `notifications.list`, consumer notices through `/api/v1`. Integration (2b-2) removes it.
  */
-export interface ContractProbe {
-  /** The audit rows about a version, in the order they were written. */
-  auditEvents(filter: { versionId: string }): Promise<ProbeAuditEvent[]>;
-}
+export type ContractProbe = Record<string, never>;

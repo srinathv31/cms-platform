@@ -2,17 +2,26 @@
 // workspace makes on demand (Compare, "Revert to vN"). The BFF words and lays them out (labels, contract
 // lines, the timeline's grouping by number); everything decided is decided here.
 //
-// `history` runs behind the seam (local and fake). `compare` and `baseVersion` are typed here and still run
-// in src/server/queries/ until they move.
+// `history` runs behind the seam in both implementations; `compare` and `baseVersion` in the local one (the
+// fake serves a read only where a contract case observes a command through it).
 
+import type {
+  ChannelFields,
+  ChannelFieldValues,
+} from "@/domain/channel-fields";
 import type { VersionActions } from "@/domain/lifecycle/version-actions";
 import type { ConsumerUsage, Person } from "@/domain/review-types";
 import type {
+  Channel,
+  ChannelFamily,
   ContractChange,
+  JSONContent,
   RevokeRecord,
+  SampleSet,
+  Variable,
   VersionState,
 } from "@/domain/types";
-import type { ReadResult, RequestContext, Unsettled } from "./types";
+import type { ReadResult, RequestContext } from "./types";
 
 /** A decision on a round: one `approvals` row. */
 export interface DecisionFacts {
@@ -96,15 +105,72 @@ export interface VersionService {
     input: { templateId: string },
   ): Promise<ReadResult<VersionHistory>>;
 
-  /** Two versions' content for Compare (`from` and `to` are version ids). */
+  /**
+   * Two versions' content for Compare (`from` and `to` are version ids, as the request named them), for anyone
+   * who may see the template. Refuses, in this order: 400 `template_unavailable` when an id is missing or
+   * malformed; 404 `template_unavailable` when the template doesn't exist, 403 when the viewer may not see its
+   * team; 404 `version_unavailable` when either id isn't one of its versions.
+   */
   compare(
     ctx: RequestContext,
     input: { templateId: string; from: string | null; to: string | null },
-  ): Promise<ReadResult<Unsettled<"P4a: two versions' content, as facts">>>;
+  ): Promise<ReadResult<ComparePairFacts>>;
 
-  /** The content the draft on screen was started from ("Revert to v3"). */
+  /**
+   * The content the draft on screen (`versionId`, as the request named it) was started from ("Revert to v3"),
+   * for someone who may edit the team's drafts: never the base of another draft the template has by now.
+   * Refuses, in this order: 400 `template_unavailable` when an id is missing or malformed; 404
+   * `template_unavailable` when the template doesn't exist; 403 with the permission's refusal; 404
+   * `no_draft_to_revert` when the version isn't the template's, 409 when it isn't an open draft; 409
+   * `no_base_version` when it wasn't started from a numbered version.
+   */
   baseVersion(
     ctx: RequestContext,
     input: { templateId: string; versionId: string | null },
-  ): Promise<ReadResult<Unsettled<"P4a: the base version's content">>>;
+  ): Promise<ReadResult<{ base: BaseVersionFacts }>>;
+}
+
+/** One side of Compare. */
+export interface CompareVersionFacts {
+  id: string;
+  /** Null for the open draft. */
+  number: number | null;
+  /** Which submission of `number`; null for the open draft. */
+  round: number | null;
+  state: VersionState;
+  /** The template's name as this version has it (a rename shows above the redline). */
+  name: string;
+  body: JSONContent;
+  /** The channels that are on, and each channel's own fields: an alert's whole content, an email's subject. */
+  channels: Channel[];
+  channelFields: ChannelFields;
+  /**
+   * The SMS footer this version prints (`smsFooterOf`): the one frozen into it at submit, or for the open draft
+   * the content type's as it stands. Null: none.
+   */
+  smsFooter: string | null;
+  variables: Variable[];
+}
+
+/** The pair Compare shows, and the template's family (its content type's: an alert compares only its fields). */
+export interface ComparePairFacts {
+  family: ChannelFamily;
+  from: CompareVersionFacts;
+  to: CompareVersionFacts;
+}
+
+/**
+ * A draft's fields as they are in the version it was started from: its name, and each channel field by id
+ * ("email.subject", null when it has none), the way the workspace holds and saves them. With its number, round
+ * and state, for its label ("Reverted to v1, round 1").
+ */
+export interface BaseVersionFacts extends ChannelFieldValues {
+  number: number;
+  round: number;
+  state: VersionState;
+  name: string;
+  body: JSONContent;
+  variables: Variable[];
+  channels: Channel[];
+  sampleSets: SampleSet[];
 }

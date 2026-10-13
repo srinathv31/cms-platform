@@ -8,17 +8,18 @@
 // viewer may not act on (`generic`), then `version_gone`. Someone else changing the version between the
 // command's read and its write is `version_changed`. A refusal writes nothing.
 //
-// `setSunset` runs behind the seam (local and fake). The others are typed here and still run in
-// src/server/actions/review.ts and src/server/queries/review.ts until they move.
+// `setSunset` runs behind the seam (local and fake), and so do the reads: the queue, the badge and the screen
+// (local; their facts are in ./review-reads.ts). The other commands are typed here and still run in
+// src/server/actions/review.ts until they move.
 
 import type { OutputKey } from "@/domain/review-outputs";
 import type { SubmitSummary } from "@/domain/submit-types";
+import type { ReviewQueueFacts, ReviewScreenFacts } from "./review-reads";
 import type {
   ActionResult,
   Changed,
   ReadResult,
   RequestContext,
-  Unsettled,
 } from "./types";
 
 /** A released version: the number's head. */
@@ -85,19 +86,29 @@ export interface ReviewService {
   /** Withdraw a pending revoke. */
   cancelRevoke(ctx: RequestContext, input: VersionRef): Promise<ActionResult>;
 
-  /** The review queue of a space (`teamId` null: All teams). */
+  /**
+   * The review queue of a space (`teamId` null: All teams) for the viewer: the rounds in review there that wait
+   * on them, or that they submitted, and the rounds decided there lately. A round on a team the viewer can't see
+   * waits on them when its stage names them (`queuePlacement`). The space is one the viewer may enter (the BFF
+   * resolved it with `identity.space`).
+   */
   queue(
     ctx: RequestContext,
     input: { teamId: string | null },
-  ): Promise<ReadResult<Unsettled<"P4a: the review queue's facts">>>;
+  ): Promise<ReadResult<ReviewQueueFacts>>;
 
-  /** How many rounds wait on the viewer in a space: the sidebar badge. */
+  /** How many rounds wait on the viewer in a space: the sidebar badge (the queue's `waiting`). */
   badgeCount(
     ctx: RequestContext,
     input: { teamId: string | null },
   ): Promise<ReadResult<{ count: number }>>;
 
-  /** The review screen of one round (the number's head without `round`). */
+  /**
+   * The review screen of one round, opened from a space (`teamId` null: All teams): `round`, or without one the
+   * number's head, except for a stage reviewer from outside the team, who gets the newest round they may open
+   * (`roundToOpen`). Refuses 404 `version_unavailable` when there is no such round, or none the viewer may open
+   * from the space (the two read the same, decision 0052).
+   */
   screen(
     ctx: RequestContext,
     input: {
@@ -106,7 +117,7 @@ export interface ReviewService {
       versionNumber: number;
       round: number | null;
     },
-  ): Promise<ReadResult<Unsettled<"P4a: the review screen's facts">>>;
+  ): Promise<ReadResult<ReviewScreenFacts>>;
 
   /** What submit would freeze, with the draft's `rev` (the submit dialog). */
   submitSummary(

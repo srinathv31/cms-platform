@@ -50,10 +50,29 @@ export function reviewContract(h: ContractHarness, base: Date) {
       .notifications.list(await h.as("priya"), { limit: 100 });
     if (!bell.ok) throw new Error(bell.code);
     return {
-      audit: await h.probe.auditEvents({ versionId: version.id }),
+      audit: await auditOf(templateId, version.id),
       notices: await h.consumerNotices(CORAL, templateId),
       priya: bell.items,
     };
+  }
+
+  /** The audit rows about one version, oldest first, as the template's Activity tab reads them. */
+  async function auditOf(templateId: string, versionId: string) {
+    const activity = await h
+      .services()
+      .audit.activity(await h.as("jordan"), { templateId });
+    if (!activity.ok) throw new Error(activity.code);
+    return activity.events
+      .filter((e) => e.versionId === versionId)
+      .reverse()
+      .map(({ action, at, actorId, details }) => ({
+        action,
+        at,
+        actorId,
+        templateId,
+        versionId,
+        details,
+      }));
   }
 
   /** The notifications in `after` that `before` didn't have (the bell lists newest first). */
@@ -90,7 +109,6 @@ export function reviewContract(h: ContractHarness, base: Date) {
           action: "version.sunset_set",
           at: minute(1).toISOString(),
           actorId: "alex",
-          teamId: history.template.teamId,
           templateId,
           versionId: version.id,
           details: expect.objectContaining({
