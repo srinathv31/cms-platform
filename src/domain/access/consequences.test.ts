@@ -8,6 +8,7 @@ import {
   memberConsequences,
   recertFootnote,
   recertItemOutcome,
+  recertProgressLabel,
   recertRemoveConsequence,
   requestConsequences,
   startRecertConsequence,
@@ -222,6 +223,17 @@ describe("a review as the Recertification section shows it", () => {
     expect(outcome(null, null, "suspended")).toBe("Suspended for inactivity");
     expect(outcome(null, null, "lapsed", at(31))).toBe("Access lapsed Mar 3");
     expect(outcome(null, null, "active", at(31))).toBe("Not confirmed");
+  });
+});
+
+describe("a review's progress (recertProgressLabel)", () => {
+  it('reads "4 of 6 confirmed"', () => {
+    expect(recertProgressLabel({ decided: 4, total: 6 })).toBe(
+      "4 of 6 confirmed",
+    );
+    expect(recertProgressLabel({ decided: 0, total: 0 })).toBe(
+      "0 of 0 confirmed",
+    );
   });
 });
 

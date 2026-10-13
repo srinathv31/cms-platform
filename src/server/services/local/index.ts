@@ -1,6 +1,6 @@
 import "server-only";
 
-import { notMoved, notMovedArea } from "../not-moved";
+import { notMovedArea } from "../not-moved";
 import type { ImplementationOptions } from "../options";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
@@ -9,12 +9,15 @@ import { newTemplateId } from "@/server/ids";
 import { localAccess } from "./access";
 import { localActivity } from "./activity";
 import type { LocalDeps } from "./command";
+import { localAccessReads } from "./access-reads";
+import { localAuditReads } from "./audit";
 import { localComments } from "./comments";
 import { localDemo } from "./demo";
 import { localDrafts } from "./drafts";
 import { localIdentity } from "./identity";
 import { localNotifications } from "./notifications";
 import { localPlatform } from "./platform";
+import { localPlatformReads } from "./platform-reads";
 import { localRender } from "./render";
 import { localReview } from "./review";
 import { localReviewReads } from "./review-reads";
@@ -49,14 +52,10 @@ export function localServices(options: LocalOptions = {}): Services {
     templates: { ...localTemplates(deps), ...localWorkspace(deps) },
     drafts: localDrafts(deps),
     comments: { ...localComments(deps), ...localThreads() },
-    access: localAccess(deps),
-    platform: localPlatform(deps),
+    access: { ...localAccess(deps), ...localAccessReads(deps) },
+    platform: { ...localPlatform(deps), ...localPlatformReads(deps) },
     notifications: localNotifications(deps),
-    audit: {
-      page: notMoved("audit.page"),
-      exportRows: notMoved("audit.exportRows"),
-      ...localActivity(deps),
-    },
+    audit: { ...localAuditReads(deps), ...localActivity(deps) },
     usage: notMovedArea<UsageService>("usage"),
     render: localRender(deps),
     demo: localDemo(deps, identity),

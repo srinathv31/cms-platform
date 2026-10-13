@@ -11,6 +11,7 @@ import {
   type Named,
   type RecertFacts,
   type RecertItemFacts,
+  type RecertProgress,
 } from "../access-types";
 import type { MembershipStatus, TeamRole } from "../types";
 import { inactivity, suspensionHeld } from "./inactivity";
@@ -52,7 +53,8 @@ export interface MemberConsequences {
 
 /** What each member action does: Remove, Restore, Suspend and Keep. */
 export function memberConsequences(input: {
-  membership: MembershipFacts;
+  /** The roles they have, and what the inactivity clock runs from (a Keep restarts it at `now`). */
+  membership: Pick<MembershipFacts, "roles" | "addedAt" | "lastActiveAt">;
   member: Named;
   team: Named;
   now: Date;
@@ -82,6 +84,13 @@ export function requestConsequences(input: {
     approve: `${requester.name} gets ${ROLE_LABEL[role]} access to ${team.name} and sees its Library the next time they open Stencil.`,
     deny: `${firstName(requester.name)} sees your note and can ask again.`,
   };
+}
+
+/** A review's progress as people read it: "4 of 6 confirmed". */
+export function recertProgressLabel(
+  progress: Pick<RecertProgress, "decided" | "total">,
+): string {
+  return `${progress.decided} of ${progress.total} confirmed`;
 }
 
 /** What starting a review now asks of the team, and by when: the deadline `startRecert` sets. */

@@ -6,8 +6,8 @@ import { requestContextOrRefusal } from "@/server/context/request";
 
 // The Audit page's "Export N events": the same filters as the page (`?team&person&action&template&
 // from&to`), every matching event (no page limit), as RFC 4180 CSV. Times are ISO instants on the
-// demo clock. Request-time only: it reads the persona cookie, and checks `audit.view` itself.
-// A refusal (403 or 404) is `{ ok: false, code, reason }` like every other refusal, never the file.
+// backend's clock. Request-time only: it reads the request context, and the audit service checks `audit.view`.
+// A refusal (401, 403 or 404) is `{ ok: false, code, reason }` like every other refusal, never the file.
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +21,7 @@ export async function GET(
   const context = await requestContextOrRefusal();
   if (!context.ok) return signedOutResponse();
   const result = await getAuditExport(
-    context.context.viewer,
+    context.context,
     team,
     parseAuditFilters(params),
   );

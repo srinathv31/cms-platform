@@ -57,8 +57,9 @@ export function recertSubjects(
 }
 
 /**
- * Progress: "4 of 6 confirmed" counts decided items (kept or removed). An undecided item whose person
- * no longer has a membership on the team (removed on the Members page) counts as removed.
+ * Progress: the counts behind "4 of 6 confirmed" (`recertProgressLabel`). It counts decided items (kept or
+ * removed); an undecided item whose person no longer has a membership on the team (removed on the Members
+ * page) counts as removed.
  */
 export function recertProgress(
   r: Pick<RecertFacts, "items" | "teamId">,
@@ -82,8 +83,24 @@ export function recertProgress(
     kept,
     removed,
     pending: total - decided,
-    label: `${decided} of ${total} confirmed`,
   };
+}
+
+/**
+ * The review a team's Recertification section shows: the open (or upcoming) one, the earliest start first, else
+ * the most recent by deadline. null before the team's first review.
+ */
+export function currentRecert<
+  R extends Pick<RecertFacts, "startsAt" | "dueAt" | "completedAt">,
+>(recerts: readonly R[], now: Date): R | null {
+  const live = recerts
+    .filter((r) => recertPhase(r, now) !== "closed")
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  if (live.length) return live[0]!;
+  return (
+    [...recerts].sort((a, b) => b.dueAt.getTime() - a.dueAt.getTime())[0] ??
+    null
+  );
 }
 
 /** "Q1 2027": the calendar quarter (UTC) of the deadline. */
