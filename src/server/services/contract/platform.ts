@@ -13,7 +13,8 @@ import type { ContractHarness } from "./harness";
 //
 // Each case sets the backend's clock and compares what the reads show before and after. A setting saved as it
 // already is answers `changed: false`: the cases use it to see what a command stored, since the settings' own
-// reads haven't moved behind the seam yet (plan P4b). A refusal is checked by its code.
+// reads run on the local implementation only (./settings.ts). The rows each command writes to the audit log are
+// ./audit.ts's; a chain edited under versions in review is ./approval-chain.ts's. A refusal is checked by its code.
 
 const CT = "ct_disclosure";
 const ALERT = "ct_alert";
