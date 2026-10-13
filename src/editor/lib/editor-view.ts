@@ -12,6 +12,11 @@ export function viewDom(editor: Editor): HTMLElement | null {
   return editor.isDestroyed ? null : editor.view.dom;
 }
 
+/** The editor's wrapper (`.ucomp-editor`), where its menus render, or null while its view isn't mounted. */
+export function editorFrame(editor: Editor): HTMLElement | null {
+  return viewDom(editor)?.closest<HTMLElement>(".ucomp-editor") ?? null;
+}
+
 /**
  * Calls `attach(dom)` whenever the editor's view is mounted (now, or when it mounts later), and the
  * cleanup it returns when the view goes away (unmount, destroy) or the component unmounts.

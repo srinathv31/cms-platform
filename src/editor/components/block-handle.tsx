@@ -2,7 +2,8 @@
 
 // Notion-style block handle on the OFFICIAL DragHandle (@tiptap/extension-drag-handle-react):
 // a + that inserts a block below and opens the `/` menu, and a ⋮⋮ grip that drags the block, or,
-// clicked, opens the block menu (components/block-menu.tsx: numbering). Alt+F10 from the caret opens
+// clicked, opens the block menu (components/block-menu.tsx: numbering; block-menu-openers.tsx: the
+// grip's and the keyboard's way in). Alt+F10 from the caret opens
 // the same menu for the caret's block (in a table cell it stays the table's, unless the caret is in
 // a numbered list there). A second click on the grip closes the menu. Centered on each block's first
 // line. Never rendered in read-only mode.
@@ -19,7 +20,11 @@ import { isRequiredHeading } from "../extensions/required-sections";
 import { useViewDom } from "../lib/editor-view";
 import { insertBlockBelow } from "../lib/insert-below";
 import { keyboardBlockAt } from "../lib/list-numbering";
-import { GripBlockMenu, GripTrigger, KeyboardBlockMenu } from "./block-menu";
+import {
+  GripBlockMenu,
+  GripTrigger,
+  KeyboardBlockMenu,
+} from "./block-menu-openers";
 import type { SlashMenuController } from "./slash-menu";
 
 // Stable reference: the React DragHandle re-registers its plugin when this object changes.

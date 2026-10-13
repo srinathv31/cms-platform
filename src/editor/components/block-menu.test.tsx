@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-// The block menu (components/block-menu.tsx): named "Block options" however it opened; Numbering (ten
-// styles and Default, the list's own checked) and Start at… for a numbered list; both disabled, with
-// the reason, elsewhere. Choices are edits of the list node. The grip opens it on a click and closes
-// it on the next one.
+// The block menu (components/block-menu.tsx, opened by components/block-menu-openers.tsx): named
+// "Block options" however it opened; Numbering (ten styles and Default, the list's own checked) and
+// Start at… for a numbered list; both disabled, with the reason, elsewhere. Choices are edits of the
+// list node. The grip opens it on a click and closes it on the next one.
 
 import type { JSONContent } from "@tiptap/core";
 import { Editor } from "@tiptap/react";
@@ -13,13 +13,12 @@ import { listItemMarkers } from "../extensions/list-markers";
 import { editorExtensions } from "../schema";
 import { createVariableStore } from "../state/variable-store";
 import { byRole } from "../testing/editor";
+import { NO_NUMBERING_REASON, START_RANGE_MESSAGE } from "./block-menu";
 import {
   GripBlockMenu,
   GripTrigger,
   KeyboardBlockMenu,
-  NO_NUMBERING_REASON,
-  START_RANGE_MESSAGE,
-} from "./block-menu";
+} from "./block-menu-openers";
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

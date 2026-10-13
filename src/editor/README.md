@@ -228,7 +228,8 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
   (same Suspense boundary) and the panel's usage counts are in the server HTML; otherwise they fill
   in after hydration on the same line (rows keep their height).
 - **Hidden routes.** Survives React `<Activity>` hiding: an editor destroyed while hidden comes back
-  with its latest content and re-registers with its root.
+  with its latest content and re-registers with its root (`lib/use-editor-lifecycle.ts`; its undo
+  history comes with it, `lib/history-carry.ts`).
 - **Hide a field, don't unmount it.** A field that leaves the tree leaves the root: its chips stop
   counting, and a key renamed meanwhile never reaches them (they come back as unknown chips). To put
   an inline field away for a while (the email subject while Email is off), pass `hidden`: it isn't
@@ -688,7 +689,7 @@ body, an SMS's message) in a page's main column:
 | Chip popover                                                                                     | Base UI `Popover` parts, anchored to the chip, never taking focus (`chip-popover.tsx`)                                                                                                                                                                                                                                           |
 | Panel, forms, dialogs, table menu                                                                | shadcn `Button`, `Input`, `Select`, `Switch`, `AlertDialog`, `DropdownMenu`                                                                                                                                                                                                                                                      |
 | ⋮⋮ handle                                                                                        | `@tiptap/extension-drag-handle-react` + our `+` (`components/block-handle.tsx`)                                                                                                                                                                                                                                                  |
-| Block menu (numbering)                                                                           | Base UI `Menu` with a submenu and radio items (`components/block-menu.tsx`); target list, previews and edits in `lib/list-numbering.ts`                                                                                                                                                                                          |
+| Block menu (numbering)                                                                           | Base UI `Menu` with a submenu and radio items (`components/block-menu.tsx`, opened by `block-menu-openers.tsx`); target list, previews and edits in `lib/list-numbering.ts`                                                                                                                                                      |
 | List markers                                                                                     | `model/list-markers.ts` text, drawn as a decoration (`data-list-marker`) live and as an attribute in the static paint (`extensions/list-markers.ts`); `::before` in `styles.css`, never CSS counters                                                                                                                             |
 | Dragged-block highlight                                                                          | `@tiptap/extension-node-range` decoration helper (`extensions/block-range-highlight.ts`)                                                                                                                                                                                                                                         |
 | Format toolbar (+ Comment)                                                                       | `BubbleMenu` from `@tiptap/react/menus` (`components/format-bubble.tsx`, its link field `components/link-field.tsx`); Base UI `Tooltip`                                                                                                                                                                                          |
@@ -712,11 +713,15 @@ state/                    zustand stores: variable list (ids, rename forwards, t
                           flag popover
 extensions/               TipTap extensions (server-safe, except variable-view.ts)
 components/               React: EditorRoot, DocumentEditor, VariablesPanel, InlineVariableField,
-                          StaticDocument, chip + popover, `{{` picker, form, handle, toolbar, menus
+                          StaticDocument, chip + popover, `{{` picker, form, handle, toolbar, menus;
+                          block-menu.tsx is the block menu (popup, numbering, Start at…) and
+                          block-menu-openers.tsx its two ways in (the grip's click, Alt+F10)
 paste/                    clipboard HTML normalizer, Markdown → HTML, `{{key}}` → chips;
                           __fixtures__/ Word (Windows, Mac) and Google Docs clipboard HTML
 lib/                      small helpers (chip transforms, section positions, + insert, hooks,
-                          thread anchors and quotes, block rects, platform keys, Tab order)
+                          thread anchors and quotes, block rects, platform keys, Tab order);
+                          load-block-handle.ts loads the handle ahead of the editor, use-editor-lifecycle.ts
+                          hands the document and undo history to a rebuilt editor (the Activity switch)
 testing/                  helpers for the tests (headless editors); `testing/editor` is public, for tests elsewhere
 ```
 
