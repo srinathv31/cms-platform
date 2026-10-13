@@ -309,6 +309,7 @@ describe("hand-written documents", () => {
   const CASES: [string, unknown, boolean][] = [
     ["a paragraph", doc(para("Hello")), true],
     ["a paragraph with no content", doc(p()), true],
+    ["no marks on the root", { ...doc(para("Hello")), marks: [] }, true],
     [
       "every mark, in any order",
       doc(
@@ -456,6 +457,16 @@ describe("hand-written documents", () => {
       inDoc({ type: "paragraph", marks: [mark("bold")] }),
       false,
     ],
+    [
+      "a mark of an unknown type on the root",
+      { ...doc(para("a")), marks: [mark("nope")] },
+      false,
+    ],
+    [
+      "marks on the root that is a string",
+      { ...doc(para("a")), marks: "bold" },
+      false,
+    ],
     ["an empty document", { type: "doc" }, false],
     ["a document with no blocks", inDoc(), false],
     ["a root that is not a doc", p(), false],
@@ -600,6 +611,11 @@ describe("hand-written documents", () => {
     ["attrs that is null", inDoc({ type: "paragraph", attrs: null })],
     ["content that is null", inDoc({ type: "paragraph", content: null })],
     ["marks that is null", inDoc({ type: "paragraph", marks: null })],
+    ["marks that is null on the root", { ...doc(para("a")), marks: null }],
+    [
+      "a known mark on the root",
+      { ...doc(para("a")), marks: [{ type: "bold" }] },
+    ],
   ])("%s: the check accepts it, the schema refuses it", (_name, value) => {
     expect(bodyProblem(value)).toBeNull();
     expect(schemaAcceptsBody(value)).toBe(false);

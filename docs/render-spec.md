@@ -167,7 +167,7 @@ It is looser than the document check in three rules, which an engine must still 
 - A table is at most 12 columns wide.
 - Lists nest at most 9 levels deep, bullet and ordered together, counted through table cells too.
 
-It is stricter than ProseMirror's parse in shape only: `attrs` must be an object and `content` and `marks` arrays when present, where the parse also reads `null` as absent. The editor and the save never write those. The checks of section 3 that are not about structure (characters, link addresses, the normalization) are not in the schema.
+It is stricter than ProseMirror's parse in shape only: `attrs` must be an object and `content` and `marks` arrays when present, where the parse also reads `null` as absent, and the root takes no marks, where the parse accepts a known mark there. The editor and the save never write those. The checks of section 3 that are not about structure (characters, link addresses, the normalization) are not in the schema.
 
 ---
 

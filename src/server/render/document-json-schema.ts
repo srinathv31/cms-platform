@@ -26,7 +26,8 @@
 // as written, but any value is accepted), `requiredKey`, a variable's `key`, a link's `href`.
 //
 // Stricter than ProseMirror's parse, in shape only (the editor never writes them): `attrs` must be an
-// object, `content` and `marks` arrays, where ProseMirror also reads null or a string as "none".
+// object, `content` and `marks` arrays, where ProseMirror also reads null or a string as "none"; and the
+// root `doc` takes no marks, where ProseMirror accepts a known one there.
 //
 // It throws rather than guess when the editor's schema grows past what it can state: a content
 // expression with no JSON Schema form, an attribute it has no rule for, a mark that excludes others, or
@@ -204,11 +205,10 @@ class SchemaBuilder {
     const attributes = this.attributes(type.name, type.spec.attrs);
     if (attributes) properties.attrs = attributes;
 
-    if (type.isInline) {
-      properties.marks = override.marks ?? this.marks(type);
-    } else if (type !== this.schema.topNodeType) {
-      properties.marks = NO_MARKS;
-    }
+    // A block takes no marks, and neither does the root: ProseMirror checks a node's marks against its parent,
+    // and the root has none, so it would accept a known mark there (the editor never writes one).
+    if (type.isInline) properties.marks = override.marks ?? this.marks(type);
+    else properties.marks = NO_MARKS;
 
     return { type: "object", required, properties };
   }

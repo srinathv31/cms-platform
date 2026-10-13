@@ -40,6 +40,10 @@
           }
         ]
       }
+    },
+    "marks": {
+      "type": "array",
+      "items": false
     }
   },
   "$defs": {
