@@ -14,8 +14,8 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 1    | 4      | 5   | 10    |
-| Partly fixed | 1        | 4    | 5      | 2   | 12    |
+| Open         | 0        | 1    | 3      | 5   | 9     |
+| Partly fixed | 1        | 4    | 6      | 2   | 13    |
 | Fixed        | 1        | 21   | 31     | 33  | 86    |
 | Deferred     | 0        | 2    | 1      | 0   | 3     |
 
@@ -354,7 +354,7 @@ If the backend moves to the Spring Boot API with this app as its BFF, these find
 | [B3 · Medium](#b3--medium-invariants-rely-on-sqlites-single-writer)                               | Partial unique indexes or row locks behind the last-admin, one-open-recertification and one-pending-request rules, CHECK constraints on state, status and role, and the missing indexes. SQLite's single writer hides all of these today.                                                                                                                                                                      |
 | [B4 · Medium](#b4--medium-sqlite-workarounds-are-spread-through-the-code)                         | Retries inside the database client, ordering by ULID or sequence instead of `rowid`, and filtering in SQL.                                                                                                                                                                                                                                                                                                     |
 | [B5 · Medium](#b5--medium-autosave-conflict-recovery-reads-the-audit-log)                         | `rev` and the last save session live on the version row, not in the audit log.                                                                                                                                                                                                                                                                                                                                 |
-| [A4 · Medium](#a4--medium-get-apiv1-routes-can-return-a-non-json-500)                             | Every route maps a failure to the contract's error body with a correlation id, as RFC 9457 problem details, together with the route half of [A3](#a3--medium-six-error-shapes-and-some-actions-throw).                                                                                                                                                                                                         |
+| [A4 · Medium](#a4--medium-get-apiv1-routes-can-return-a-non-json-500)                             | Every route maps a failure to the contract's error body with a correlation id, in the error format [decision 0056](decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md) settles, together with the route half of [A3](#a3--medium-six-error-shapes-and-some-actions-throw).                                                                                                                      |
 | [A8 · Low](#a8--low-sample-urls-are-built-from-request-headers)                                   | The consumer base URL comes from configuration (`CONSUMER_API_BASE_URL`).                                                                                                                                                                                                                                                                                                                                      |
 | [A9 · Low](#a9--low-notifications-store-app-urls)                                                 | Notifications store the `NotificationLink` descriptor, and the BFF builds the link when it reads them.                                                                                                                                                                                                                                                                                                         |
 | [D11 · Low](#d11--low-javascript-only-behavior-that-wont-port-cleanly)                            | Dates are validated by round trip (`2026-02-30` must fail, not become March 2), ids compare by code point, and lookups go through `Map`.                                                                                                                                                                                                                                                                       |
@@ -530,7 +530,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D10 · Medium: Audit and notice payloads are untyped
 
-- **Status:** Open
+- **Status:** Partly fixed. The seed writes the runtime's audit action names and notice fields, so there are no aliases and `noticeView` reads one shape ([decision 0064](decisions/0064-payloads-are-facts-with-one-shape-per-event.md), `src/server/seed/templates/build.ts`). A typed payload per action is still open: the catalogue is written with the handoff package and the types are generated from the enterprise API design.
 - **Where:** `src/domain/review-types.ts` line 52; `src/domain/audit.ts` line 140
 - **What happens:** `details: Record`. The sentence builders guess which fields exist, notices read two payload shapes (the seed's and live rows'), and audit aliases exist only to cover the seed's spellings.
 - **Fix:** A typed payload per action, and migrate the seed instead of aliasing it.
@@ -538,7 +538,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D11 · Low: JavaScript-only behavior that won't port cleanly
 
-- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant` is gone with the notices `since` parameter, and the consumer API's search compares names and ids by code point (`compareCodePoints` in `src/domain/golive/cursor.ts`, PR #10). `localeCompare` ordering elsewhere (the read models' sorts, `domain/golive/usage.ts`, `domain/consequences.ts`) and `canonicalAction` remain. The contract matcher reports a new variable on a renamed variable's old key as an addition beside the rename (D8).
+- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant` is gone with the notices `since` parameter, and the consumer API's search compares names and ids by code point (`compareCodePoints` in `src/domain/golive/cursor.ts`, PR #10). `localeCompare` ordering elsewhere (the read models' sorts, `domain/golive/usage.ts`, `domain/consequences.ts`) remain. `canonicalAction` and the Audit action catalog no longer look a name up on a plain object (`Object.hasOwn`). The contract matcher reports a new variable on a renamed variable's old key as an addition beside the rename (D8).
 - **Where:** `src/domain/audit.ts` line 93; `src/domain/golive/api-errors.ts` line 61
 - **What happens:** A plain-object lookup with untrusted keys (`canonicalAction("toString")` returns a function). `parseInstant("2026-02-30")` rolls over to March 2. `localeCompare` orders ids and names (ICU collation, unlike Java's `compareTo`). If a key is renamed and a new variable reuses the old key, the diff reports only the rename.
 - **Fix:** Use `Map` or `Object.hasOwn`; validate dates by round-trip; compare ids by code point; fix the contract matcher.
@@ -768,10 +768,10 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A3 · Medium: Six error shapes, and some actions throw
 
-- **Status:** Partly fixed. Every server action but the demo tools runs on one kit and returns `ActionResult` with a code, so Edit and New template (`startDraft`, `createTemplate`) show the domain's refusal instead of throwing, and the ⌘K palette answers through `readResponse` like the other reads (I12); the autosave route, import (its two reads included) and the audit export now refuse in that same `{ ok: false, code, reason }` shape too, with codes from the refusal tables ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md), [decision 0041](decisions/0041-routes-refuse-in-the-actions-shape.md)); only `/api/v1` problem details remain, and they wait for the Java API.
+- **Status:** Partly fixed. Every server action but the demo tools runs on one kit and returns `ActionResult` with a code, so Edit and New template (`startDraft`, `createTemplate`) show the domain's refusal instead of throwing, and the ⌘K palette answers through `readResponse` like the other reads (I12); the autosave route, import (its two reads included) and the audit export now refuse in that same `{ ok: false, code, reason }` shape too, with codes from the refusal tables ([decision 0029](decisions/0029-every-action-runs-on-one-kit.md), [decision 0041](decisions/0041-routes-refuse-in-the-actions-shape.md)); only `/api/v1`'s errors remain: [decision 0056](decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md) has them follow the existing UCOMP API's error format, which waits for the Java API.
 - **Where:** `src/server/actions/templates.ts` line 57
 - **What happens:** `/api/v1` uses `{error: {code, message, details}}`; drafts, imports and palette each have their own; audit export returns text. `startDraft` and `createTemplate` throw, so in production the user sees a generic message instead of the domain's sentence.
-- **Fix:** One result kit for actions and RFC 9457 problem details for routes.
+- **Fix:** One result kit for actions, and for routes the error format [decision 0056](decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md) settles.
 - **Evidence:** traced
 
 #### A4 · Medium: GET /api/v1 routes can return a non-JSON 500
@@ -784,7 +784,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A5 · Medium: The contract is TypeScript only, and the simulator tests against a fake
 
-- **Status:** Partly fixed. Rendering has a full spec (`docs/render-spec.md`) and golden files for a Java port (PR #6, #7). The rest of `/api/v1` still has no OpenAPI or JSON Schema.
+- **Status:** Partly fixed. Rendering has a full spec (`docs/render-spec.md`) and golden files for a Java port (PR #6, #7). The rest of `/api/v1` still has no OpenAPI or JSON Schema; the Java team writes the OpenAPI document from [the OpenAPI brief](reference/openapi-brief.md), which sets out every endpoint, field and error as decided.
 - **Where:** `src/contracts/api-v1.ts` line 1; `src/simulator/actions.test.ts` line 118
 - **What happens:** No OpenAPI or JSON Schema for a Java team to generate from. The status-code table lives in `domain/golive-types.ts`. The simulator's tests use a hand-written fake UCOMP whose messages already differ from the real routes.
 - **Fix:** Generate OpenAPI (or zod schemas) from one source; run the simulator client against the real handlers with a seeded temp DB.
@@ -908,7 +908,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T5 · Medium: E2E can't be pointed at its own database
 
-- **Status:** Fixed. `playwright.config.ts` gives e2e its own `data/e2e.db` and `data/e2e-uploads` (`E2E_DATABASE_URL`, `E2E_UPLOADS_DIR`, read once in `e2e/storage.ts`) and starts the server on them as `DATABASE_URL` and the new `UPLOADS_DIR`, so a run never touches the demo database; the raw-SQL assertions stay for the Java API work.
+- **Status:** Fixed. `playwright.config.ts` gives e2e its own `data/e2e.db` and `data/e2e-uploads` (`E2E_DATABASE_URL`, `E2E_UPLOADS_DIR`, read once in `e2e/storage.ts`) and starts the server on them as `DATABASE_URL` and the new `UPLOADS_DIR`, so a run never touches the demo database. The raw-SQL assertions moved into one helper, `e2e/helpers/state/` ([decision 0068](decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)): it is the one thing that changes for the Java API, and ESLint keeps the database client out of every spec.
 - **Where:** `e2e/api/helpers.ts` line 12
 - **What happens:** `openDb()` hard-codes `data/ucomp.db` and two helpers hard-code the uploads folder, so `DATABASE_URL` splits server and tests. Thirteen specs assert with raw SQL, which won't survive a Java backend.
 - **Fix:** One `E2E_DATABASE_URL` and uploads dir set in `playwright.config.ts` and read by the helpers; assert through the API where possible.
@@ -1056,7 +1056,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### H8 · Low: Oversized files and functions
 
-- **Status:** Fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines. The four domain files (`lifecycle.ts`, `access.ts`, `platform-config.ts`, `redline.ts`) are split by concern into folders ([decision 0043](decisions/0043-split-files-by-concern-not-by-line-count.md)), and the other long files stay under that rule. The workspace session and the live draft keep their state in vanilla zustand, the library the editor uses, behind their unchanged interfaces ([decision 0044](decisions/0044-the-workspace-session-stores-its-state-in-zustand.md)).
+- **Status:** Fixed. `ReviewWorkspace` is split into one hook per kind of state (`useReviewView`, `useReviewChanges`, `usePreviewSets`, `useReviewComments`, `useReviewDecision`, `useGoLive`) and a `CommentsSection`, none over about 150 lines. The four domain files (`lifecycle.ts`, `access.ts`, `platform-config.ts`, `redline.ts`) are split by concern into folders ([decision 0043](decisions/0043-split-files-by-concern-not-by-line-count.md)), and the other long files stay under that rule. The workspace session and the live draft keep their state in vanilla zustand, the library the editor uses, behind their unchanged interfaces ([decision 0044](decisions/0044-the-workspace-session-stores-its-state-in-zustand.md)). `ContentWorkspace`, the Content tab, is split the same way: `useContentRevert` (the values shown, and revert), `useContentComments` (the threads and the comment box) and a props object per concern.
 - **Where:** `src/components/review/review-workspace.tsx` (was line 56)
 - **What happens:** 25 production files over 400 lines. `ReviewWorkspace` is a 400-line function owning views, sample sets, comments, decisions and the go-live moment. The workspace session store handles nine concerns with a hand-rolled store while the editor uses zustand.
 - **Fix:** Split into hooks; pick one store library.
@@ -1070,7 +1070,7 @@ The owner may keep Next.js as the backend or move business rules and storage to 
 2. **Use-case services behind interfaces** in a new `services` folder under `src/server/`: today's Drizzle code moves unchanged into a local implementation; an HTTP implementation can call Spring later. Only the local implementation, `src/server/db` and `src/server/seed` import Drizzle.
 3. **Read models return capability flags** (`{ok, code, reason}`) with stable codes. Components render them; they never call `can()` or compare English sentences.
 4. **Move the rules listed in [B2](#b2--high-about-a-third-of-the-business-rules-live-outside-srcdomain) into `src/domain`** as pure functions returning `{changes, effects}`.
-5. **A machine-readable contract** for `/api/v1`: OpenAPI 3.1, RFC 9457 problem details, cursor paging and consumer credentials.
+5. **A machine-readable contract** for `/api/v1`: OpenAPI 3.1, the error format [decision 0056](decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md) settles, cursor paging and consumer credentials.
 6. **One config module** with `DEMO_MODE`, `CONSUMER_API_BASE_URL` and a `Clock` interface.
 
 Rendering is already in this shape: `src/server/render/engine.ts` runs with no database, `docs/render-spec.md` specifies it, and the golden files are the acceptance test for a second implementation.

@@ -1,4 +1,3 @@
-import { createClient, type Client, type InValue } from "@libsql/client";
 import {
   expect,
   type APIRequestContext,
@@ -7,55 +6,10 @@ import {
 } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
-import { E2E_DATABASE_URL } from "../storage";
 
-// Shared by the API specs: the database (read for what the seed holds and for render_log; written
-// only through `withTemporarily`, which always puts the row back), the render call, a chunked upload
-// with no Content-Length, and the assertions every error response has to pass.
-
-// ── The database ─────────────────────────────────────────────────────────────
-
-/** How long SQLite waits for the server's write lock before a statement fails with SQLITE_BUSY. */
-const BUSY_TIMEOUT_MS = 5_000;
-
-const isBusy = (error: unknown) =>
-  /SQLITE_BUSY|database is locked/i.test(
-    `${(error as { code?: unknown })?.code ?? ""} ${(error as Error)?.message ?? ""}`,
-  );
-
-/** Runs a statement again, a few times with a growing pause, while the server holds the file's write lock. */
-export async function retryBusy<T>(run: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await run();
-    } catch (error) {
-      if (attempt >= 6 || !isBusy(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt));
-    }
-  }
-}
-
-/**
- * e2e's own database (`E2E_DATABASE_URL`, the file the server runs on; see e2e/storage.ts). The server
- * writes to it while a spec reads and writes, so the connection waits out its lock and `execute` and
- * `batch` retry a SQLITE_BUSY that still gets through.
- */
-export function openDb(): Client {
-  const client = createClient({
-    url: E2E_DATABASE_URL,
-    timeout: BUSY_TIMEOUT_MS,
-  });
-  return new Proxy(client, {
-    get(target, prop) {
-      const member = Reflect.get(target, prop, target);
-      if (typeof member !== "function") return member;
-      if (prop === "execute" || prop === "batch")
-        return (...args: unknown[]) =>
-          retryBusy(() => member.apply(target, args));
-      return member.bind(target);
-    },
-  });
-}
+// Shared by the API specs: the render call, a chunked upload with no Content-Length, and the assertions
+// every error response has to pass. What the specs read from the database (the seed's versions, the render
+// log) comes from ../helpers/state.
 
 export type Channel = "pdf" | "web" | "email" | "push" | "sms";
 export type VariableType =
@@ -93,38 +47,6 @@ export interface SeedVersion {
   activeNumber: number | null;
 }
 
-/** Every version in the seed, every round of it, with what the render rules look at. Nothing is hardcoded by id. */
-export async function allVersions(db: Client): Promise<SeedVersion[]> {
-  const { rows } = await db.execute(`
-    SELECT v.id, v.template_id, v.name AS template_name, t.team_id, v.number, v.round, v.state, v.channels, v.variables,
-           v.sunset_at, v.revoke,
-           (SELECT a.number FROM versions a WHERE a.template_id = v.template_id AND a.state = 'active') AS active_number,
-           (SELECT h.id FROM versions h WHERE h.template_id = v.template_id AND h.number = v.number
-            ORDER BY h.state IN ('active', 'superseded', 'revoked') DESC, h.round DESC LIMIT 1) AS head_id
-    FROM versions v JOIN templates t ON t.id = v.template_id
-    ORDER BY v.template_id, v.number, v.round`);
-  return rows.map((r) => {
-    const revoke = r.revoke
-      ? (JSON.parse(String(r.revoke)) as { confirmedAt?: string })
-      : null;
-    return {
-      id: String(r.id),
-      templateId: String(r.template_id),
-      templateName: String(r.template_name),
-      teamId: String(r.team_id),
-      number: r.number === null ? null : Number(r.number),
-      round: r.round === null ? null : Number(r.round),
-      head: r.number !== null && r.head_id === r.id,
-      state: String(r.state),
-      channels: JSON.parse(String(r.channels)) as Channel[],
-      variables: JSON.parse(String(r.variables)) as Variable[],
-      sunsetAt: r.sunset_at === null ? null : Number(r.sunset_at),
-      revokedAt: revoke?.confirmedAt ?? null,
-      activeNumber: r.active_number === null ? null : Number(r.active_number),
-    };
-  });
-}
-
 /**
  * A document's version (PDF, Web, Email), not an alert's (Push, SMS): what the specs that render and
  * check documents pick from. The seed has both (decision 0034).
@@ -143,89 +65,24 @@ export function pick(
   return found;
 }
 
-/** The demo clock: real time plus the "advance N days" offset. */
-export async function demoNow(db: Client): Promise<number> {
-  const { rows } = await db.execute(
-    "SELECT value FROM settings WHERE key = 'clock_offset_days'",
-  );
-  const days = rows[0] ? Number(JSON.parse(String(rows[0].value))) : 0;
-  return Date.now() + days * 86_400_000;
-}
-
-/**
- * Sets columns on one row for the length of `fn`, then puts back exactly what was there, even when
- * `fn` throws. For the rules the seed has no row for (a sunset that has passed, a content type that
- * narrows its channels).
- */
-export async function withTemporarily<T>(
-  db: Client,
-  table: "versions" | "content_types",
-  id: string,
-  set: Record<string, InValue>,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const columns = Object.keys(set);
-  const before = (
-    await db.execute({
-      sql: `SELECT ${columns.join(", ")} FROM ${table} WHERE id = ?`,
-      args: [id],
-    })
-  ).rows[0];
-  if (!before) throw new Error(`${table} row ${id} doesn't exist.`);
-  const assign = columns.map((column) => `${column} = ?`).join(", ");
-  try {
-    await db.execute({
-      sql: `UPDATE ${table} SET ${assign} WHERE id = ?`,
-      args: [...columns.map((c) => set[c]), id],
-    });
-    return await fn();
-  } finally {
-    await db.execute({
-      sql: `UPDATE ${table} SET ${assign} WHERE id = ?`,
-      args: [...columns.map((c) => before[c] as InValue), id],
-    });
-  }
-}
-
 // ── render_log ───────────────────────────────────────────────────────────────
 
-export const LOG_COLUMNS = [
+/** The fields a render log row has. None of them holds a variable value. */
+export const LOG_FIELDS = [
   "id",
   "at",
-  "template_id",
-  "version_id",
-  "version_number",
-  "consumer_id",
+  "templateId",
+  "versionId",
+  "versionNumber",
+  "consumerId",
   "channel",
   "platform",
-  "is_preview",
-  "correlation_id",
+  "isPreview",
+  "correlationId",
   "outcome",
-  "error_code",
-  "duration_ms",
+  "errorCode",
+  "durationMs",
 ] as const;
-
-export type LogRow = Record<
-  (typeof LOG_COLUMNS)[number],
-  string | number | null
->;
-
-/** Every render_log row for a correlation id, oldest first, every column. */
-export async function logFor(
-  db: Client,
-  correlationId: string,
-): Promise<LogRow[]> {
-  const { columns, rows } = await db.execute({
-    sql: "SELECT * FROM render_log WHERE correlation_id = ? ORDER BY at, id",
-    args: [correlationId],
-  });
-  return rows.map(
-    (row) =>
-      Object.fromEntries(
-        columns.map((column) => [column, row[column]]),
-      ) as LogRow,
-  );
-}
 
 // ── Values ───────────────────────────────────────────────────────────────────
 

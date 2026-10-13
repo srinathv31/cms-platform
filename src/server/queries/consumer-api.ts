@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, gt, inArray, type SQL } from "drizzle-orm";
+import { and, asc, eq, gt, type SQL } from "drizzle-orm";
 import { sunsetDay } from "@/domain/business-zone";
 import { apiBadRequest, QUERY_MESSAGES } from "@/domain/golive/api-errors";
 import { contractDiff } from "@/domain/golive/contract-diff";
@@ -404,55 +404,11 @@ export async function listNotices(
     .limit(opts.limit + 1);
   const { items, hasMore } = cutPage(rows, opts.limit);
   return {
-    notices: (await withActiveVersion(items)).map(noticeView),
+    notices: items.map(noticeView),
     hasMore,
     nextCursor: noticeCursor(
       { consumerId, templateId: opts.templateId ?? null, epoch },
       items.at(-1)?.seq ?? after,
     ),
   };
-}
-
-type NoticeDbRow = typeof consumerNotices.$inferSelect;
-
-/**
- * Seeded revoke notices don't say which version was Active when they were written (live ones do).
- * Fill it in from the versions' own dates: the other version that was Active at that moment, if any.
- */
-async function withActiveVersion(rows: NoticeDbRow[]): Promise<NoticeDbRow[]> {
-  const gaps = rows.filter(
-    (r) =>
-      r.kind === "revoked" && !Object.hasOwn(r.payload ?? {}, "activeVersion"),
-  );
-  if (gaps.length === 0) return rows;
-  const history = await db
-    .select({
-      id: versions.id,
-      templateId: versions.templateId,
-      number: versions.number,
-      activatedAt: versions.activatedAt,
-      supersededAt: versions.supersededAt,
-    })
-    .from(versions)
-    .where(
-      inArray(versions.templateId, [...new Set(gaps.map((r) => r.templateId))]),
-    );
-
-  return rows.map((row) => {
-    if (!gaps.includes(row)) return row;
-    const at = row.createdAt.getTime();
-    const active = history.find(
-      (v) =>
-        v.templateId === row.templateId &&
-        v.id !== row.versionId &&
-        v.number !== null &&
-        v.activatedAt !== null &&
-        v.activatedAt.getTime() <= at &&
-        (v.supersededAt === null || v.supersededAt.getTime() > at),
-    );
-    return {
-      ...row,
-      payload: { ...row.payload, activeVersion: active?.number ?? null },
-    };
-  });
 }

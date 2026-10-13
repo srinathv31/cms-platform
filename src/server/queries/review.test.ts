@@ -789,8 +789,14 @@ describe("getActivity", () => {
     const activated = items.find(
       (i) => i.action === "version.activated" && i.versionLabel === "v2",
     )!;
-    expect(activated.actor).toBeNull();
-    expect(activated.summary).toBe("v2 became Active, replacing v1.");
+    expect(activated.actor).toEqual(expect.objectContaining({ id: "jordan" }));
+    expect(activated.summary).toBe(
+      "Jordan Ellis approved v2, making it Active.",
+    );
+    const superseded = items.find(
+      (i) => i.action === "version.superseded" && i.versionLabel === "v1",
+    )!;
+    expect(superseded.summary).toBe("v1 was superseded by v2.");
   });
 });
 

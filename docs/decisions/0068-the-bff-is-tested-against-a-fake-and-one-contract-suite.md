@@ -1,6 +1,7 @@
 # 0068. The BFF is tested against a fake, and one contract suite runs against every implementation
 
 Status: Accepted
+Amended 2026-10-12: the e2e helper is the folder `e2e/helpers/state/`, not one `state.ts`; its README lists what a Java implementation provides, and ESLint allows the database client only in `e2e/helpers/state/db.ts`.
 Amended 2026-10-13: the Java API's test clock must be settable to an exact instant, not only offset, and its
 fixture loader must take the base instant the seed was built on ([0069](0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)):
 contract cases pin the backend's clock and compare state before and after, never find a write by its instant

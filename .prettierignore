@@ -28,6 +28,10 @@ package-lock.json
 /e2e/fixtures/import/
 /src/domain/messages/GraphemeBreakTest.txt
 
+# Generated file: the document JSON Schema, written by `npm run document-schema:update` and compared with what the
+# generator makes (src/server/render/document-json-schema.test.ts).
+/docs/reference/document.schema.json
+
 # Generated code: shadcn components (added with `npx shadcn add`, never hand-edited) and Drizzle's migrations and
 # snapshots (written by `npm run db:generate`; tests read the .sql files and split them on
 # "--> statement-breakpoint").

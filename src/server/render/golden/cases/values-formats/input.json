@@ -68,11 +68,11 @@
       "sample": "21.99 %"
     },
     {
-      "key": "percent_json",
-      "label": "JSON number",
+      "key": "percent_whole",
+      "label": "Whole percent",
       "type": "percent",
       "required": true,
-      "sample": "21.90"
+      "sample": "22"
     },
     {
       "key": "number_long",
@@ -89,8 +89,8 @@
       "sample": "1,234,567.891"
     },
     {
-      "key": "number_json",
-      "label": "JSON number",
+      "key": "number_whole",
+      "label": "Whole number",
       "type": "number",
       "required": true,
       "sample": "20000"
@@ -155,10 +155,10 @@
     "percent_three": "6.875",
     "percent_zero": "21.90",
     "percent_symbol": "21.99 %",
-    "percent_json": 21.90,
+    "percent_whole": "22",
     "number_long": "1.999999",
     "number_grouped": "1,234,567.891",
-    "number_json": 20000,
+    "number_whole": "20000",
     "date_us": "3/4/2027",
     "date_words": "Sept 30, 2027",
     "date_iso": "2028-02-29",
@@ -630,7 +630,7 @@
                     "content": [
                       {
                         "type": "text",
-                        "text": "percent_json"
+                        "text": "percent_whole"
                       }
                     ]
                   }
@@ -649,7 +649,7 @@
                       {
                         "type": "variable",
                         "attrs": {
-                          "key": "percent_json"
+                          "key": "percent_whole"
                         }
                       }
                     ]
@@ -759,7 +759,7 @@
                     "content": [
                       {
                         "type": "text",
-                        "text": "number_json"
+                        "text": "number_whole"
                       }
                     ]
                   }
@@ -778,7 +778,7 @@
                       {
                         "type": "variable",
                         "attrs": {
-                          "key": "number_json"
+                          "key": "number_whole"
                         }
                       }
                     ]

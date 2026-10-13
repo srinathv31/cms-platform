@@ -422,7 +422,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "percent_json"
+                      "text": "percent_whole"
                     }
                   ]
                 }
@@ -439,8 +439,8 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "21.90%",
-                      "variable": "percent_json"
+                      "text": "22%",
+                      "variable": "percent_whole"
                     }
                   ]
                 }
@@ -539,7 +539,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "number_json"
+                      "text": "number_whole"
                     }
                   ]
                 }
@@ -557,7 +557,7 @@
                     {
                       "type": "text",
                       "text": "20,000",
-                      "variable": "number_json"
+                      "variable": "number_whole"
                     }
                   ]
                 }

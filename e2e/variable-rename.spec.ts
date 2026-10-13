@@ -1,15 +1,9 @@
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   SPRING_NAME,
   TEAM,
   click,
-  createSpringTravel,
-  json,
   reactReady,
-  removeTemplate,
-  rows,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -23,6 +17,7 @@ import {
   tap,
   test,
 } from "./helpers/scenario";
+import { Changes, findVersion, openDraftOf } from "./helpers/state";
 
 // A renamed variable is one contract change (handoff review D8, decision 0022). The draft saves the rename with
 // the variable (its old key kept as its id), so after a reload the panel still flags it, the submit dialog lists
@@ -32,22 +27,14 @@ import {
 // Standalone: the fixture inserts Spring Travel v2 Active (first_name in the greeting and in the email subject);
 // afterAll removes the template and every row this run wrote for it.
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const statusBadge = (page: Page) =>
   page
@@ -88,14 +75,8 @@ test("a renamed variable reaches the submit dialog and the stored contract as on
     await expect(panelRow(page, "given_name")).toContainText("Key changed");
     await expectAutosaved(page);
 
-    const [draft] = await rows(
-      db,
-      "SELECT variables FROM versions WHERE template_id = ? AND state = 'draft'",
-      [templateId],
-    );
-    const saved = (
-      json(draft.variables) as { id?: string; key: string }[]
-    ).find((v) => v.key === "given_name");
+    const draft = await openDraftOf(templateId);
+    const saved = draft!.variables.find((v) => v.key === "given_name");
     expect(
       saved,
       "the draft keeps the variable's old key as its id",
@@ -129,13 +110,9 @@ test("a renamed variable reaches the submit dialog and the stored contract as on
       timeout: 20_000,
     });
 
-    const [v3] = await rows(
-      db,
-      "SELECT state, contract_changes FROM versions WHERE template_id = ? AND number = 3",
-      [templateId],
-    );
-    expect(v3.state).toBe("in_review");
-    expect(json(v3.contract_changes)).toEqual([
+    const v3 = await findVersion({ templateId, number: 3 });
+    expect(v3!.state).toBe("in_review");
+    expect(v3!.contractChanges).toEqual([
       {
         kind: "key_renamed",
         key: "given_name",

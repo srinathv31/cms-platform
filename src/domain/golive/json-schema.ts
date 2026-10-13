@@ -4,16 +4,17 @@
 //
 // The schema describes the CANONICAL forms (the ones `Variable.sample` holds and the render route
 // turns every value into, `validateValue`): "1000", "21.90", "2027-03-04", "20000", "NJ". The route
-// also accepts friendly forms ("$1,000", "21.99%", "3/4/2027", "New Jersey") and JSON numbers (read
-// from their source text, same grammar); the schema doesn't advertise them, so a consumer that
-// validates against it always sends something the route accepts, with any standard 2020-12 validator
-// (format is only an annotation there, so the date pattern itself checks the calendar):
+// also accepts friendly forms ("$1,000", "21.99%", "3/4/2027", "New Jersey"); the schema doesn't
+// advertise them, so a consumer that validates against it always sends something the route accepts,
+// with any standard 2020-12 validator (format is only an annotation there, so the date pattern itself
+// checks the calendar). Every value is a JSON string, and the route refuses a JSON number
+// (decision 0058), so a body the schema accepts is a body the route accepts; the route accepts more
+// (friendly forms, whitespace, null, blanks: render spec section 5), and the schema holds to:
 //   - every value is at most MAX_VALUE_LENGTH characters (`maxLength`, which counts code points, as the
 //     route does);
 //   - a required text must have a non-blank character (the route reads blank as missing);
-//   - numeric types are decimal strings only, exactly the route's canonical grammar (no leading
-//     zeros, no negative zero, no exponent, a point only between digits); a pattern can't constrain
-//     a JSON number;
+//   - numeric types are decimal strings, exactly the route's canonical grammar (no leading zeros,
+//     no negative zero, no exponent, a point only between digits);
 //   - a date is a real calendar day, years 0001–9999, leap years included.
 // Patterns use [0-9], not \d: some validators (Python's re, for one) read \d as any Unicode digit.
 
@@ -98,7 +99,7 @@ function propertyOf(variable: Variable): ApiJsonSchemaProperty {
     case "currency":
     case "percent":
     case "number":
-      // Strings only: `pattern` can't constrain a JSON number, and some don't stringify plainly.
+      // Strings only, as the route takes them (decision 0058).
       return { ...base, type: "string", pattern: DECIMAL_PATTERN };
     case "date":
       return { ...base, type: "string", format: "date", pattern: DATE_PATTERN };

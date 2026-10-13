@@ -1,16 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   SPRING_NAME,
   TEAM,
   click,
-  createSpringTravel,
-  json,
   reactReady,
-  removeTemplate,
-  rows,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -28,6 +22,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { Changes, openDraftOf } from "./helpers/state";
 
 // Three ways the autosave session used to drop edits without a word (handoff review I1, I6, I10).
 //
@@ -49,21 +44,16 @@ const TOO_LATE = "Typed after the other tab saved.";
 const CONFLICT =
   "Your latest changes can't be saved — this draft changed elsewhere.";
 
-let db: Client;
+// `undo` empties the list, so each test makes its fixture and removes it again.
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 
-test.beforeAll(() => {
-  db = openDb();
-});
 test.beforeEach(async () => {
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 test.afterEach(async () => {
-  if (fixture) await removeTemplate(db, fixture.templateId);
   fixture = null;
-});
-test.afterAll(() => {
-  db?.close();
+  await changes.undo();
 });
 
 const statusBadge = (page: Page) =>
@@ -93,17 +83,10 @@ async function openDraft(page: Page): Promise<string> {
   await click(edit);
   await expect(statusBadge(page)).toHaveText("Draft");
   await liveEditor(page);
-  return String((await theDraft()).id);
+  return (await theDraft()).id;
 }
 
-const theDraft = async () => {
-  const [draft] = await rows(
-    db,
-    "SELECT id, rev, name, body FROM versions WHERE template_id = ? AND state = 'draft'",
-    [fixture!.templateId],
-  );
-  return draft!;
-};
+const theDraft = async () => (await openDraftOf(fixture!.templateId))!;
 
 /** Clicks at the end of the document's first paragraph and types `text` after a space. */
 async function typeAtEndOfFirstParagraph(page: Page, text: string) {
@@ -167,20 +150,20 @@ test("after another session saves first, the page turns read-only and offers Rel
   await test.step("Another session renames the draft: it saves first, through the same API", async () => {
     const { rev } = await theDraft();
     const res = await page.request.put(`/api/drafts/${draftId}`, {
-      data: { rev: Number(rev), sessionKey: randomUUID(), name: ELSEWHERE },
+      data: { rev, sessionKey: randomUUID(), name: ELSEWHERE },
     });
     expect(res.status()).toBe(200);
 
     // A save from the rev it just left is refused in the shape every refusal has, carrying the current rev.
     const stale = await page.request.put(`/api/drafts/${draftId}`, {
-      data: { rev: Number(rev), sessionKey: randomUUID(), name: "Too late" },
+      data: { rev, sessionKey: randomUUID(), name: "Too late" },
     });
     expect(stale.status()).toBe(409);
     expect(await stale.json()).toEqual({
       ok: false,
       code: "draft_changed",
       reason: "This draft changed. Try again.",
-      rev: Number(rev) + 1,
+      rev: rev + 1,
     });
   });
 
@@ -207,8 +190,8 @@ test("after another session saves first, the page turns read-only and offers Rel
     expect(await documentEditor(page).textContent()).toBe(before);
     const draft = await theDraft();
     expect(draft.name).toBe(ELSEWHERE);
-    expect(JSON.stringify(json(draft.body))).toContain(TYPED);
-    expect(JSON.stringify(json(draft.body))).not.toContain(TOO_LATE);
+    expect(JSON.stringify(draft.body)).toContain(TYPED);
+    expect(JSON.stringify(draft.body)).not.toContain(TOO_LATE);
   });
 
   await test.step("Reload shows the draft as the other session left it, editable again", async () => {
@@ -284,7 +267,7 @@ test("leaving while a save is out asks first, and leaving once saved doesn't", a
     release();
     await expect(saveIndicator(page)).toHaveText("Saved", { timeout: 15_000 });
     await page.unroute("**/api/drafts/**");
-    expect(JSON.stringify(json((await theDraft()).body))).toContain(TOO_LATE);
+    expect(JSON.stringify((await theDraft()).body)).toContain(TOO_LATE);
 
     await page.reload();
     await hydrated(page);

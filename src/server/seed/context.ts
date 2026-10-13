@@ -5,8 +5,8 @@ import type { InferInsertModel } from "drizzle-orm";
 import type { Channel, Variable, VersionState } from "@/domain/types";
 import type * as ucomp from "@/server/db/schema/ucomp";
 import type * as sim from "@/server/db/schema/sim";
-import { seededId, seededTemplateId } from "@/server/ids";
-import { fnv1a, mulberry32, SEED, type Rng } from "./rng";
+import { seededId } from "@/server/ids";
+import { fnv1a, mulberry32, type Rng } from "./rng";
 import { VariableKit } from "./variables";
 
 export { DAY, HOUR } from "./time";
@@ -95,57 +95,58 @@ export interface TemplateRef {
 export interface SeedCtx {
   /** The moment of the reset, in epoch ms. Every timestamp is relative to this. */
   base: number;
-  rng: Rng;
   vars: VariableKit;
   sink: Sink;
   templates: Map<string, TemplateRef>;
   /** A Date `days` before base (negative = in the future). */
   at(days: number): Date;
-  /** Unique seeded id, e.g. `m_k3f9a2x7q1`, the next from the one sequence the whole seed shares. */
-  id(prefix: string): string;
   /**
-   * Unique seeded id from a sequence of its own, keyed by `key` (as content.ts keys block ids), so it
-   * draws nothing from the shared one. For rows added once the seed's ids were in use: e2e specs and
-   * screenshots name template and version ids, and one more draw from the shared sequence would move
-   * every id after it.
+   * A random sequence of its own, named `name`: the same numbers every run, whatever else the seed draws.
+   * Asking for the same name again carries on from where it was.
    */
-  keyedId(key: string, prefix: string): string;
-  /** Unique seeded template id, e.g. `UC-4F7K2Q`. */
-  templateId(): string;
+  random(name: string): Rng;
+  /**
+   * A unique seeded id for a row of `scope`, e.g. `ae_k3f9a2x7q1`, drawn from the sequence of that scope and
+   * prefix (`random`). A scope is a template (`template:balance-transfer`), a team, or a module, so adding a row
+   * to one moves the ids of its own later rows and nothing else's.
+   */
+  id(scope: string, prefix: string): string;
+  /** Takes an id the spec spells out (a template's, a version's), so no other id repeats it. Throws if it's taken. */
+  claimId(id: string): string;
   template(key: string): TemplateRef;
 }
 
 export function createContext(base: number): SeedCtx {
-  const rng = mulberry32(SEED);
   const used = new Set<string>();
-  const unique = (make: () => string) => {
-    for (;;) {
-      const id = make();
-      if (!used.has(id)) {
-        used.add(id);
-        return id;
-      }
-    }
+  const claimId = (id: string) => {
+    if (used.has(id)) throw new Error(`Seed: the id ${id} is used twice`);
+    used.add(id);
+    return id;
   };
-  const keyed = new Map<string, Rng>();
-  const sequence = (key: string) => {
-    const existing = keyed.get(key);
+  const sequences = new Map<string, Rng>();
+  const random = (name: string) => {
+    const existing = sequences.get(name);
     if (existing) return existing;
-    const created = mulberry32(fnv1a(key));
-    keyed.set(key, created);
+    const created = mulberry32(fnv1a(name));
+    sequences.set(name, created);
     return created;
   };
   const templates = new Map<string, TemplateRef>();
   return {
     base,
-    rng,
     vars: new VariableKit(base),
     sink: emptySink(),
     templates,
     at: (days) => new Date(base - days * DAY),
-    id: (prefix) => unique(() => seededId(rng, prefix)),
-    keyedId: (key, prefix) => unique(() => seededId(sequence(key), prefix)),
-    templateId: () => unique(() => seededTemplateId(rng)),
+    random,
+    id(scope, prefix) {
+      const sequence = random(`id:${scope}:${prefix}`);
+      for (;;) {
+        const id = seededId(sequence, prefix);
+        if (!used.has(id)) return claimId(id);
+      }
+    },
+    claimId,
     template(key) {
       const t = templates.get(key);
       if (!t) throw new Error(`Seed: unknown template "${key}"`);

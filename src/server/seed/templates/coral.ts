@@ -276,6 +276,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
   const templates: SeedTemplate[] = [
     // v1 Superseded (sunset in 21 days, Coral still renders it); v2 Active.
     {
+      id: "UC-D6KSGY",
       key: "balance-transfer",
       teamId: "coral-offers",
       name: "Balance Transfer Intro — Terms",
@@ -284,6 +285,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_wmjrge009b",
           ref: "v1",
           number: 1,
           state: "superseded",
@@ -308,6 +310,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           sunset: { inDays: 21, setBy: "jordan", setAt: 2.2 },
         },
         {
+          id: "v_jfskb1av2t",
           ref: "v2",
           number: 2,
           state: "active",
@@ -359,6 +362,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
     // v1 Superseded (no sunset), v2 Active, v3 In review on round 2 after one send-back (round 1, Changes
     // requested), with a breaking contract change.
     {
+      id: "UC-J530DX",
       key: "cash-back",
       teamId: "coral-offers",
       name: "Cash Back Welcome Bonus — Terms",
@@ -367,6 +371,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_yp1y983kjs",
           ref: "v1",
           number: 1,
           state: "superseded",
@@ -390,6 +395,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           supersededAt: 86.5,
         },
         {
+          id: "v_6e52pfw6vt",
           ref: "v2",
           number: 2,
           state: "active",
@@ -415,6 +421,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           activatedAt: 86.5,
         },
         {
+          id: "v_3mmgdkgv9r",
           ref: "v3r1",
           number: 3,
           round: 1,
@@ -453,6 +460,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           ],
         },
         {
+          id: "v_re7k4ka1gj",
           ref: "v3",
           number: 3,
           round: 2,
@@ -503,6 +511,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
 
     // v1 Changes requested; an open draft with one resolved and one open comment thread.
     {
+      id: "UC-NYP7F0",
       key: "annual-fee-waiver",
       teamId: "coral-offers",
       name: "Annual Fee Waiver — Terms",
@@ -511,6 +520,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_1gy58yyfg2",
           ref: "v1",
           number: 1,
           state: "changes_requested",
@@ -533,6 +543,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           ],
         },
         {
+          id: "v_dw4w6br3dk",
           ref: "draft",
           number: null,
           state: "draft",
@@ -589,6 +600,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
 
     // v1 Revoked (wrong bonus amount); v2 Active.
     {
+      id: "UC-WGGRJH",
       key: "holiday-points",
       teamId: "coral-offers",
       name: "Holiday Points Promo — Terms",
@@ -597,6 +609,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_g1avtnqwc9",
           ref: "v1",
           number: 1,
           state: "revoked",
@@ -629,6 +642,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
           },
         },
         {
+          id: "v_pvamm0apbr",
           ref: "v2",
           number: 2,
           state: "active",
@@ -662,6 +676,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
 
     // v1 Active, created from a starter. The simple, settled template.
     {
+      id: "UC-PAS9A0",
       key: "rate-change-notice",
       teamId: "coral-offers",
       name: "Rate Change Notice",
@@ -671,6 +686,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_gatk8sxvzb",
           ref: "v1",
           number: 1,
           state: "active",

@@ -1,7 +1,4 @@
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import {
   asPersona,
   beat,
@@ -18,6 +15,12 @@ import {
   untilUncovered,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import {
+  Changes,
+  commentThreads,
+  findVersion,
+  versionNumbered,
+} from "./helpers/state";
 
 // Alerts end to end (decision 0034): an alert is made, written with its phone live beside it, held at
 // submit until its SMS is in GSM-7, approved, changed, reviewed with its fields redlined, commented on at a
@@ -60,22 +63,11 @@ const TITLE_ADDED = " now";
 const SMS_ADDED_V2 = " Thanks.";
 const COMMENT = "Is “now” right for a statement sent overnight?";
 
-let db: Client;
-/** Set once the template exists, so afterAll removes it even when the test fails half way. */
+const changes = new Changes();
+/** Set once the template exists (and handed to `changes`), so afterAll removes it even when the test fails half way. */
 let templateId: string | null = null;
 
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (templateId) await removeTemplate(db, templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 // ── The screens ──────────────────────────────────────────────────────────────
 
@@ -164,12 +156,8 @@ async function approve(page: Page, n: number) {
 }
 
 const storedSms = async (n: number) => {
-  const [row] = await rowsOf(
-    db,
-    "SELECT channel_fields FROM versions WHERE template_id = ? AND number = ?",
-    [templateId, n],
-  );
-  return JSON.stringify(JSON.parse(String(row.channel_fields)).sms.text);
+  const version = await versionNumbered(templateId!, n);
+  return JSON.stringify(version!.channelFields.sms.text);
 };
 
 // ── The spec ─────────────────────────────────────────────────────────────────
@@ -240,6 +228,7 @@ test.describe("alerts", () => {
       await tap(gallery.getByRole("button", { name: /^Statement ready/ }));
       await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
       templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
+      changes.ownTemplate(templateId);
       await expect(nameField(page)).toHaveValue(NAME);
       await expect(
         page.getByRole("heading", { name: "Push notification" }),
@@ -428,12 +417,12 @@ test.describe("alerts", () => {
       await expectAutosaved(page);
 
       await submit(page, 1);
-      const [v1] = await rowsOf(
-        db,
-        "SELECT state, submitted_by FROM versions WHERE template_id = ? AND number = 1",
-        [templateId],
-      );
-      expect(v1).toEqual({ state: "in_review", submitted_by: "maya" });
+      expect(
+        await findVersion({ templateId: templateId!, number: 1 }),
+      ).toMatchObject({
+        state: "in_review",
+        submittedBy: "maya",
+      });
       expect(await storedSms(1)).toContain(SMS_ADDED.trim());
       await beat(page);
     });
@@ -536,13 +525,9 @@ test.describe("alerts", () => {
       );
       await expect
         .poll(async () =>
-          (
-            await rowsOf(
-              db,
-              "SELECT block_id, quote FROM comment_threads WHERE template_id = ?",
-              [templateId],
-            )
-          ).map((r) => `${r.block_id}:${r.quote}`),
+          (await commentThreads(templateId!)).map(
+            (r) => `${r.blockId}:${r.quote}`,
+          ),
         )
         .toEqual(["push.title:null"]);
 

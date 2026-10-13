@@ -1,7 +1,4 @@
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import {
   asPersona,
   expect,
@@ -15,6 +12,7 @@ import {
   typeSlowly,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import { Changes, versionsOf } from "./helpers/state";
 
 // A resubmission is the next round of the same version (decision 0033), walked once through the UI:
 //
@@ -33,21 +31,18 @@ const TEAM = "coral-offers";
 const NAME = "Review rounds — Terms";
 const REASON = "Say when the intro rate ends.";
 
-let db: Client;
+const changes = new Changes();
 let templateId: string | null = null;
 
-test.beforeAll(() => {
-  db = openDb();
-});
+test.afterAll(() => changes.undo());
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (templateId) await removeTemplate(db, templateId);
-  } finally {
-    db.close();
-  }
-});
+/** Every round of every version of the template, as the stored rows have it. */
+const storedRounds = async (id: string) =>
+  (await versionsOf(id)).map(({ number, round, state }) => ({
+    number,
+    round,
+    state,
+  }));
 
 const decision = (page: Page) =>
   page.locator('aside[aria-label="Decision"]').filter({ visible: true });
@@ -109,6 +104,7 @@ test("a send-back keeps the version number: v1 goes back, returns as v1, round 2
     await tap(gallery.getByRole("button", { name: /Card offer terms/ }));
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1]!;
+    changes.ownTemplate(templateId);
     await expect(nameField(page)).toBeFocused();
     // The page is live (the document's editor has taken over from the server's markup) before the first keystroke.
     await liveEditor(page);
@@ -188,12 +184,7 @@ test("a send-back keeps the version number: v1 goes back, returns as v1, round 2
       header(page).getByText("v1 · Round 2", { exact: true }),
     ).toBeVisible();
 
-    const list = await rowsOf(
-      db,
-      "SELECT number, round, state FROM versions WHERE template_id = ? ORDER BY number, round",
-      [id],
-    );
-    expect(list).toEqual([
+    expect(await storedRounds(id)).toEqual([
       { number: 1, round: 1, state: "changes_requested" },
       { number: 1, round: 2, state: "in_review" },
     ]);
@@ -355,12 +346,7 @@ test("a send-back keeps the version number: v1 goes back, returns as v1, round 2
       decision(page).getByRole("link", { name: "Open v1", exact: true }),
     ).toHaveAttribute("href", `/${TEAM}/review/${id}/1`);
 
-    const list = await rowsOf(
-      db,
-      "SELECT number, round, state FROM versions WHERE template_id = ? ORDER BY number, round",
-      [id],
-    );
-    expect(list).toEqual([
+    expect(await storedRounds(id)).toEqual([
       { number: 1, round: 1, state: "changes_requested" },
       { number: 1, round: 2, state: "active" },
     ]);

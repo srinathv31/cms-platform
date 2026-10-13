@@ -1,4 +1,8 @@
+import type { PlatformArea } from "@/domain/access-types";
+import { ruleLabel } from "@/domain/platform-config/approval-chains";
+import { configChanged } from "@/domain/platform-config/effects";
 import { DEFAULT_SMS_MAX_PARTS } from "@/domain/platform-config/limits";
+import { CHANNEL_LABELS, joinWithAnd } from "@/domain/render/errors";
 import type { Channel } from "@/domain/types";
 import type { SeedCtx } from "./context";
 import { REQUIRED_SECTIONS } from "./content";
@@ -111,56 +115,93 @@ export function seedPlatform(ctx: SeedCtx) {
     },
   );
 
-  // The Alert's events came after the seed's ids were in use, so they draw from sequences of their own
-  // (`keyed`): one more draw from the shared sequence would move every template id after it.
-  const configEvents: {
-    daysAgo: number;
-    area: string;
-    summary: string;
-    keyed?: string;
-  }[] = [
-    {
-      daysAgo: 430,
-      area: "content_types",
-      summary: "Created content type Disclosure with 3 required sections",
-    },
-    {
-      daysAgo: 430,
-      area: "approval_chains",
-      summary: "Set Disclosure approval chain: Team approver",
-    },
-    {
-      daysAgo: 428,
-      area: "channel_rules",
-      summary: "Allowed pdf, web and email for Disclosure",
-    },
-    {
-      daysAgo: 60,
-      area: "content_types",
-      summary:
-        "Created content type Alert with an SMS footer and a 3-part budget",
-      keyed: "platform:alert:content_types",
-    },
-    {
-      daysAgo: 60,
-      area: "approval_chains",
-      summary: "Set Alert approval chain: Team approver",
-      keyed: "platform:alert:approval_chains",
-    },
-    {
-      daysAgo: 60,
-      area: "channel_rules",
-      summary: "Allowed push and sms for Alert",
-      keyed: "platform:alert:channel_rules",
-    },
-  ];
-  for (const e of configEvents) {
+  // The platform's configuration story, in the facts the runtime writes when someone makes each change
+  // (`platform.config_changed`, by area). A channel rule is one event per channel.
+  const config = (
+    daysAgo: number,
+    area: PlatformArea,
+    summary: string,
+    facts: Record<string, unknown>,
+  ) =>
     ctx.sink.auditEvents.push({
-      id: e.keyed ? ctx.keyedId(e.keyed, "ae") : ctx.id("ae"),
-      at: ctx.at(e.daysAgo),
+      id: ctx.id("platform", "ae"),
+      at: ctx.at(daysAgo),
       actorId: "riley",
       action: "platform.config_changed",
-      details: { area: e.area, summary: e.summary },
+      details: platformConfigDetails(area, summary, facts),
     });
+
+  const disclosureTitles = REQUIRED_SECTIONS.map((s) => s.title);
+  const stageRule = { kind: "team_role", role: "approver" } as const;
+  const chain = [{ name: TEAM_STAGE.name, rule: stageRule }];
+  const chainSummary = (contentTypeName: string) =>
+    `Set ${contentTypeName} approval chain: ${TEAM_STAGE.name} (${ruleLabel(stageRule, [])})`;
+
+  const contentTypes = [
+    {
+      daysAgo: 430,
+      channelsDaysAgo: 428,
+      id: CONTENT_TYPE_ID,
+      name: "Disclosure",
+      allowed: CHANNELS_ALL,
+      sections: disclosureTitles,
+      summary: `Changed Disclosure required sections: added ${joinWithAnd(disclosureTitles)}`,
+    },
+    {
+      daysAgo: 60,
+      channelsDaysAgo: 60,
+      id: ALERT_CONTENT_TYPE_ID,
+      name: "Alert",
+      allowed: ALERT_CHANNELS,
+      sections: [],
+      // An alert has no sections to add; what it is created with is its SMS footer and budget.
+      summary:
+        "Created content type Alert with an SMS footer and a 3-part budget",
+    },
+  ];
+  for (const type of contentTypes) {
+    config(type.daysAgo, "content_types", type.summary, {
+      contentTypeId: type.id,
+      contentTypeName: type.name,
+      added: type.sections,
+      removed: [],
+      renamed: [],
+      sections: type.sections,
+    });
+    config(type.daysAgo, "approval_chains", chainSummary(type.name), {
+      contentTypeId: type.id,
+      contentTypeName: type.name,
+      before: [],
+      after: [TEAM_STAGE.name],
+      stages: chain,
+    });
+    for (const channel of type.allowed) {
+      config(
+        type.channelsDaysAgo,
+        "channel_rules",
+        `Turned on ${CHANNEL_LABELS[channel]} for ${type.name}`,
+        {
+          contentTypeId: type.id,
+          contentTypeName: type.name,
+          channel,
+          allowed: true,
+          activeUsing: 0,
+        },
+      );
+    }
   }
+}
+
+/**
+ * The `details` of a `platform.config_changed` row: the area, the sentence and the area's facts, built by the
+ * function the runtime builds them with.
+ */
+export function platformConfigDetails(
+  area: PlatformArea,
+  summary: string,
+  facts: Record<string, unknown>,
+): Record<string, unknown> {
+  const effect = configChanged(area, null, summary, facts);
+  if (effect.kind !== "audit") throw new Error("Seed: not an audit effect");
+  return effect.details;
 }

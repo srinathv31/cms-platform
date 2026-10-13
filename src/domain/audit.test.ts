@@ -224,7 +224,7 @@ describe("the action catalog", () => {
     expect(categoryOf("platform.other")).toBe("platform");
   });
 
-  it("labels every action, aliases with their canonical label", () => {
+  it("labels every action, and a stage's approval as Approved", () => {
     for (const a of [...LIFECYCLE, ...ACCESS])
       expect(actionLabel(a)).toMatch(/^[A-Z][a-z]/);
     expect(actionLabel("version.submitted")).toBe("Submitted");
@@ -233,19 +233,23 @@ describe("the action catalog", () => {
     expect(actionLabel("platform.config_changed")).toBe(
       "Configuration changed",
     );
-    expect(actionLabel("version.revoke_confirmed")).toBe("Revoked");
-    expect(actionLabel("comment.resolved")).toBe("Comment resolved");
+    expect(actionLabel("version.revoked")).toBe("Revoked");
+    expect(actionLabel("thread.resolved")).toBe("Comment resolved");
     expect(actionLabel("version.stage_approved")).toBe("Approved");
     expect(actionLabel("version.fancy_thing")).toBe("Fancy thing");
+    // An action is data from the database: a name on Object's prototype isn't in the catalog.
+    expect(actionLabel("toString")).toBe("ToString");
+    expect(categoryOf("hasOwnProperty")).toBe("templates");
+    expect(parseAuditFilters({ action: "toString" })).toEqual({});
   });
 
-  it("reads an approver's final approval as Approved, the system's activation as Became Active", () => {
+  it("files every approval under Approved: a stage's, and the last stage's, which also activates", () => {
+    expect(canonicalAction("version.stage_approved")).toBe("version.approved");
     expect(canonicalAction("version.activated", true)).toBe("version.approved");
-    expect(canonicalAction("version.activated", false)).toBe(
-      "version.activated",
-    );
     expect(actionLabel("version.activated", true)).toBe("Approved");
-    expect(actionLabel("version.activated")).toBe("Became Active");
+    // No other spelling is folded into another: `canonicalAction` knows no aliases.
+    for (const action of ["version.revoked", "thread.resolved", "toString"])
+      expect(canonicalAction(action)).toBe(action);
   });
 
   it("lists options grouped by category in a stable order, every value canonical", () => {
@@ -282,12 +286,7 @@ describe("describeAuditEvent", () => {
   });
 
   it("writes one plain sentence for every lifecycle action, through describeActivity", () => {
-    for (const action of [
-      ...LIFECYCLE,
-      "version.approved",
-      "version.revoke_confirmed",
-      "comment.resolved",
-    ]) {
+    for (const action of LIFECYCLE) {
       const s = describeAuditEvent(
         { action, details: { reason: "Wrong APR" }, version: v(3) },
         maya,
@@ -309,9 +308,9 @@ describe("describeAuditEvent", () => {
     expect(
       describeAuditEvent(
         { action: "version.activated", details: {}, version: v(2) },
-        null,
+        alex,
       ),
-    ).toBe("v2 became Active.");
+    ).toBe("Alex Kim approved v2, making it Active.");
     expect(
       describeAuditEvent(
         {
@@ -368,7 +367,6 @@ describe("describeAuditEvent", () => {
     expect(say("access.requested", morgan)).toBe(
       "Morgan Lee asked for Author access: Joining the offers team.",
     );
-    // The seed's request carries no userName: the actor is the requester.
     expect(say("access.requested", morgan, { role: "author" })).toBe(
       "Morgan Lee asked for Author access.",
     );
@@ -518,13 +516,14 @@ describe("parseAuditFilters", () => {
     ).toEqual({});
   });
 
-  it("folds spellings to the canonical action, dedupes, and swaps a reversed range", () => {
+  it("folds a stage's approval to Approved, dedupes, and swaps a reversed range", () => {
     expect(
       parseAuditFilters({
-        action: "version.revoke_confirmed,version.revoked,comment.resolved",
+        action:
+          "version.stage_approved,version.approved,version.revoked,version.revoked",
       }),
     ).toEqual({
-      action: "version.revoked,thread.resolved",
+      action: "version.approved,version.revoked",
     });
     expect(parseAuditFilters({ from: "2026-10-05", to: "2026-09-01" })).toEqual(
       { from: "2026-09-01", to: "2026-10-05" },
@@ -622,10 +621,10 @@ describe("filtering rows", () => {
     row({
       id: "3",
       at: "2026-10-03T00:00:00.000Z",
-      action: "version.activated",
+      action: "version.sunset_passed",
       actor: null,
       template: cashBack,
-      versionLabel: "v2",
+      versionLabel: "v1",
     }),
     row({
       id: "4",
@@ -659,7 +658,7 @@ describe("filtering rows", () => {
     row({
       id: "8",
       at: "2026-09-01T12:00:00.000Z",
-      action: "version.revoke_confirmed",
+      action: "version.revoked",
       actor: alex,
       template: cashBack,
       versionLabel: "v1",
@@ -691,11 +690,11 @@ describe("filtering rows", () => {
     expect(ids({ person: "maya,riley" })).toEqual(["1", "6", "7"]);
   });
 
-  it("filters by category or canonical action, aliases and final approvals included", () => {
+  it("filters by category or canonical action, final approvals included", () => {
     expect(ids({ action: "access" })).toEqual(["4", "5", "6"]);
     expect(ids({ action: "platform" })).toEqual(["7"]);
     expect(ids({ action: "version.approved" })).toEqual(["2"]);
-    expect(ids({ action: "version.activated" })).toEqual(["3"]);
+    expect(ids({ action: "version.sunset_passed" })).toEqual(["3"]);
     expect(ids({ action: "version.revoked" })).toEqual(["8"]);
     expect(ids({ action: "platform,version.submitted" })).toEqual(["1", "7"]);
   });

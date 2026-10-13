@@ -1,15 +1,9 @@
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   SPRING_NAME,
   TEAM,
   click,
-  createSpringTravel,
-  json,
   reactReady,
-  removeTemplate,
-  rows,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -24,6 +18,7 @@ import {
   tap,
   test,
 } from "./helpers/scenario";
+import { Changes, findVersion, openDraftOf } from "./helpers/state";
 
 // Renaming a variable while Email is off (handoff review I3). The subject and preheader stay in the editor
 // root while Email is off, only hidden: the subject's chip still counts in the panel, the rename reaches it and
@@ -32,22 +27,14 @@ import {
 // Standalone: the fixture inserts Spring Travel v2 Active (first_name in the greeting and in the email subject);
 // afterAll removes the template and every row this run wrote for it.
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const statusBadge = (page: Page) =>
   page
@@ -67,12 +54,8 @@ const keysIn = (doc: { content?: unknown[] } | null): string[] =>
   );
 
 const savedSubjectKeys = async (templateId: string) => {
-  const [draft] = await rows(
-    db,
-    "SELECT channel_fields FROM versions WHERE template_id = ? AND state = 'draft'",
-    [templateId],
-  );
-  return keysIn(json(draft.channel_fields)?.email?.subject ?? null);
+  const draft = await openDraftOf(templateId);
+  return keysIn(draft!.channelFields.email?.subject ?? null);
 };
 
 test("a variable renamed while Email is off is renamed in the subject too, and the draft submits", async ({
@@ -167,13 +150,9 @@ test("a variable renamed while Email is off is renamed in the subject too, and t
       timeout: 20_000,
     });
 
-    const [v3] = await rows(
-      db,
-      "SELECT state, channel_fields FROM versions WHERE template_id = ? AND number = 3",
-      [templateId],
-    );
-    expect(v3.state).toBe("in_review");
-    expect(keysIn(json(v3.channel_fields)?.email?.subject ?? null)).toEqual([
+    const v3 = await findVersion({ templateId, number: 3 });
+    expect(v3!.state).toBe("in_review");
+    expect(keysIn(v3!.channelFields.email?.subject ?? null)).toEqual([
       "given_name",
     ]);
   });

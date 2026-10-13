@@ -68,12 +68,12 @@ describe("noticeView: new_version", () => {
     });
   });
 
-  it("seeded shape: previousVersionNumber, no activeVersion (the new version is the Active one)", () => {
+  it("a version with no contract changes says so", () => {
     const view = noticeView(
       row("new_version", {
         templateName: "Rate Change Notice",
         versionNumber: 2,
-        previousVersionNumber: 1,
+        activeVersion: 2,
         contractChanges: [],
       }),
     );
@@ -141,13 +141,13 @@ describe("noticeView: sunset_scheduled", () => {
     });
   });
 
-  it("seeded shape: replacedByVersionNumber", () => {
+  it("words the changes the Active version asks, with an optional variable", () => {
     const view = noticeView(
       row("sunset_scheduled", {
         templateName: "Balance Transfer Intro — Terms",
         versionNumber: 1,
         sunsetAt: "2026-10-26T16:05:07.984Z",
-        replacedByVersionNumber: 2,
+        activeVersion: 2,
         contractChanges: [END_DATE],
       }),
     );
@@ -317,15 +317,16 @@ describe("noticeView: sunset_passed", () => {
 });
 
 describe("noticeView: revoked", () => {
-  it("both shapes: the reason, with its period", () => {
-    const seeded = noticeView(
+  it("the reason, with its period", () => {
+    const nothingActive = noticeView(
       row("revoked", {
         templateName: "Holiday Points Promo — Terms",
         versionNumber: 1,
+        activeVersion: null,
         reason: "Wrong bonus amount",
       }),
     );
-    expect(seeded).toMatchObject({
+    expect(nothingActive).toMatchObject({
       activeVersion: null,
       reason: "Wrong bonus amount",
       changes: [],

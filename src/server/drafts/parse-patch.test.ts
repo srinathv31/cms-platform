@@ -126,7 +126,7 @@ describe("parseDraftPatch", () => {
       ok({
         ...base,
         sampleSets: [
-          { id: "s1", name: "Maya", values: { first_name: "Maya", n: 3 } },
+          { id: "s1", name: "Maya", values: { first_name: "Maya", n: "3" } },
         ],
       }).sampleSets,
     ).toHaveLength(1);
@@ -265,25 +265,21 @@ describe("parseDraftPatch", () => {
     );
   });
 
-  it("refuses non-finite sample values", () => {
-    expect(
-      message({
-        ...base,
-        sampleSets: [{ id: "s1", name: "A", values: { n: Infinity } }],
-      }),
-    ).toMatch(/^sampleSets\b/);
-    expect(
-      message({
-        ...base,
-        sampleSets: [{ id: "s1", name: "A", values: { n: null } }],
-      }),
-    ).toMatch(/^sampleSets\b/);
+  it("refuses sample values that aren't strings", () => {
+    for (const value of [Infinity, 3, true, null]) {
+      expect(
+        message({
+          ...base,
+          sampleSets: [{ id: "s1", name: "A", values: { n: value } }],
+        }),
+      ).toMatch(/^sampleSets\.0\.values\.n\b/);
+    }
   });
 
   describe("a sample value over 1,000 characters", () => {
     const AT_LIMIT = "a".repeat(1000);
     const sentence = "A sample value can be at most 1,000 characters.";
-    const inSet = (value: string | number) => ({
+    const inSet = (value: string) => ({
       ...base,
       sampleSets: [{ id: "s1", name: "A", values: { first_name: value } }],
     });
@@ -306,15 +302,6 @@ describe("parseDraftPatch", () => {
           variables: [{ ...variable, sample: `${AT_LIMIT}b` }],
         }),
       ).toBe(sentence);
-    });
-
-    it("is refused the same way when it arrives as a JSON number with too many digits", () => {
-      const digits = `1${"0".repeat(1000)}`;
-      const text = `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"A","values":{"n":${digits}}}]}`;
-      expect(parseDraftPatchText(text)).toEqual({
-        ok: false,
-        message: sentence,
-      });
     });
 
     it("leaves other limits with their own messages", () => {
@@ -361,27 +348,27 @@ describe("parseDraftPatchText", () => {
     });
   });
 
-  it("keeps sample-set numbers as the exact text sent (21.90 stays 21.90, every digit kept)", () => {
-    const text = `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"Maya","values":{"apr":21.90,"fee":95,"big":1000000000000000000000,"name":"Maya","tiny":0.000001}}]}`;
+  it("keeps a sample value that is a string exactly as sent (21.90 stays 21.90)", () => {
+    const text = `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"Maya","values":{"apr":"21.90","big":"1000000000000000000000","exp":"1e3"}}]}`;
     const result = parseDraftPatchText(text);
     expect(result).toMatchObject({ ok: true });
     if (!result.ok) return;
     expect(result.patch.sampleSets?.[0].values).toEqual({
       apr: "21.90",
-      fee: "95",
       big: "1000000000000000000000",
-      name: "Maya",
-      tiny: "0.000001",
+      exp: "1e3",
     });
   });
 
-  it("sends an exponent through as its text, for the value's own check to refuse", () => {
-    const result = parseDraftPatchText(
-      `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"A","values":{"n":1e3}}]}`,
-    );
-    expect(result.ok && result.patch.sampleSets?.[0].values).toEqual({
-      n: "1e3",
-    });
+  it("refuses a sample value sent as a JSON number, whatever its digits (decision 0058)", () => {
+    for (const number of ["21.90", "95", "1e3", `1${"0".repeat(1000)}`]) {
+      const text = `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"A","values":{"n":${number}}}]}`;
+      const result = parseDraftPatchText(text);
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.message).toMatch(
+        /^sampleSets\.0\.values\.n\b/,
+      );
+    }
   });
 
   it("leaves numbers elsewhere alone", () => {

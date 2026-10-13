@@ -183,6 +183,27 @@ const editorSchemaNames = {
     "From @/editor/schema, code outside src/editor uses baseExtensions, BaseExtensionOptions and ensureBlockIds only (src/editor/README.md).",
 };
 
+// The database client, for e2e: only e2e/helpers/state/db.ts may import it.
+const e2eDatabaseMessage =
+  "e2e touches the database only through e2e/helpers/state (decision 0068): add a named function there, and import it from e2e/helpers/state.";
+const noE2eDatabase = {
+  group: [
+    "@libsql/*",
+    "drizzle-orm",
+    "drizzle-orm/*",
+    "better-sqlite3",
+    "node:sqlite",
+    "@/server/db",
+    "@/server/db/*",
+  ],
+  message: e2eDatabaseMessage,
+};
+const noStateInternals = {
+  group: ["**/helpers/state/*", "./state/*"],
+  message:
+    "Import from e2e/helpers/state (its index); the modules behind it are internal to the helper.",
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -456,6 +477,38 @@ const eslintConfig = defineConfig([
                 "The simulator reaches UCOMP only through /api/v1 (it may use its own sim schema).",
             },
           ],
+        },
+      ],
+    },
+  },
+
+  {
+    // e2e reads and changes Stencil's data through e2e/helpers/state and nowhere else (decision 0068): that
+    // folder is SQL today and a test endpoint or JDBC when Java owns the data. A spec that needs a fact it can't
+    // get there adds a named function to the helper; it doesn't open the database.
+    files: ["e2e/**/*.{ts,mts,js,mjs}"],
+    ignores: ["e2e/helpers/state/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [editorSchemaNames],
+          patterns: [editorInternals, noE2eDatabase, noStateInternals],
+        },
+      ],
+    },
+  },
+  {
+    // Inside the helper, only db.ts opens the database; the other modules read and write through it. They hold
+    // to the editor's public API like every other e2e file: this block replaces the one above for these files.
+    files: ["e2e/helpers/state/**/*.ts"],
+    ignores: ["e2e/helpers/state/db.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [editorSchemaNames],
+          patterns: [editorInternals, noE2eDatabase],
         },
       ],
     },

@@ -1,11 +1,7 @@
-import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import {
-  allVersions,
   correlation,
   expectError,
-  logFor,
-  openDb,
   render,
   validValues,
   type SeedVersion,
@@ -33,6 +29,25 @@ import {
   untilUncovered,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import {
+  Changes,
+  allVersions,
+  approvalsOf,
+  approversOf,
+  auditEvents,
+  commentThread,
+  commentThreads,
+  commentsIn,
+  decisionsOnTemplate,
+  findVersion,
+  findVersions,
+  notificationsAbout,
+  renderLogFor,
+  versionById,
+  versionNumbered,
+  versionsOf,
+  type VersionRecord,
+} from "./helpers/state";
 
 // Phase 4 gate: demo scenario 3 ("Review loop"), start to finish, with Maya and Jordan taking turns
 // through the persona switcher, as a presenter would.
@@ -62,9 +77,9 @@ import { viewEveryOutput } from "./helpers/review";
 //      resolved, the change request answered, approved on round 2), the audit events and notifications
 //      hold the same trail, and the render API agrees: v1 renders as Coral, and never names a round.
 //
-// Self-contained: it creates one template, and afterAll removes everything it wrote for it (the template,
-// its versions, approvals, threads, comments, audit events, notifications, notices and render_log rows), so
-// the queue counts the other specs see stay as they were. Console and page errors fail it.
+// Self-contained: it creates one template, and afterAll removes everything it wrote for it (`Changes.ownTemplate`:
+// the template, its versions, approvals, threads, comments, audit events, notifications, notices and render_log
+// rows), so the queue counts the other specs see stay as they were. Console and page errors fail it.
 //
 // Run it against a HEALTHY server: playwright.config.ts reuses the server on E2E_PORT only while "/" answers
 // without an error; when it doesn't (a compile error from someone's edit), Playwright starts its own, and its
@@ -87,61 +102,7 @@ const OWN_VERSION = "You submitted this version.";
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// ── The database ─────────────────────────────────────────────────────────────
-
-type Row = Record<string, InValue>;
-
-/** The file has no busy timeout, and the app writes to it: a read or write waits its turn. */
-async function busy<T>(run: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await run();
-    } catch (error) {
-      const text =
-        String((error as { code?: unknown; message?: unknown })?.code ?? "") +
-        String((error as Error)?.message ?? "");
-      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text))
-        throw error;
-      await new Promise((resolve) => setTimeout(resolve, 40 * 2 ** attempt));
-    }
-  }
-}
-
-async function rows(
-  db: Client,
-  sql: string,
-  args: InValue[] = [],
-): Promise<Row[]> {
-  const result = await busy(() => db.execute({ sql, args }));
-  return result.rows.map((row) =>
-    Object.fromEntries(
-      result.columns.map((column) => [column, row[column] as InValue]),
-    ),
-  );
-}
-
-/** A row the app writes a moment after the screen shows it (comments are shown at once, then saved): waits for it. */
-async function rowWhen(
-  db: Client,
-  sql: string,
-  args: InValue[],
-  message: string,
-): Promise<Row> {
-  let found: Row | undefined;
-  await expect
-    .poll(
-      async () => {
-        found = (await rows(db, sql, args))[0];
-        return found !== undefined;
-      },
-      { message, timeout: 15_000 },
-    )
-    .toBe(true);
-  return found!;
-}
-
-const json = (value: InValue) =>
-  value === null || value === undefined ? null : JSON.parse(String(value));
+// ── Documents ────────────────────────────────────────────────────────────────
 
 /** The ids of a document's top-level blocks, in order. */
 function blockIds(body: {
@@ -150,41 +111,9 @@ function blockIds(body: {
   return (body.content ?? []).map((block) => String(block.attrs?.id ?? ""));
 }
 
-let db: Client;
-/** Set once the template exists, so afterAll removes it even when the test fails half way. */
-let templateId: string | null = null;
+const changes = new Changes();
 
-test.beforeAll(() => {
-  db = openDb();
-});
-
-/** Removes everything this run wrote: the rows this template owns, children first. */
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (templateId) {
-      const id = templateId;
-      const own = "(SELECT id FROM versions WHERE template_id = ?)";
-      const threads = "(SELECT id FROM comment_threads WHERE template_id = ?)";
-      const statements: [string, InValue[]][] = [
-        [`DELETE FROM comments WHERE thread_id IN ${threads}`, [id]],
-        ["DELETE FROM comment_threads WHERE template_id = ?", [id]],
-        [`DELETE FROM approvals WHERE version_id IN ${own}`, [id]],
-        ["DELETE FROM audit_events WHERE template_id = ?", [id]],
-        ["DELETE FROM notifications WHERE href LIKE ?", [`%/${id}%`]],
-        ["DELETE FROM consumer_notices WHERE template_id = ?", [id]],
-        ["DELETE FROM render_log WHERE template_id = ?", [id]],
-        ["DELETE FROM uploads WHERE template_id = ?", [id]],
-        ["DELETE FROM versions WHERE template_id = ?", [id]],
-        ["DELETE FROM templates WHERE id = ?", [id]],
-      ];
-      for (const [sql, args] of statements)
-        await busy(() => db.execute({ sql, args }));
-    }
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 // ── The screens ──────────────────────────────────────────────────────────────
 
@@ -275,13 +204,9 @@ async function openQueue(page: Page, tab?: string) {
 
 /** How many in-review versions of the team wait on this person: all of them, except the ones they submitted (one stage, so one approver's say). */
 async function waitingOn(person: string): Promise<number> {
-  const [row] = await rows(
-    db,
-    `SELECT COUNT(*) AS n FROM versions v JOIN templates t ON t.id = v.template_id
-     WHERE t.team_id = ? AND v.state = 'in_review' AND (v.submitted_by IS NULL OR v.submitted_by <> ?)`,
-    [TEAM, person],
-  );
-  return Number(row.n);
+  return (await findVersions({ teamSlug: TEAM, state: "in_review" })).filter(
+    (v) => v.submittedBy !== person,
+  ).length;
 }
 
 /** The Review item's badge says what the database says waits on this person (no badge at zero). Polled: the badge follows a decision a moment after it. */
@@ -389,7 +314,8 @@ test.describe("scenario 3: the review loop", () => {
   }) => {
     test.setTimeout(demoTimeout(240_000));
 
-    let v1: Row;
+    let templateId = "";
+    let v1: VersionRecord;
     let draftId = "";
     let interestBlock = "";
     let threadId = "";
@@ -408,6 +334,8 @@ test.describe("scenario 3: the review loop", () => {
       await tap(gallery.getByRole("button", { name: /Card offer terms/ }));
       await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
       templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
+      // Registered as soon as the id is known, so the template is removed even when the test fails half way.
+      changes.ownTemplate(templateId);
 
       // The name is selected: typing replaces it; Enter goes to the document, where the caret is in the first section.
       await expect(nameField(page)).toBeFocused();
@@ -446,22 +374,18 @@ test.describe("scenario 3: the review loop", () => {
         timeout: 20_000,
       });
 
-      [v1] = await rows(
-        db,
-        "SELECT * FROM versions WHERE template_id = ? AND number = 1",
-        [templateId],
-      );
+      v1 = (await versionNumbered(templateId, 1))!;
       expect(v1).toMatchObject({
         state: "in_review",
-        submitted_by: "maya",
-        submit_note: NOTE_V1,
+        submittedBy: "maya",
+        submitNote: NOTE_V1,
       });
       interestBlock =
         (await block(page, INTEREST_STARTS).getAttribute("data-id")) ?? "";
       expect(interestBlock, "the paragraph has a block id").not.toBe("");
-      expect(blockIds(json(v1.body))).toContain(interestBlock);
+      expect(blockIds(v1.body)).toContain(interestBlock);
     });
-    const id = templateId!;
+    const id = templateId;
 
     // ── 1. Maya sees Approve disabled ───────────────────────────────────────
 
@@ -606,31 +530,29 @@ test.describe("scenario 3: the review loop", () => {
       await expect(highlights(page)).toHaveText([QUOTE]);
 
       // Stored on the block, with the quote.
-      const stored = await rowWhen(
-        db,
-        "SELECT * FROM comment_threads WHERE template_id = ? AND block_id = ?",
-        [id, interestBlock],
-        "Jordan's thread is saved",
-      );
+      await expect
+        .poll(
+          async () =>
+            (await commentThreads(id, { blockId: interestBlock })).length,
+          { message: "Jordan's thread is saved", timeout: 15_000 },
+        )
+        .toBeGreaterThan(0);
+      const [stored] = await commentThreads(id, { blockId: interestBlock });
       expect(stored).toMatchObject({
-        block_id: interestBlock,
+        blockId: interestBlock,
         quote: QUOTE,
         status: "open",
-        origin_version_id: v1.id,
+        originVersionId: v1.id,
       });
-      threadId = String(stored.id);
-      await rowWhen(
-        db,
-        "SELECT * FROM comments WHERE thread_id = ?",
-        [threadId],
-        "Jordan's comment is saved",
-      );
-      const stash = await rows(
-        db,
-        "SELECT * FROM comments WHERE thread_id = ?",
-        [threadId],
-      );
-      expect(stash.map((c) => [c.author_id, c.body, c.kind])).toEqual([
+      threadId = stored.id;
+      await expect
+        .poll(async () => (await commentsIn(threadId)).length, {
+          message: "Jordan's comment is saved",
+          timeout: 15_000,
+        })
+        .toBeGreaterThan(0);
+      const stash = await commentsIn(threadId);
+      expect(stash.map((c) => [c.authorId, c.body, c.kind])).toEqual([
         ["jordan", COMMENT, "comment"],
       ]);
       await beat(page, 600);
@@ -685,80 +607,58 @@ test.describe("scenario 3: the review loop", () => {
     });
 
     await test.step("2.5 The database: the decision, the new draft with the same block ids, the reason as a document thread", async () => {
-      const [version] = await rows(
-        db,
-        "SELECT state FROM versions WHERE id = ?",
-        [v1.id],
-      );
-      expect(version.state).toBe("changes_requested");
+      const version = await versionById(v1.id);
+      expect(version!.state).toBe("changes_requested");
 
       // The decision.
-      const decisions = await rows(
-        db,
-        "SELECT * FROM approvals WHERE version_id = ?",
-        [v1.id],
-      );
+      const decisions = await approvalsOf(v1.id);
       expect(decisions).toHaveLength(1);
       expect(decisions[0]).toMatchObject({
-        actor_id: "jordan",
+        actorId: "jordan",
         decision: "changes_requested",
         reason: REASON,
-        stage_position: 0,
-        stage_name: "Team approver",
+        stagePosition: 0,
+        stageName: "Team approver",
       });
 
       // The new draft: a copy with the same block ids, based on v1.
-      const drafts = await rows(
-        db,
-        "SELECT * FROM versions WHERE template_id = ? AND state = 'draft'",
-        [id],
-      );
+      const drafts = await findVersions({ templateId: id, state: "draft" });
       expect(drafts, "one new draft").toHaveLength(1);
       const [draft] = drafts;
-      draftId = String(draft.id);
+      draftId = draft.id;
       expect(draft.number, "an open draft has no number").toBeNull();
       expect(draft.round, "nor a round").toBeNull();
-      expect(draft.based_on_version_id).toBe(v1.id);
-      expect(draft.created_by, "the author's draft").toBe("maya");
-      expect(blockIds(json(draft.body))).toEqual(blockIds(json(v1.body)));
-      expect(json(draft.body)).toEqual(json(v1.body));
+      expect(draft.basedOnVersionId).toBe(v1.id);
+      expect(draft.createdBy, "the author's draft").toBe("maya");
+      expect(blockIds(draft.body)).toEqual(blockIds(v1.body));
+      expect(draft.body).toEqual(v1.body);
 
       // The reason: a thread about the whole version, with a change_request comment.
-      const documentThreads = await rows(
-        db,
-        "SELECT * FROM comment_threads WHERE template_id = ? AND block_id = 'doc'",
-        [id],
-      );
+      const documentThreads = await commentThreads(id, { blockId: "doc" });
       expect(documentThreads).toHaveLength(1);
       expect(documentThreads[0]).toMatchObject({
-        origin_version_id: v1.id,
+        originVersionId: v1.id,
         status: "open",
         quote: null,
       });
-      requestThreadId = String(documentThreads[0].id);
-      const reasonComments = await rows(
-        db,
-        "SELECT * FROM comments WHERE thread_id = ?",
-        [String(documentThreads[0].id)],
-      );
+      requestThreadId = documentThreads[0].id;
+      const reasonComments = await commentsIn(documentThreads[0].id);
       expect(reasonComments).toHaveLength(1);
       expect(reasonComments[0]).toMatchObject({
-        author_id: "jordan",
+        authorId: "jordan",
         body: REASON,
         kind: "change_request",
       });
 
       // Jordan's comment is still where it was.
-      const [kept] = await rows(
-        db,
-        "SELECT * FROM comment_threads WHERE id = ?",
-        [threadId],
-      );
-      expect(kept).toMatchObject({ block_id: interestBlock, status: "open" });
+      expect(await commentThread(threadId)).toMatchObject({
+        blockId: interestBlock,
+        status: "open",
+      });
     });
 
     await test.step("2.6 The render API: v1 is refused as sent back for changes, and nothing is active yet", async () => {
-      const [v1Version] = (await allVersions(db)).filter(
+      const [v1Version] = (await allVersions()).filter(
         (v) => v.templateId === id && v.number === 1,
       );
       expect(v1Version).toMatchObject({
@@ -785,12 +685,12 @@ test.describe("scenario 3: the review loop", () => {
         "version_not_released",
         "Version 1 was sent back for changes. No version is active yet.",
       );
-      const [refusedLog] = await logFor(db, sentBack.correlationId!);
+      const [refusedLog] = await renderLogFor(sentBack.correlationId!);
       expect(refusedLog).toMatchObject({
-        consumer_id: "coral",
-        version_number: 1,
-        is_preview: 0,
-        error_code: "version_not_released",
+        consumerId: "coral",
+        versionNumber: 1,
+        isPreview: false,
+        errorCode: "version_not_released",
       });
     });
 
@@ -926,12 +826,10 @@ test.describe("scenario 3: the review loop", () => {
       await expect(highlights(page)).toHaveText([QUOTE]);
       await beat(page);
 
-      const [saved] = await rows(db, "SELECT body FROM versions WHERE id = ?", [
-        draftId,
-      ]);
-      expect(JSON.stringify(json(saved.body))).toContain(FIX.trim());
-      expect(blockIds(json(saved.body)), "the same block ids").toEqual(
-        blockIds(json(v1.body)),
+      const saved = await versionById(draftId);
+      expect(JSON.stringify(saved!.body)).toContain(FIX.trim());
+      expect(blockIds(saved!.body), "the same block ids").toEqual(
+        blockIds(v1.body),
       );
     });
 
@@ -964,25 +862,13 @@ test.describe("scenario 3: the review loop", () => {
 
       // Shown at once, saved a moment later.
       await expect
-        .poll(
-          async () =>
-            (
-              await rows(
-                db,
-                "SELECT status FROM comment_threads WHERE id = ?",
-                [threadId],
-              )
-            )[0]?.status,
-          { message: "the resolve is saved" },
-        )
+        .poll(async () => (await commentThread(threadId))?.status, {
+          message: "the resolve is saved",
+        })
         .toBe("resolved");
-      const [row] = await rows(
-        db,
-        "SELECT * FROM comment_threads WHERE id = ?",
-        [threadId],
-      );
-      expect(row).toMatchObject({ status: "resolved", resolved_by: "maya" });
-      expect(row.resolved_at).not.toBeNull();
+      const row = await commentThread(threadId);
+      expect(row).toMatchObject({ status: "resolved", resolvedBy: "maya" });
+      expect(row!.resolvedAt).not.toBeNull();
       await beat(page, 600);
     });
 
@@ -1022,60 +908,49 @@ test.describe("scenario 3: the review loop", () => {
       );
       await expect(documentEditor(page)).toContainText(FIX.trim());
 
-      const versionRows = await rows(
-        db,
-        "SELECT number, round, state, submitted_by, submit_note FROM versions WHERE template_id = ? ORDER BY number, round",
-        [id],
-      );
+      const versionRows = (await versionsOf(id)).map((v) => ({
+        number: v.number,
+        round: v.round,
+        state: v.state,
+        submittedBy: v.submittedBy,
+        submitNote: v.submitNote,
+      }));
       expect(versionRows).toEqual([
         {
           number: 1,
           round: 1,
           state: "changes_requested",
-          submitted_by: "maya",
-          submit_note: NOTE_V1,
+          submittedBy: "maya",
+          submitNote: NOTE_V1,
         },
         {
           number: 1,
           round: 2,
           state: "in_review",
-          submitted_by: "maya",
-          submit_note: NOTE_V2,
+          submittedBy: "maya",
+          submitNote: NOTE_V2,
         },
       ]);
 
       // Resubmitting answers the change request: it resolves as Maya's, still about round 1. Jordan's comment stays as she left it.
-      const [answered] = await rows(
-        db,
-        "SELECT * FROM comment_threads WHERE id = ?",
-        [requestThreadId],
-      );
+      const answered = await commentThread(requestThreadId);
       expect(answered).toMatchObject({
-        block_id: "doc",
+        blockId: "doc",
         status: "resolved",
-        resolved_by: "maya",
-        origin_version_id: v1.id,
+        resolvedBy: "maya",
+        originVersionId: v1.id,
       });
       expect(
-        answered.resolved_at,
+        answered!.resolvedAt,
         "it has the moment it was answered",
       ).not.toBeNull();
-      const [comment] = await rows(
-        db,
-        "SELECT * FROM comment_threads WHERE id = ?",
-        [threadId],
-      );
-      expect(comment).toMatchObject({
-        block_id: interestBlock,
+      expect(await commentThread(threadId)).toMatchObject({
+        blockId: interestBlock,
         status: "resolved",
-        resolved_by: "maya",
+        resolvedBy: "maya",
       });
       expect(
-        await rows(
-          db,
-          "SELECT id FROM comment_threads WHERE template_id = ? AND status = 'open'",
-          [id],
-        ),
+        await commentThreads(id, { status: "open" }),
         "nothing is left open",
       ).toEqual([]);
       await beat(page, 900);
@@ -1265,44 +1140,28 @@ test.describe("scenario 3: the review loop", () => {
     });
 
     await test.step("4.3 The database: round 2 is Active, round 1 is as it was, and the approval records who and what", async () => {
-      const list = await rows(
-        db,
-        "SELECT number, round, state, activated_at FROM versions WHERE template_id = ? ORDER BY number, round",
-        [id],
-      );
+      const list = await versionsOf(id);
       expect(list.map((v) => [v.number, v.round, v.state])).toEqual([
         [1, 1, "changes_requested"],
         [1, 2, "active"],
       ]);
       expect(
-        list[1].activated_at,
+        list[1].activatedAt,
         "round 2 has its activation time",
       ).not.toBeNull();
-      expect(list[0].activated_at).toBeNull();
+      expect(list[0].activatedAt).toBeNull();
 
-      const [round2] = await rows(
-        db,
-        "SELECT id, current_stage FROM versions WHERE template_id = ? AND number = 1 AND round = 2",
-        [id],
-      );
-      const approvals = await rows(
-        db,
-        "SELECT * FROM approvals WHERE version_id = ?",
-        [round2.id],
-      );
+      const round2 = await findVersion({ templateId: id, number: 1, round: 2 });
+      const approvals = await approvalsOf(round2!.id);
       expect(approvals).toHaveLength(1);
       expect(approvals[0]).toMatchObject({
-        actor_id: "jordan",
+        actorId: "jordan",
         decision: "approved",
-        stage_position: 0,
-        stage_name: "Team approver",
+        stagePosition: 0,
+        stageName: "Team approver",
       });
       // Every approval of the template: Jordan's request on round 1, his approval of round 2. Nothing else.
-      const all = await rows(
-        db,
-        "SELECT a.decision, v.number, v.round FROM approvals a JOIN versions v ON v.id = a.version_id WHERE v.template_id = ? ORDER BY a.decided_at, a.id",
-        [id],
-      );
+      const all = await decisionsOnTemplate(id);
       expect(all.map((r) => [r.number, r.round, r.decision])).toEqual([
         [1, 1, "changes_requested"],
         [1, 2, "approved"],
@@ -1486,14 +1345,10 @@ test.describe("scenario 3: the review loop", () => {
     await test.step("5.2 The trail in the database: the audit events and who was notified", async () => {
       // audit_events: the lifecycle, in order, by who did it (autosaves and the template's creation aside). Rows written
       // in one transaction share a timestamp: the change request answered follows round 2's submit by insertion order.
-      const audit = (
-        await rows(
-          db,
-          "SELECT * FROM audit_events WHERE template_id = ? ORDER BY at, rowid",
-          [id],
-        )
-      ).filter((r) => /^(version|comment|thread)\./.test(String(r.action)));
-      expect(audit.map((r) => [r.action, r.actor_id])).toEqual([
+      const audit = (await auditEvents({ templateId: id })).filter((e) =>
+        /^(version|comment|thread)\./.test(e.action),
+      );
+      expect(audit.map((e) => [e.action, e.actorId])).toEqual([
         ["version.submitted", "maya"],
         ["comment.added", "jordan"],
         ["version.changes_requested", "jordan"],
@@ -1503,35 +1358,35 @@ test.describe("scenario 3: the review loop", () => {
         ["version.activated", "jordan"],
       ]);
       for (const event of audit)
-        expect(event).toMatchObject({ team_id: TEAM, template_id: id });
-      expect(json(audit[0].details)).toMatchObject({
+        expect(event).toMatchObject({ teamId: TEAM, templateId: id });
+      expect(audit[0].details).toMatchObject({
         number: 1,
         round: 1,
         note: NOTE_V1,
       });
-      expect(json(audit[1].details)).toMatchObject({
+      expect(audit[1].details).toMatchObject({
         number: 1,
         round: 1,
         blockId: interestBlock,
         quote: QUOTE,
       });
-      expect(json(audit[2].details)).toMatchObject({
+      expect(audit[2].details).toMatchObject({
         number: 1,
         round: 1,
         stage: "Team approver",
         reason: REASON,
       });
-      expect(json(audit[3].details)).toMatchObject({
+      expect(audit[3].details).toMatchObject({
         threadId,
         blockId: interestBlock,
       });
-      expect(json(audit[4].details)).toMatchObject({
+      expect(audit[4].details).toMatchObject({
         number: 1,
         round: 2,
         note: NOTE_V2,
       });
       // The change request, answered by the resubmit: about round 1 (the thread's origin), saying round 2 of v1 answered it, and automatic.
-      expect(json(audit[5].details)).toEqual({
+      expect(audit[5].details).toEqual({
         threadId: requestThreadId,
         blockId: "doc",
         auto: true,
@@ -1541,46 +1396,34 @@ test.describe("scenario 3: the review loop", () => {
       expect(audit[5].at, "answered at the moment round 2 was submitted").toBe(
         audit[4].at,
       );
-      expect(json(audit[6].details)).toMatchObject({
+      expect(audit[6].details).toMatchObject({
         number: 1,
         round: 2,
         supersedes: null,
         stage: "Team approver",
       });
-      expect(audit[4].version_id, "round 2 is its own row").not.toBe(v1.id);
-      expect(audit.map((r) => r.version_id)).toEqual([
+      expect(audit[4].versionId, "round 2 is its own row").not.toBe(v1.id);
+      expect(audit.map((e) => e.versionId)).toEqual([
         v1.id,
         v1.id,
         v1.id,
         v1.id,
-        audit[4].version_id,
+        audit[4].versionId,
         v1.id,
-        audit[4].version_id,
+        audit[4].versionId,
       ]);
 
       // notifications: each submit asks the team's approvers except the submitter; the author hears about the
       // comment, the change request and the go-live.
-      const approvers = (
-        await rows(
-          db,
-          `SELECT DISTINCT m.user_id AS id FROM memberships m JOIN membership_roles r ON r.membership_id = m.id
-           WHERE m.team_id = ? AND m.status = 'active' AND r.role = 'approver'`,
-          [TEAM],
-        )
-      )
-        .map((r) => String(r.id))
-        .filter((user) => user !== "maya")
-        .sort();
-      expect(approvers, "Jordan and others can approve").toContain("jordan");
-      const notes = await rows(
-        db,
-        "SELECT * FROM notifications WHERE href LIKE ? ORDER BY created_at, id",
-        [`%/${id}%`],
+      const approvers = (await approversOf(TEAM)).filter(
+        (user) => user !== "maya",
       );
+      expect(approvers, "Jordan and others can approve").toContain("jordan");
+      const notes = await notificationsAbout(id);
       const to = (kind: string) =>
         notes
           .filter((r) => r.kind === kind)
-          .map((r) => String(r.user_id))
+          .map((r) => r.userId)
           .sort();
       expect(
         to("review_requested"),
@@ -1593,10 +1436,10 @@ test.describe("scenario 3: the review loop", () => {
         approvers.length * 2 + 3,
       );
       for (const note of notes)
-        expect(note).toMatchObject({ team_id: TEAM, read_at: null });
+        expect(note).toMatchObject({ teamId: TEAM, readAt: null });
       // Round 1's ask names no round (nothing had been sent back yet), and its link is the bare one; round 2's names it.
       const asked = notes.filter(
-        (r) => r.kind === "review_requested" && r.user_id === "jordan",
+        (r) => r.kind === "review_requested" && r.userId === "jordan",
       );
       expect(asked.map((r) => [r.title, r.href])).toEqual([
         [
@@ -1622,7 +1465,7 @@ test.describe("scenario 3: the review loop", () => {
     });
 
     await test.step("5.3 The render API: v1 renders as Coral, its released round, and no round is named", async () => {
-      const all = await allVersions(db);
+      const all = await allVersions();
       const v1Rows = all.filter((v) => v.templateId === id && v.number === 1);
       expect(v1Rows.map((v) => [v.round, v.state, v.head])).toEqual([
         [1, "changes_requested", false],
@@ -1652,14 +1495,14 @@ test.describe("scenario 3: the review loop", () => {
         active.res.headers()["x-stencil-newer-version"],
         "v1 is the newest",
       ).toBeUndefined();
-      const [okLog] = await logFor(db, active.correlationId!);
+      const [okLog] = await renderLogFor(active.correlationId!);
       expect(okLog).toMatchObject({
-        consumer_id: "coral",
-        version_id: released.id,
-        version_number: 1,
-        is_preview: 0,
+        consumerId: "coral",
+        versionId: released.id,
+        versionNumber: 1,
+        isPreview: false,
         outcome: "ok",
-        error_code: null,
+        errorCode: null,
       });
     });
   });

@@ -43,7 +43,7 @@
   "values": {
     "purchase_apr": "1,00",
     "annual_fee": "007",
-    "cash_fee": 1e3
+    "cash_fee": "1e3"
   },
   "body": {
     "type": "doc",

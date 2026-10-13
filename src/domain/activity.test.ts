@@ -287,47 +287,6 @@ describe("describeActivity: one sentence per audit action", () => {
   });
 });
 
-describe("describeActivity: the seed's spellings", () => {
-  it.each<[string, ActivityEvent, Person | null, string]>([
-    [
-      "version.approved",
-      event("version.approved", 2, { number: 2, stage: "Team approver" }),
-      JORDAN,
-      "Jordan Ellis approved v2 (Team approver).",
-    ],
-    [
-      "version.activated by the system",
-      event("version.activated", 2, { number: 2, supersedes: 1 }),
-      null,
-      "v2 became Active, replacing v1.",
-    ],
-    [
-      "a first activation by the system",
-      event("version.activated", 1, { number: 1, supersedes: null }),
-      null,
-      "v1 became Active.",
-    ],
-    [
-      "version.revoke_confirmed",
-      event("version.revoke_confirmed", 1, {
-        number: 1,
-        reason: "Wrong bonus amount.",
-        startedBy: "jordan",
-      }),
-      ALEX,
-      "Alex Kim confirmed the revoke of v1: Wrong bonus amount.",
-    ],
-    [
-      "comment.resolved",
-      event("comment.resolved", 1, { threadId: "t1" }),
-      MAYA,
-      "Maya Chen resolved a comment on v1.",
-    ],
-  ])("%s", (_, e, actor, sentence) => {
-    expect(describeActivity(e, actor)).toBe(sentence);
-  });
-});
-
 describe("describeActivity: details", () => {
   it("keeps a reason's own closing punctuation, and collapses its whitespace", () => {
     expect(

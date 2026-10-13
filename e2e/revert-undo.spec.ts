@@ -1,7 +1,4 @@
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { rowsOf } from "./helpers/cleanup";
 import {
   asPersona,
   caret,
@@ -16,6 +13,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { Changes, findVersion, openDraftOf } from "./helpers/state";
 
 // "Revert to v2" and its toast's Undo (handoff review I2 and I9). Eli, an Author on Deposits, presses
 // Edit on High-Yield Savings (v2 Active), so the draft on screen was started from v2:
@@ -39,46 +37,21 @@ const SLACK = 2;
 
 test.describe.configure({ mode: "serial" });
 
-let db: Client;
+const changes = new Changes();
 let templateId = "";
 
 test.beforeAll(async () => {
-  db = openDb();
-  const [row] = await rowsOf(
-    db,
-    `SELECT DISTINCT t.id FROM templates t JOIN teams tm ON tm.id = t.team_id JOIN versions v ON v.template_id = t.id
-     WHERE tm.slug = ? AND v.name = ?`,
-    [TEAM, NAME],
-  );
-  if (!row) throw new Error(`The seed has no ${NAME}. Run npm run db:reset.`);
-  templateId = String(row.id);
-  const drafts = await rowsOf(
-    db,
-    "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
-    [templateId],
-  );
-  if (drafts.length > 0)
+  const template = await findVersion({ teamSlug: TEAM, name: NAME });
+  if (!template)
+    throw new Error(`The seed has no ${NAME}. Run npm run db:reset.`);
+  templateId = template.templateId;
+  if (await openDraftOf(templateId))
     throw new Error(`${NAME} already has a draft. Run npm run db:reset.`);
+  // The draft Eli's Edit makes, and its audit rows, go again: the template is as the seed made it.
+  await changes.watchTemplate(templateId);
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    const drafts = await rowsOf(
-      db,
-      "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
-      [templateId],
-    );
-    for (const draft of drafts) {
-      await rowsOf(db, "DELETE FROM audit_events WHERE version_id = ?", [
-        draft.id,
-      ]);
-      await rowsOf(db, "DELETE FROM versions WHERE id = ?", [draft.id]);
-    }
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const header = (page: Page) => page.locator("header").filter({ visible: true });
 const statusMenu = (page: Page) =>
@@ -254,12 +227,8 @@ test("the version Revert reads is a GET route that a request without Eli's sessi
   baseURL,
 }) => {
   await openDraft(page);
-  const [draft] = await rowsOf(
-    db,
-    "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
-    [templateId],
-  );
-  const read = `/api/templates/${templateId}/base-version?draft=${String(draft!.id)}`;
+  const draft = await openDraftOf(templateId);
+  const read = `/api/templates/${templateId}/base-version?draft=${draft!.id}`;
 
   const own = await page.request.get(read);
   expect(own.status()).toBe(200);

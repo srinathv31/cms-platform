@@ -1,7 +1,4 @@
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate } from "./helpers/cleanup";
 import {
   asPersona,
   editor,
@@ -14,6 +11,7 @@ import {
   test,
   typeSlowly,
 } from "./helpers/scenario";
+import { Changes } from "./helpers/state";
 
 // List numbering from the block menu, in the real UI: what the author picks is what every channel prints.
 //
@@ -33,22 +31,11 @@ const SECOND = "Numbered second";
 test.use({ trace: "off", screenshot: "only-on-failure" });
 test.describe.configure({ mode: "serial" });
 
-let db: Client;
-/** Set once the template exists, so afterAll removes it even when a test fails half way. */
+const changes = new Changes();
+/** Set once the template exists (and handed to `changes`), so afterAll removes it even when a test fails half way. */
 let templateId: string | null = null;
 
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (templateId) await removeTemplate(db, templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 // ── The editor ───────────────────────────────────────────────────────────────
 
@@ -173,6 +160,7 @@ test.describe("list numbering from the block menu", () => {
     );
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1]!;
+    changes.ownTemplate(templateId);
     await expect(nameField(page)).toBeFocused();
     await page.keyboard.press("Enter");
     await liveEditor(page);

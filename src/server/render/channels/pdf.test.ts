@@ -918,7 +918,7 @@ describe("prepareText", () => {
     expect(lines).toBe(2);
     expect(inlines).toEqual([
       expect.objectContaining({ text: "Valid until\n" }),
-      expect.objectContaining({ text: "September 30, 2027" }),
+      expect.objectContaining({ text: "September 30, 2027", isJoined: true }),
     ]);
   });
 
@@ -969,10 +969,14 @@ describe("prepareText", () => {
       new GlyphCheck(),
     );
     expect(inlines).toEqual([
-      expect.objectContaining({ text: "   ", indent: 3 * space }),
+      expect.objectContaining({
+        text: "   ",
+        indent: 3 * space,
+        isLead: true,
+      }),
       expect.objectContaining({ text: "Lead and   three" }),
       { kind: "break" },
-      expect.objectContaining({ text: "  ", indent: 2 * space }),
+      expect.objectContaining({ text: "  ", indent: 2 * space, isLead: true }),
       expect.objectContaining({ text: "after a break" }),
     ]);
   });

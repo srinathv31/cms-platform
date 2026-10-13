@@ -46,7 +46,7 @@ the merge of each wave, and wave 4.
 | F (item 3)             | `src/server/**` except `render/`, `db/schema`, `seed/`; `src/lib/fresh-database.ts`; `src/app/api/**` as callers; server tests; `src/server/README.md`; `docs/architecture.md` "How requests flow"                                                                                                                                                                                                                                                                                                                       | `src/components/**`, `src/editor/**`, `src/domain/**` beyond type moves agreed in 2a        |
 | G (item 5, components) | `src/components/workspace/content/content-workspace.tsx`, `comments/thread-list.tsx`, `workspace/content/rail.tsx`, new hooks beside them, tests for `preview/pdf/pdf-controller.ts` and `settings/platform/approval-chains.tsx`, `src/components/README.md` "Layout" rows for those files                                                                                                                                                                                                                               | `src/server/**`                                                                             |
 | H (item 5, editor)     | `src/editor/components/block-menu.tsx`, `components/document-editor.tsx`, new files beside them, `src/editor/README.md` "Files"                                                                                                                                                                                                                                                                                                                                                                                          | `src/editor/model/**`                                                                       |
-| I (item 5, render)     | `src/server/render/golden/content.ts` (split into four), `src/server/render/channels/pdf-text.ts` (`breakLines`), `golden/README.md`                                                                                                                                                                                                                                                                                                                                                                                     | `focused-cases.ts` and `cases/` (lane E is merged first)                                    |
+| I (item 5, render)     | `src/server/render/golden/content-*.ts` and `diff.ts` (was `content.ts`, split), `src/server/render/channels/pdf-text.ts` (`breakLines`), `golden/README.md`                                                                                                                                                                                                                                                                                                                                                             | `focused-cases.ts` and `cases/` (lane E is merged first)                                    |
 | K (item 5, seed)       | `src/server/seed/templates/build.ts` and new emitters beside it, `seed.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                          | anything else under `src/server`                                                            |
 | J (item 6)             | a new brief under `docs/reference/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | code                                                                                        |
 | L1 to L7 (item 2)      | one README each (`src/app`, `src/components`, `src/domain`, `src/editor`, `src/server`, `src/simulator`, `src/contracts`), plus the "Phase N" and build-history comments in that layer's code, plus that README's "how to read a file here" paragraph from item 9; L7 also owns `docs/architecture.md`, `docs/render-spec.md`, `AGENTS.md`, `docs/README.md`, `docs/reference/ui-checklist.md`                                                                                                                           | another lane's README                                                                       |
@@ -200,7 +200,7 @@ the merge of each wave, and wave 4.
 
 ### Item 5. Go deeper on the files that concentrate complexity (lanes G, H, I, K; the server queries inside F)
 
-- [ ] Split by concern (decision 0043's own test) the files the review says a human cannot read in ten minutes
+- [ ] (wave 2.1: components, editor, render and seed; the server-query splits come with the seam, item 3) Split by concern (decision 0043's own test) the files the review says a human cannot read in ten minutes
       (§4 M-23, §5), and add the missing tests:
   - Lane G, components: `src/components/workspace/content/content-workspace.tsx` (24 props, seven concerns, into
     `useContentRevert`, `useContentComments` and a props object per concern), `src/components/comments/thread-list.tsx`
@@ -211,7 +211,7 @@ the merge of each wave, and wave 4.
   - Lane H, editor: `src/editor/components/block-menu.tsx` (popup, items, numbering and start-at in one file; the
     grip and keyboard openers in another) and `src/editor/components/document-editor.tsx` (the block-handle loader to
     `lib/`, the Activity and history hand-over to a `useEditorLifecycle` hook).
-  - Lane I, render: `src/server/render/golden/content.ts` into content-text, content-html, content-plaintext,
+  - Lane I, render: the golden pipeline's old `content.ts` into content-text, content-html, content-plaintext,
     content-pdf and diff; `breakLines` in `src/server/render/channels/pdf-text.ts` into `placeLead`, `placeWord`,
     `applyEdits` with flags on `Piece` instead of identity sets.
   - Lane K, seed: `src/server/seed/templates/build.ts` (one 370-line function) into `emitVersion`, `emitApprovals`,
@@ -225,17 +225,17 @@ the merge of each wave, and wave 4.
 
 ### Item 6. A brief for the OpenAPI specification (lane J)
 
-- [ ] Write the document from which the Java team authors the OpenAPI 3.1 (Swagger) spec for `/api/v1`. The team
+- [x] Write the document from which the Java team authors the OpenAPI 3.1 (Swagger) spec for `/api/v1`. The team
       writes the spec, since the Java API's shape is theirs; this brief gives them everything the Node side knows.
       It should cover: every endpoint and DTO in `src/contracts/api-v1.ts` with the status table
-      (`API_ERROR_STATUS`); the decision on RFC 9457 problem details (and that the CMS preview route changes in the
-      same PR, since it shares the shape today); consumer authentication (client credentials, replacing
+      (`API_ERROR_STATUS`); the error format decision 0056 settles (the existing UCOMP API's, and that the CMS preview
+      route changes in the same PR, since it shares the shape today); consumer authentication (client credentials, replacing
       `X-Consumer-Id`); the cursor format and the commit-ordered `seq` it depends on (decision 0006); the sunset
       instant plus `sunsetDay` and `zone` (decision 0038); the notices kinds and their per-kind fields; the render
       request's rule that a JSON number keeps its source text (decision 0011 and `docs/render-spec.md`); the
       `Date` header going back to real time (A7); and the fields the review found ambiguous (`ApiTemplateDetail.name`'s
       three-way rule, `activatedAt`'s fallback, `ApiError.details` per code, `ApiContractChange` as a tagged union).
-      It takes lane B's answers on the error shape and consumer identity as inputs.
+      It takes lane B's answers on the error shape and consumer identity as inputs. (wave 2.1)
 - Why: the contract is TypeScript-only today (A5). The spec is also what makes the BFF seam (item 3) testable.
 - Start at: `src/contracts/api-v1.ts`, `src/contracts/README.md`, `src/server/queries/consumer-api.ts`,
   `src/domain/golive/cursor.ts`, the review's routes report ("For the Java team").
