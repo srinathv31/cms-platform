@@ -10,8 +10,8 @@ import type { FakeTx } from "./store";
 
 // The fake's effects writer for access and platform changes, the twin of `writeAccessEffects`
 // (services/local/access-effects.ts): audit rows and notifications, written into the command's `FakeTx`, with
-// the same recipients. A notification stores its kind, its facts and its link (by team id). The access commands
-// that write through it move behind the seam with plan P2.
+// the same recipients. A notification stores its kind, its facts and its link (by team id). The fake's access and
+// platform commands (./access.ts, ./platform.ts) and its access sweep (./sweeps.ts) write through it.
 
 /** Writes an access transition's audit rows and notifications, as `writeAccessEffects` does. */
 export function writeFakeAccessEffects(

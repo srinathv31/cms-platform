@@ -3,8 +3,10 @@
 Team access as pure rules: asking for access and deciding a request, managing members, quarterly recertification,
 inactivity, the clock-driven sweep that applies deadlines, and the sentences the Team settings screens show about
 all of them. Every function takes `now` (the demo clock) and returns what to write (`changes`) and what to record
-(`effects`); server code applies both in one transaction ([server/actions/access.ts](../../server/actions/access.ts),
-[server/access-sweep.ts](../../server/access-sweep.ts)). Its contracts (inputs, effects, limits) are in
+(`effects`). The backend applies both in one transaction: the local implementation's
+[access commands](../../server/services/local/access.ts) and [scheduled jobs](../../server/services/local/sweeps.ts), and their twins in
+the fake, which decide with these same functions, so a rule both would need lives here (`requestPermission`,
+`lastAdminRefusal`). Its contracts (inputs, effects, limits) are in
 [access-types.ts](../access-types.ts).
 
 One file per concern, split by concern ([decision 0043](../../../docs/decisions/0043-split-files-by-concern-not-by-line-count.md)).
@@ -21,8 +23,8 @@ the sweep that applies the deadlines.
 | [roles.ts](roles.ts)                     | The team roles as people read them: labels, order, which can be asked for, and a membership's status word.                                                       | `ROLE_LABEL`, `sortRoles`, `rolesLabel`, `firstName`, `isRequestableRole`, `membershipStatusLabel`                                                                               |
 | [refusals.ts](refusals.ts)               | `ACCESS_REFUSALS`, the whole refusal table of team access: every code with its sentence, in one place.                                                           | `ACCESS_REFUSALS`                                                                                                                                                                |
 | [inactivity.ts](inactivity.ts)           | The inactivity clock: its anchor, the 90-day flag and the 120-day suspension, and whether a flag or a held suspension is already recorded for the current clock. | `inactivity`, `inactivityAnchor`, `flaggedFor`, `suspensionHeld`                                                                                                                 |
-| [requests.ts](requests.ts)               | Asking for access (one pending request per team) and deciding it (a denial needs a note, nobody decides their own).                                              | `requestAccess`, `decideAccessRequest`, `validateAccessReason`, `validateDecisionNote`, `requestDecisionRefusal`                                                                 |
-| [members.ts](members.ts)                 | Managing members: change roles, remove, suspend, keep and reinstate. Nobody changes their own access, and a team keeps at least one active Team Admin.           | `changeRoles`, `removeMember`, `suspendInactive`, `keepInactive`, `reinstate`, `validateRoles`, `losesLastAdmin`, `reinstatedSet`                                                |
+| [requests.ts](requests.ts)               | Asking for access (one pending request per team) and deciding it (a denial needs a note, nobody decides their own).                                              | `requestAccess`, `decideAccessRequest`, `requestPermission`, `validateAccessReason`, `validateDecisionNote`, `requestDecisionRefusal`                                            |
+| [members.ts](members.ts)                 | Managing members: change roles, remove, suspend, keep and reinstate. Nobody changes their own access, and a team keeps at least one active Team Admin.           | `changeRoles`, `removeMember`, `suspendInactive`, `keepInactive`, `reinstate`, `validateRoles`, `losesLastAdmin`, `lastAdminRefusal`, `reinstatedSet`                            |
 | [recertification.ts](recertification.ts) | The quarterly review: its phase, who it covers and its progress, starting it, and keeping or removing a member in it.                                            | `startRecert`, `decideRecertItem`, `recertPhase`, `recertSubjects`, `recertProgress`, `recertDueAt`, `quarterLabel`                                                              |
 | [consequences.ts](consequences.ts)       | What the Team settings sections say: each strip's line before the Team Admin confirms, a review's footnote and settled rows, and the roles editor's live line.   | `memberConsequences`, `requestConsequences`, `startRecertConsequence`, `recertRemoveConsequence`, `recertFootnote`, `recertItemOutcome`, `describeRoleChange`, `heldAsLastAdmin` |
 | [sweep.ts](sweep.ts)                     | What the clock did since last time: every deadline it has reached, backdated to the instant each was reached.                                                    | `sweepAccess`                                                                                                                                                                    |
@@ -34,7 +36,11 @@ Tests sit beside each file. [fixtures.ts](fixtures.ts) holds the inputs more tha
 
 - Anyone may ask for Viewer, Author or Approver on a team, with a reason. One pending request per team. A Team Admin
   of that team approves or denies (a denial needs a note), never their own.
-- Nobody changes their own access, and a team always keeps at least one active Team Admin.
+- Nobody changes their own access, and a team always keeps at least one active Team Admin: the transitions check it on
+  what they read (`losesLastAdmin`), and the backend checks it again once the change is written (`lastAdminRefusal`),
+  so two admins demoting each other at once can't both succeed where writes don't take turns.
+- An Auditor holds no team role: they can't ask for one (`requestPermission`), and a request of theirs can't be
+  approved (`decideAccessRequest`).
 - **Recertification.** Each member (Team Admins aside) is kept or removed by the deadline. Removing ends access at
   once. Anyone still unconfirmed when the deadline arrives lapses AT the deadline (`now >= dueAt`), and the review
   closes.

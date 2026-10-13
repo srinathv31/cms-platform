@@ -401,7 +401,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### S4 · High: Access deadlines only take effect when a demo trigger runs the sweep
 
 - **Status:** Deferred. Belongs to the real-login work: effective status at sign-in plus a scheduled sweep.
-- **Where:** `src/server/access-sweep.ts` line 144; `src/server/actions/persona.ts` line 39
+- **Where:** `src/server/services/local/sweeps.ts` (`runScheduledJobs`); `src/server/services/local/demo.ts` (`switchPersona`)
 - **What happens:** Recertification lapses and inactivity suspensions are applied by `runAccessSweep`, which runs on persona switch, Advance clock and access actions only. With real sign-in and real time, a lapsed approver keeps editing and approving until someone happens to run an access action. Each sweep also loads every membership and user.
 - **Fix:** A scheduled job (Spring `@Scheduled` or a cron route), plus computing effective membership status from the deadlines when the viewer is loaded.
 - **Evidence:** traced
