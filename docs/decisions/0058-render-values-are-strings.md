@@ -1,13 +1,13 @@
 # 0058. Render values are JSON strings; a JSON number is refused
 
 Status: Accepted
-Amended 2026-10-12: built (wave 2, lane I). The refusal's `details.invalid` entry carries `"sent": "number"`, which is what lets the message name the string form; the sentence is `{key} must be a JSON string, like "21.90", not a number.`, the same example for every key so that no value is echoed. `VariableValue` in the editor model is `string` now, and the `values-formats` case sends its former number rows as strings (`percent_whole`, `number_whole`).
+Amended 2026-10-12: built (wave 2, lane I). The refusal's `details.invalid` entry carries `"sent": "number"`, which is what lets the message name the string form; the sentence is `{key} must be a JSON string, like "21.90", not a number.`, the same example for every key so that no value is echoed. `json-number-text.ts` is gone (its path in the Context is no longer in backticks, so `docs:check` passes). `VariableValue` in the editor model is `string` now, and the `values-formats` case sends its former number rows as strings (`percent_whole`, `number_whole`).
 Date: 2026-10-12
 
 ## Context
 
 The render route reads a JSON number in `values` from its exact source text (`parseJsonWithNumberText` in
-`src/domain/render/json-number-text.ts`, called from `src/server/api/render-http.ts`): `{"purchase_apr": 21.90}`
+src/domain/render/json-number-text.ts (removed), called from `src/server/api/render-http.ts`): `{"purchase_apr": 21.90}`
 becomes `"21.90"` and renders `21.90%`, `1e3` is refused, and a 22-digit integer keeps every digit
 ([render spec](../render-spec.md) §5, "JSON numbers"). Autosave does the same for sample values
 (`src/server/drafts/parse-patch.ts`). The published JSON Schema already says strings: every property is
