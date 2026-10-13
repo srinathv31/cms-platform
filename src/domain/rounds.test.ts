@@ -5,6 +5,7 @@ import {
   compareRounds,
   headOf,
   isReleased,
+  latestVersion,
   nextRound,
   parseRoundParam,
   replacedBy,
@@ -270,6 +271,19 @@ describe("lookups and order", () => {
       "superseded",
       "revoked",
     ]);
+  });
+
+  it("the latest version is the open draft, else the highest number's latest round", () => {
+    expect(latestVersion(rows)?.id).toBe("d");
+    expect(latestVersion(rows.filter((r) => r.id !== "d"))?.id).toBe("v3r2");
+    expect(
+      latestVersion([
+        { id: "v1", ...row(1, 1, "superseded") },
+        { id: "v2r2", ...row(2, 2, "active") },
+        { id: "v2r1", ...row(2, 1, "changes_requested") },
+      ])?.id,
+    ).toBe("v2r2");
+    expect(latestVersion([])).toBeUndefined();
   });
 
   it("treats a numbered row without a round as a bug", () => {

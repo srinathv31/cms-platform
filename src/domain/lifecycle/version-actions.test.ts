@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { REASONS } from "../permissions";
+import { REQUEST_REFUSALS } from "../refusals";
 import type { Viewer } from "../types";
 import { CONFIRMED, NOW, PENDING, TOMORROW } from "./fixtures";
 import { REFUSALS } from "./refusals";
-import { versionActions } from "./version-actions";
+import { versionActions, workspaceActions } from "./version-actions";
 
 // What a viewer may do on a released version: the Versions tab's four controls, decided once for the local
 // implementation, the fake and (ported) the Java API.
@@ -97,5 +98,43 @@ describe("versionActions", () => {
       confirmRevoke: { ok: false, ...REFUSALS.alreadyRevoked },
       cancelRevoke: { ok: false, ...REFUSALS.alreadyRevoked },
     });
+  });
+});
+
+describe("workspaceActions", () => {
+  const sam = member("sam", ["viewer"]);
+  const row = (
+    id: string,
+    number: number | null,
+    state: "draft" | "in_review" | "active" | "superseded",
+  ) => ({ id, number, round: number === null ? null : 1, state });
+
+  it("on a live template, offers Edit to an author, and nothing to someone without the edit permission", () => {
+    const live = [row("v1", 1, "superseded"), row("v2", 2, "active")];
+    expect(workspaceActions(maya, TEAM, live)).toEqual({
+      edit: { ok: true },
+      startDraft: { ok: true },
+      submit: { ok: false, ...REQUEST_REFUSALS.noDraftToSubmit },
+    });
+    expect(workspaceActions(sam, TEAM, live)).toEqual({
+      edit: { ok: false, ...REASONS.generic },
+      startDraft: { ok: false, ...REASONS.generic },
+      submit: { ok: false, ...REQUEST_REFUSALS.noDraftToSubmit },
+    });
+  });
+
+  it("with a draft open, its author may submit it; with a newer version in review, Edit says why not", () => {
+    const drafting = [row("v1", 1, "active"), row("d", null, "draft")];
+    expect(workspaceActions(maya, TEAM, drafting).submit).toEqual({ ok: true });
+    expect(
+      workspaceActions(jordan, TEAM, drafting).submit,
+      "an approver doesn't submit",
+    ).toMatchObject({ ok: false });
+    expect(
+      workspaceActions(maya, TEAM, [
+        row("v1", 1, "active"),
+        row("v2", 2, "in_review"),
+      ]).startDraft,
+    ).toEqual({ ok: false, ...REFUSALS.newerInReview });
   });
 });

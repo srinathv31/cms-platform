@@ -4,13 +4,15 @@
 // actions (`setSunset`, the revoke transitions) refuse with the same codes.
 
 import { can } from "../permissions";
-import { refuse, type Refusal } from "../refusals";
+import { REQUEST_REFUSALS, refuse, type Refusal } from "../refusals";
+import { latestVersion, type RoundRow } from "../rounds";
 import type {
   PermissionResult,
   RevokeRecord,
   VersionState,
   Viewer,
 } from "../types";
+import { planDraftStart } from "./drafts";
 import { REFUSALS } from "./refusals";
 import { revokePending } from "./revoke";
 import { sunsetPassed } from "./sunset";
@@ -83,5 +85,37 @@ export function versionActions(
     cancelRevoke: pending
       ? can(viewer, "version.revoke.start", { teamId })
       : noPending,
+  };
+}
+
+/** What the viewer may do in a template's workspace, whatever tab is open. */
+export interface WorkspaceActions {
+  /** Edit the team's drafts (the name field, autosave). Refused, the header says "View only". */
+  edit: PermissionResult;
+  /**
+   * Edit: start the template's next draft from its latest version (`planDraftStart`), or open the one there is.
+   * Refused without the edit permission, and while a newer version is in review or the latest isn't Active or
+   * Revoked.
+   */
+  startDraft: PermissionResult;
+  /** Submit for review: the template's open draft, by someone who may submit the team's drafts. */
+  submit: PermissionResult;
+}
+
+/** What the viewer may do in the workspace of a template on `teamId`, given its versions (every round). */
+export function workspaceActions(
+  viewer: Viewer,
+  teamId: string,
+  versions: readonly (RoundRow & { id: string })[],
+): WorkspaceActions {
+  const edit = can(viewer, "draft.edit", { teamId });
+  const plan = planDraftStart(versions);
+  return {
+    edit,
+    startDraft: edit.ok && plan.kind === "blocked" ? refuse(plan) : edit,
+    submit:
+      latestVersion(versions)?.state === "draft"
+        ? can(viewer, "version.submit", { teamId })
+        : refuse(REQUEST_REFUSALS.noDraftToSubmit),
   };
 }
