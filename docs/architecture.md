@@ -155,8 +155,9 @@ cookie. Coral calls the consumer URL over HTTP from the server, as a real consum
 
 ## Data
 
-One SQLite file, `data/ucomp.db`, through libSQL and Drizzle. `DATABASE_URL` and `DATABASE_AUTH_TOKEN` can point
-at Turso instead. Two schema files:
+One SQLite file, `data/ucomp.db`, through libSQL and Drizzle. A remote libSQL database (Turso) isn't a supported
+deployment: the code's read-check-write rules assume one local file and one process, and the Java API replaces this
+layer. Two schema files:
 
 - [schema/ucomp.ts](../src/server/db/schema/ucomp.ts), the CMS:
   - **Settings:** `settings` (demo clock offset, seed version, business time zone).

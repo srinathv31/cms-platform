@@ -27,18 +27,30 @@ import { filePathOfUrl } from "@/lib/file-url";
 // processes (the e2e helpers, a second server on the same file) are covered by the client's busy
 // `timeout`, which makes SQLite itself wait for their lock instead of failing at once.
 //
-// This is the only place the app waits for the database, and the worst case is short:
-//   - a write waits at most WRITE_TURN_WAIT_MS (5 s) for its turn in this process, then
-//   - SQLite waits at most BUSY_TIMEOUT_MS (5 s) for a lock another process holds on the file,
-// and past either the write fails with SQLITE_BUSY. Nothing above retries it: `inTransaction`
-// (src/server/effects.ts) runs a transaction once, so a server action, an autosave or a sweep stuck
-// behind a long write fails within about 10 s (5 s when no other process opens the file), and the
-// person sees the failure instead of a spinner. Don't add a busy retry above this: every attempt
-// would wait its full turn again.
+// This is the only place the app waits for the database, and nothing above it retries: a write that
+// can't get the file fails with SQLITE_BUSY (`inTransaction`, src/server/effects.ts, runs once). Don't
+// add a busy retry above this; each attempt would wait again.
+//
+// The worst case:
+//   - In this process a write waits at most WRITE_TURN_WAIT_MS (5 s) for its turn. When no other
+//     process opens the file that is the whole bound, and a turn is held only across microtasks.
+//   - While ANOTHER process holds the file's lock, libSQL's busy wait is synchronous: it blocks the
+//     event loop for up to BUSY_TIMEOUT_MS (5 s) per statement. No timer fires and the server answers
+//     nothing, reads included. When one write gives up, the next queued write starts its own 5 s wait
+//     at once, so writes fail one after another, about 5 s apart, until the lock clears. A COMMIT can
+//     wait on another process's readers the same way.
+// So don't write to the file from another process (`npm run db:reset`, an e2e helper) beside a live
+// server and expect the server to stay responsive.
+//
+// Every URL gets this wrapper, a remote one too, on purpose: invariants the code relies on (a
+// transaction reads what the writer before it committed, `takeNoticeSeqs`, last-admin and the other
+// read-check-write rules; quality review H-2) hold only because writes here take turns. A remote
+// libSQL database (Turso) is not a supported deployment: the Java API replaces this layer.
 
 /**
  * The clients' busy `timeout`: how long SQLite waits for another process's lock on the local file
- * (the e2e helpers, a second server on the same file) before failing with SQLITE_BUSY.
+ * (the e2e helpers, a second server on the same file) before failing with SQLITE_BUSY. The wait blocks
+ * the event loop (see above).
  */
 export const BUSY_TIMEOUT_MS = 5_000;
 

@@ -371,9 +371,10 @@ async function recentConsumers(tx: Tx, ctx: EffectContext): Promise<string[]> {
  * One write transaction (`BEGIN IMMEDIATE`), run once. Every write transaction in the app runs here: the
  * server actions (`actions/kit.ts`), autosave (`drafts/apply-patch.ts`), import (`import/create.ts`) and
  * the sweeps. Two writes at once never collide: the database client makes the second wait its turn, at
- * most 5 s, plus at most 5 s for a lock another process holds (src/lib/serialized-writes.ts, the only
- * place the app waits). Past that it fails with SQLITE_BUSY, and the failure is the answer: a retry here
- * would wait the whole turn again for every attempt. The transaction reads what it checks, so whichever
+ * most 5 s (src/lib/serialized-writes.ts, the only place the app waits, which also says what a lock held
+ * by another process does: it freezes the event loop and fails queued writes one by one). Past the wait
+ * it fails with SQLITE_BUSY, and the failure is the answer: a retry here would wait again for every
+ * attempt. The transaction reads what it checks, so whichever
  * write goes second sees the first one's, and its compare-and-set refuses if the row moved.
  */
 export function inTransaction<T>(
