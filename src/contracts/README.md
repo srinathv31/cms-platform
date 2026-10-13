@@ -92,7 +92,10 @@ a removal and a new required variable
 A render body is at most 1,000,000 bytes (`MAX_BODY_BYTES`), else 413 `body_too_large`; the route counts the bytes as
 it reads, so a chunked body is held to the limit too. Each value is at most 1,000 characters, counted in Unicode code
 points (`MAX_VALUE_LENGTH`), else 422 `invalid_values` with `maxLength` on that key's `details.invalid` entry. A value
-is never cut, because it prints exactly as sent. The published JSON Schema gives every property the same
+is never cut, because it prints exactly as sent. Every value is a JSON string, so `ApiRenderRequest.values` is
+`Record<string, string>`: a JSON number is 422 `invalid_values` too, with `sent: "number"` on that key's entry and a
+sentence that says to send `"21.90"`
+([decision 0058](../../docs/decisions/0058-render-values-are-strings.md)). The published JSON Schema gives every property the same
 `maxLength`. Both limits are in `src/domain/render/types.ts`, and why the value limit is 1,000 is
 [decision 0011](../../docs/decisions/0011-cap-each-render-value.md).
 

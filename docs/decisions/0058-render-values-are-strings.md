@@ -1,6 +1,7 @@
 # 0058. Render values are JSON strings; a JSON number is refused
 
 Status: Accepted
+Amended 2026-10-12: built (wave 2, lane I). The refusal's `details.invalid` entry carries `"sent": "number"`, which is what lets the message name the string form; the sentence is `{key} must be a JSON string, like "21.90", not a number.`, the same example for every key so that no value is echoed. `VariableValue` in the editor model is `string` now, and the `values-formats` case sends its former number rows as strings (`percent_whole`, `number_whole`).
 Date: 2026-10-12
 
 ## Context

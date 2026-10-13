@@ -193,8 +193,9 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
   refuse a cursor from another list, or a notices cursor from before a demo reset (`noticeEpoch`), with
   `bad_request`.
-- Render reads a JSON number in `values` as its exact source text (`parseJsonWithNumberText` in
-  `src/domain/render/json-number-text.ts`), so `21.90` stays `"21.90"`.
+- Render takes every value in `values` as a JSON string: a JSON number is refused with 422 `invalid_values` and a
+  sentence that says to send `"21.90"` (`validateValues` in `src/domain/render/validate.ts`, [decision
+  0058](../../docs/decisions/0058-render-values-are-strings.md)).
 - Render adds `X-Stencil-Template-Id`, `X-Stencil-Version`, `X-Stencil-Newer-Version` and `X-Stencil-Preview`,
   and a strict CSP on web HTML.
 

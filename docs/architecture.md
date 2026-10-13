@@ -134,8 +134,8 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
    [version-rules.ts](../src/domain/render/version-rules.ts)): Active renders; Superseded renders until its sunset,
    then 410; Revoked is 410; unreleased states are 409.
 3. Channel allowed and enabled (422). The rest is the engine ([engine.ts](../src/server/render/engine.ts)), which
-   needs no database, clock, or request: values valid (422; each at most 1,000 characters, and a JSON number keeps
-   its exact source text), then the document check.
+   needs no database, clock, or request: values valid (422; each a string of at most 1,000 characters, a JSON
+   number refused), then the document check.
 4. Resolve the TipTap JSON to a `RenderDoc` (`src/domain/render`), then a channel adapter renders web HTML, an email,
    or a PDF. A message channel skips the body: `renderMessage` (`src/domain/render/message.ts`, the function the
    browser preview runs too) resolves its fields and renders a push for the requested `platform` or an SMS with the
