@@ -269,8 +269,9 @@ markerFormat, markerDelimiter }`: the numbering style the author chose (null = t
 - **Three ways to insert**, each one undo step: drag a panel row into the text; type `{{` for the
   picker (filter by label or key, spaces allowed; **Create** pinned at the bottom unless the query
   already names a variable; Create turns the picker into the compact form, and Enter creates the
-  variable and inserts its chip); click or Enter on a panel row (inserts at the last caret of the
-  last-focused field, or at the start of the first required section if nothing had focus yet).
+  variable, inserts its chip and gives focus back to the text at once, so the next key lands);
+  click or Enter on a panel row (inserts at the last caret of the last-focused field, or at the
+  start of the first required section if nothing had focus yet).
   Typing `{{key}}` in full also makes a chip. A chip gets a space only where it would touch a word;
   the caret lands right after it.
 - **Panel rows**: type, label, key, uses, Required switch; unused rows are muted. The pencil
