@@ -170,8 +170,8 @@ nothing today and goes at integration. Test hooks reach
 what a serializing database never shows: `hooks({ beforeCompareAndSet })` commits a competing write between a command's
 read and its write, and `runScheduledJobs(at)` runs the backend's sweeps at an instant. Refusals are compared by
 code; the sentence is the BFF's. [contract/agreement.test.ts](contract/agreement.test.ts) compares the fake's and the
-local implementation's reads of the whole seed, field for field: every template's history, and who everyone is and
-every space they may enter.
+local implementation's reads of the whole seed, field for field: every template's history, activity and threads, who
+everyone is and every space they may enter, and everyone's notifications.
 
 To add a case, add it to the area's cases file; its runner runs it against both. One local harness per test file.
 
