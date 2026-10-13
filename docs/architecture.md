@@ -272,6 +272,10 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   Functional specs click at test speed. The whole-demo script (`e2e/demo-script.spec.ts`) and the recording pacing
   are opt-in: `npx playwright test --project=demo` plays the script with a cursor, paced clicks and a video
   ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
+  Specs read and arrange Stencil's data only through `e2e/helpers/state` ([README](../e2e/helpers/state/README.md)):
+  named functions that return records, SQL today and a test endpoint or JDBC when Java owns the data
+  ([decision 0068](decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)). ESLint forbids the
+  database client anywhere else in `e2e/`. Where a screen or `/api/v1` can show a fact, the spec asserts it there.
 - **Golden files:** [src/server/render/golden](../src/server/render/golden/README.md) freezes every channel's
   output for a set of documents and checks that web, email, and PDF show the same content. Any change to render
   output fails `npm test` until it is regenerated with `npm run golden:update` and the diff is read. They are also

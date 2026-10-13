@@ -60,6 +60,9 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 - There is no `@/editor` barrel. Import each export from the module that defines it, and only from the modules the
   editor README's Public API table lists (`EDITOR_PUBLIC_MODULES` in [eslint.config.mjs](eslint.config.mjs) is that
   table; from `@/editor/schema` only `baseExtensions`, `BaseExtensionOptions` and `ensureBlockIds`).
+- `e2e/` reads and changes Stencil's data only through `e2e/helpers/state` (named functions that return records; SQL
+  today, a test endpoint or JDBC when Java owns the data): `@libsql/client`, Drizzle and `@/server/db` are imported only
+  by `e2e/helpers/state/db.ts`. Assert through the UI or `/api/v1` where a screen or the API can show the fact.
 - `"use server"` appears only in `src/server/actions/` (and the simulator's `src/simulator/actions.ts`): server
   actions are for mutations. A read a screen loads on demand is a GET route under
   `src/app/api/templates/[templateId]/`.
