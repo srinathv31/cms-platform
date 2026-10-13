@@ -2,7 +2,6 @@ import type { AccessService } from "../access";
 import type { AuditService } from "../audit";
 import type { CommentService } from "../comments";
 import type { DemoService } from "../demo";
-import type { DraftService } from "../drafts";
 
 import { notMovedArea } from "../not-moved";
 import type { Clock, ImplementationOptions, TestHooks } from "../options";
@@ -11,6 +10,7 @@ import type { RenderService } from "../render";
 import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
+import { fakeDrafts } from "./drafts";
 import { fakeIdentity } from "./identity";
 import { fakeNotifications } from "./notifications";
 import { fakeReview } from "./review";
@@ -52,14 +52,22 @@ export function fakeServices(
     review: fakeReview(deps),
     versions: fakeVersions(deps),
     templates: notMovedArea<TemplateService>("templates"),
-    drafts: notMovedArea<DraftService>("drafts"),
+    drafts: fakeDrafts(deps),
     comments: notMovedArea<CommentService>("comments"),
     access: notMovedArea<AccessService>("access"),
     platform: notMovedArea<PlatformService>("platform"),
     notifications: fakeNotifications(deps),
     audit: notMovedArea<AuditService>("audit"),
     usage: notMovedArea<UsageService>("usage"),
-    render: notMovedArea<RenderService>("render"),
+    // The preview is a read no contract case observes a command through, so the fake doesn't render: the preview
+    // route's tests hand it facts (decision 0072's slim fake).
+    render: {
+      preview: async () => {
+        throw new Error(
+          "The fake doesn't render: test the preview on facts (src/server/services/README.md, The fake).",
+        );
+      },
+    } satisfies RenderService,
     demo: notMovedArea<DemoService>("demo"),
   };
 }

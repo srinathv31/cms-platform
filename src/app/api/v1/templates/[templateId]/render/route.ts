@@ -15,7 +15,7 @@ import {
   readRenderRequest,
   renderSuccessResponse,
 } from "@/server/api/render-http";
-import { renderTemplate } from "@/server/render/render-template";
+import { renderTemplate } from "@/server/services/local/render/render-template";
 
 // POST /api/v1/templates/{templateId}/render: the render API, shaped like the future Java service.
 // The contract (body, headers, every error and its wording) is src/domain/render/types.ts.

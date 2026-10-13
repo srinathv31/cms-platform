@@ -196,8 +196,6 @@ const SEAM_NOT_YET = [
   "src/server/actions/review.ts",
   "src/server/actions/templates.ts",
   "src/server/clock.ts",
-  "src/server/drafts/apply-patch.ts",
-  "src/server/drafts/save-draft.ts",
   "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/activity.ts",
@@ -219,8 +217,6 @@ const SEAM_NOT_YET = [
   "src/server/queries/threads.ts",
   "src/server/queries/usage.ts",
   "src/server/queries/workspace.ts",
-  "src/server/render/log.ts",
-  "src/server/render/render-template.ts",
   "src/server/sunset-sweep.ts",
   "src/server/templates/create.ts",
   "src/server/version-rows.ts",
@@ -244,7 +240,6 @@ const CLOCK_NOT_YET = [
   "src/server/actions/kit.ts",
   "src/server/actions/persona.ts",
   "src/server/api/http.ts",
-  "src/server/drafts/save-draft.ts",
   "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/audit.ts",
@@ -257,7 +252,6 @@ const CLOCK_NOT_YET = [
   "src/server/queries/submit-summary.ts",
   "src/server/queries/usage.ts",
   "src/server/queries/workspace.ts",
-  "src/server/render/render-template.ts",
   "src/server/sunset-sweep.ts",
 ];
 const DECIDES_NOT_YET = [
@@ -270,7 +264,6 @@ const DECIDES_NOT_YET = [
   "src/server/actions/platform.ts",
   "src/server/actions/review.ts",
   "src/server/actions/templates.ts",
-  "src/server/drafts/apply-patch.ts",
   "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/audit.ts",
@@ -287,7 +280,6 @@ const DECIDES_NOT_YET = [
   "src/server/queries/template-access.ts",
   "src/server/queries/usage.ts",
   "src/server/queries/workspace.ts",
-  "src/server/render/render-template.ts",
 ];
 const INTERNALS_NOT_YET = [
   "src/server/actions/demo.ts",

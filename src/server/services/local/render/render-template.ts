@@ -32,13 +32,15 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { findRound } from "@/server/services/local/find-round";
-import { runEngine, type RenderBody } from "./engine";
+import { runEngine } from "@/server/render/engine";
+import type { RenderBody, RenderResult } from "../../render";
 import { writeRenderLog } from "./log";
 
-// The render pipeline behind two routes: POST /api/v1/templates/{templateId}/render (consumers, with
-// `preview: false`) and POST /api/templates/{templateId}/preview (Stencil's own preview, for the
-// signed-in person: the editor, the workspace and the review screen, with `preview: true`). Both come
-// through here, so an approver sees what a customer gets.
+// The render pipeline, the local implementation's: the engine, the document check and the channel adapters it runs
+// are in src/server/render/. Behind two routes: POST /api/v1/templates/{templateId}/render (consumers, with
+// `preview: false`) and POST /api/templates/{templateId}/preview (Stencil's own preview for the signed-in
+// person, through `render.preview` in ../render.ts: the editor, the workspace and the review screen, with
+// `preview: true`). Both come through here, so an approver sees what a customer gets.
 //
 //   0 the target: push needs a platform, no other channel takes one, push and SMS take no encoding
 //     → 400 bad_request (not logged)
@@ -78,22 +80,9 @@ export interface RenderInput {
   viewer: Viewer | null;
 }
 
-export type { RenderBody };
-
-export type RenderResult =
-  | {
-      ok: true;
-      channel: Channel;
-      /** null for the open draft. */
-      versionNumber: number | null;
-      /** The Active version's number when the rendered one is Superseded. */
-      newerVersion: number | null;
-      /** "UC-4F7K2Q-v2.pdf", "UC-4F7K2Q-draft.html", or "UC-4F7K2Q-v3-round-2.pdf" for a labelled preview round. */
-      filename: string;
-      /** pdf: bytes; web: the HTML document; email: subject, preheader, html and text; push and sms: their JSON. */
-      body: RenderBody;
-    }
-  | { ok: false; error: RenderError };
+// What the pipeline answers is the render service's result (src/server/services/render.ts): the preview's
+// answer, and the consumer render's.
+export type { RenderBody, RenderResult };
 
 const EXTENSION: Readonly<Record<Channel, string>> = {
   pdf: "pdf",

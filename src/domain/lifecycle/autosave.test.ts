@@ -1,0 +1,301 @@
+import { describe, expect, it } from "vitest";
+import { REQUEST_REFUSALS } from "../refusals";
+import type { DraftPatch, JSONContent, VersionState } from "../types";
+import {
+  changedFields,
+  draftChanged,
+  draftSaveChanges,
+  draftSaveRefusal,
+  mergeDraftEdit,
+  recordedRev,
+  sessionOwnsRev,
+} from "./autosave";
+import { REFUSALS } from "./refusals";
+
+const t0 = new Date("2026-10-04T10:00:00.000Z");
+const t1 = new Date("2026-10-04T10:00:05.000Z");
+const t2 = new Date("2026-10-04T10:00:09.000Z");
+
+const line = (text: string): JSONContent => ({
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+
+describe("sessionOwnsRev", () => {
+  it("is true when the save is behind and the session's last save produced the current rev", () => {
+    expect(sessionOwnsRev(7, 7, 6)).toBe(true);
+    expect(sessionOwnsRev(7, 7, 0)).toBe(true);
+  });
+
+  it("is false when someone else wrote since", () => {
+    expect(sessionOwnsRev(6, 7, 5)).toBe(false);
+  });
+
+  it("is false when the save is current or ahead", () => {
+    expect(sessionOwnsRev(7, 7, 7)).toBe(false);
+    expect(sessionOwnsRev(7, 7, 8)).toBe(false);
+  });
+
+  it("is false for a session that has saved nothing, or whose record says no rev", () => {
+    expect(sessionOwnsRev(null, 7, 6)).toBe(false);
+  });
+});
+
+describe("recordedRev", () => {
+  it("is the rev a session's row recorded", () => {
+    expect(recordedRev({ saves: 2, rev: 7 })).toBe(7);
+    expect(recordedRev({ rev: 0 })).toBe(0);
+  });
+
+  it("is null for a row with no rev (written before it was recorded), or details that aren't a record", () => {
+    for (const details of [
+      null,
+      undefined,
+      "x",
+      7,
+      [],
+      { saves: 15 },
+      { rev: "7" },
+      { rev: null },
+    ])
+      expect(recordedRev(details)).toBeNull();
+  });
+});
+
+describe("draftSaveRefusal", () => {
+  const draft = (over: Partial<{ state: VersionState; rev: number }> = {}) => ({
+    state: "draft" as VersionState,
+    rev: 5,
+    allowedChannels: ["pdf", "web"] as const,
+    ...over,
+  });
+
+  it("lets a save at the current rev land", () => {
+    expect(draftSaveRefusal(draft(), { rev: 5 }, null)).toBeNull();
+    expect(
+      draftSaveRefusal(draft(), { rev: 5, channels: ["web"] }, null),
+    ).toBeNull();
+  });
+
+  it("refuses version_not_draft once the version has left draft, before anything else", () => {
+    for (const state of [
+      "in_review",
+      "changes_requested",
+      "active",
+      "superseded",
+      "revoked",
+    ] as const)
+      expect(
+        draftSaveRefusal(
+          draft({ state }),
+          { rev: 0, channels: ["email"] },
+          null,
+        ),
+      ).toEqual({ ok: false, ...REQUEST_REFUSALS.versionNotDraft });
+  });
+
+  it("refuses draft_changed with the current rev for a rev behind or ahead", () => {
+    for (const rev of [4, 0, 6, 99])
+      expect(draftSaveRefusal(draft(), { rev }, null)).toEqual({
+        ok: false,
+        ...REQUEST_REFUSALS.draftChanged,
+        rev: 5,
+      });
+  });
+
+  it("lets a save that is behind land when the session's own last save produced the current rev (a lost response)", () => {
+    expect(draftSaveRefusal(draft(), { rev: 3 }, 5)).toBeNull();
+    // Someone wrote after the session's last save, or the save is ahead: a conflict all the same.
+    expect(draftSaveRefusal(draft(), { rev: 3 }, 4)).toMatchObject({
+      code: "draft_changed",
+      rev: 5,
+    });
+    expect(draftSaveRefusal(draft(), { rev: 6 }, 5)).toMatchObject({
+      code: "draft_changed",
+      rev: 5,
+    });
+  });
+
+  it("checks the rev before the channels, and the channels last, a lost response's included", () => {
+    expect(
+      draftSaveRefusal(draft(), { rev: 4, channels: ["email"] }, null),
+    ).toMatchObject({ code: "draft_changed" });
+    expect(
+      draftSaveRefusal(draft(), { rev: 4, channels: ["email"] }, 5),
+    ).toEqual({ ok: false, ...REFUSALS.channelNotAllowed });
+    expect(draftSaveRefusal(draft(), { rev: 5, channels: [] }, null)).toEqual({
+      ok: false,
+      ...REFUSALS.noChannels,
+    });
+  });
+
+  it("draftChanged carries the rev it is given", () => {
+    expect(draftChanged(12)).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.draftChanged,
+      rev: 12,
+    });
+  });
+});
+
+describe("draftSaveChanges", () => {
+  const stored = {
+    channelFields: {
+      email: { subject: line("Hi"), preheader: line("Pre") },
+    },
+    writers: ["maya"],
+  };
+  const patch = (over: Partial<DraftPatch>): DraftPatch => ({
+    rev: 5,
+    sessionKey: "session-1",
+    ...over,
+  });
+
+  it("writes only the fields the patch names, and the saver among the writers", () => {
+    expect(draftSaveChanges(stored, patch({ name: "Renamed" }), "dee")).toEqual(
+      { writers: ["maya", "dee"], name: "Renamed" },
+    );
+    expect(
+      draftSaveChanges(
+        stored,
+        patch({
+          body: line("B"),
+          variables: [],
+          channels: ["pdf"],
+          sampleSets: [],
+        }),
+        "maya",
+      ),
+    ).toEqual({
+      writers: ["maya"],
+      body: line("B"),
+      variables: [],
+      channels: ["pdf"],
+      sampleSets: [],
+    });
+  });
+
+  it("lays the channel fields the patch names over the stored ones: the others are kept, null clears one", () => {
+    expect(
+      draftSaveChanges(stored, patch({ "email.subject": line("New") }), "maya")
+        .channelFields,
+    ).toEqual({ email: { subject: line("New"), preheader: line("Pre") } });
+    expect(
+      draftSaveChanges(stored, patch({ "email.subject": null }), "maya")
+        .channelFields,
+    ).toEqual({ email: { preheader: line("Pre") } });
+    expect(
+      draftSaveChanges(stored, patch({ body: line("B") }), "maya"),
+    ).not.toHaveProperty("channelFields");
+  });
+
+  it("doesn't change what it was given", () => {
+    const snapshot = JSON.stringify(stored);
+    draftSaveChanges(stored, patch({ "email.subject": null }), "dee");
+    expect(JSON.stringify(stored)).toBe(snapshot);
+  });
+});
+
+describe("changedFields", () => {
+  it("lists the provided fields in a fixed order", () => {
+    expect(changedFields({ sampleSets: [], body: {}, name: "A" })).toEqual([
+      "body",
+      "name",
+      "sampleSets",
+    ]);
+  });
+
+  it("counts null (it clears a channel field) but not undefined", () => {
+    expect(
+      changedFields({ "email.subject": null, "email.preheader": undefined }),
+    ).toEqual(["email.subject"]);
+  });
+
+  it("ignores everything that is not a draft field", () => {
+    expect(changedFields({ rev: 3, sessionKey: "abc" } as never)).toEqual([]);
+  });
+});
+
+describe("mergeDraftEdit", () => {
+  it("starts a row at one save", () => {
+    expect(mergeDraftEdit(null, ["body"], t0, 6)).toEqual({
+      at: t0,
+      details: { saves: 1, fields: ["body"], since: t0.toISOString(), rev: 6 },
+    });
+  });
+
+  it("adds a save and unions the fields, in canonical order", () => {
+    const first = mergeDraftEdit(null, ["variables", "body"], t0, 6);
+    const second = mergeDraftEdit(first, ["name", "body"], t1, 7);
+    expect(second.details).toEqual({
+      saves: 2,
+      fields: ["body", "variables", "name"],
+      since: t0.toISOString(),
+      rev: 7,
+    });
+    expect(second.at).toBe(t1);
+
+    const third = mergeDraftEdit(second, ["body"], t2, 8);
+    expect(third.details).toMatchObject({
+      saves: 3,
+      fields: ["body", "variables", "name"],
+      since: t0.toISOString(),
+      rev: 8,
+    });
+    expect(third.at).toBe(t2);
+  });
+
+  it("does not repeat a field", () => {
+    const first = mergeDraftEdit(null, ["body"], t0, 6);
+    expect(mergeDraftEdit(first, ["body"], t1, 7).details.fields).toEqual([
+      "body",
+    ]);
+  });
+
+  it("does not change the row it was given", () => {
+    const first = mergeDraftEdit(null, ["body"], t0, 6);
+    const snapshot = JSON.stringify(first);
+    mergeDraftEdit(first, ["name"], t1, 7);
+    expect(JSON.stringify(first)).toBe(snapshot);
+  });
+
+  it("picks up rows written before fields and since existed", () => {
+    const legacy = { at: t0, details: { saves: 15, basedOn: 1 } };
+    const merged = mergeDraftEdit(legacy, ["body"], t1, 12);
+    expect(merged.details).toEqual({
+      saves: 16,
+      basedOn: 1,
+      fields: ["body"],
+      since: t0.toISOString(),
+      rev: 12,
+    });
+  });
+
+  it("copes with a row whose details are null or garbage", () => {
+    for (const details of [
+      null,
+      "text",
+      7,
+      [],
+      { saves: "many", fields: "all", since: "never" },
+    ]) {
+      const merged = mergeDraftEdit({ at: t0, details }, ["name"], t1, 3);
+      expect(merged.details).toEqual({
+        saves: 2,
+        fields: ["name"],
+        since: t0.toISOString(),
+        rev: 3,
+      });
+    }
+  });
+
+  it("drops field names it does not know", () => {
+    const merged = mergeDraftEdit(
+      { at: t0, details: { saves: 1, fields: ["body", "rev", 5] } },
+      ["name"],
+      t1,
+      3,
+    );
+    expect(merged.details.fields).toEqual(["body", "name"]);
+  });
+});

@@ -1,28 +1,28 @@
 import "server-only";
 import type { DraftPatch, DraftSaveResponse, Viewer } from "@/domain/types";
-import { now } from "@/server/clock";
-import { db } from "@/server/db/client";
-import { accessRefusal, applyDraftPatch } from "./apply-patch";
+import { newId } from "@/server/ids";
+import { services } from "@/server/services";
+import { prepareDraftPatch } from "./prepare-patch";
 
-/**
- * The `version_gone` or permission refusal for this viewer and version, or null when they may save to it.
- * The route asks this before it reads the body.
- */
-export function draftAccessRefusal(viewer: Viewer, versionId: string) {
-  return accessRefusal(db, viewer, versionId);
-}
+// A bridge, not code to copy. Autosave's save runs behind the seam (`DraftService.save`), and the route prepares the
+// patch and calls it with the request's context. This keeps the old signature for the tests plan P1 owns that still
+// save a draft through it (src/server/actions/review.test.ts) until P1 ports them; the integration step (2b-2)
+// deletes the file. It saves as the route does, as `viewer`.
 
-/**
- * Saves an autosave patch to a draft: permission check, state and rev check, the write, and the
- * merged audit row, in one transaction. `patch` must come from `parseDraftPatch`.
- * Returns the contract's response; the route maps a refusal's `code` to an HTTP status.
- */
+/** Prepares the patch and saves it as `viewer`, through `services().drafts.save`. */
 export async function saveDraft(
   viewer: Viewer,
   versionId: string,
   patch: DraftPatch,
 ): Promise<DraftSaveResponse> {
-  // Read the demo clock before the transaction opens: it queries the database on its own connection.
-  const at = await now();
-  return applyDraftPatch(db, { viewer, versionId, patch, at });
+  const prepared = prepareDraftPatch(patch);
+  if (!prepared.ok) return prepared;
+  return services().drafts.save(
+    {
+      viewer,
+      correlationId: newId("req", 12),
+      credential: { kind: "in_process", userId: viewer.userId },
+    },
+    { versionId, patch: prepared.patch },
+  );
 }

@@ -3,7 +3,7 @@ import type { Db } from "@/server/db/client";
 
 // The local backend's write transaction. Every write transaction in the app runs here: the commands
 // (`runCommand` in ./command.ts) and, until they move behind the seam, the legacy server actions
-// (`actions/kit.ts`), autosave (`drafts/apply-patch.ts`), import (`import/create.ts`) and the sweeps. The
+// (`actions/kit.ts`), import (`import/create.ts`) and the sweeps. The
 // effects a transition asks for are written inside it (./effects.ts, ./access-effects.ts), so a transition and
 // its side records land together or not at all.
 

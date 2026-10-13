@@ -21,7 +21,7 @@ import type {
 import { CHANNELS } from "@/domain/types";
 import { baseHeaders } from "@/server/api/http";
 import { readBodyCapped } from "@/server/api/read-body";
-import type { RenderResult } from "@/server/render/render-template";
+import type { RenderResult } from "@/server/services/render";
 
 // What the two routes that render share: the consumer API's (POST /api/v1/templates/{id}/render) and
 // Stencil's own preview (POST /api/templates/{id}/preview). Each reads the same request body (this
