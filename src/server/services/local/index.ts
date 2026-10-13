@@ -5,7 +5,7 @@ import type { CommentService } from "../comments";
 import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
 
-import { notMovedArea } from "../not-moved";
+import { notMovedArea, partlyMovedArea } from "../not-moved";
 import type { ImplementationOptions } from "../options";
 import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
@@ -14,8 +14,11 @@ import type { Services } from "../types";
 import type { UsageService } from "../usage";
 import { now } from "@/server/clock";
 import type { LocalDeps } from "./command";
+import { localAccessReads } from "./access-reads";
+import { localAuditReads } from "./audit";
 import { localIdentity } from "./identity";
 import { localNotifications } from "./notifications";
+import { localPlatformReads } from "./platform-reads";
 import { localReview } from "./review";
 import { localVersions } from "./versions";
 
@@ -36,10 +39,14 @@ export function localServices(options: ImplementationOptions = {}): Services {
     templates: notMovedArea<TemplateService>("templates"),
     drafts: notMovedArea<DraftService>("drafts"),
     comments: notMovedArea<CommentService>("comments"),
-    access: notMovedArea<AccessService>("access"),
-    platform: notMovedArea<PlatformService>("platform"),
+    // The commands of these three areas still run in src/server/actions/ (plan P2); their reads moved (P4b).
+    access: partlyMovedArea<AccessService>("access", localAccessReads(deps)),
+    platform: partlyMovedArea<PlatformService>(
+      "platform",
+      localPlatformReads(deps),
+    ),
     notifications: localNotifications(deps),
-    audit: notMovedArea<AuditService>("audit"),
+    audit: partlyMovedArea<AuditService>("audit", localAuditReads(deps)),
     usage: notMovedArea<UsageService>("usage"),
     render: notMovedArea<RenderService>("render"),
     demo: notMovedArea<DemoService>("demo"),

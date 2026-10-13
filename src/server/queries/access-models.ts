@@ -1,7 +1,7 @@
 // The access, platform-settings, Audit page, bell and sidebar-card view models: what the read models in this folder
 // hand the settings, audit and shell components. They are worded and carry app URLs, so they never cross the
 // service interfaces (decision 0072): a read that moves behind the seam answers facts, and its read model builds
-// these from them. Read models use ISO strings, because they cross into client components. The facts the domain
+// these from them (the settings and audit ones: queries/access.ts, platform.ts and audit.ts). Read models use ISO strings, because they cross into client components. The facts the domain
 // rules take are in src/domain/access-types.ts.
 
 import type {
@@ -124,6 +124,8 @@ export interface AccessRequestsSection {
   team: { id: string; slug: string; name: string };
   pending: AccessRequestRow[]; // oldest first
   decided: AccessRequestRow[]; // last 30 days, newest first
+  /** YYYY-MM-DD: the day the section counts its dates from (the read's `asOf`). */
+  today: string;
 }
 
 export interface RecertItemRow {
@@ -199,6 +201,8 @@ export interface InactivitySection {
   /** Suspended for inactivity (by an admin or automatically), most recent first. */
   suspended: InactivityRow[];
   thresholds: { flagDays: number; suspendDays: number };
+  /** YYYY-MM-DD: the day the section counts its dates from (the read's `asOf`). */
+  today: string;
 }
 
 // ── Read models: Settings, Platform group ────────────────────────────────────
@@ -321,7 +325,7 @@ export interface AuditOption {
 export interface AuditPageData {
   space: { slug: string; isAll: boolean; name: string };
   rows: AuditRow[];
-  /** Matching rows before the page limit (rows holds at most AUDIT_PAGE_LIMIT). */
+  /** Matching rows before the page limit (rows holds at most `AUDIT_PAGE_LIMIT`, src/domain/audit.ts). */
   total: number;
   applied: AuditFilters;
   /**
@@ -350,8 +354,6 @@ export interface AuditPageData {
   csvHref: string;
   today: string;
 }
-
-export const AUDIT_PAGE_LIMIT = 500;
 
 // ── Notifications (the bell) ─────────────────────────────────────────────────
 

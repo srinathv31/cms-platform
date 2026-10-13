@@ -13,6 +13,21 @@ export function notMoved(
   };
 }
 
+/** An area some of whose methods have moved: those are `moved`, every other method is `notMoved`. */
+export function partlyMovedArea<T extends object>(
+  area: string,
+  moved: Partial<T>,
+): T {
+  return new Proxy({} as T, {
+    get: (_, method) =>
+      typeof method !== "string"
+        ? undefined
+        : method in moved
+          ? (moved as Record<string, unknown>)[method]
+          : notMoved(`${area}.${method}`),
+  });
+}
+
 /** An area none of whose methods has moved: every method is `notMoved`. */
 export function notMovedArea<T extends object>(area: string): T {
   return new Proxy({} as T, {

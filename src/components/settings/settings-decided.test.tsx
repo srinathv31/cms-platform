@@ -435,6 +435,7 @@ describe("Inactivity", () => {
     flagged: [row],
     suspended: [],
     thresholds: { flagDays: 90, suspendDays: 120 },
+    today: TODAY,
   });
 
   it("says Kept active only when the read model says the sweep held them, whatever the day count", async () => {
@@ -494,7 +495,6 @@ describe("Recertification", () => {
         kept: 0,
         removed: 0,
         pending: items.length,
-        label: "",
       },
       items,
       lapsed: [],
