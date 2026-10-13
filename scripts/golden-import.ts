@@ -30,6 +30,7 @@ import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { contentTypeFamily, familyChannels } from "@/domain/types";
+import { fileUrlOfPath } from "@/lib/file-url";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { findRound } from "@/server/queries/find-round";
@@ -52,7 +53,9 @@ async function main() {
     throw new Error(`The version must be a number or "draft". ${USAGE}`);
 
   const dir = mkdtempSync(path.join(tmpdir(), "golden-import-"));
-  const client = createClient({ url: `file:${path.join(dir, "seed.db")}` });
+  const client = createClient({
+    url: fileUrlOfPath(path.join(dir, "seed.db")),
+  });
   try {
     const db = drizzle(client, { schema }) as unknown as Db;
     await migrate(drizzle(client, { schema }), {

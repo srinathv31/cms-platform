@@ -15,6 +15,7 @@ import type {
   Variable,
   Viewer,
 } from "@/domain/types";
+import { fileUrlOfPath } from "@/lib/file-url";
 import { createAppClient } from "@/lib/serialized-writes";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -141,7 +142,7 @@ async function seed() {
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "ucomp-drafts-"));
   // Opened as the app opens its database: two saves at once take turns rather than collide.
-  client = createAppClient({ url: `file:${join(dir, "drafts.db")}` });
+  client = createAppClient({ url: fileUrlOfPath(join(dir, "drafts.db")) });
   db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
 }, 30_000);

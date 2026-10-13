@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient, type Client } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fileUrlOfPath } from "@/lib/file-url";
 import {
   createAppClient,
   serializeWrites,
@@ -19,7 +20,7 @@ const open = (client: Client) => (opened.push(client), client);
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "ucomp-serialized-writes-"));
-  url = `file:${join(dir, "test.db")}`;
+  url = fileUrlOfPath(join(dir, "test.db"));
   const setup = createClient({ url });
   await setup.execute("CREATE TABLE t (x INTEGER)");
   setup.close();
