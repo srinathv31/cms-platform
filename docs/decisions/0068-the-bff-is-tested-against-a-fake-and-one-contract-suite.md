@@ -1,6 +1,7 @@
 # 0068. The BFF is tested against a fake, and one contract suite runs against every implementation
 
 Status: Accepted
+Amended 2026-10-12: the e2e helper is the folder `e2e/helpers/state/`, not one `state.ts`; its README lists what a Java implementation provides, and ESLint allows the database client only in `e2e/helpers/state/db.ts`.
 Date: 2026-10-12
 
 ## Context

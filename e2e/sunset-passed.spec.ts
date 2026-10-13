@@ -1,17 +1,16 @@
-import type { Client } from "@libsql/client";
 import type { ApiNoticeList } from "@/contracts/api-v1";
 import { sunsetDay } from "@/domain/business-zone";
-import { openDb } from "./api/helpers";
 import { switchPersona } from "./helpers/access";
 import {
+  Changes,
   TEAM,
-  restore,
-  rows,
-  run,
-  takeSnapshot,
-  type Row,
-  type Snapshot,
-} from "./helpers/golive";
+  auditEvents,
+  clockOffsetDays,
+  consumerIds,
+  consumerNotices,
+  findVersion,
+  renderLog,
+} from "./helpers/state";
 import { asPersona, expect, hydrated, test } from "./helpers/scenario";
 
 // A sunset that has passed is final (handoff review D2): the version has stopped rendering, and a new date
@@ -37,107 +36,35 @@ const NY = "America/New_York";
 /** The personas the test switches to through the app; each switch stamps their sign-in time. */
 const SWITCHED = ["alex", "jordan"];
 
-let db: Client;
-let snapshot: Snapshot | undefined;
+const changes = new Changes();
 let templateId = "";
 let sunsetAt = 0;
-let passedBefore = new Set<string>();
-let noticesBefore = new Set<string>();
-let lastActiveBefore: Row[] = [];
 
 test.beforeAll(async () => {
-  db = openDb();
-  const [v1] = await rows(
-    db,
-    `SELECT v.template_id, v.sunset_at FROM versions v JOIN templates t ON t.id = v.template_id
-     WHERE t.team_id = ? AND v.name = ? AND v.number = 1 AND v.state = 'superseded'`,
-    [TEAM, NAME],
-  );
-  if (!v1?.sunset_at)
+  const v1 = await findVersion({
+    teamSlug: TEAM,
+    name: NAME,
+    number: 1,
+    state: "superseded",
+  });
+  if (!v1?.sunsetAt)
     throw new Error(
       "The seed has no Balance Transfer v1 (Superseded, with a sunset). Run npm run db:reset.",
     );
-  templateId = String(v1.template_id);
-  sunsetAt = Number(v1.sunset_at);
+  templateId = v1.templateId;
+  sunsetAt = v1.sunsetAt;
 
-  passedBefore = new Set(
-    (
-      await rows(
-        db,
-        "SELECT id FROM audit_events WHERE action = 'version.sunset_passed'",
-      )
-    ).map((r) => String(r.id)),
-  );
-  noticesBefore = new Set(
-    (
-      await rows(
-        db,
-        "SELECT id FROM consumer_notices WHERE kind = 'sunset_passed'",
-      )
-    ).map((r) => String(r.id)),
-  );
-  lastActiveBefore = await rows(
-    db,
-    `SELECT id, last_active_at FROM users WHERE id IN (${SWITCHED.map(() => "?").join(", ")})`,
-    SWITCHED,
-  );
-  snapshot = await takeSnapshot(db);
-  const current =
-    snapshot.clock === null ? 0 : Number(JSON.parse(snapshot.clock));
+  // What the run writes: the sweep's audit rows and notices (with any read marks on them), the sign-in time the
+  // persona switch stamps, and the clock this moves.
+  await changes.watchAuditEvents("version.sunset_passed");
+  await changes.watchConsumerNotices("sunset_passed");
+  await changes.watchSignIns(SWITCHED);
   const past = Math.ceil((sunsetAt - Date.now()) / DAY) + 1;
-  await run(
-    db,
-    "INSERT INTO settings (key, value) VALUES ('clock_offset_days', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    [String(Math.max(current, past))],
-  );
+  await changes.setClockOffsetDays(Math.max(await clockOffsetDays(), past));
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  // Every step runs, whatever failed before it; the first failure is reported at the end.
-  const problems: unknown[] = [];
-  const attempt = async (step: () => Promise<void>) => {
-    try {
-      await step();
-    } catch (error) {
-      problems.push(error);
-    }
-  };
-  await attempt(async () => {
-    if (snapshot) await restore(db, snapshot);
-  });
-  await attempt(async () => {
-    const written = (
-      await rows(
-        db,
-        "SELECT id FROM audit_events WHERE action = 'version.sunset_passed'",
-      )
-    ).filter((r) => !passedBefore.has(String(r.id)));
-    for (const r of written)
-      await run(db, "DELETE FROM audit_events WHERE id = ?", [r.id]);
-  });
-  await attempt(async () => {
-    const sent = (
-      await rows(
-        db,
-        "SELECT id FROM consumer_notices WHERE kind = 'sunset_passed'",
-      )
-    ).filter((r) => !noticesBefore.has(String(r.id)));
-    for (const r of sent) {
-      await run(db, "DELETE FROM sim_notice_reads WHERE notice_id = ?", [r.id]);
-      await run(db, "DELETE FROM consumer_notices WHERE id = ?", [r.id]);
-    }
-  });
-  await attempt(async () => {
-    for (const u of lastActiveBefore)
-      await run(db, "UPDATE users SET last_active_at = ? WHERE id = ?", [
-        u.last_active_at ?? null,
-        u.id ?? null,
-      ]);
-  });
-  db.close();
-  if (problems.length > 0) throw problems[0];
-});
+// Every step runs, whatever failed before it; the first failure is reported at the end.
+test.afterAll(() => changes.undo());
 
 test("once v1's sunset has passed, Change sunset stays in place, disabled, with the reason", async ({
   page,
@@ -199,12 +126,10 @@ test("once v1's sunset has passed, Change sunset stays in place, disabled, with 
   await change.click({ force: true });
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  const [after] = await rows(
-    db,
-    "SELECT state, sunset_at FROM versions WHERE template_id = ? AND number = 1",
-    [templateId],
-  );
-  expect(after).toMatchObject({ state: "superseded", sunset_at: sunsetAt });
+  expect(await findVersion({ templateId, number: 1 })).toMatchObject({
+    state: "superseded",
+    sunsetAt,
+  });
 
   // The Usage tab's consumers read v1 the same way (a render the version no longer serves can't wait on a date).
   await page.goto(`/${TEAM}/templates/${templateId}/usage`);
@@ -224,24 +149,10 @@ test("a persona switch records v1's passed sunset once, Activity says it stopped
   page,
 }) => {
   const others = async () =>
-    (
-      await rows(
-        db,
-        "SELECT COUNT(*) AS n FROM audit_events WHERE action <> 'version.sunset_passed'",
-      )
-    )[0]!.n;
+    (await auditEvents({ notAction: "version.sunset_passed" })).length;
   const recorded = () =>
-    rows(
-      db,
-      "SELECT * FROM audit_events WHERE action = 'version.sunset_passed' AND template_id = ?",
-      [templateId],
-    );
-  const notices = () =>
-    rows(
-      db,
-      "SELECT * FROM consumer_notices WHERE kind = 'sunset_passed' AND template_id = ? ORDER BY seq",
-      [templateId],
-    );
+    auditEvents({ templateId, action: "version.sunset_passed" });
+  const notices = () => consumerNotices({ templateId, kind: "sunset_passed" });
   const before = await others();
   expect(
     await recorded(),
@@ -249,20 +160,17 @@ test("a persona switch records v1's passed sunset once, Activity says it stopped
   ).toEqual([]);
   expect(await notices(), "nor tells a consumer").toEqual([]);
   // Who hears of it: the consumers with a non-preview render of the template from 90 days before the sunset on.
-  const audience = (
-    await rows(
-      db,
-      `SELECT DISTINCT r.consumer_id FROM render_log r JOIN consumers c ON c.id = r.consumer_id
-       WHERE r.template_id = ? AND r.is_preview = 0 AND r.at >= ? ORDER BY r.consumer_id`,
-      [templateId, sunsetAt - 90 * DAY],
-    )
-  ).map((r) => String(r.consumer_id));
+  const registered = new Set(await consumerIds());
+  const audience = [
+    ...new Set(
+      (await renderLog({ templateId, isPreview: false }))
+        .filter((r) => r.at >= sunsetAt - 90 * DAY)
+        .map((r) => r.consumerId)
+        .filter((id): id is string => id !== null && registered.has(id)),
+    ),
+  ].sort();
   expect(audience, "Coral renders Balance Transfer").toContain("coral");
-  const [active] = await rows(
-    db,
-    "SELECT number FROM versions WHERE template_id = ? AND state = 'active'",
-    [templateId],
-  );
+  const active = await findVersion({ templateId, state: "active" });
 
   await asPersona(page, "jordan");
   await page.goto(`/${TEAM}/templates/${templateId}/activity`);
@@ -276,9 +184,9 @@ test("a persona switch records v1's passed sunset once, Activity says it stopped
   const day = sunsetDay(new Date(sunsetAt), NY);
   await expect.poll(async () => (await recorded()).length).toBe(1);
   const [row] = await recorded();
-  expect(row).toMatchObject({ actor_id: null, team_id: TEAM });
-  expect(Number(row!.at), "dated at the sunset").toBe(sunsetAt);
-  expect(JSON.parse(String(row!.details))).toEqual({
+  expect(row).toMatchObject({ actorId: null, teamId: TEAM });
+  expect(row!.at, "dated at the sunset").toBe(sunsetAt);
+  expect(row!.details).toEqual({
     number: 1,
     sunsetAt: new Date(sunsetAt).toISOString(),
     sunsetDay: day,
@@ -307,22 +215,22 @@ test("a persona switch records v1's passed sunset once, Activity says it stopped
   // The same sweep told each consumer once: created when it ran (after the sunset), with the instant, the day
   // and the zone, and the version to move to.
   const sent = await notices();
-  expect(sent.map((n) => String(n.consumer_id)).sort()).toEqual(audience);
+  expect(sent.map((n) => n.consumerId).sort()).toEqual(audience);
   const payload = {
     templateName: NAME,
     versionNumber: 1,
-    activeVersion: active ? Number(active.number) : null,
+    activeVersion: active?.number ?? null,
     sunsetAt: new Date(sunsetAt).toISOString(),
     sunsetDay: day,
     zone: NY,
   };
   for (const n of sent) {
-    expect(n).toMatchObject({ kind: "sunset_passed", template_id: templateId });
+    expect(n).toMatchObject({ kind: "sunset_passed", templateId });
     expect(
-      Number(n.created_at),
+      n.createdAt,
       "written when the sweep ran, not backdated",
     ).toBeGreaterThan(sunsetAt);
-    expect(JSON.parse(String(n.payload))).toEqual(payload);
+    expect(n.payload).toEqual(payload);
   }
 
   // The notices API serves it to Coral as the newest notice about the template.

@@ -1,7 +1,4 @@
-import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import {
   channelControl,
   expectViewed,
@@ -10,6 +7,13 @@ import {
   reviewTabs,
 } from "./helpers/review";
 import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
+import {
+  Changes,
+  addVersionLike,
+  auditEvents,
+  findVersion,
+  removeTemplate,
+} from "./helpers/state";
 
 // An approver views every output before approving (decision 0037). Approve waits until each output of the
 // round has rendered on the approver's screen in the Preview: each channel, and Push on both phones. It is
@@ -57,63 +61,34 @@ const UNDRAWABLE = {
   name: "Viewed outputs — Undrawable PDF",
 };
 
-let db: Client;
-const made: string[] = [];
+const changes = new Changes();
 
 test.beforeAll(async () => {
-  db = openDb();
   // A run that died half way leaves its copies: start clean.
   for (const id of [DOCUMENT.id, ALERT.id, REFUSED.id, UNDRAWABLE.id])
-    await removeTemplate(db, id);
+    await removeTemplate(id);
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    for (const id of made) await removeTemplate(db, id);
-  } finally {
-    db.close();
-  }
-});
-
-async function insert(
-  table: "templates" | "versions",
-  row: Record<string, InValue>,
-) {
-  const columns = Object.keys(row);
-  await rowsOf(
-    db,
-    `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
-    columns.map((c) => row[c]),
-  );
-}
+// Removes the copies the tests made, with everything the approvals wrote for them.
+test.afterAll(() => changes.undo());
 
 /** A seeded round in review, copied as the first version of a template of its own, waiting on its first stage. */
 async function copyInReview(copy: { id: string; from: string; name: string }) {
-  const [version] = await rowsOf(
-    db,
-    "SELECT * FROM versions WHERE name = ? AND state = 'in_review'",
-    [copy.from],
-  );
+  const version = await findVersion({ name: copy.from, state: "in_review" });
   expect(version, `the seed has ${copy.from} in review`).toBeTruthy();
-  const [template] = await rowsOf(db, "SELECT * FROM templates WHERE id = ?", [
-    version!.template_id,
-  ]);
-  await insert("templates", { ...template!, id: copy.id });
-  made.push(copy.id);
-  await insert("versions", {
-    ...version!,
+  await changes.addTemplateLike(version!.templateId, { id: copy.id });
+  await addVersionLike(version!, {
     id: `ver_e2e_${copy.id}`,
-    template_id: copy.id,
+    templateId: copy.id,
     name: copy.name,
     number: 1,
     round: 1,
-    based_on_version_id: null,
-    contract_changes: null,
-    current_stage: 0,
-    submitted_by: "maya",
-    created_by: "maya",
-    writers: JSON.stringify(["maya"]),
+    basedOnVersionId: null,
+    contractChanges: null,
+    currentStage: 0,
+    submittedBy: "maya",
+    createdBy: "maya",
+    writers: ["maya"],
   });
 }
 
@@ -161,12 +136,11 @@ async function approve(page: Page) {
 }
 
 async function auditedOutputs(templateId: string): Promise<unknown> {
-  const [row] = await rowsOf(
-    db,
-    "SELECT details FROM audit_events WHERE template_id = ? AND action = 'version.activated'",
-    [templateId],
-  );
-  return JSON.parse(String(row!.details)).outputsViewed;
+  const [event] = await auditEvents({
+    templateId,
+    action: "version.activated",
+  });
+  return event!.details!.outputsViewed;
 }
 
 test("a document: Approve waits until PDF and Web have rendered on screen, and the approval records them", async ({

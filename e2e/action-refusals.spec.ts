@@ -1,17 +1,11 @@
-import { randomUUID } from "node:crypto";
-import type { Client } from "@libsql/client";
-import { openDb } from "./api/helpers";
-import {
-  SPRING_NAME,
-  TEAM,
-  createSpringTravel,
-  removeTemplate,
-  rows,
-  run,
-  type Row,
-  type SpringFixture,
-} from "./helpers/golive";
+import { SPRING_NAME, TEAM, type SpringFixture } from "./helpers/golive";
 import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
+import {
+  Changes,
+  addVersionLike,
+  findVersions,
+  versionById,
+} from "./helpers/state";
 
 // A refusal an action used to throw now shows its sentence (handoff review A3, H1). Edit threw the
 // domain's refusal, so the person saw "Couldn't open a draft. Try again." whatever the reason was.
@@ -25,51 +19,33 @@ import { asPersona, expect, hydrated, tap, test } from "./helpers/scenario";
 
 const REFUSAL = "A newer version is in review.";
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 /** v3, In review: a copy of v2 submitted after it. */
 async function submitV3(spring: SpringFixture) {
-  const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
-    spring.v2Id,
-  ]);
+  const v2 = await versionById(spring.v2Id);
   const at = Date.now();
-  const v3: Row = {
-    ...v2,
-    id: `v_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
+  await addVersionLike(v2!, {
     number: 3,
     round: 1,
     state: "in_review",
-    based_on_version_id: spring.v2Id,
-    current_stage: 0,
+    basedOnVersionId: spring.v2Id,
+    currentStage: 0,
     rev: 0,
-    created_at: at,
-    updated_at: at,
-    submitted_by: "priya",
-    submitted_at: at,
-    writers: JSON.stringify(["priya"]),
-    activated_at: null,
-  };
-  const columns = Object.keys(v3);
-  await run(
-    db,
-    `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
-    columns.map((c) => v3[c]),
-  );
+    createdAt: at,
+    updatedAt: at,
+    submittedBy: "priya",
+    submittedAt: at,
+    writers: ["priya"],
+    activatedAt: null,
+  });
 }
 
 test("Edit refused because a newer version went into review shows the domain's sentence", async ({
@@ -104,10 +80,6 @@ test("Edit refused because a newer version went into review shows the domain's s
     `/${TEAM}/templates/${spring.templateId}`,
   );
   expect(
-    await rows(
-      db,
-      "SELECT id FROM versions WHERE template_id = ? AND state = 'draft'",
-      [spring.templateId],
-    ),
+    await findVersions({ templateId: spring.templateId, state: "draft" }),
   ).toEqual([]);
 });

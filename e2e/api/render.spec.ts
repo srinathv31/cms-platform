@@ -1,26 +1,31 @@
-import type { Client } from "@libsql/client";
 import { expect, test } from "@playwright/test";
 import { sunsetDay, sunsetInstant } from "@/domain/business-zone";
 import {
+  allVersions,
+  consumerIds,
+  contentType,
+  demoNow,
+  renderLogFields,
+  renderLogFor,
+  renderLogRowsContaining,
+  withAllowedChannels,
+  withVersion,
+} from "../helpers/state";
+import {
   JUNK,
   LABEL,
-  LOG_COLUMNS,
+  LOG_FIELDS,
   NOUNS,
-  allVersions,
   andList,
   asPersona,
   correlation,
-  demoNow,
   expectError,
   isDocument,
-  logFor,
   longDate,
-  openDb,
   pick,
   postChunked,
   render,
   validValues,
-  withTemporarily,
   type Channel,
   type SeedVersion,
   type Variable,
@@ -49,20 +54,10 @@ import {
 const ALL_CHANNELS: readonly Channel[] = ["pdf", "web", "email"];
 const SENTINEL_TEXT = "Zyxwvut-Sentinel";
 
-let db: Client;
-
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(() => {
-  db.close();
-});
-
 // ── Finding things ───────────────────────────────────────────────────────────
 
 /** The documents' versions: the rules below are checked on PDF, Web and Email. Alerts are at the end. */
-const versions = async () => (await allVersions(db)).filter(isDocument);
+const versions = async () => (await allVersions()).filter(isDocument);
 
 const rendersTo = (channel: Channel) => (v: SeedVersion) =>
   v.state === "active" && v.channels.includes(channel);
@@ -175,9 +170,7 @@ test.describe("each channel's content type", () => {
     request,
   }) => {
     const v = await activeEverywhere();
-    const consumers = (await db.execute("SELECT id FROM consumers")).rows.map(
-      (r) => String(r.id),
-    );
+    const consumers = await consumerIds();
     expect(consumers.length).toBeGreaterThan(1);
     for (const consumer of consumers) {
       const { res } = await render(request, {
@@ -220,7 +213,7 @@ test.describe("headers", () => {
     }
     expect(ids[0]).not.toBe(ids[1]);
     // The generated id is the one in the log.
-    expect(await logFor(db, ids[0])).toHaveLength(1);
+    expect(await renderLogFor(ids[0])).toHaveLength(1);
   });
 
   test("an id that is too long is not echoed; a fresh one is generated", async ({
@@ -688,10 +681,10 @@ test.describe("values", () => {
       invalid: [{ key: text.key, expected: "text", maxLength: 1000 }],
     });
     expect(JSON.stringify(error)).not.toContain(SENTINEL_TEXT);
-    expect(await logFor(db, cid)).toEqual([
+    expect(await renderLogFor(cid)).toEqual([
       expect.objectContaining({
         outcome: "error",
-        error_code: "invalid_values",
+        errorCode: "invalid_values",
       }),
     ]);
   });
@@ -750,52 +743,46 @@ test.describe("channels", () => {
       "Active version without email",
       (x) => x.state === "active" && !x.channels.includes("email"),
     );
-    const contentType = (
-      await db.execute("SELECT id FROM content_types WHERE key = 'disclosure'")
-    ).rows[0];
-    expect(contentType, "the disclosure content type").toBeTruthy();
+    expect(
+      await contentType("disclosure"),
+      "the disclosure content type",
+    ).toBeTruthy();
 
-    await withTemporarily(
-      db,
-      "content_types",
-      String(contentType.id),
-      { allowed_channels: JSON.stringify(["pdf", "web"]) },
-      async () => {
-        // The version has email on; the content type no longer does.
-        const blocked = await render(request, {
+    await withAllowedChannels("disclosure", ["pdf", "web"], async () => {
+      // The version has email on; the content type no longer does.
+      const blocked = await render(request, {
+        templateId: v.templateId,
+        body: bodyFor(v, "email"),
+      });
+      const error = await expectError(
+        blocked.res,
+        422,
+        "channel_not_allowed",
+        "Disclosures don't render to Email.",
+      );
+      expect(error.details).toEqual({ channel: "email" });
+
+      // A version that never had email on: still channel_not_allowed, because the content type is checked first.
+      const never = await render(request, {
+        templateId: without.templateId,
+        body: bodyFor(without, "email"),
+      });
+      await expectError(
+        never.res,
+        422,
+        "channel_not_allowed",
+        "Disclosures don't render to Email.",
+      );
+
+      // The channels it still allows are untouched.
+      for (const channel of ["pdf", "web"] as const) {
+        const ok = await render(request, {
           templateId: v.templateId,
-          body: bodyFor(v, "email"),
+          body: bodyFor(v, channel),
         });
-        const error = await expectError(
-          blocked.res,
-          422,
-          "channel_not_allowed",
-          "Disclosures don't render to Email.",
-        );
-        expect(error.details).toEqual({ channel: "email" });
-
-        // A version that never had email on: still channel_not_allowed, because the content type is checked first.
-        const never = await render(request, {
-          templateId: without.templateId,
-          body: bodyFor(without, "email"),
-        });
-        await expectError(
-          never.res,
-          422,
-          "channel_not_allowed",
-          "Disclosures don't render to Email.",
-        );
-
-        // The channels it still allows are untouched.
-        for (const channel of ["pdf", "web"] as const) {
-          const ok = await render(request, {
-            templateId: v.templateId,
-            body: bodyFor(v, channel),
-          });
-          expect(ok.res.status(), channel).toBe(200);
-        }
-      },
-    );
+        expect(ok.res.status(), channel).toBe(200);
+      }
+    });
 
     // Put back.
     const after = await render(request, {
@@ -831,7 +818,7 @@ test.describe("version rules for consumers", () => {
   test("a Superseded version that isn't past its sunset still renders, and names the Active version", async ({
     request,
   }) => {
-    const at = await demoNow(db);
+    const at = await demoNow();
     const superseded = (await versions()).filter(
       (v) =>
         v.state === "superseded" &&
@@ -860,7 +847,7 @@ test.describe("version rules for consumers", () => {
   test("the same on the email channel: the JSON has newerVersion", async ({
     request,
   }) => {
-    const at = await demoNow(db);
+    const at = await demoNow();
     const v = pick(
       await versions(),
       "Superseded version that hasn't sunset",
@@ -870,31 +857,25 @@ test.describe("version rules for consumers", () => {
         (x.sunsetAt === null || x.sunsetAt > at),
     );
     // The seed's Superseded versions don't have Email on; turn it on for this test.
-    await withTemporarily(
-      db,
-      "versions",
-      v.id,
-      { channels: JSON.stringify(["pdf", "web", "email"]) },
-      async () => {
-        const { res } = await render(request, {
-          templateId: v.templateId,
-          body: bodyFor(v, "email"),
-        });
-        expect(res.status()).toBe(200);
-        expect(res.headers()["x-stencil-newer-version"]).toBe(
-          String(v.activeNumber),
-        );
-        const body = await res.json();
-        expect(body.newerVersion).toBe(v.activeNumber);
-        expect(typeof body.subject).toBe("string");
-      },
-    );
+    await withVersion(v.id, { channels: ["pdf", "web", "email"] }, async () => {
+      const { res } = await render(request, {
+        templateId: v.templateId,
+        body: bodyFor(v, "email"),
+      });
+      expect(res.status()).toBe(200);
+      expect(res.headers()["x-stencil-newer-version"]).toBe(
+        String(v.activeNumber),
+      );
+      const body = await res.json();
+      expect(body.newerVersion).toBe(v.activeNumber);
+      expect(typeof body.subject).toBe("string");
+    });
   });
 
   test("a Superseded version past its sunset is a 410 version_sunset", async ({
     request,
   }) => {
-    const at = await demoNow(db);
+    const at = await demoNow();
     // A sunset the seed already passed, when it has one. The message names its day in the business
     // time zone (Eastern, the default).
     const seeded = (await versions()).filter(
@@ -925,31 +906,25 @@ test.describe("version rules for consumers", () => {
         x.sunsetAt === null,
     );
     const sunset = sunsetInstant("2020-03-01", "America/New_York").getTime();
-    await withTemporarily(
-      db,
-      "versions",
-      v.id,
-      { sunset_at: sunset },
-      async () => {
-        const { res } = await render(request, {
-          templateId: v.templateId,
-          body: bodyFor(v, v.channels[0]),
-        });
-        const error = await expectError(
-          res,
-          410,
-          "version_sunset",
-          `Version ${v.number} was sunset on March 1, 2020. Version ${v.activeNumber} is active.`,
-        );
-        expect(error.details).toEqual({
-          version: v.number,
-          activeVersion: v.activeNumber,
-          at: "2020-03-01T05:00:00.000Z",
-          sunsetDay: "2020-03-01",
-          zone: "America/New_York",
-        });
-      },
-    );
+    await withVersion(v.id, { sunsetAt: sunset }, async () => {
+      const { res } = await render(request, {
+        templateId: v.templateId,
+        body: bodyFor(v, v.channels[0]),
+      });
+      const error = await expectError(
+        res,
+        410,
+        "version_sunset",
+        `Version ${v.number} was sunset on March 1, 2020. Version ${v.activeNumber} is active.`,
+      );
+      expect(error.details).toEqual({
+        version: v.number,
+        activeVersion: v.activeNumber,
+        at: "2020-03-01T05:00:00.000Z",
+        sunsetDay: "2020-03-01",
+        zone: "America/New_York",
+      });
+    });
   });
 
   test("a revoked version is a 410 version_revoked that gives the date and the Active version", async ({
@@ -1339,7 +1314,7 @@ test.describe("consumers only", () => {
         });
         expect(res.headers()["x-stencil-preview"], what).toBeUndefined();
         expect(
-          await logFor(db, cid),
+          await renderLogFor(cid),
           `${what}: refused before it is logged`,
         ).toHaveLength(0);
       }
@@ -1365,7 +1340,7 @@ test.describe("consumers only", () => {
         "consumer_required",
         "X-Consumer-Id is required.",
       );
-      expect(await logFor(db, cid)).toHaveLength(0);
+      expect(await renderLogFor(cid)).toHaveLength(0);
     });
   });
 
@@ -1393,11 +1368,11 @@ test.describe("consumers only", () => {
         });
         await expectError(res, 409, "version_not_released");
         expect(res.headers()["x-stencil-preview"]).toBeUndefined();
-        expect((await logFor(db, cid))[0]).toMatchObject({
-          is_preview: 0,
-          consumer_id: "coral",
+        expect((await renderLogFor(cid))[0]).toMatchObject({
+          isPreview: false,
+          consumerId: "coral",
           outcome: "error",
-          error_code: "version_not_released",
+          errorCode: "version_not_released",
         });
       }
     });
@@ -1420,22 +1395,22 @@ test.describe("render_log", () => {
         body: bodyFor(v, channel),
       });
       expect(res.status(), channel).toBe(200);
-      const rows = await logFor(db, cid);
+      const rows = await renderLogFor(cid);
       expect(rows, channel).toHaveLength(1);
       expect(rows[0], channel).toMatchObject({
-        template_id: v.templateId,
-        version_id: v.id,
-        version_number: v.number,
-        consumer_id: "deposits-online",
+        templateId: v.templateId,
+        versionId: v.id,
+        versionNumber: v.number,
+        consumerId: "deposits-online",
         channel,
         platform: null,
-        is_preview: 0,
-        correlation_id: cid,
+        isPreview: false,
+        correlationId: cid,
         outcome: "ok",
-        error_code: null,
+        errorCode: null,
       });
-      expect(Number(rows[0].duration_ms), channel).toBeGreaterThanOrEqual(0);
-      expect(Number(rows[0].at), channel).toBeGreaterThan(0);
+      expect(rows[0]!.durationMs, channel).toBeGreaterThanOrEqual(0);
+      expect(rows[0]!.at, channel).toBeGreaterThan(0);
     }
   });
 
@@ -1518,16 +1493,16 @@ test.describe("render_log", () => {
         body: c.body,
       });
       await expectError(res, c.status, c.code);
-      const rows = await logFor(db, cid);
+      const rows = await renderLogFor(cid);
       expect(rows, c.what).toHaveLength(1);
       expect(rows[0], c.what).toMatchObject({
-        template_id: c.version.templateId,
-        version_id: c.version.id,
-        version_number: c.version.number,
-        consumer_id: "coral",
-        is_preview: 0,
+        templateId: c.version.templateId,
+        versionId: c.version.id,
+        versionNumber: c.version.number,
+        consumerId: "coral",
+        isPreview: false,
         outcome: "error",
-        error_code: c.code,
+        errorCode: c.code,
       });
     }
   });
@@ -1597,15 +1572,12 @@ test.describe("render_log", () => {
       const cid = correlation("log-none");
       const { res } = await render(request, { ...call, correlationId: cid });
       expect(res.status(), what).toBeGreaterThanOrEqual(400);
-      expect(await logFor(db, cid), what).toHaveLength(0);
+      expect(await renderLogFor(cid), what).toHaveLength(0);
     }
   });
 
   test("the table has exactly the expected columns, and none for values", async () => {
-    const { rows } = await db.execute("PRAGMA table_info(render_log)");
-    expect(rows.map((r) => String(r.name)).sort()).toEqual(
-      [...LOG_COLUMNS].sort(),
-    );
+    expect((await renderLogFields()).sort()).toEqual([...LOG_FIELDS].sort());
   });
 
   test("no variable value, raw or formatted, is ever in render_log", async ({
@@ -1788,10 +1760,10 @@ test.describe("render_log", () => {
 
     // Every row these requests wrote: one each, with exactly the expected columns, and no sentinel in any of them.
     for (const { what, cid } of sent) {
-      const rows = await logFor(db, cid);
+      const rows = await renderLogFor(cid);
       expect(rows, `${what}: one row`).toHaveLength(1);
       expect(Object.keys(rows[0]).sort(), `${what}: the columns`).toEqual(
-        [...LOG_COLUMNS].sort(),
+        [...LOG_FIELDS].sort(),
       );
       const everything = JSON.stringify(Object.values(rows[0]));
       for (const sentinel of SENTINELS) {
@@ -1802,18 +1774,10 @@ test.describe("render_log", () => {
       }
     }
 
-    // And nowhere in the table: every column of every row, matched as text.
-    const { rows: columns } = await db.execute("PRAGMA table_info(render_log)");
-    const asText = columns
-      .map((c) => `coalesce(cast("${String(c.name)}" as text), '')`)
-      .join(" || ' ' || ");
+    // And nowhere in the table: every field of every row, matched as text.
     for (const sentinel of SENTINELS) {
-      const { rows } = await db.execute({
-        sql: `SELECT count(*) AS n FROM render_log WHERE instr(${asText}, ?) > 0`,
-        args: [sentinel],
-      });
       expect(
-        Number(rows[0].n),
+        await renderLogRowsContaining(sentinel),
         `rows in render_log containing ${sentinel}`,
       ).toBe(0);
     }
@@ -1827,7 +1791,7 @@ test.describe("alerts", () => {
     request,
   }) => {
     const v = pick(
-      await allVersions(db),
+      await allVersions(),
       "Active alert with push and SMS on",
       (x) =>
         x.state === "active" &&
@@ -1847,11 +1811,11 @@ test.describe("alerts", () => {
       expect(res.headers()["content-type"]).toMatch(/^application\/json/);
       expect(res.headers()["x-stencil-version"]).toBe(String(v.number));
       // The log row names the channel and, for a push, the phone: a setting of the request, never a value.
-      expect((await logFor(db, correlationId!))[0]).toMatchObject({
+      expect((await renderLogFor(correlationId!))[0]).toMatchObject({
         outcome: "ok",
         channel: "channel" in body ? body.channel : null,
         platform: "platform" in body ? body.platform : null,
-        consumer_id: "coral",
+        consumerId: "coral",
       });
       return (await res.json()) as Record<string, unknown>;
     };
@@ -1884,7 +1848,7 @@ test.describe("alerts", () => {
     request,
   }) => {
     const v = pick(
-      await allVersions(db),
+      await allVersions(),
       "Active alert with push and SMS on",
       (x) =>
         x.state === "active" &&
@@ -1901,12 +1865,12 @@ test.describe("alerts", () => {
       },
     });
     await expectError(failed.res, 422, "missing_variables");
-    expect(await logFor(db, failed.correlationId!)).toEqual([
+    expect(await renderLogFor(failed.correlationId!)).toEqual([
       expect.objectContaining({
         channel: "push",
         platform: "android",
         outcome: "error",
-        error_code: "missing_variables",
+        errorCode: "missing_variables",
       }),
     ]);
 
@@ -1919,6 +1883,6 @@ test.describe("alerts", () => {
       },
     });
     await expectError(refused.res, 400, "bad_request");
-    expect(await logFor(db, refused.correlationId!)).toHaveLength(0);
+    expect(await renderLogFor(refused.correlationId!)).toHaveLength(0);
   });
 });

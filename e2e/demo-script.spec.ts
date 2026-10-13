@@ -1,8 +1,7 @@
 import path from "node:path";
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import { sunsetInstant } from "@/domain/business-zone";
-import { longDate, openDb } from "./api/helpers";
+import { longDate } from "./api/helpers";
 import {
   advanceClock,
   openBell,
@@ -20,11 +19,9 @@ import {
   SPRING_OFFER_NAME,
   backToUcomp,
   click,
-  clockDay,
   dropDemoNoise,
   escapeRe,
   expectFailed,
-  json,
   openDemoDrawer,
   openOffer,
   openOfferTab,
@@ -32,7 +29,6 @@ import {
   reactReady,
   resultsHeadline,
   resultsRows,
-  rows,
   selectCustomers,
   send,
   sendButton,
@@ -68,6 +64,18 @@ import {
   untilUncovered,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import {
+  clockDay,
+  findVersion,
+  findVersions,
+  membershipOf,
+  openDraftOf,
+  renderLog,
+  simDeliveries,
+  simLink,
+  storedTextAbout,
+  templateById,
+} from "./helpers/state";
 
 // Opt-in, never in `npm run e2e`: `chromium` ignores this file (playwright.config.ts, decision 0049). It runs in the
 // `demo` project, which records it with presentation pacing (`npx playwright test --project=demo
@@ -466,26 +474,19 @@ async function pickDay(page: Page, ymd: string) {
 
 // ── The run ──────────────────────────────────────────────────────────────────
 
-let db: Client;
-
 test.beforeAll(() => {
   test.setTimeout(120_000);
   // The story starts from the seed, whatever ran before it.
   resetDemoData();
-  db = openDb();
 });
 
 test.afterEach(({ problems }) => dropDemoNoise(problems));
 
 // Whatever happened: the story moves the clock, lapses access and relinks Coral's offers, and the specs after
-// this one expect the seed.
+// this one expect the seed. Re-seeding undoes all of it, so this file needs no `Changes`.
 test.afterAll(() => {
   test.setTimeout(120_000);
-  try {
-    resetDemoData();
-  } finally {
-    db?.close();
-  }
+  resetDemoData();
 });
 
 test("the demo script, scenarios 1–11, as one story from a fresh reset", async ({
@@ -800,12 +801,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await expect(statusBadge(page)).toHaveText("Changes requested", {
       timeout: 20_000,
     });
-    const [draft] = await rows(
-      db,
-      "SELECT based_on_version_id FROM versions WHERE template_id = ? AND state = 'draft'",
-      [springId],
-    );
-    expect(draft, "a new draft appeared").toBeTruthy();
+    expect(await openDraftOf(springId), "a new draft appeared").toBeTruthy();
   });
 
   await test.step("3.3 Maya: the comment in the margin; she fixes it, resolves it and resubmits as v1, round 2", async () => {
@@ -906,16 +902,12 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     ).toBeVisible();
     await beat(page, 1000);
     await shoot(page, "demo-03-active");
-    const v1 = await rows(
-      db,
-      "SELECT id, round, state FROM versions WHERE template_id = ? AND number = 1 ORDER BY round",
-      [springId],
-    );
+    const v1 = await findVersions({ templateId: springId, number: 1 });
     expect(v1.map((r) => [r.round, r.state])).toEqual([
       [1, "changes_requested"],
       [2, "active"],
     ]);
-    springV1Id = String(v1[1].id);
+    springV1Id = v1[1].id;
   });
 
   // ── 4. Going live ──────────────────────────────────────────────────────────
@@ -993,11 +985,10 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
       /\/sim\/offers\/offer_spring_travel\?tab=send$/,
       { timeout: 30_000 },
     );
-    const [link] = await rows(
-      db,
-      "SELECT * FROM sim_links WHERE offer_id = 'offer_spring_travel'",
-    );
-    expect(link).toMatchObject({ template_id: springId, pinned_version: 1 });
+    expect(await simLink("offer_spring_travel")).toMatchObject({
+      templateId: springId,
+      pinnedVersion: 1,
+    });
   });
 
   await test.step("4.2 Send to five customers: all Delivered; one in the phone frame, one as a PDF; the long name holds", async () => {
@@ -1109,30 +1100,16 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await row.scrollIntoViewIfNeeded();
     await shoot(page, "demo-04-usage");
 
-    const log = await rows(
-      db,
-      "SELECT * FROM render_log WHERE template_id = ? AND is_preview = 0",
-      [springId],
-    );
+    const log = await renderLog({ templateId: springId, isPreview: false });
     expect(log).toHaveLength(15);
     for (const entry of log)
       expect(entry).toMatchObject({
-        consumer_id: "coral",
-        version_id: springV1Id,
-        version_number: 1,
+        consumerId: "coral",
+        versionId: springV1Id,
+        versionNumber: 1,
         outcome: "ok",
       });
-    const haystack = JSON.stringify([
-      ...(await rows(db, "SELECT * FROM render_log WHERE template_id = ?", [
-        springId,
-      ])),
-      ...(await rows(db, "SELECT * FROM audit_events WHERE template_id = ?", [
-        springId,
-      ])),
-      ...(await rows(db, "SELECT * FROM notifications WHERE href LIKE ?", [
-        `%/${springId}%`,
-      ])),
-    ]);
+    const haystack = await storedTextAbout(springId);
     for (const customer of FIVE)
       for (const value of [customer.first, customer.last, customer.email])
         expect(haystack, `"${value}" is not in UCOMP's data`).not.toContain(
@@ -1226,7 +1203,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     );
     await click(dialog.getByText("Set a sunset date for v1", { exact: true }));
     await expect(dialog.getByRole("checkbox")).toBeChecked();
-    sunsetDay = await clockDay(db, SUNSET_DAYS);
+    sunsetDay = await clockDay(SUNSET_DAYS);
     await click(dialog.getByRole("button", { name: /^Sunset date/ }));
     await pickDay(page, sunsetDay);
     const sunsetLong = longDate(`${sunsetDay}T00:00:00Z`);
@@ -1247,20 +1224,23 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     });
     await expect(statusBadge(page)).toHaveText("Active");
     // The released rows (v1's sent-back round 1 is a record and keeps its state).
-    const versions = await rows(
-      db,
-      "SELECT number, round, state, sunset_at FROM versions WHERE template_id = ? AND state IN ('active', 'superseded') ORDER BY number",
-      [springId],
-    );
-    expect(versions).toEqual([
+    const released = (await findVersions({ templateId: springId }))
+      .filter((v) => v.state === "active" || v.state === "superseded")
+      .map(({ number, round, state, sunsetAt }) => ({
+        number,
+        round,
+        state,
+        sunsetAt,
+      }));
+    expect(released).toEqual([
       // 00:00 Eastern on the day picked (the business time zone, decision 0017).
       {
         number: 1,
         round: 2,
         state: "superseded",
-        sunset_at: sunsetInstant(sunsetDay, "America/New_York").getTime(),
+        sunsetAt: sunsetInstant(sunsetDay, "America/New_York").getTime(),
       },
-      { number: 2, round: 1, state: "active", sunset_at: null },
+      { number: 2, round: 1, state: "active", sunsetAt: null },
     ]);
   });
 
@@ -1291,7 +1271,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
   });
 
   await test.step("5.4 Advance the clock 15 days (the Demo pill): sending fails with the sunset message", async () => {
-    const before = await clockDay(db);
+    const before = await clockDay();
     const drawer = await openDemoDrawer(page);
     await beat(page, 600);
     await click(
@@ -1301,7 +1281,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
       }),
     );
     await expect
-      .poll(() => clockDay(db), { message: "the clock moved" })
+      .poll(() => clockDay(), { message: "the clock moved" })
       .toBe(
         new Date(Date.parse(`${before}T00:00:00Z`) + ADVANCE_DAYS * 86_400_000)
           .toISOString()
@@ -1458,12 +1438,11 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await beat(page, 900);
     await v1.scrollIntoViewIfNeeded();
     await shoot(page, "demo-06-revoked");
-    const [row] = await rows(
-      db,
-      "SELECT revoke FROM versions WHERE template_id = ? AND number = 1",
-      [btId],
-    );
-    revokedDay = longDate(json(row.revoke).confirmedAt);
+    const confirmedAt = (await findVersion({ templateId: btId, number: 1 }))
+      ?.revoke?.confirmedAt;
+    if (!confirmedAt)
+      throw new Error("Balance Transfer v1's revoke has no confirmation time.");
+    revokedDay = longDate(confirmedAt);
 
     await openSimulator(page);
     await expect(offerRow(page, BT_OFFER_NAME)).toContainText("Revoked");
@@ -1483,11 +1462,10 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await beat(page, 900);
     await resultsHeadline(page).scrollIntoViewIfNeeded();
     await shoot(page, "demo-06-sim-revoked");
-    const failed = await rows(
-      db,
-      "SELECT status FROM sim_deliveries WHERE offer_id = ? AND status = 'failed'",
-      [BT_OFFER],
-    );
+    const failed = await simDeliveries({
+      offerId: BT_OFFER,
+      status: "failed",
+    });
     expect(failed.length).toBeGreaterThanOrEqual(4);
   });
 
@@ -1975,27 +1953,17 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
     await page.keyboard.press("Escape");
     await expect(after).toBeHidden();
 
-    expect(await clockDay(db)).toBe(new Date().toISOString().slice(0, 10));
-    const [bt] = await rows(
-      db,
-      "SELECT v.state, v.revoke FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.number = 1",
-      [BT_NAME],
-    );
+    expect(await clockDay()).toBe(new Date().toISOString().slice(0, 10));
+    const bt = await findVersion({ name: BT_NAME, number: 1 });
     expect(bt, "Balance Transfer v1's revoke is undone").toMatchObject({
       state: "superseded",
       revoke: null,
     });
-    const [sam] = await rows(
-      db,
-      "SELECT status FROM memberships WHERE user_id = 'sam' AND team_id = ?",
-      [TEAM],
-    );
-    expect(sam.status, "Sam's access is back").toBe("active");
+    const sam = await membershipOf("sam", TEAM);
+    expect(sam?.status, "Sam's access is back").toBe("active");
     expect(
-      await rows(db, "SELECT id FROM templates WHERE id IN (?, ?)", [
-        springId,
-        importedId,
-      ]),
-    ).toEqual([]);
+      [await templateById(springId), await templateById(importedId)],
+      "the story's templates are gone",
+    ).toEqual([undefined, undefined]);
   });
 });

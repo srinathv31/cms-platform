@@ -1,9 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Client, InValue } from "@libsql/client";
 import { expect, test, type Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { rowsOf } from "./helpers/cleanup";
 import { settled } from "./helpers/settled";
+import { Changes, findVersion } from "./helpers/state";
 
 // What a person sees when a page throws (docs/handoff-review.md, I7; decision 0013). Each test breaks one
 // stored JSON value, so the query that reads it throws the way a corrupt row or a failing backend would,
@@ -28,69 +26,23 @@ import { settled } from "./helpers/settled";
 const TEAM = "coral-offers";
 const BALANCE = "Balance Transfer Intro — Terms";
 const CASH_BACK = "Cash Back Welcome Bonus — Terms";
-/** Not JSON: drizzle's JSON.parse throws on it. */
-const BROKEN = "{";
 
-let db: Client;
-const restores: (() => Promise<void>)[] = [];
+const changes = new Changes();
 
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterEach(async () => {
-  while (restores.length) await restores.pop()!();
-});
-
-test.afterAll(() => {
-  db.close();
-});
-
-/** Breaks one stored value until the returned function (or afterEach) puts back exactly what was there. */
-async function breakValue(
-  table: "versions" | "settings" | "sim_customers",
-  keyColumn: "id" | "key",
-  key: string,
-  column: string,
-) {
-  const [before] = await rowsOf(
-    db,
-    `SELECT ${column} FROM ${table} WHERE ${keyColumn} = ?`,
-    [key],
-  );
-  if (!before) throw new Error(`${table} row ${key} doesn't exist.`);
-  let restored = false;
-  const restore = async () => {
-    if (restored) return;
-    restored = true;
-    await rowsOf(
-      db,
-      `UPDATE ${table} SET ${column} = ? WHERE ${keyColumn} = ?`,
-      [before[column] as InValue, key],
-    );
-  };
-  restores.push(restore);
-  await rowsOf(db, `UPDATE ${table} SET ${column} = ? WHERE ${keyColumn} = ?`, [
-    BROKEN,
-    key,
-  ]);
-  return restore;
-}
+// Whatever a failed test left broken is put back before the next test: `undo` also covers a value the test
+// already restored itself.
+test.afterEach(() => changes.undo());
 
 async function versionOf(name: string, state: string) {
-  const [row] = await rowsOf(
-    db,
-    "SELECT v.id, v.template_id, v.number FROM versions v JOIN templates t ON t.id = v.template_id WHERE v.name = ? AND v.state = ?",
-    [name, state],
-  );
-  if (!row)
+  const version = await findVersion({ name, state });
+  if (!version)
     throw new Error(
       `This spec needs the fresh seed (npm run db:reset): no ${state} version of ${name}.`,
     );
   return {
-    id: String(row.id),
-    templateId: String(row.template_id),
-    number: Number(row.number),
+    id: version.id,
+    templateId: version.templateId,
+    number: version.number!,
   };
 }
 
@@ -186,7 +138,7 @@ test("a tab that fails keeps the workspace header, the tab bar and the frame", a
   page,
 }) => {
   const v = await versionOf(BALANCE, "active");
-  const restore = await breakValue("versions", "id", v.id, "body");
+  const restore = await changes.breakVersionBody(v.id);
 
   await page.goto(`/${TEAM}/templates/${v.templateId}`);
   await expectErrorScreen(page, "This tab didn't load.", { frame: true });
@@ -229,7 +181,7 @@ test("a page that fails keeps the sidebar and the top bar", async ({
   page,
 }) => {
   const v = await versionOf(CASH_BACK, "in_review");
-  const restore = await breakValue("versions", "id", v.id, "body");
+  const restore = await changes.breakVersionBody(v.id);
 
   await page.goto(`/${TEAM}/review/${v.templateId}/${v.number}`);
   await expectErrorScreen(page, "This page didn't load", { frame: true });
@@ -253,20 +205,7 @@ test("a page that fails keeps the sidebar and the top bar", async ({
 test("a page of the simulator that fails keeps Coral's frame and goes back to /sim", async ({
   page,
 }) => {
-  const [customer] = await rowsOf(
-    db,
-    "SELECT id FROM sim_customers ORDER BY id LIMIT 1",
-  );
-  if (!customer)
-    throw new Error(
-      "This spec needs the fresh seed (npm run db:reset): Coral has no customers.",
-    );
-  const restore = await breakValue(
-    "sim_customers",
-    "id",
-    String(customer.id),
-    "statement",
-  );
+  const restore = await changes.breakCustomerAccount();
 
   await page.goto("/sim/customers");
   await expect(
@@ -313,12 +252,7 @@ test("a page of the simulator that fails keeps Coral's frame and goes back to /s
 test("when the frame itself fails, the global error page replaces it", async ({
   page,
 }) => {
-  const restore = await breakValue(
-    "settings",
-    "key",
-    "clock_offset_days",
-    "value",
-  );
+  const restore = await changes.breakClockSetting();
 
   await page.goto(`/${TEAM}/library`);
   await expectErrorScreen(page, "This page didn't load", { frame: false });

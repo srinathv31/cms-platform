@@ -1,19 +1,16 @@
-import type { Client } from "@libsql/client";
 import { expect, test } from "@playwright/test";
+import { allVersions, renderLogFor } from "../helpers/state";
 import {
   LABEL,
-  LOG_COLUMNS,
+  LOG_FIELDS,
   andList,
   asPersona,
   correlation,
   expectError,
   isDocument,
-  logFor,
-  openDb,
   pick,
   preview,
   validValues,
-  allVersions,
   type Channel,
   type SeedVersion,
 } from "./helpers";
@@ -30,17 +27,7 @@ const PERSONA_WITH_NO_TEAM = "morgan";
 
 const DOCUMENT_CHANNELS: readonly Channel[] = ["pdf", "web", "email"];
 
-let db: Client;
-
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(() => {
-  db.close();
-});
-
-const versions = async () => (await allVersions(db)).filter(isDocument);
+const versions = async () => (await allVersions()).filter(isDocument);
 const required = (v: SeedVersion) => v.variables.filter((x) => x.required);
 const pdfMagic = (bytes: Buffer) => bytes.subarray(0, 4).toString("latin1");
 
@@ -80,17 +67,17 @@ test.describe("the preview route", () => {
       expect(await res.text()).toMatch(/<!doctype html>/i);
     });
 
-    const rows = await logFor(db, cid);
+    const rows = await renderLogFor(cid);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      template_id: draft.templateId,
-      version_id: draft.id,
-      version_number: null,
+      templateId: draft.templateId,
+      versionId: draft.id,
+      versionNumber: null,
       channel: "web",
-      is_preview: 1,
-      consumer_id: null,
+      isPreview: true,
+      consumerId: null,
       outcome: "ok",
-      error_code: null,
+      errorCode: null,
     });
   });
 
@@ -171,9 +158,9 @@ test.describe("the preview route", () => {
         expect(res.headers()["x-stencil-newer-version"], v.state).toBe(
           v.state === "superseded" ? String(v.activeNumber) : undefined,
         );
-        expect((await logFor(db, cid))[0], v.state).toMatchObject({
-          is_preview: 1,
-          consumer_id: null,
+        expect((await renderLogFor(cid))[0], v.state).toMatchObject({
+          isPreview: true,
+          consumerId: null,
           outcome: "ok",
         });
       }
@@ -263,13 +250,13 @@ test.describe("the preview route", () => {
         );
         expect(res.headers()["x-stencil-preview"]).toBeUndefined();
       });
-      const rows = await logFor(db, cid);
+      const rows = await renderLogFor(cid);
       expect(rows, persona).toHaveLength(1);
       expect(rows[0], persona).toMatchObject({
-        is_preview: 1,
-        consumer_id: null,
+        isPreview: true,
+        consumerId: null,
         outcome: "error",
-        error_code: "preview_forbidden",
+        errorCode: "preview_forbidden",
       });
     }
   });
@@ -279,7 +266,7 @@ test.describe("the preview route", () => {
     baseURL,
   }) => {
     const alert = pick(
-      await allVersions(db),
+      await allVersions(),
       "Active Coral Offers alert with push and SMS on",
       (v) =>
         v.state === "active" &&
@@ -306,9 +293,9 @@ test.describe("the preview route", () => {
         expect(body.payloadBytes, platform).toEqual(expect.any(Number));
         // The subtitle is the iPhone's alone.
         if (platform === "android") expect(body).not.toHaveProperty("subtitle");
-        expect((await logFor(db, cid))[0], platform).toMatchObject({
-          is_preview: 1,
-          consumer_id: null,
+        expect((await renderLogFor(cid))[0], platform).toMatchObject({
+          isPreview: true,
+          consumerId: null,
           channel: "push",
           platform,
           outcome: "ok",
@@ -331,7 +318,7 @@ test.describe("the preview route", () => {
         "bad_request",
         "platform must be ios or android.",
       );
-      expect(await logFor(db, cid)).toHaveLength(0);
+      expect(await renderLogFor(cid)).toHaveLength(0);
     });
   });
 
@@ -380,9 +367,9 @@ test.describe("the preview route", () => {
       }
     });
     for (const cid of sent) {
-      const rows = await logFor(db, cid);
+      const rows = await renderLogFor(cid);
       expect(rows, cid).toHaveLength(1);
-      expect(Object.keys(rows[0]).sort(), cid).toEqual([...LOG_COLUMNS].sort());
+      expect(Object.keys(rows[0]).sort(), cid).toEqual([...LOG_FIELDS].sort());
       expect(JSON.stringify(Object.values(rows[0])), cid).not.toContain(
         "Zyxwvut",
       );

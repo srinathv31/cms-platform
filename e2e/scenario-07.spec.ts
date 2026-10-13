@@ -1,6 +1,4 @@
-import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { demoNow, openDb } from "./api/helpers";
 import {
   click,
   closeSettings,
@@ -9,7 +7,6 @@ import {
   strip,
   switchPersona,
 } from "./helpers/access";
-import { rowsOf } from "./helpers/cleanup";
 import {
   asPersona,
   beat,
@@ -22,6 +19,7 @@ import {
   shoot,
   test,
 } from "./helpers/scenario";
+import { Changes, demoNow } from "./helpers/state";
 
 // Phase 6 gate: demo scenario 7 ("Teams and roles"), each persona through the persona switcher or its own cookie.
 //
@@ -62,32 +60,12 @@ const viewOnly = (page: Page) => page.getByText("View only", { exact: true });
 const newTemplate = (page: Page) =>
   page.getByRole("button", { name: "New template" });
 
-let db: Client;
-/** Disclosure's allowed channels as the run found them. */
-let channelsBefore: InValue | undefined;
+const changes = new Changes();
 
-test.beforeAll(async () => {
-  db = openDb();
-  const [disclosure] = await rowsOf(
-    db,
-    "SELECT allowed_channels FROM content_types WHERE key = 'disclosure'",
-  );
-  channelsBefore = disclosure?.allowed_channels;
-});
+// Disclosure's allowed channels as the run found them: Settings > Channel rules changes them, and `undo` puts them back.
+test.beforeAll(() => changes.watchAllowedChannels("disclosure"));
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (channelsBefore !== undefined)
-      await rowsOf(
-        db,
-        "UPDATE content_types SET allowed_channels = ? WHERE key = 'disclosure'",
-        [channelsBefore],
-      );
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 test.describe("scenario 7: teams and roles", () => {
   test("Priya edits in Coral and is View only in Deposits; Sam can use SHARE but not edit; Riley changes a channel rule; Taylor sees it in the audit log", async ({
@@ -193,7 +171,7 @@ test.describe("scenario 7: teams and roles", () => {
 
     // ── 3. Riley ─────────────────────────────────────────────────────────────
 
-    const before = await demoNow(db);
+    const before = await demoNow();
 
     await test.step("3.1 Riley: Settings > Channel rules; Email off names what it stops, and only the confirm commits it", async () => {
       await asPersona(page, "riley");
@@ -255,7 +233,7 @@ test.describe("scenario 7: teams and roles", () => {
       await shoot(page, "riley-view-only");
     });
 
-    const after = await demoNow(db);
+    const after = await demoNow();
 
     // ── 4. Taylor ────────────────────────────────────────────────────────────
 

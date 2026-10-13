@@ -1,6 +1,4 @@
-import { rm } from "node:fs/promises";
 import path from "node:path";
-import type { Client } from "@libsql/client";
 import {
   expect,
   test,
@@ -8,14 +6,14 @@ import {
   type APIResponse,
 } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { E2E_UPLOADS_DIR } from "../storage";
-import { asPersona, openDb, postChunked } from "./helpers";
+import { Changes, templateById, uploadsOf, versionsOf } from "../helpers/state";
+import { asPersona, postChunked } from "./helpers";
 
 // The import API (Phase 7a): POST /api/imports with each kind of file, the refusals, the permission
 // check, and the two read routes (the original's bytes and the Original tab's view), called the way
 // the Library's import row calls them. The generated fixtures live in e2e/fixtures/import
-// (make-fixtures.mjs). Every template this spec creates is deleted again at the end (rows only; the
-// upload folders it made are removed too).
+// (make-fixtures.mjs). Every template this spec creates is deleted again at the end, with its upload
+// folders.
 
 const FIXTURES = path.join(process.cwd(), "e2e", "fixtures", "import");
 const fixture = (name: string) => readFileSync(path.join(FIXTURES, name));
@@ -39,36 +37,9 @@ interface Imported {
   href: string;
 }
 
-let db: Client;
-const created: string[] = [];
+const changes = new Changes();
 
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(async () => {
-  for (const id of created) {
-    const { rows } = await db.execute({
-      sql: "SELECT id FROM uploads WHERE template_id = ?",
-      args: [id],
-    });
-    for (const row of rows)
-      await rm(path.join(E2E_UPLOADS_DIR, String(row.id)), {
-        recursive: true,
-        force: true,
-        maxRetries: 3,
-        retryDelay: 50,
-      });
-    for (const table of ["uploads", "audit_events", "versions"]) {
-      await db.execute({
-        sql: `DELETE FROM ${table} WHERE template_id = ?`,
-        args: [id],
-      });
-    }
-    await db.execute({ sql: "DELETE FROM templates WHERE id = ?", args: [id] });
-  }
-  db.close();
-});
+test.afterAll(() => changes.undo());
 
 function upload(
   request: APIRequestContext,
@@ -97,7 +68,7 @@ async function imported(res: APIResponse): Promise<Imported> {
     templateId: expect.stringMatching(/^UC-[0-9A-Z]{6}$/),
     href: `/coral-offers/templates/${body.templateId}`,
   });
-  created.push(body.templateId);
+  changes.ownTemplate(body.templateId);
   // The one-shot cookies: the name is selected and the rail opens on Original on arrival.
   const cookies = res
     .headersArray()
@@ -113,34 +84,19 @@ async function imported(res: APIResponse): Promise<Imported> {
 }
 
 async function rowsFor(templateId: string) {
-  const template = (
-    await db.execute({
-      sql: "SELECT starter_key FROM templates WHERE id = ?",
-      args: [templateId],
-    })
-  ).rows[0];
-  const version = (
-    await db.execute({
-      sql: "SELECT name, body, variables, import_upload_id FROM versions WHERE template_id = ?",
-      args: [templateId],
-    })
-  ).rows[0];
-  const upload = (
-    await db.execute({
-      sql: "SELECT id, filename, mime, path FROM uploads WHERE template_id = ?",
-      args: [templateId],
-    })
-  ).rows[0];
+  const template = await templateById(templateId);
+  const [version] = await versionsOf(templateId);
+  const [upload] = await uploadsOf(templateId);
   return {
     name: String(version?.name),
-    starterKey: template?.starter_key ?? null,
-    body: JSON.stringify(JSON.parse(String(version?.body))),
-    variables: JSON.parse(String(version?.variables)) as {
+    starterKey: template?.starterKey ?? null,
+    body: JSON.stringify(version?.body),
+    variables: version?.variables as {
       key: string;
       type: string;
       required: boolean;
     }[],
-    importUploadId: String(version?.import_upload_id),
+    importUploadId: String(version?.importUploadId),
     upload: {
       id: String(upload?.id),
       filename: String(upload?.filename),
