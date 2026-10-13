@@ -115,8 +115,10 @@ export function writeFakeEffects(
 
 /** The template's team's slug: notifications link under it. */
 function teamSlugOf(state: FakeState, ctx: EffectContext): string {
-  const template = state.templates.find((t) => t.id === ctx.templateId);
-  return state.teams.find((t) => t.id === template?.teamId)?.slug ?? ctx.teamId;
+  const team = state.teams.find((t) => t.id === ctx.teamId);
+  if (!team)
+    throw new Error(`Effects for team ${ctx.teamId}, which isn't there.`);
+  return team.slug;
 }
 
 /** Every membership, with its team and roles, as the recipient rules read them (domain/recipients.ts). */

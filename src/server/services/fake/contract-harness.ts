@@ -4,7 +4,7 @@ import type { TestHooks } from "../options";
 import type { Services } from "../types";
 import { fakeConsumerNotices } from "./consumer-api";
 import { fakeServices } from "./index";
-import { viewerOf } from "./rows";
+import { viewerOf } from "./identity";
 import {
   cloneState,
   seededState,

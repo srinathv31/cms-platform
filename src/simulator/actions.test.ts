@@ -104,7 +104,7 @@ function detail(
   return {
     id: TPL,
     name: NAME,
-    team: { id: "coral-offers", name: "Coral Offers" },
+    team: { id: "t_coral", name: "Coral Offers" },
     contentType: { key: "disclosure", name: "Disclosure" },
     asOf: "2026-10-05T12:00:00.000Z",
     activeVersion: ucomp.active,
@@ -174,7 +174,7 @@ function alertDetail(): ApiTemplateDetail {
   return {
     id: ALERT,
     name: ALERT_NAME,
-    team: { id: "coral-offers", name: "Coral Offers" },
+    team: { id: "t_coral", name: "Coral Offers" },
     contentType: { key: "alert", name: "Alert" },
     asOf: "2026-10-05T12:00:00.000Z",
     activeVersion: 1,

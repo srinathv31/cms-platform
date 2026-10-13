@@ -20,7 +20,6 @@ import {
   renderLog,
   settings,
   teams,
-  templates,
   users,
   versions,
 } from "@/server/db/schema/ucomp";
@@ -188,15 +187,16 @@ export async function writeEffects(
   return written;
 }
 
-/** The template's team's slug: notifications link under it. */
+/** The slug of the template's team (`ctx.teamId`): notifications link under it (decision 0053). */
 async function teamSlug(tx: Tx, ctx: EffectContext): Promise<string> {
   const rows = await tx
     .select({ teamSlug: teams.slug })
-    .from(templates)
-    .innerJoin(teams, eq(teams.id, templates.teamId))
-    .where(eq(templates.id, ctx.templateId))
+    .from(teams)
+    .where(eq(teams.id, ctx.teamId))
     .limit(1);
-  return rows[0]?.teamSlug ?? ctx.teamId;
+  if (!rows[0])
+    throw new Error(`Effects for team ${ctx.teamId}, which isn't there.`);
+  return rows[0].teamSlug;
 }
 
 /**

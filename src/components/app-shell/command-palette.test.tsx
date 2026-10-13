@@ -38,13 +38,13 @@ const { SEARCH_PAUSE_MS } =
   await import("@/components/palette/use-palette-results");
 
 const coral: SpaceNav = {
+  teamId: "t_coral",
   slug: "coral-offers",
   name: "Coral Offers",
   kind: "team",
   icon: "users",
   showAudit: false,
   settings: { team: false, platform: false },
-  recert: null,
   card: null,
 };
 

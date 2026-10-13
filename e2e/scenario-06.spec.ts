@@ -43,6 +43,7 @@ import {
   notificationsAbout,
   renderLogFor,
   simDeliveries,
+  teamIdOf,
   versionById,
 } from "./helpers/state";
 
@@ -391,7 +392,7 @@ test.describe("scenario 6: revoke", () => {
       expect(audit.map((e) => e.action)).toEqual(["version.revoke_started"]);
       expect(audit[0]).toMatchObject({
         actorId: "jordan",
-        teamId: TEAM,
+        teamId: await teamIdOf(TEAM),
         templateId: v1.templateId,
         versionId: v1.id,
       });
@@ -415,7 +416,7 @@ test.describe("scenario 6: revoke", () => {
       ).toEqual(approvers.filter((id) => id !== "jordan"));
       for (const note of fresh) {
         expect(note).toMatchObject({
-          teamId: TEAM,
+          teamId: v1.teamId,
           title: `Jordan Ellis started revoking ${NAME} v1. Confirm or cancel.`,
           body: REASON,
           href: `/${TEAM}/templates/${v1.templateId}/versions`,
@@ -723,7 +724,7 @@ test.describe("scenario 6: revoke", () => {
       expect(audit.map((e) => e.actorId)).toEqual(["jordan", "alex"]);
       for (const event of audit)
         expect(event).toMatchObject({
-          teamId: TEAM,
+          teamId: v1.teamId,
           templateId: v1.templateId,
           versionId: v1.id,
         });
@@ -778,7 +779,7 @@ test.describe("scenario 6: revoke", () => {
       ).toEqual([...told].sort());
       for (const note of revoked) {
         expect(note).toMatchObject({
-          teamId: TEAM,
+          teamId: v1.teamId,
           title: `Alex Kim confirmed the revoke of ${NAME} v1.`,
           body: REASON,
           href: `/${TEAM}/templates/${v1.templateId}/versions`,

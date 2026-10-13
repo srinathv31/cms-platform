@@ -4,7 +4,7 @@ import type { AuditService } from "../audit";
 import type { CommentService } from "../comments";
 import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
-import type { IdentityService } from "../identity";
+
 import { notMovedArea } from "../not-moved";
 import type { ImplementationOptions } from "../options";
 import type { NotificationService } from "../notifications";
@@ -15,6 +15,7 @@ import type { Services } from "../types";
 import type { UsageService } from "../usage";
 import { now } from "@/server/clock";
 import type { LocalDeps } from "./command";
+import { localIdentity } from "./identity";
 import { localReview } from "./review";
 import { localVersions } from "./versions";
 
@@ -29,7 +30,7 @@ export function localServices(options: ImplementationOptions = {}): Services {
     hooks: options.hooks ?? {},
   };
   return {
-    identity: notMovedArea<IdentityService>("identity"),
+    identity: localIdentity(),
     review: localReview(deps),
     versions: localVersions(deps),
     templates: notMovedArea<TemplateService>("templates"),

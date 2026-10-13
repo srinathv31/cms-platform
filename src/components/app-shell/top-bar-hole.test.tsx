@@ -34,7 +34,7 @@ vi.mock("@/server/viewer", () => ({
     ({ userId: "maya", name: "Maya Chen", initials: "MC" }) as Viewer,
 }));
 vi.mock("@/server/queries/spaces", () => ({
-  getShell: async () => ({ spaces: [] }),
+  getShell: async () => ({ spaces: [], canRequestAccess: { ok: true } }),
 }));
 vi.mock("@/server/queries/personas", () => ({
   getPersonaSummaries: async () => [maya, jordan],

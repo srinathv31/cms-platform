@@ -160,6 +160,7 @@ export interface ApiTemplateSummary {
   id: string; // "UC-4F7K2Q"
   /** The Active version's name. Each version keeps the name it was approved with; a rename arrives with a new version. */
   name: string;
+  /** The owning team. `id` is opaque ("t_coral"): never parse it, and never read it as the team's URL name. */
   team: { id: string; name: string };
   contentType: { key: string; name: string }; // { key: "disclosure", name: "Disclosure" }
   activeVersion: number;
@@ -197,6 +198,7 @@ export interface ApiTemplateDetail {
    * names the contract's own version.
    */
   name: string;
+  /** The owning team. `id` is opaque ("t_coral"): never parse it, and never read it as the team's URL name. */
   team: { id: string; name: string };
   contentType: { key: string; name: string };
   asOf: string;

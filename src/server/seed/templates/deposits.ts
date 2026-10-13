@@ -152,7 +152,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
     {
       id: "UC-ZKZSRZ",
       key: "high-yield-savings",
-      teamId: "deposits",
+      teamId: "t_deposits",
       name: "High-Yield Savings — Rate Disclosure",
       createdBy: "eli",
       createdAt: 200,
@@ -301,7 +301,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
     {
       id: "UC-A4S1YT",
       key: "checking-fees",
-      teamId: "deposits",
+      teamId: "t_deposits",
       name: "Everyday Checking — Fee Schedule",
       createdBy: "eli",
       createdAt: 150,
@@ -340,7 +340,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
     {
       id: "UC-DNF479",
       key: "overdraft-protection",
-      teamId: "deposits",
+      teamId: "t_deposits",
       name: "Overdraft Protection — Terms",
       createdBy: "eli",
       createdAt: 12,

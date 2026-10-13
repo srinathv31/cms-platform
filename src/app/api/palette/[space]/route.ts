@@ -14,11 +14,10 @@ export async function GET(
 ) {
   const context = await requestContextOrRefusal();
   if (!context.ok) return signedOutResponse();
-  const { viewer } = context.context;
   const { space } = await ctx.params;
   const query = request.nextUrl.searchParams;
   return readResponse(
-    await searchPalette(viewer, {
+    await searchPalette(context.context, {
       space,
       q: query.get("q"),
       template: query.get("template"),

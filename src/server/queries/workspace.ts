@@ -120,8 +120,8 @@ export const getWorkspaceHeader = cache(
       .then((r) => r[0]);
 
     if (!tpl) notFound();
-    if (spaceSlug !== ALL_SPACE && tpl.teamSlug !== spaceSlug) notFound();
-    if (!canSeeSpace(space.viewer, tpl.teamSlug)) notFound();
+    if (space.teamId !== null && tpl.teamId !== space.teamId) notFound();
+    if (!canSeeSpace(space.viewer, tpl.teamId)) notFound();
 
     const list = await db
       .select({

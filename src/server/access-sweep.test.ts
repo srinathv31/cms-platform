@@ -37,7 +37,7 @@ seededDatabasePerTest({ base: BASE });
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
   recertId = (await db.query.recertifications.findFirst({
-    where: eq(recertifications.teamId, "coral-offers"),
+    where: eq(recertifications.teamId, "t_coral"),
   }))!.id;
 });
 
@@ -48,7 +48,7 @@ beforeEach(() => {
 const coral = (userId: string) =>
   db.query.memberships.findFirst({
     where: and(
-      eq(memberships.teamId, "coral-offers"),
+      eq(memberships.teamId, "t_coral"),
       eq(memberships.userId, userId),
     ),
   });
@@ -145,9 +145,9 @@ describe("runAccessSweep across the seed's deadlines", () => {
     // Audit rows, by the system, backdated to each boundary, in time order.
     const rows = await auditAfter(day(15));
     expect(rows.map((r) => [r.action, r.at, r.actorId, r.teamId])).toEqual([
-      ["access.suspended", suspendAt, null, "coral-offers"],
-      ["access.lapsed", dueAt, null, "coral-offers"],
-      ["recert.closed", dueAt, null, "coral-offers"],
+      ["access.suspended", suspendAt, null, "t_coral"],
+      ["access.lapsed", dueAt, null, "t_coral"],
+      ["recert.closed", dueAt, null, "t_coral"],
     ]);
     expect(rows[0]!.details).toMatchObject({
       userId: "devon",
@@ -248,7 +248,7 @@ describe("runAccessSweep in one 31-day jump with nobody confirmed", () => {
         at: memberships.statusChangedAt,
       })
       .from(memberships)
-      .where(eq(memberships.teamId, "coral-offers"))
+      .where(eq(memberships.teamId, "t_coral"))
       .orderBy(memberships.userId);
     expect(statuses).toEqual([
       { userId: "alex", status: "active", at: null },
@@ -287,7 +287,7 @@ describe("runAccessSweep never leaves a team without a Team Admin", () => {
       .from(auditEvents)
       .where(eq(auditEvents.action, "access.kept_last_admin"));
     expect(kept.map((r) => r.teamId).sort()).toEqual(
-      ["card-statements", "coral-offers", "deposits"].sort(),
+      ["t_cards", "t_coral", "t_deposits"].sort(),
     );
     const told = await db
       .select({ userId: notifications.userId, href: notifications.href })

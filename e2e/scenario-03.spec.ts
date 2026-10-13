@@ -44,6 +44,7 @@ import {
   notificationsAbout,
   renderLogFor,
   versionById,
+  teamIdOf,
   versionNumbered,
   versionsOf,
   type VersionRecord,
@@ -1357,8 +1358,9 @@ test.describe("scenario 3: the review loop", () => {
         ["thread.resolved", "maya"],
         ["version.activated", "jordan"],
       ]);
+      const teamId = await teamIdOf(TEAM);
       for (const event of audit)
-        expect(event).toMatchObject({ teamId: TEAM, templateId: id });
+        expect(event).toMatchObject({ teamId, templateId: id });
       expect(audit[0].details).toMatchObject({
         number: 1,
         round: 1,
@@ -1415,7 +1417,7 @@ test.describe("scenario 3: the review loop", () => {
 
       // notifications: each submit asks the team's approvers except the submitter; the author hears about the
       // comment, the change request and the go-live.
-      const approvers = (await approversOf(TEAM)).filter(
+      const approvers = (await approversOf(teamId)).filter(
         (user) => user !== "maya",
       );
       expect(approvers, "Jordan and others can approve").toContain("jordan");
@@ -1436,7 +1438,7 @@ test.describe("scenario 3: the review loop", () => {
         approvers.length * 2 + 3,
       );
       for (const note of notes)
-        expect(note).toMatchObject({ teamId: TEAM, readAt: null });
+        expect(note).toMatchObject({ teamId, readAt: null });
       // Round 1's ask names no round (nothing had been sent back yet), and its link is the bare one; round 2's names it.
       const asked = notes.filter(
         (r) => r.kind === "review_requested" && r.userId === "jordan",

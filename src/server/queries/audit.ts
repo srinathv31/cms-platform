@@ -108,9 +108,7 @@ const auditPageFor = cache(
       if (values[i] !== null) filters[key] = values[i]!;
     });
     const space = await requireSpace(spaceSlug);
-    requireCan(space.viewer, "audit.view", {
-      teamId: space.teamId ?? ALL_SPACE,
-    });
+    requireCan(space.viewer, "audit.view", { teamId: space.teamId });
     const { data } = await readAudit(
       {
         slug: space.slug,
@@ -157,10 +155,7 @@ export async function auditScope(
 ): Promise<{ ok: true; scope: AuditScope } | ReadRefusal> {
   const refused = refusal(403, REASONS.generic);
   if (spaceSlug === ALL_SPACE) {
-    if (
-      !isCrossTeam(viewer) ||
-      !can(viewer, "audit.view", { teamId: ALL_SPACE }).ok
-    )
+    if (!isCrossTeam(viewer) || !can(viewer, "audit.view", { teamId: null }).ok)
       return refused;
     return {
       ok: true,
@@ -324,9 +319,8 @@ function toRow(
 ): AuditRow {
   const actor = e.actorId ? personOf(people, e.actorId) : null;
   const subjectId = subjectIdOf(e.action, e.details);
-  const team = e.teamId
-    ? (teamsById.get(e.teamId) ?? { slug: e.teamId, name: e.teamId })
-    : null;
+  // A team id names a team row (teams are never deleted); the row's slug and name, never the id, show.
+  const team = e.teamId ? (teamsById.get(e.teamId) ?? null) : null;
   const version: NumberedRound | null =
     e.versionNumber !== null &&
     e.versionRound !== null &&

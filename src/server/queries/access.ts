@@ -137,7 +137,7 @@ const okOr = (r: { ok: true } | Refused): PermissionResult =>
 const okUnless = (refusal: Refusal | null): PermissionResult =>
   refusal ? refuse(refusal) : { ok: true };
 
-/** The team behind a space slug (team ids are their slugs). 404 for an unknown one or "all". */
+/** The team a space slug names (the URL's; queries take its id). 404 for an unknown one or "all". */
 async function teamBySlug(slug: string) {
   if (slug === ALL_SPACE) notFound();
   const team = await db.query.teams.findFirst({ where: eq(teams.slug, slug) });
@@ -631,20 +631,20 @@ export const getSidebarCards = cache(
   async (): Promise<Record<string, SidebarCardModel | null>> => {
     const { viewer } = await requireRequestContext();
     const teamRows = await db
-      .select({ slug: teams.slug, name: teams.name })
+      .select({ id: teams.id, slug: teams.slug, name: teams.name })
       .from(teams);
-    const spaces = spacesFor(viewer, teamRows);
-    const cards: Record<string, SidebarCardModel | null> = Object.fromEntries(
-      spaces.map((s) => [s.slug, null]),
+    const slugOf = new Map(teamRows.map((t) => [t.id, t.slug]));
+    const teamIds = spacesFor(viewer, teamRows).flatMap((s) =>
+      s.teamId === null ? [] : [s.teamId],
     );
-    const managed = spaces
-      .filter((s) => s.kind === "team")
-      .map((s) => s.slug)
-      .filter(
-        (teamId) =>
-          can(viewer, "team.decideAccessRequest", { teamId }).ok ||
-          can(viewer, "team.manageMembers", { teamId }).ok,
-      );
+    const cards: Record<string, SidebarCardModel | null> = Object.fromEntries(
+      teamIds.map((teamId) => [teamId, null]),
+    );
+    const managed = teamIds.filter(
+      (teamId) =>
+        can(viewer, "team.decideAccessRequest", { teamId }).ok ||
+        can(viewer, "team.manageMembers", { teamId }).ok,
+    );
     if (managed.length === 0) return cards;
 
     const nowDate = await demoNow();
@@ -682,7 +682,7 @@ export const getSidebarCards = cache(
         cards[teamId] = {
           kind: "access_requests",
           id: `access-requests:${teamId}:${newest.id}:${waiting.length}`,
-          teamSlug: teamId,
+          teamSlug: slugOf.get(teamId)!,
           count: waiting.length,
           firstName: firstName(userOf(people, newest.userId).name),
           role: newest.role,
@@ -701,7 +701,7 @@ export const getSidebarCards = cache(
           cards[teamId] = {
             kind: "recert_due",
             id: `recert:${open.id}`,
-            teamSlug: teamId,
+            teamSlug: slugOf.get(teamId)!,
             label: open.label,
             dueAt: iso(open.dueAt),
             progressLabel: progress.label,

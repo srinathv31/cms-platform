@@ -42,13 +42,13 @@ const persona = (userId: string, teamIds: string[]): Viewer => ({
   platformRole: null,
   memberships: teamIds.map((teamId) => ({
     teamId,
-    teamSlug: teamId,
+    teamSlug: `slug-of-${teamId}`,
     teamName: teamId,
     roles: ["author"],
     status: "active",
   })),
 });
-const maya = persona("maya", ["coral-offers"]);
+const maya = persona("maya", ["t_coral"]);
 
 beforeEach(() => {
   vi.mocked(getViewer).mockReset().mockResolvedValue(maya);
@@ -825,7 +825,7 @@ describe("POST …/render: push and SMS", () => {
       await import("@/server/db/schema/ucomp");
     await db.insert(templatesTable).values({
       id: ALERT_ID,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentTypeId: "ct_alert",
       createdBy: "maya",
       createdAt: env.now,

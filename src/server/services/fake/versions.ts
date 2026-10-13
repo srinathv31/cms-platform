@@ -9,7 +9,8 @@ import { compareRounds, headOf } from "@/domain/rounds";
 import { notMoved } from "../not-moved";
 import { refusal } from "../results";
 import type { VersionFacts, VersionService } from "../versions";
-import { businessZone, currentName, templateById } from "./rows";
+import { businessZone } from "./settings";
+import { currentName, templateById } from "./version-rows";
 import type { FakeState } from "./state";
 import type { FakeDeps } from "./index";
 

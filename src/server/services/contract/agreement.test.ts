@@ -20,6 +20,33 @@ it("seeds the same templates under the same ids", () => {
   expect(Object.keys(local.templates).length).toBeGreaterThan(10);
 });
 
+it("answers who everyone is, and every space and shell, alike", async () => {
+  const slugs = ["all", "coral-offers", "deposits", "card-statements", "nope"];
+  for (const userId of [
+    "maya",
+    "priya",
+    "alex",
+    "eli",
+    "riley",
+    "taylor",
+    "morgan",
+  ]) {
+    const credential = { kind: "in_process" as const, userId };
+    expect(await fake.services().identity.viewer(credential), userId).toEqual(
+      await local.services().identity.viewer(credential),
+    );
+    const [inFake, inLocal] = [await fake.as(userId), await local.as(userId)];
+    expect(await fake.services().identity.shell(inFake), userId).toEqual(
+      await local.services().identity.shell(inLocal),
+    );
+    for (const slug of slugs)
+      expect(
+        await fake.services().identity.space(inFake, { slug }),
+        `${userId} in ${slug}`,
+      ).toEqual(await local.services().identity.space(inLocal, { slug }));
+  }
+});
+
 it.each(["maya", "jordan", "eli", "riley"])(
   "answers every template's history alike for %s, now and after the sunsets pass",
   async (userId) => {

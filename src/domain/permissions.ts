@@ -208,10 +208,9 @@ export function hasActiveTeamAccess(
   );
 }
 
-/** null, undefined and "all" all mean the cross-team context. */
+/** A team id, or null (and undefined) for the cross-team context. */
 function teamIdOf(resource: PermissionResource): string | null {
-  const id = resource.teamId;
-  return id && id !== ALL_SPACE ? id : null;
+  return resource.teamId || null;
 }
 
 // ── Helpers for the UI ────────────────────────────────────────
@@ -229,11 +228,24 @@ export function isCrossTeam(viewer: Viewer): boolean {
   return viewer.platformRole !== null;
 }
 
+/**
+ * A space the viewer can switch to: one team, or "All teams". The URL names it by `slug`; everything
+ * else (permission checks, queries, services) by `teamId`, null for "All teams" (decision 0053).
+ */
 export interface Space {
+  teamId: string | null;
   slug: string;
   name: string;
   kind: "team" | "all";
 }
+
+/** The "All teams" space, for the platform roles. */
+export const ALL_TEAMS_SPACE: Space = {
+  teamId: null,
+  slug: ALL_SPACE,
+  name: "All teams",
+  kind: "all",
+};
 
 /**
  * The team switcher list: "All teams" first for cross-team viewers, then the viewer's active
@@ -241,33 +253,33 @@ export interface Space {
  */
 export function spacesFor(
   viewer: Viewer,
-  allTeams: readonly { slug: string; name: string }[] = [],
+  allTeams: readonly { id: string; slug: string; name: string }[] = [],
 ): Space[] {
-  const teams = new Map<string, string>();
+  const teams = new Map<string, Space>();
+  const add = (teamId: string, slug: string, name: string) =>
+    teams.set(teamId, { teamId, slug, name, kind: "team" });
   for (const m of viewer.memberships) {
     if (m.status === "active" && m.roles.length > 0)
-      teams.set(m.teamSlug, m.teamName);
+      add(m.teamId, m.teamSlug, m.teamName);
   }
-  if (isCrossTeam(viewer)) for (const t of allTeams) teams.set(t.slug, t.name);
+  if (isCrossTeam(viewer)) for (const t of allTeams) add(t.id, t.slug, t.name);
 
-  const teamSpaces: Space[] = [...teams]
-    .map(([slug, name]) => ({ slug, name, kind: "team" as const }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  return isCrossTeam(viewer)
-    ? [{ slug: ALL_SPACE, name: "All teams", kind: "all" }, ...teamSpaces]
-    : teamSpaces;
+  const teamSpaces = [...teams.values()].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+  return isCrossTeam(viewer) ? [ALL_TEAMS_SPACE, ...teamSpaces] : teamSpaces;
 }
 
-/** Where the viewer lands. null means no team yet: they must request access. */
+/** Where the viewer lands, as the slug the URL names. null means no team yet: they must request access. */
 export function defaultSpace(viewer: Viewer): string | null {
   return spacesFor(viewer)[0]?.slug ?? null;
 }
 
-export function canSeeSpace(viewer: Viewer, slug: string): boolean {
-  if (isCrossTeam(viewer)) return true;
-  if (slug === ALL_SPACE) return false;
-  return viewer.memberships.some(
-    (m) => m.status === "active" && m.teamSlug === slug && m.roles.length > 0,
-  );
+/**
+ * Whether the viewer may enter a space: a team by its id, or "All teams" (null). Entering a space is
+ * seeing its templates, so this is `template.view` there: every role on the team, and the platform roles
+ * everywhere.
+ */
+export function canSeeSpace(viewer: Viewer, teamId: string | null): boolean {
+  return can(viewer, "template.view", { teamId }).ok;
 }

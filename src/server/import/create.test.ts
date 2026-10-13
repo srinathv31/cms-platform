@@ -122,7 +122,7 @@ describe("importTemplate", () => {
       where: eq(templates.id, res.templateId),
     });
     expect(tpl).toMatchObject({
-      teamId: "coral-offers",
+      teamId: "t_coral",
       starterKey: null,
       createdBy: "maya",
     });

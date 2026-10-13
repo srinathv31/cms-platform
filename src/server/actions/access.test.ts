@@ -75,7 +75,7 @@ beforeEach(() => {
   vi.mocked(revalidatePath).mockClear();
 });
 
-const membershipOf = async (userId: string, teamId = "coral-offers") => {
+const membershipOf = async (userId: string, teamId = "t_coral") => {
   const m = await db.query.memberships.findFirst({
     where: and(eq(memberships.userId, userId), eq(memberships.teamId, teamId)),
   });
@@ -86,7 +86,7 @@ const membershipOf = async (userId: string, teamId = "coral-offers") => {
     .where(eq(membershipRoles.membershipId, m.id));
   return { ...m, roles: roles.map((r) => r.role).sort() };
 };
-const membershipId = async (userId: string, teamId = "coral-offers") =>
+const membershipId = async (userId: string, teamId = "t_coral") =>
   (await membershipOf(userId, teamId))!.id;
 const auditAt = (at: Date) =>
   db
@@ -104,14 +104,14 @@ const requestCount = async () =>
   (await db.select().from(accessRequests)).length;
 const coralRecert = async () =>
   (await db.query.recertifications.findFirst({
-    where: eq(recertifications.teamId, "coral-offers"),
+    where: eq(recertifications.teamId, "t_coral"),
   }))!;
 
 /** Morgan has asked for Author on Coral Offers, and the request waits for Alex. Returns its id. */
 async function morganAsks() {
   await as("morgan");
   const result = await requestAccess({
-    teamId: "coral-offers",
+    teamId: "t_coral",
     role: "author",
     reason: "  Drafting the spring offers.  ",
   });
@@ -174,7 +174,7 @@ describe("requesting and deciding access", () => {
   it("Morgan asks for Author on Coral Offers; Alex (the Team Admin) is told", async () => {
     const at = await as("morgan");
     const result = await requestAccess({
-      teamId: "coral-offers",
+      teamId: "t_coral",
       role: "author",
       reason: "  Drafting the spring offers.  ",
     });
@@ -193,7 +193,7 @@ describe("requesting and deciding access", () => {
       }),
     ).toMatchObject({
       userId: "morgan",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       role: "author",
       reason: "Drafting the spring offers.",
       status: "pending",
@@ -201,7 +201,7 @@ describe("requesting and deciding access", () => {
     });
     expect(
       (await auditAt(at)).map((r) => [r.action, r.actorId, r.teamId]),
-    ).toEqual([["access.requested", "morgan", "coral-offers"]]);
+    ).toEqual([["access.requested", "morgan", "t_coral"]]);
     expect(
       (await notificationsAt(at)).map((n) => [
         n.userId,
@@ -225,7 +225,7 @@ describe("requesting and deciding access", () => {
     await as("morgan");
     expect(
       await requestAccess({
-        teamId: "coral-offers",
+        teamId: "t_coral",
         role: "viewer",
         reason: "Also this.",
       }),
@@ -235,7 +235,7 @@ describe("requesting and deciding access", () => {
     });
     expect(
       await requestAccess({
-        teamId: "deposits",
+        teamId: "t_deposits",
         role: "viewer",
         reason: "   ",
       }),
@@ -245,7 +245,7 @@ describe("requesting and deciding access", () => {
     });
     expect(
       await requestAccess({
-        teamId: "deposits",
+        teamId: "t_deposits",
         role: "team_admin" as never,
         reason: "Please.",
       }),
@@ -264,7 +264,7 @@ describe("requesting and deciding access", () => {
     await as("maya");
     expect(
       await requestAccess({
-        teamId: "coral-offers",
+        teamId: "t_coral",
         role: "author",
         reason: "Again.",
       }),
@@ -290,7 +290,7 @@ describe("requesting and deciding access", () => {
     });
     await as("alex");
     const own = await requestAccess({
-      teamId: "coral-offers",
+      teamId: "t_coral",
       role: "viewer",
       reason: "Checking the read-only view.",
     });
@@ -420,7 +420,7 @@ describe("the Auditor holds no team role (adversarial review fix)", () => {
     const at = await as("taylor");
     expect(
       await requestAccess({
-        teamId: "deposits",
+        teamId: "t_deposits",
         role: "approver",
         reason: "Spot checks.",
       }),
@@ -436,7 +436,7 @@ describe("the Auditor holds no team role (adversarial review fix)", () => {
     await db.insert(accessRequests).values({
       id: "ar_taylor_test",
       userId: "taylor",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       role: "approver",
       reason: "Made before the audit role.",
       createdAt: BASE,
@@ -486,7 +486,7 @@ describe("members", () => {
     await as("alex");
     expect(
       await removeMember({
-        membershipId: await membershipId("priya", "deposits"),
+        membershipId: await membershipId("priya", "t_deposits"),
       }),
     ).toEqual({
       ok: false,
@@ -748,7 +748,7 @@ describe("recertification", () => {
       ok: false,
       ...REASONS.generic,
     });
-    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({
+    expect(await startRecertification({ teamId: "t_coral" })).toEqual({
       ok: false,
       ...REASONS.generic,
     });
@@ -780,7 +780,7 @@ describe("recertification", () => {
       }),
     ).toEqual({ ok: true });
     expect(await membershipOf("priya")).toBeNull();
-    expect(await membershipOf("priya", "deposits")).toMatchObject({
+    expect(await membershipOf("priya", "t_deposits")).toMatchObject({
       status: "active",
     }); // other teams untouched
     expect((await auditAt(at)).map((r) => r.action)).toEqual([
@@ -838,7 +838,7 @@ describe("recertification", () => {
   it("starts a new review over the current members, due in 30 days; only one at a time", async () => {
     await closeReview();
     const at = await as("alex");
-    const result = await startRecertification({ teamId: "coral-offers" });
+    const result = await startRecertification({ teamId: "t_coral" });
     expect(result).toEqual({
       ok: true,
       recertId: expect.stringMatching(/^rc_/),
@@ -849,7 +849,7 @@ describe("recertification", () => {
         where: eq(recertifications.id, result.recertId),
       }),
     ).toMatchObject({
-      teamId: "coral-offers",
+      teamId: "t_coral",
       startsAt: at,
       dueAt: new Date(at.getTime() + 30 * DAY),
       completedAt: null,
@@ -871,7 +871,7 @@ describe("recertification", () => {
     ]);
 
     await as("alex");
-    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({
+    expect(await startRecertification({ teamId: "t_coral" })).toEqual({
       ok: false,
       ...ACCESS_REFUSALS.reviewOpen,
     });
@@ -880,13 +880,13 @@ describe("recertification", () => {
   it("runs the sweep first: a past-due review is closed, with its lapses, before a new one starts", async () => {
     await closeReview();
     await as("alex");
-    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({
+    expect(await startRecertification({ teamId: "t_coral" })).toEqual({
       ok: true,
       recertId: expect.stringMatching(/^rc_/),
     });
     const open = await db.query.recertifications.findFirst({
       where: and(
-        eq(recertifications.teamId, "coral-offers"),
+        eq(recertifications.teamId, "t_coral"),
         isNull(recertifications.completedAt),
       ),
     });
@@ -895,7 +895,7 @@ describe("recertification", () => {
     await as("alex");
     env.now = new Date(open.dueAt.getTime() + DAY); // the deadline passed with nobody signing in
     // Every undecided member ended at the deadline, so nobody is left for a new review.
-    expect(await startRecertification({ teamId: "coral-offers" })).toEqual({
+    expect(await startRecertification({ teamId: "t_coral" })).toEqual({
       ok: false,
       ...ACCESS_REFUSALS.nobodyToReview,
     });

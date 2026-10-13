@@ -51,7 +51,7 @@ const { RecertificationView } = await import("./team/recertification-view");
 const { TimeZoneSectionView } = await import("./platform/time-zone");
 
 const OK = { ok: true } as const;
-const TEAM = { id: "coral-offers", slug: "coral-offers", name: "Coral Offers" };
+const TEAM = { id: "t_coral", slug: "coral-offers", name: "Coral Offers" };
 const person = (id: string, name: string) => ({
   id,
   name,

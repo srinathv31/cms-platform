@@ -23,19 +23,18 @@ let tick = 0;
 const instant = () => new Date(BASE.getTime() + ++tick * 1000);
 
 describe("accessHref", () => {
-  it("builds links from team ids (which are the slugs)", () => {
+  it("builds a team's link under its slug, never its id", () => {
     expect(
-      accessHref({
-        to: "settings",
-        teamId: "coral-offers",
-        section: "access-requests",
-      }),
+      accessHref(
+        { to: "settings", teamId: "t_coral", section: "access-requests" },
+        "coral-offers",
+      ),
     ).toBe("/coral-offers/settings/access-requests");
-    expect(accessHref({ to: "library", teamId: "deposits" })).toBe(
-      "/deposits/library",
-    );
-    expect(accessHref({ to: "request-access" })).toBe("/request-access");
-    expect(accessHref({ to: "platform", section: "teams" })).toBe(
+    expect(
+      accessHref({ to: "library", teamId: "t_deposits" }, "deposits"),
+    ).toBe("/deposits/library");
+    expect(accessHref({ to: "request-access" }, null)).toBe("/request-access");
+    expect(accessHref({ to: "platform", section: "teams" }, null)).toBe(
       "/all/settings/teams",
     );
   });
@@ -47,19 +46,19 @@ describe("resolveAccessRecipients", () => {
       expect(
         await resolveAccessRecipients(tx, {
           kind: "team_admins",
-          teamId: "coral-offers",
+          teamId: "t_coral",
         }),
       ).toEqual(["alex"]);
       expect(
         await resolveAccessRecipients(tx, {
           kind: "team_admins",
-          teamId: "deposits",
+          teamId: "t_deposits",
         }),
       ).toEqual(["naomi"]);
       expect(
         await resolveAccessRecipients(tx, {
           kind: "team_admins",
-          teamId: "coral-offers",
+          teamId: "t_coral",
           exceptUserIds: ["alex"],
         }),
       ).toEqual([]);
@@ -81,13 +80,13 @@ describe("writeAccessEffects", () => {
       {
         kind: "audit",
         action: "access.requested",
-        teamId: "coral-offers",
+        teamId: "t_coral",
         details: { userId: "morgan", role: "author" },
       },
       {
         kind: "audit",
         action: "access.lapsed",
-        teamId: "coral-offers",
+        teamId: "t_coral",
         actorId: null,
         at: backdated,
         details: { userId: "sam" },
@@ -97,15 +96,15 @@ describe("writeAccessEffects", () => {
         notification: "access_requested",
         to: {
           kind: "team_admins",
-          teamId: "coral-offers",
+          teamId: "t_coral",
           exceptUserIds: ["morgan"],
         },
-        teamId: "coral-offers",
+        teamId: "t_coral",
         title: "Morgan Lee asked for Author access to Coral Offers.",
         body: "Drafting.",
         link: {
           to: "settings",
-          teamId: "coral-offers",
+          teamId: "t_coral",
           section: "access-requests",
         },
       },
@@ -122,7 +121,7 @@ describe("writeAccessEffects", () => {
     expect(audit.at(-1)).toMatchObject({
       actorId: null,
       at: backdated,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       templateId: null,
     });
     const requested = (
@@ -159,13 +158,13 @@ describe("writeAccessEffects", () => {
           {
             kind: "notification",
             notification: "recert_due",
-            to: { kind: "team_admins", teamId: "coral-offers" },
-            teamId: "coral-offers",
+            to: { kind: "team_admins", teamId: "t_coral" },
+            teamId: "t_coral",
             title:
               "Q1 2027 access review for Coral Offers is due March 3, 2027.",
             link: {
               to: "settings",
-              teamId: "coral-offers",
+              teamId: "t_coral",
               section: "recertification",
             },
           },
@@ -185,7 +184,7 @@ describe("applyMembershipChange", () => {
         kind: "insert",
         membership: {
           userId: "morgan",
-          teamId: "coral-offers",
+          teamId: "t_coral",
           roles: ["author"],
           addedAt: now,
           addedBy: "alex",

@@ -42,7 +42,7 @@ const author: Viewer = {
   platformRole: null,
   memberships: [
     {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
       roles: ["author"],
@@ -174,9 +174,7 @@ describe("serverAction", () => {
         { key: "kit_permit", value: "x" },
         {
           authorize: ({ viewer }) =>
-            permit(
-              canComment(viewer, { teamId: "coral-offers", version: active }),
-            ),
+            permit(canComment(viewer, { teamId: "t_coral", version: active })),
         },
       ),
     ).toEqual({ ok: false, ...COMMENT_REFUSALS.closed });

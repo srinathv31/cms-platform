@@ -6,7 +6,7 @@ import { refresh, revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { eq } from "drizzle-orm";
 import { demoToolsRefusal } from "@/domain/demo";
-import { canSeeSpace, defaultSpace } from "@/domain/permissions";
+import { defaultSpace, isCrossTeam, spacesFor } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
 import { runAccessSweep } from "@/server/access-sweep";
@@ -15,7 +15,8 @@ import { DEMO_MODE } from "@/server/config";
 import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema/ucomp";
 import { runSunsetSweep } from "@/server/sunset-sweep";
-import { getPersonas, getViewer, PERSONA_COOKIE } from "@/server/viewer";
+import { getPersonas } from "@/server/queries/personas";
+import { getViewer, PERSONA_COOKIE } from "@/server/viewer";
 
 const YEAR = 60 * 60 * 24 * 365;
 
@@ -81,7 +82,11 @@ export async function switchPersona(
     refresh();
     return { ok: true };
   }
-  if (canSeeSpace(viewer, segment)) {
+  // The URL names the space by its slug: a platform role sees every one, anyone else the teams they are on.
+  if (
+    isCrossTeam(viewer) ||
+    spacesFor(viewer).some((s) => s.slug === segment)
+  ) {
     refresh();
     return { ok: true };
   }

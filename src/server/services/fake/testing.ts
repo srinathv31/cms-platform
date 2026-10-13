@@ -4,7 +4,7 @@ import type { RequestContext } from "@/server/context/request";
 import { signInRequired } from "@/server/context/sign-in";
 import type { Services } from "../types";
 import { fakeServices } from "./index";
-import { viewerOf } from "./rows";
+import { viewerOf } from "./identity";
 import {
   cloneState,
   seededState,

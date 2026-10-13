@@ -38,7 +38,7 @@ function person(
     platformRole,
     memberships: Object.entries(teams).map(([teamId, roles]) => ({
       teamId,
-      teamSlug: teamId,
+      teamSlug: `slug-of-${teamId}`,
       teamName: teamId,
       roles,
       status: "active" as const,

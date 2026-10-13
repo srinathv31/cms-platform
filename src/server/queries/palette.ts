@@ -7,11 +7,13 @@ import {
   PALETTE_QUERY_MAX,
   paletteTemplates,
 } from "@/domain/palette";
-import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import { can, canSeeSpace } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { RoundRow } from "@/domain/rounds";
 import type { VersionState, Viewer } from "@/domain/types";
 import { refusal, type ReadResult } from "@/server/api/reads";
+import type { RequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
 import { db } from "@/server/db/client";
 import {
   auditEvents,
@@ -42,18 +44,21 @@ const RECENT_SCAN = 200;
  * see here (the palette offers its tabs only then).
  */
 export async function searchPalette(
-  viewer: Viewer,
+  ctx: RequestContext,
   input: { space: string; q: string | null; template: string | null },
 ): Promise<ReadResult<PaletteResults>> {
+  const { viewer } = ctx;
   const parsed = Input.safeParse(input);
   if (!parsed.success) return refusal(400, REQUEST_REFUSALS.invalidSearch);
   const { space, template: currentId } = parsed.data;
-  if (!canSeeSpace(viewer, space))
-    return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
+  // The URL names the space by its slug: resolved to its team once, here (decision 0053).
+  const found = await services().identity.space(ctx, { slug: space });
+  if (!found.ok) return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
+  const { teamId } = found.space;
 
   const query = normalizePaletteQuery(parsed.data.q ?? "");
   const [rows, recentIds] = await Promise.all([
-    spaceTemplates(viewer, space),
+    spaceTemplates(viewer, teamId),
     recentTemplateIds(viewer),
   ]);
   const { recent, templates: listed } = paletteTemplates({
@@ -69,33 +74,35 @@ export async function searchPalette(
     space,
     query,
     // Creating needs a team, so the cross-team space never offers it (as the Library doesn't).
-    canCreate:
-      space !== ALL_SPACE &&
-      can(viewer, "template.create", { teamId: space }).ok,
+    canCreate: teamId !== null && can(viewer, "template.create", { teamId }).ok,
     current: currentId !== null && rows.some((r) => r.id === currentId),
     recent,
     templates: listed,
   };
 }
 
-/** The templates the viewer can see in the space ("all": every team), in name order, with the Library's name and status. */
+/**
+ * The templates the viewer can see in the space (a team by id; null, All teams: every team), in name order,
+ * with the Library's name and status.
+ */
 async function spaceTemplates(
   viewer: Viewer,
-  space: string,
+  teamId: string | null,
 ): Promise<PaletteTemplateRow[]> {
   const name = currentName(templates.id);
   const rows = await db
     .select({
       id: templates.id,
       name,
+      teamId: templates.teamId,
       teamSlug: teams.slug,
       teamName: teams.name,
     })
     .from(templates)
     .innerJoin(teams, eq(teams.id, templates.teamId))
-    .where(space === ALL_SPACE ? undefined : eq(teams.slug, space))
+    .where(teamId === null ? undefined : eq(templates.teamId, teamId))
     .orderBy(name);
-  const visible = rows.filter((r) => canSeeSpace(viewer, r.teamSlug));
+  const visible = rows.filter((r) => canSeeSpace(viewer, r.teamId));
   if (visible.length === 0) return [];
 
   // Light columns only: never load `body` for a list.
@@ -119,7 +126,7 @@ async function spaceTemplates(
     if (list) list.push(v);
     else byTemplate.set(v.templateId, [v]);
   }
-  return visible.map((r) => ({
+  return visible.map(({ teamId: _teamId, ...r }) => ({
     ...r,
     status:
       pickLatest(byTemplate.get(r.id) ?? [])?.state ??

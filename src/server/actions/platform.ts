@@ -106,6 +106,7 @@ export async function createTeam(input: {
         .select({ slug: teams.slug, name: teams.name })
         .from(teams);
       const outcome = createTeamRule({
+        id: newId("t"),
         name: input.name,
         description: input.description,
         icon: input.icon,

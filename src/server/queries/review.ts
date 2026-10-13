@@ -180,7 +180,7 @@ const loadInReview = cache(async (spaceSlug: string) => {
   const viewer = space.viewer;
   const inSpace = (v: QueueVersion) => space.isAll || v.teamId === space.teamId;
   const namedElsewhere = (v: QueueVersion) =>
-    !canSeeSpace(viewer, v.teamSlug) &&
+    !canSeeSpace(viewer, v.teamId) &&
     stageApproverIds(
       currentStageOf(v, chainFor(chains, v.contentTypeId)),
     ).includes(viewer.userId);

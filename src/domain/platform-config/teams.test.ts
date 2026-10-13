@@ -44,6 +44,7 @@ describe("slugify", () => {
 describe("createTeam", () => {
   const run = (over: Partial<Parameters<typeof createTeam>[0]> = {}) =>
     createTeam({
+      id: "t_home",
       name: "Home Loans",
       description: "Mortgage disclosures.",
       icon: "home",
@@ -54,12 +55,12 @@ describe("createTeam", () => {
       ...over,
     });
 
-  it("creates the team (id = slug) with its first Team Admin, records it and tells the admin", () => {
+  it("creates the team under the id it is given (never its slug) with its first Team Admin, records it and tells the admin", () => {
     const result = run();
     expect(result).toEqual({
       ok: true,
       team: {
-        id: "home-loans",
+        id: "t_home",
         slug: "home-loans",
         name: "Home Loans",
         description: "Mortgage disclosures.",
@@ -70,7 +71,7 @@ describe("createTeam", () => {
         kind: "insert",
         membership: {
           userId: "alex",
-          teamId: "home-loans",
+          teamId: "t_home",
           roles: ["team_admin"],
           addedAt: NOW,
           addedBy: "riley",
@@ -80,7 +81,7 @@ describe("createTeam", () => {
         {
           kind: "audit",
           action: "platform.config_changed",
-          teamId: "home-loans",
+          teamId: "t_home",
           details: {
             area: "teams",
             summary: "Created team Home Loans with Alex Kim as Team Admin",
@@ -93,7 +94,7 @@ describe("createTeam", () => {
         {
           kind: "audit",
           action: "access.granted",
-          teamId: "home-loans",
+          teamId: "t_home",
           details: {
             userId: "alex",
             userName: "Alex Kim",
@@ -106,9 +107,9 @@ describe("createTeam", () => {
           kind: "notification",
           notification: "team_admin_appointed",
           to: { kind: "user", userId: "alex" },
-          teamId: "home-loans",
+          teamId: "t_home",
           title: "Riley Brooks made you Team Admin of Home Loans.",
-          link: { to: "settings", teamId: "home-loans", section: "members" },
+          link: { to: "settings", teamId: "t_home", section: "members" },
         },
       ],
     });
@@ -296,6 +297,7 @@ describe("validateNewTeam (the Create team form, as the admin types)", () => {
       const { problem } = check(over);
       expect(problem).not.toBeNull();
       const created = createTeam({
+        id: "t_home",
         name: "Home Loans",
         description: "",
         icon: "home",

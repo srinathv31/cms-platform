@@ -713,7 +713,8 @@ export function isNotificationKind(kind: string): kind is AnyNotificationKind {
   return (NOTIFICATION_KINDS as readonly string[]).includes(kind);
 }
 
-type Where = { team: string | null; teamName: string | null };
+/** The notification's team: its slug, for the link, and its name. */
+type Where = { teamSlug: string | null; teamName: string | null };
 
 const NOTIFICATION_FALLBACKS: Record<
   AnyNotificationKind,
@@ -794,9 +795,9 @@ const NOTIFICATION_FALLBACKS: Record<
   },
 };
 
-/** Team ids are their slugs (seed contract). No team: the app's root, which lands in the viewer's space. */
+/** A path in the team's space, by its slug. No team: the app's root, which lands in the viewer's space. */
 function teamPath(w: Where, rest: string): string {
-  return w.team ? `/${w.team}/${rest}` : "/";
+  return w.teamSlug ? `/${w.teamSlug}/${rest}` : "/";
 }
 
 /**

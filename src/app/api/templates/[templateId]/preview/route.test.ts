@@ -476,7 +476,7 @@ describe("POST …/preview: push and SMS", () => {
       );
     await db.insert(templates).values({
       id: ALERT_ID,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentTypeId: "ct_alert",
       createdBy: "maya",
       createdAt: env.now,

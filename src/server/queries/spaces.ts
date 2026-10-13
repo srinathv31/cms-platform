@@ -1,17 +1,16 @@
 import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import { eq, isNull } from "drizzle-orm";
-import { db } from "@/server/db/client";
-import { recertifications, teams } from "@/server/db/schema/ucomp";
-import { demoNow } from "./dynamic";
-import { requireCan } from "./require-can";
-import { requireRequestContext } from "@/server/context/request";
-import { ALL_SPACE, can, spacesFor, type Space } from "@/domain/permissions";
 import type { SidebarCardModel } from "@/domain/access-types";
-import type { Viewer } from "@/domain/types";
+import type { PermissionResult, Viewer } from "@/domain/types";
+import { requireRequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
+import type { SpaceFacts } from "@/server/services/identity";
 import { getHomeCard, getSidebarCards } from "./access";
-import { formatShortDate } from "@/domain/dates";
+
+// The spaces read models: the `[team]` segment resolved to its team, once, at the edge (`requireSpace`), and
+// the sidebar's list of spaces (`getShell`). The identity service resolves and decides (decision 0053: the
+// slug becomes the team's id here, and everything below takes the id); these lay its facts out for the screens.
 
 // ── Settings access (which groups of the settings modal this viewer may use) ──
 
@@ -20,35 +19,26 @@ export interface SettingsAccess {
   platform: boolean;
 }
 
-export function settingsAccessFor(
-  viewer: Viewer,
-  teamSlug: string,
-): SettingsAccess {
-  const teamId = teamSlug === ALL_SPACE ? null : teamSlug;
+function settingsAccess(space: SpaceFacts): SettingsAccess {
   return {
-    team: teamId ? can(viewer, "team.manageMembers", { teamId }).ok : false,
-    platform: can(viewer, "platform.manage").ok,
+    team: space.can.manageMembers.ok,
+    platform: space.can.managePlatform.ok,
   };
 }
 
 // ── One entry per space the viewer can switch to ──
 
-export interface RecertCard {
-  id: string;
-  label: string;
-  dueLabel: string;
-}
-
 export interface SpaceNav {
+  /** The team's id; null for All teams. */
+  teamId: string | null;
+  /** Its name in the URL. */
   slug: string;
   name: string;
-  kind: Space["kind"];
+  kind: SpaceFacts["kind"];
   /** Lucide icon key (teams.icon). */
   icon: string;
   showAudit: boolean;
   settings: SettingsAccess;
-  /** Superseded by `card` (kept until the sidebar switches). */
-  recert: RecertCard | null;
   /** The one dismissible sidebar card for this space (access requests, then recertification). */
   card: SidebarCardModel | null;
 }
@@ -58,70 +48,37 @@ export interface ShellData {
   spaces: SpaceNav[];
   /** The card for a viewer with no space yet (their pending request, on /request-access). */
   homeCard: SidebarCardModel | null;
+  /** Whether the viewer may ask for a role on a team (the Auditor may not). */
+  canRequestAccess: PermissionResult;
 }
 
 /** Everything the sidebar needs, for every space at once, so a team switch never refetches. */
 export const getShell = cache(async (): Promise<ShellData> => {
-  const { viewer } = await requireRequestContext();
-  const teamRows = await db
-    .select({
-      id: teams.id,
-      slug: teams.slug,
-      name: teams.name,
-      icon: teams.icon,
-    })
-    .from(teams)
-    .orderBy(teams.name);
-  // Platform Admin and Auditor get "All teams" first, then every team to step into.
-  const spaces = spacesFor(viewer, teamRows);
-  if (spaces.length === 0) {
-    return {
-      viewer: { userId: viewer.userId, name: viewer.name },
-      spaces: [],
-      homeCard: await getHomeCard(),
-    };
-  }
-
-  const iconBySlug = new Map(teamRows.map((t) => [t.slug, t.icon]));
-
-  // Open recertification (Team Admins only).
-  const nowDate = await demoNow();
-  const openRecerts = await db
-    .select()
-    .from(recertifications)
-    .where(isNull(recertifications.completedAt));
-  const recertByTeam = new Map<string, RecertCard>();
-  for (const r of openRecerts) {
-    if (r.startsAt.getTime() > nowDate.getTime()) continue;
-    if (!can(viewer, "team.manageMembers", { teamId: r.teamId }).ok) continue;
-    const existing = recertByTeam.get(r.teamId);
-    if (existing) continue;
-    recertByTeam.set(r.teamId, {
-      id: r.id,
-      label: r.label,
-      dueLabel: formatShortDate(r.dueAt, nowDate),
-    });
-  }
+  const ctx = await requireRequestContext();
+  const shell = await services().identity.shell(ctx);
+  if (!shell.ok)
+    throw new Error(`The shell refused a signed-in viewer: ${shell.code}`);
+  const base = {
+    viewer: { userId: ctx.viewer.userId, name: ctx.viewer.name },
+    canRequestAccess: shell.can.requestAccess,
+  };
+  if (shell.spaces.length === 0)
+    return { ...base, spaces: [], homeCard: await getHomeCard() };
 
   const cards = await getSidebarCards();
-
   return {
-    viewer: { userId: viewer.userId, name: viewer.name },
+    ...base,
     homeCard: null,
-    spaces: spaces.map((s): SpaceNav => {
-      const isAll = s.slug === ALL_SPACE;
-      const teamId = isAll ? undefined : s.slug;
-      return {
-        slug: s.slug,
-        name: s.name,
-        kind: s.kind,
-        icon: isAll ? "layers" : (iconBySlug.get(s.slug) ?? "users"),
-        showAudit: can(viewer, "audit.view", { teamId }).ok,
-        settings: settingsAccessFor(viewer, s.slug),
-        recert: isAll ? null : (recertByTeam.get(s.slug) ?? null),
-        card: cards[s.slug] ?? null,
-      };
-    }),
+    spaces: shell.spaces.map((space): SpaceNav => ({
+      teamId: space.teamId,
+      slug: space.slug,
+      name: space.name,
+      kind: space.kind,
+      icon: space.icon ?? (space.teamId === null ? "layers" : "users"),
+      showAudit: space.can.viewAudit.ok,
+      settings: settingsAccess(space),
+      card: space.teamId === null ? null : (cards[space.teamId] ?? null),
+    })),
   };
 });
 
@@ -129,34 +86,33 @@ export const getShell = cache(async (): Promise<ShellData> => {
 
 export interface SpaceContext {
   viewer: Viewer;
+  /** The `[team]` segment: the space's name in the URL, for links. */
   slug: string;
   isAll: boolean;
-  /** The team id (same as the slug) or null in the cross-team space. */
+  /** The team's id, which every check and query takes; null in the cross-team space. */
   teamId: string | null;
   name: string;
+  /** Which groups of the settings modal the viewer may use here. */
+  settings: SettingsAccess;
 }
 
 /**
- * Resolves the `[team]` segment for the current viewer. Not found for an unknown slug, and the same page for
- * a team (or "All teams") the viewer can't see: seeing a space is `template.view` there, as
- * `canSeeSpace` answers it for the team switcher and the persona switch.
+ * Resolves the `[team]` segment for the current viewer, once per render (`identity.space`). Not found for an
+ * unknown slug, and the same page for a team (or "All teams") the viewer can't see.
  */
 export const requireSpace = cache(
   async (slug: string): Promise<SpaceContext> => {
-    const { viewer } = await requireRequestContext();
-    const isAll = slug === ALL_SPACE;
-    const team = isAll
-      ? null
-      : ((await db.query.teams.findFirst({ where: eq(teams.slug, slug) })) ??
-        null);
-    if (!isAll && !team) notFound();
-    requireCan(viewer, "template.view", { teamId: team?.id ?? ALL_SPACE });
+    const ctx = await requireRequestContext();
+    const found = await services().identity.space(ctx, { slug });
+    if (!found.ok) notFound();
+    const { space } = found;
     return {
-      viewer,
-      slug,
-      isAll,
-      teamId: team ? team.id : null,
-      name: isAll ? "All teams" : team!.name,
+      viewer: ctx.viewer,
+      slug: space.slug,
+      isAll: space.teamId === null,
+      teamId: space.teamId,
+      name: space.name,
+      settings: settingsAccess(space),
     };
   },
 );

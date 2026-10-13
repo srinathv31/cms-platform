@@ -1,10 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  requireSpaceFromParams,
-  settingsAccessFor,
-} from "@/server/queries/spaces";
+import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { SettingsDialog } from "./settings-dialog";
 import { SettingsNavList } from "./settings-nav-list";
 import { visibleGroups } from "./sections";
@@ -15,7 +12,7 @@ type TeamParams = Promise<{ team: string }>;
 /** Which groups this viewer may use. Streams; bounces anyone with no settings access. */
 async function SettingsNav({ params }: { params: TeamParams }) {
   const space = await requireSpaceFromParams(params);
-  const access = settingsAccessFor(space.viewer, space.slug);
+  const access = space.settings;
   if (visibleGroups(access).length === 0) redirect(`/${space.slug}/library`);
   const trails = access.team ? await getTeamNavTrails(space.slug) : {};
   return (

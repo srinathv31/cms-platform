@@ -1,6 +1,7 @@
 import { sweepSunsets, type SunsetFacts } from "@/domain/lifecycle/sunset";
 import { writeFakeEffects } from "./effects";
-import { activeVersion, businessZone, templateById } from "./rows";
+import { businessZone } from "./settings";
+import { activeVersion, templateById } from "./version-rows";
 import type { FakeState } from "./state";
 import type { FakeStore } from "./store";
 

@@ -93,8 +93,12 @@ export function cannotBeFirstTeamAdmin(
     : null;
 }
 
-/** Creates a team (id = slug, the seed contract) with `admin` as its first Team Admin. */
+/**
+ * Creates a team with `admin` as its first Team Admin. `id` is the new team's id, drawn by the caller: opaque,
+ * never the slug, which only the URL uses (decision 0053).
+ */
 export function createTeam(input: {
+  id: string;
   name: string;
   description: string;
   icon: string;
@@ -123,7 +127,7 @@ export function createTeam(input: {
   if (problem) return refuse(problem);
 
   const team = {
-    id: slug,
+    id: input.id,
     slug,
     name,
     description,

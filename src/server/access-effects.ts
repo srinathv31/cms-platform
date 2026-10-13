@@ -12,6 +12,7 @@ import {
   membershipRoles,
   memberships,
   notifications,
+  teams,
   users,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
@@ -66,7 +67,7 @@ export async function writeAccessEffects(
       (id) => id !== ctx.actorId,
     );
     if (recipients.length === 0) continue;
-    const href = accessHref(effect.link);
+    const href = accessHref(effect.link, await linkSlug(tx, effect.link));
     await tx.insert(notifications).values(
       recipients.map((userId) => ({
         id: newId("nt"),
@@ -118,13 +119,31 @@ export async function resolveAccessRecipients(
     .sort();
 }
 
-/** Team ids are their slugs (seed contract), so every link builds from the id. */
-export function accessHref(link: AccessLink): string {
+/**
+ * The slug of the team a link opens in, read inside the transaction: a link names its team by id, and the URL
+ * by slug (decision 0053). null for a link outside any team.
+ */
+async function linkSlug(tx: Tx, link: AccessLink): Promise<string | null> {
+  if (link.to !== "settings" && link.to !== "library") return null;
+  const [team] = await tx
+    .select({ slug: teams.slug })
+    .from(teams)
+    .where(eq(teams.id, link.teamId))
+    .limit(1);
+  if (!team)
+    throw new Error(
+      `A notification links to team ${link.teamId}, which isn't there.`,
+    );
+  return team.slug;
+}
+
+/** Where a link opens, as an app URL: under `teamSlug`, the slug of the team it names, for a team's link. */
+export function accessHref(link: AccessLink, teamSlug: string | null): string {
   switch (link.to) {
     case "settings":
-      return `/${link.teamId}/settings/${link.section}`;
+      return `/${teamSlug}/settings/${link.section}`;
     case "library":
-      return `/${link.teamId}/library`;
+      return `/${teamSlug}/library`;
     case "request-access":
       return "/request-access";
     case "platform":

@@ -11,7 +11,7 @@ import {
 import { commentAnchors } from "@/domain/comments";
 import { DAY_MS } from "@/domain/dates";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
-import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import { can, canSeeSpace } from "@/domain/permissions";
 import {
   DEFAULT_SMS_MAX_PARTS,
   type MessageTypeRules,
@@ -140,11 +140,10 @@ function findTemplate(templateId: string) {
 /** The template belongs to the space (or the space is "All teams"), and the viewer sees its team. */
 function seesInSpace(
   space: SpaceContext,
-  template: { teamSlug: string },
+  template: { teamId: string },
 ): boolean {
-  if (space.slug !== ALL_SPACE && template.teamSlug !== space.slug)
-    return false;
-  return canSeeSpace(space.viewer, template.teamSlug);
+  if (space.teamId !== null && template.teamId !== space.teamId) return false;
+  return canSeeSpace(space.viewer, template.teamId);
 }
 
 export type ReviewVersionRow = typeof versions.$inferSelect;

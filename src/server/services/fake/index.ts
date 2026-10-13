@@ -3,7 +3,7 @@ import type { AuditService } from "../audit";
 import type { CommentService } from "../comments";
 import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
-import type { IdentityService } from "../identity";
+
 import { notMovedArea } from "../not-moved";
 import type { NotificationService } from "../notifications";
 import type { Clock, ImplementationOptions, TestHooks } from "../options";
@@ -12,6 +12,7 @@ import type { RenderService } from "../render";
 import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
+import { fakeIdentity } from "./identity";
 import { fakeReview } from "./review";
 import type { FakeState } from "./state";
 import { FakeStore } from "./store";
@@ -47,7 +48,7 @@ export function fakeServices(
     hooks: options.hooks ?? {},
   };
   return {
-    identity: notMovedArea<IdentityService>("identity"),
+    identity: fakeIdentity(state),
     review: fakeReview(deps),
     versions: fakeVersions(deps),
     templates: notMovedArea<TemplateService>("templates"),

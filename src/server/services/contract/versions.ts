@@ -28,7 +28,7 @@ export function versionsContract(h: ContractHarness, base: Date) {
       expect(history.asOf).toBe(base.toISOString());
       expect(history.template).toEqual({
         id: templateId,
-        teamId: expect.any(String),
+        teamId: "t_coral",
         teamSlug: "coral-offers",
         name: "Balance Transfer Intro — Terms",
       });

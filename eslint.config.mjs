@@ -119,7 +119,6 @@ const SEAM_NOT_YET = [
   "src/server/queries/platform.ts",
   "src/server/queries/review-shared.ts",
   "src/server/queries/review.ts",
-  "src/server/queries/spaces.ts",
   "src/server/queries/submit-summary.ts",
   "src/server/queries/template-name.ts",
   "src/server/queries/threads.ts",
@@ -130,7 +129,6 @@ const SEAM_NOT_YET = [
   "src/server/sunset-sweep.ts",
   "src/server/templates/create.ts",
   "src/server/version-rows.ts",
-  "src/server/viewer.ts",
 ];
 
 // The editor's public modules: the table under "Public API" in src/editor/README.md. Code outside src/editor

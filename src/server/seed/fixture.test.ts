@@ -3,11 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient, type Client } from "@libsql/client";
 import { getTableColumns, getTableName } from "drizzle-orm";
-import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DAY_MS } from "@/domain/dates";
 import { fileUrlOfPath } from "@/lib/file-url";
+import type { Db } from "@/server/db/client";
 import * as ucomp from "@/server/db/schema/ucomp";
 import {
   FIXTURE_BASE,
@@ -26,7 +27,7 @@ import { buildSeed, seedDatabase, type SeedResult } from "./index";
 
 const dirs: string[] = [];
 let client: Client;
-let db: LibSQLDatabase<typeof ucomp>;
+let db: Db;
 let seeded: SeedResult;
 let fixture: SeedFixture;
 

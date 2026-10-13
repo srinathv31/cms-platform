@@ -182,7 +182,7 @@ describe("getReviewScreen", () => {
     );
     expect(screen.template).toEqual({
       id: ids["cash-back"],
-      teamId: "coral-offers",
+      teamId: "t_coral",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
       family: "document",
@@ -277,9 +277,7 @@ describe("getReviewScreen", () => {
     people.priyaApprover = {
       ...priya,
       memberships: priya.memberships.map((m) =>
-        m.teamId === "coral-offers"
-          ? { ...m, roles: ["author", "approver"] }
-          : m,
+        m.teamId === "t_coral" ? { ...m, roles: ["author", "approver"] } : m,
       ),
     };
     as("priyaApprover");

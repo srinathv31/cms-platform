@@ -134,17 +134,12 @@ describe("getUsageDashboard", () => {
     const s = since();
     const prev = s - USAGE_WINDOW_DAYS * DAY;
     // One denominator: a render is an attempt, succeeded or failed.
-    const ok = await direct("outcome = 'ok' and at >= ?", "coral-offers", [s]);
-    const errors = await direct(
-      "outcome = 'error' and at >= ?",
-      "coral-offers",
-      [s],
-    );
-    const renders = ok + errors;
-    const previous = await direct("at >= ? and at < ?", "coral-offers", [
-      prev,
+    const ok = await direct("outcome = 'ok' and at >= ?", "t_coral", [s]);
+    const errors = await direct("outcome = 'error' and at >= ?", "t_coral", [
       s,
     ]);
+    const renders = ok + errors;
+    const previous = await direct("at >= ? and at < ?", "t_coral", [prev, s]);
 
     expect(d.space).toEqual({
       slug: "coral-offers",
@@ -180,7 +175,7 @@ describe("getUsageDashboard", () => {
     );
 
     const consumers = await libsql.execute({
-      sql: "select count(distinct consumer_id) as n from render_log where is_preview = 0 and consumer_id is not null and at >= ? and at <= ? and template_id in (select id from templates where team_id = 'coral-offers')",
+      sql: "select count(distinct consumer_id) as n from render_log where is_preview = 0 and consumer_id is not null and at >= ? and at <= ? and template_id in (select id from templates where team_id = 't_coral')",
       args: [s, env.now.getTime()],
     });
     expect(d.stats.consumers.value).toBe(Number(consumers.rows[0]!.n));
@@ -254,9 +249,7 @@ describe("getUsageDashboard", () => {
     );
     expect(cells.at(-1)!.date >= d.today).toBe(true);
     const first = Date.parse(`${cells[0]!.date}T00:00:00Z`);
-    expect(d.heatmap.total).toBe(
-      await direct("at >= ?", "coral-offers", [first]),
-    );
+    expect(d.heatmap.total).toBe(await direct("at >= ?", "t_coral", [first]));
     expect(d.heatmap.busiest!.count).toBe(
       Math.max(...cells.map((c) => c.count)),
     );
@@ -267,19 +260,19 @@ describe("getUsageDashboard", () => {
     const day = d.daily.find((x) => x.date === "2026-09-12")!; // the Cash Back burst of failures (22.3 days ago)
     const start = Date.parse("2026-09-12T00:00:00Z");
     expect(day.errors).toBe(
-      await direct("outcome = 'error' and at >= ? and at < ?", "coral-offers", [
+      await direct("outcome = 'error' and at >= ? and at < ?", "t_coral", [
         start,
         start + DAY,
       ]),
     );
     expect(day.count).toBe(
-      await direct("at >= ? and at < ?", "coral-offers", [start, start + DAY]),
+      await direct("at >= ? and at < ?", "t_coral", [start, start + DAY]),
     );
     expect(day.errors).toBeLessThanOrEqual(day.count);
     const week = d.weekly.at(-2)!;
     const ws = Date.parse(`${week.weekStart}T00:00:00Z`);
     expect(week.count).toBe(
-      await direct("at >= ? and at < ?", "coral-offers", [ws, ws + 7 * DAY]),
+      await direct("at >= ? and at < ?", "t_coral", [ws, ws + 7 * DAY]),
     );
     // Every channel's renders, the Payment Due Reminder alert's push and SMS among them.
     expect(
@@ -425,7 +418,7 @@ describe("getUsageDashboard", () => {
       expect(v1.tags).toEqual([{ tone: "danger", text: "renders fail" }]);
       expect(v1).toMatchObject({ sunsetDay: "2026-10-25", sunsetPassed: true });
       expect(d.stats.renders.value).toBe(
-        await direct("at >= ?", "coral-offers", [since()]),
+        await direct("at >= ?", "t_coral", [since()]),
       );
     } finally {
       env.now = BASE;

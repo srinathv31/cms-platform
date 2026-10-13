@@ -52,7 +52,7 @@ export const getNotificationsData = cache(
     const items: NotificationView[] = rows.map((n) => {
       const team = n.teamId ? teamsById.get(n.teamId) : undefined;
       const fallback = notificationFallback(n.kind, {
-        team: team?.slug ?? null,
+        teamSlug: team?.slug ?? null,
         teamName: team?.name ?? null,
       });
       return {

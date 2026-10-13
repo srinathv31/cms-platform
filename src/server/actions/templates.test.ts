@@ -235,9 +235,7 @@ describe("startDraft while another write holds the file", () => {
       .select({ templateId: versions.templateId })
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
-      .where(
-        and(eq(templates.teamId, "coral-offers"), eq(versions.state, "active")),
-      )
+      .where(and(eq(templates.teamId, "t_coral"), eq(versions.state, "active")))
       .limit(1);
     expect(active, "the seed has an Active Coral template").toBeTruthy();
     const { templateId } = active!;
@@ -301,7 +299,7 @@ describe("who wrote a new draft", () => {
       })
       .from(versions)
       .innerJoin(templates, eq(templates.id, versions.templateId))
-      .where(eq(templates.teamId, "coral-offers"));
+      .where(eq(templates.teamId, "t_coral"));
     const open = new Set(
       rows
         .filter((r) => r.state === "draft" || r.state === "in_review")

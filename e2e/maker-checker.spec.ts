@@ -20,6 +20,7 @@ import {
   decisionsOnTemplate,
   membershipOf,
   openDraftOf,
+  teamIdOf,
   versionNumbered,
 } from "./helpers/state";
 
@@ -48,12 +49,13 @@ const changes = new Changes();
 let templateId: string | null = null;
 
 test.beforeAll(async () => {
+  const teamId = await teamIdOf(TEAM);
   expect(
-    (await membershipOf("priya", TEAM))?.roles,
+    (await membershipOf("priya", teamId))?.roles,
     "the seed makes Priya an author on Coral Offers",
   ).toEqual(["author"]);
   // Priya's Approver role, and the template Maya makes below, are taken away again in afterAll.
-  await changes.grantRole("priya", TEAM, "approver");
+  await changes.grantRole("priya", teamId, "approver");
 });
 
 test.afterAll(() => changes.undo());

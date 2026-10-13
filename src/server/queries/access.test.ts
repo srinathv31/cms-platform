@@ -57,7 +57,7 @@ async function morganRequestsAccess() {
   expect(
     (
       await requestAccess({
-        teamId: "coral-offers",
+        teamId: "t_coral",
         role: "author",
         reason: "Spring offers.",
       })
@@ -85,7 +85,7 @@ describe("access read models", () => {
   it("Morgan's pending request replaces the form and fills the home card; Alex's card counts it", async () => {
     await as("alex");
     expect(await getSidebarCards()).toEqual({
-      "coral-offers": expect.objectContaining({
+      t_coral: expect.objectContaining({
         kind: "access_requests",
         count: 1,
         firstName: "Chris",
@@ -98,7 +98,7 @@ describe("access read models", () => {
     const data = await getRequestAccessData();
     expect(data.requests).toEqual([
       expect.objectContaining({
-        teamId: "coral-offers",
+        teamId: "t_coral",
         teamName: "Coral Offers",
         role: "author",
         status: "pending",
@@ -115,13 +115,13 @@ describe("access read models", () => {
 
     await as("alex");
     const cards = await getSidebarCards();
-    expect(cards["coral-offers"]).toMatchObject({
+    expect(cards.t_coral).toMatchObject({
       kind: "access_requests",
       count: 2,
       firstName: "Morgan",
     });
     await as("jordan");
-    expect(await getSidebarCards()).toEqual({ "coral-offers": null });
+    expect(await getSidebarCards()).toEqual({ t_coral: null });
   });
 
   it("Access requests section: pending oldest first; your own request can't be decided", async () => {
@@ -269,7 +269,7 @@ describe("access read models", () => {
       { ok: false, ...ACCESS_REFUSALS.decided },
     ]);
     await as("alex");
-    expect((await getSidebarCards())["coral-offers"]).toMatchObject({
+    expect((await getSidebarCards()).t_coral).toMatchObject({
       kind: "recert_due",
       progressLabel: "0 of 6 confirmed",
     });
@@ -281,7 +281,7 @@ describe("access read models", () => {
     vi.mocked(getViewer).mockResolvedValue(await loadPersona(db, "sam"));
     expect((await getRequestAccessData()).ended).toEqual([
       {
-        teamId: "coral-offers",
+        teamId: "t_coral",
         teamName: "Coral Offers",
         status: "lapsed",
         reason: "recert_unconfirmed",

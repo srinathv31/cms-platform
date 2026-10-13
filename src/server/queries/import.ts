@@ -80,15 +80,14 @@ async function visibleUpload(
   uploadId: string,
 ): Promise<VisibleUpload | null> {
   const row = await db
-    .select({ ...refColumns, teamSlug: teams.slug })
+    .select({ ...refColumns, teamId: templates.teamId })
     .from(uploads)
     .innerJoin(users, eq(users.id, uploads.createdBy))
     .innerJoin(templates, eq(templates.id, uploads.templateId))
-    .innerJoin(teams, eq(teams.id, templates.teamId))
     .where(eq(uploads.id, uploadId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!row || !canSeeSpace(viewer, row.teamSlug)) return null;
+  if (!row || !canSeeSpace(viewer, row.teamId)) return null;
   const kind = kindOfPath(row.path);
   return kind ? { ref: toRef(row, kind), path: row.path } : null;
 }

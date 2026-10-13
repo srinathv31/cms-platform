@@ -17,8 +17,8 @@ export const at = (days: number, ms = 0) => new Date(BASE + days * DAY_MS + ms);
 /** n days before BASE. */
 export const ago = (days: number) => at(-days);
 
-export const CORAL = { id: "coral-offers", name: "Coral Offers" };
-export const DEPOSITS = { id: "deposits", name: "Deposits" };
+export const CORAL = { id: "t_coral", name: "Coral Offers" };
+export const DEPOSITS = { id: "t_deposits", name: "Deposits" };
 export const PEOPLE = {
   alex: { id: "alex", name: "Alex Kim" },
   jordan: { id: "jordan", name: "Jordan Ellis" },

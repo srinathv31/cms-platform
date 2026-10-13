@@ -852,8 +852,8 @@ describe("notification fallbacks", () => {
     expect(NOTIFICATION_KINDS).toHaveLength(18);
     for (const kind of NOTIFICATION_KINDS) {
       for (const where of [
-        { team: "coral-offers", teamName: "Coral Offers" },
-        { team: null, teamName: null },
+        { teamSlug: "coral-offers", teamName: "Coral Offers" },
+        { teamSlug: null, teamName: null },
       ]) {
         const f = notificationFallback(kind, where);
         expect(f.title, kind).toMatch(/^[A-Z].*[.]$/);
@@ -866,7 +866,7 @@ describe("notification fallbacks", () => {
   it("links to the place the person acts", () => {
     const at = (kind: string) =>
       notificationFallback(kind, {
-        team: "coral-offers",
+        teamSlug: "coral-offers",
         teamName: "Coral Offers",
       });
     expect(at("access_requested")).toEqual({
@@ -887,8 +887,10 @@ describe("notification fallbacks", () => {
       href: "/coral-offers/library",
     });
     expect(
-      notificationFallback("access_granted", { team: null, teamName: null })
-        .title,
+      notificationFallback("access_granted", {
+        teamSlug: null,
+        teamName: null,
+      }).title,
     ).toBe("You now have access to your team.");
   });
 });

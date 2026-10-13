@@ -203,7 +203,7 @@ export type AccessRecipients =
   /** Every Platform Admin (additive, R1: the last Team Admin kept past a deadline). */
   | { kind: "platform_admins" };
 
-/** Team ids are their slugs (seed contract), so links build from the id. */
+/** Where a notification opens. A team's link names the team by id; the writer builds the href from its slug. */
 export type TeamSettingsSection =
   "members" | "access-requests" | "recertification" | "inactivity";
 export type PlatformSettingsSection =

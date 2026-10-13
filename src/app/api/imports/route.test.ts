@@ -85,7 +85,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({
       ok: true,
-      team: { id: "coral-offers", slug: "coral-offers" } as never,
+      team: { id: "t_coral", slug: "coral-offers" } as never,
     });
   jar.set.mockReset();
   vi.mocked(cookies).mockClear();

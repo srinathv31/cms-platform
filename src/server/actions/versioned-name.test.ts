@@ -72,11 +72,18 @@ function as(userId: string) {
 
 /** The name the ⌘K palette lists a template by, searched for by its id as Maya in Coral Offers. */
 async function paletteName(id: string) {
-  const result = await searchPalette(people.maya!, {
-    space: "coral-offers",
-    q: id,
-    template: null,
-  });
+  const result = await searchPalette(
+    {
+      viewer: people.maya!,
+      correlationId: "req_test",
+      credential: { kind: "in_process", userId: "maya" },
+    },
+    {
+      space: "coral-offers",
+      q: id,
+      template: null,
+    },
+  );
   return result.ok
     ? result.templates.find((t) => t.id === id)?.name
     : undefined;
@@ -375,7 +382,7 @@ describe("a template with no version at all", () => {
     const id = "UC-NOVERS";
     await db.insert(templates).values({
       id,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentTypeId: "ct_disclosure",
       createdBy: "maya",
       createdAt: env.now,

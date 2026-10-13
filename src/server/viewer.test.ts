@@ -18,6 +18,7 @@ vi.mock("@/server/config", () => ({
   get DEMO_MODE() {
     return env.demoMode;
   },
+  BACKEND: "local",
 }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({

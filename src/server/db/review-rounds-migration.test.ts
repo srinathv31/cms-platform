@@ -128,7 +128,7 @@ async function oldTemplate(
   await insertAsBuilt(schema.templates, [
     {
       id,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentTypeId: "ct_disclosure",
       createdBy: "maya",
       createdAt: created,

@@ -73,7 +73,7 @@ function viewer(
       ? [
           {
             teamId: team,
-            teamSlug: team,
+            teamSlug: `${team}-slug`,
             teamName: team,
             roles,
             status: opts.status ?? "active",
@@ -99,7 +99,8 @@ async function seed() {
   await db.insert(teams).values(
     ["coral", "deposits"].map((id) => ({
       id,
-      slug: id,
+      // Never the id (decision 0053).
+      slug: `${id}-slug`,
       name: id,
       description: "",
       icon: "x",

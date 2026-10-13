@@ -3,7 +3,7 @@ import { quarterLabel } from "@/domain/access/recertification";
 import { formatLongDate } from "@/domain/dates";
 import { reviewPath, versionLabel, type NumberedRound } from "@/domain/rounds";
 import type { SeedCtx, VersionRef } from "./context";
-import { flaggedMembers, recertSubjectIds } from "./teams";
+import { TEAM_SLUGS, flaggedMembers, recertSubjectIds } from "./teams";
 import { userName } from "./people";
 
 // Access requests, recertification and notifications. Lifecycle audit events and consumer notices
@@ -11,7 +11,10 @@ import { userName } from "./people";
 
 export function seedActivity(ctx: SeedCtx) {
   const { sink } = ctx;
-  const coral = "coral-offers";
+  const coral = "t_coral";
+  // A stored link names the team by its slug, as the app builds one (until notifications store link
+  // descriptors, decision 0055).
+  const space = TEAM_SLUGS[coral];
 
   // ── Chris Morales asks to join Coral Offers as an Author ───────
   const requestReason =
@@ -140,7 +143,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "review_requested",
     title: `${userName("maya")} submitted ${cashBack.name} ${sentence(cashBack.versions.v3)} for review.`,
     body: "It adds the required variable annual_fee, a breaking change for consumers.",
-    href: reviewPath(coral, cashBack.id, round(cashBack.versions.v3)),
+    href: reviewPath(space, cashBack.id, round(cashBack.versions.v3)),
     at: 0.9,
   });
   note({
@@ -148,7 +151,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "review_requested",
     title: `${userName("priya")} submitted ${abroad.name} ${sentence(abroad.versions.v1)} for review.`,
     body: "Fraud Operations asked for a push and a text when a card is used outside the US.",
-    href: reviewPath(coral, abroad.id, round(abroad.versions.v1)),
+    href: reviewPath(space, abroad.id, round(abroad.versions.v1)),
     at: 1.2,
   });
   note({
@@ -156,7 +159,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "changes_requested",
     title: `${userName("jordan")} requested changes on ${waiver.name} ${sentence(waiver.versions.v1)}.`,
     body: waiverReason ?? undefined,
-    href: `/${coral}/templates/${waiver.id}`,
+    href: `/${space}/templates/${waiver.id}`,
     at: 3.9,
   });
   note({
@@ -164,7 +167,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "access_requested",
     title: `${userName("chris")} asked for Author access to Coral Offers.`,
     body: requestReason,
-    href: `/${coral}/settings/access-requests`,
+    href: `/${space}/settings/access-requests`,
     at: 1.5,
   });
   note({
@@ -172,7 +175,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "recert_due",
     title: "Recertification is due in 30 days.",
     body: `${label} access review for Coral Offers: confirm ${members.length} members.`,
-    href: `/${coral}/settings/recertification`,
+    href: `/${space}/settings/recertification`,
     at: 4,
   });
   for (const m of flaggedMembers(coral)) {
@@ -181,7 +184,7 @@ export function seedActivity(ctx: SeedCtx) {
       kind: "inactivity_flagged",
       title: `${userName(m.user)} hasn't signed in for 90 days.`,
       body: `Access to Coral Offers is suspended automatically on ${formatLongDate(ctx.at(m.flaggedDaysAgo! - 30))}.`,
-      href: `/${coral}/settings/inactivity`,
+      href: `/${space}/settings/inactivity`,
       at: m.flaggedDaysAgo!,
       read: true,
     });
@@ -191,7 +194,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "sunset_scheduled",
     title: `Sunset set for ${balanceTransfer.name} v1.`,
     body: "Coral still renders v1. It keeps working until the sunset date.",
-    href: `/${coral}/templates/${balanceTransfer.id}`,
+    href: `/${space}/templates/${balanceTransfer.id}`,
     at: 2.2,
   });
 
@@ -201,7 +204,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "changes_requested",
     title: `${userName("jordan")} requested changes on ${cashBack.name} ${sentence(cashBack.versions.v3r1)}.`,
     body: reasonFor(cashBack.versions.v3r1) ?? undefined,
-    href: `/${coral}/templates/${cashBack.id}`,
+    href: `/${space}/templates/${cashBack.id}`,
     at: 2.6,
     read: true,
   });
@@ -209,7 +212,7 @@ export function seedActivity(ctx: SeedCtx) {
     user: "maya",
     kind: "version_live",
     title: `${cashBack.name} v2 is now Active.`,
-    href: `/${coral}/templates/${cashBack.id}`,
+    href: `/${space}/templates/${cashBack.id}`,
     at: 86.5,
     read: true,
   });
@@ -217,7 +220,7 @@ export function seedActivity(ctx: SeedCtx) {
     user: "maya",
     kind: "version_live",
     title: `${reminder.name} v1 is now Active.`,
-    href: `/${coral}/templates/${reminder.id}`,
+    href: `/${space}/templates/${reminder.id}`,
     at: 51.5,
     read: true,
   });
@@ -225,7 +228,7 @@ export function seedActivity(ctx: SeedCtx) {
     user: "priya",
     kind: "version_live",
     title: `${balanceTransfer.name} v2 is now Active.`,
-    href: `/${coral}/templates/${balanceTransfer.id}`,
+    href: `/${space}/templates/${balanceTransfer.id}`,
     at: 47.5,
     read: true,
   });
@@ -234,7 +237,7 @@ export function seedActivity(ctx: SeedCtx) {
     kind: "version_revoked",
     title: `${holiday.name} v1 was revoked.`,
     body: "Reason: Wrong bonus amount.",
-    href: `/${coral}/templates/${holiday.id}`,
+    href: `/${space}/templates/${holiday.id}`,
     at: 34.3,
     read: true,
   });

@@ -141,7 +141,7 @@ describe("runSunsetSweep across the seed's sunset", () => {
     expect(rows[0]).toMatchObject({
       at: v1.sunsetAt,
       actorId: null,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       templateId,
       versionId: v1.id,
       details: {

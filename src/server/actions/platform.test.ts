@@ -242,17 +242,20 @@ describe("createTeam", () => {
       ok: true,
       slug: "home-loans",
     });
-    expect(
-      await db.query.teams.findFirst({ where: eq(teams.id, "home-loans") }),
-    ).toMatchObject({
-      slug: "home-loans",
+    const team = await db.query.teams.findFirst({
+      where: eq(teams.slug, "home-loans"),
+    });
+    expect(team).toMatchObject({
+      id: expect.stringMatching(/^t_/),
       name: "Home Loans",
       icon: "home",
       createdAt: at,
     });
+    // An opaque id, never the slug (decision 0053).
+    expect(team!.id).not.toBe("home-loans");
     const membership = await db.query.memberships.findFirst({
       where: and(
-        eq(memberships.teamId, "home-loans"),
+        eq(memberships.teamId, team!.id),
         eq(memberships.userId, "alex"),
       ),
     });
@@ -268,8 +271,8 @@ describe("createTeam", () => {
     expect(
       (await auditAt(at)).map((r) => [r.action, r.teamId, r.actorId]).sort(),
     ).toEqual([
-      ["access.granted", "home-loans", "riley"],
-      ["platform.config_changed", "home-loans", "riley"],
+      ["access.granted", team!.id, "riley"],
+      ["platform.config_changed", team!.id, "riley"],
     ]);
     expect(
       (await notificationsAt(at)).map((n) => [n.userId, n.kind, n.href]),
@@ -383,7 +386,7 @@ describe("updateContentType", () => {
     ).toEqual([["platform.config_changed", null, "content_types"]]);
 
     // An existing draft that still has "Rates and fees" submits as before (nothing at submit checks sections).
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     expect((await versionOf(templateId))?.state).toBe("in_review");
 
     // The same list again writes nothing; then back to the seeded sections.
@@ -683,7 +686,7 @@ describe("setBusinessZone", () => {
 
 describe("saveApprovalChain", () => {
   it("adds Dana Park's Legal reviewer stage; versions in review keep their stage", async () => {
-    const waiting = await submitted("coral-offers", "maya");
+    const waiting = await submitted("t_coral", "maya");
     const at = as("riley");
     expect(
       await saveApprovalChain({
@@ -729,7 +732,7 @@ describe("saveApprovalChain", () => {
 
   it("leaves a version in review as it is when stages are reordered: it keeps its own stages", async () => {
     const legalId = await addLegalStage();
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     const own = [
       { id: TEAM_STAGE, name: "Team approver" },
       { id: legalId, name: "Legal reviewer" },
@@ -873,7 +876,7 @@ describe("saveApprovalChain", () => {
     await db.insert(memberships).values({
       id: "m_casey",
       userId: "casey",
-      teamId: "deposits",
+      teamId: "t_deposits",
       status: "active",
       addedAt: BASE,
     });
@@ -1065,7 +1068,7 @@ describe("saveApprovalChain", () => {
 
   it("when a waiting stage names someone else, they're told about the versions already waiting", async () => {
     const legalId = await addLegalStage();
-    const templateId = await submitted("coral-offers", "maya"); // waits on the Team approver stage
+    const templateId = await submitted("t_coral", "maya"); // waits on the Team approver stage
     const at = as("riley");
     const stages = (rule: ApproverRule) => [
       { id: TEAM_STAGE, name: "Team approver", rule },
@@ -1099,7 +1102,7 @@ describe("saveApprovalChain", () => {
 
   it("when a waiting stage goes back to the team's approvers, nobody who wrote the version is told", async () => {
     const legalId = await addLegalStage();
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     // Alex holds Approver on Coral Offers; say he edited Maya's draft too.
     await db
       .update(versions)
@@ -1138,7 +1141,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
   });
 
   it("Maya submits → Jordan approves stage 1 → it waits on Dana → Dana approves stage 2 → Active", async () => {
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
 
     as("dana");
     expect(await getReviewBadgeCount("coral-offers")).toBe(0);
@@ -1233,7 +1236,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
   });
 
   it("refuses anyone the Legal stage doesn't name, and the submitter", async () => {
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     as("jordan");
     expect(await approve(templateId)).toMatchObject({
       ok: true,
@@ -1289,7 +1292,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
         ],
       }),
     ).toEqual({ ok: true });
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
 
     as("jordan");
     expect(await approve(templateId)).toMatchObject({
@@ -1339,7 +1342,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
   });
 
   it("refuses removing the Legal stage while a version waits on it", async () => {
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     as("jordan");
     expect(await approve(templateId)).toMatchObject({
       ok: true,
@@ -1367,7 +1370,7 @@ describe("two-stage approval: Team approver, then Dana Park's Legal reviewer", (
   });
 
   it("Dana decides a Deposits submission from her own space, with no Deposits membership", async () => {
-    const templateId = await submitted("deposits", "eli");
+    const templateId = await submitted("t_deposits", "eli");
     as("naomi");
     expect(await approve(templateId)).toMatchObject({
       ok: true,
@@ -1449,7 +1452,7 @@ describe("editing the chain while versions are in review: each version keeps the
 
   it("the review's stall: Dana approves Legal, the chain is reordered, Jordan approves Team and it goes Active", async () => {
     await setChain([legal, team]);
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     as("dana");
     expect(await approve(templateId)).toEqual({
       ok: true,
@@ -1496,7 +1499,7 @@ describe("editing the chain while versions are in review: each version keeps the
 
   it("a stage inserted before the one it waits on isn't added to it, and it doesn't skip the one it waits on", async () => {
     await setChain([team, legal]);
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     as("jordan");
     expect(await approve(templateId)).toEqual({
       ok: true,
@@ -1536,7 +1539,7 @@ describe("editing the chain while versions are in review: each version keeps the
     ]);
 
     // A version submitted now goes through all three.
-    const next = await submitted("coral-offers", "maya");
+    const next = await submitted("t_coral", "maya");
     expect((await versionOf(next))?.stages?.map((s) => s.name)).toEqual([
       "Team approver",
       "Compliance",
@@ -1550,9 +1553,9 @@ describe("editing the chain while versions are in review: each version keeps the
       rule: { kind: "user", userId: "naomi" } as ApproverRule,
     };
     await setChain([team, compliance, legal]);
-    await submitted("coral-offers", "maya"); // another version in review on the three stages
+    await submitted("t_coral", "maya"); // another version in review on the three stages
     const current = await chain();
-    const templateId = await submitted("coral-offers", "maya"); // recorded Team, Compliance, Legal; waits on Team
+    const templateId = await submitted("t_coral", "maya"); // recorded Team, Compliance, Legal; waits on Team
     as("riley");
     const withoutCompliance = current
       .filter((s) => s.name !== "Compliance")
@@ -1577,7 +1580,7 @@ describe("editing the chain while versions are in review: each version keeps the
   });
 
   it("a new rule on the stage it waits on reaches it: Naomi decides what waited on Dana", async () => {
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     as("jordan");
     expect(await approve(templateId)).toEqual({
       ok: true,
@@ -1634,7 +1637,7 @@ describe("editing the chain while versions are in review: each version keeps the
 
   it("a waiting stage changed to name someone who already approved the version asks nobody; another change unblocks it", async () => {
     await setChain([team, legal]);
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     as("jordan");
     expect(await approve(templateId)).toEqual({
       ok: true,
@@ -1706,7 +1709,7 @@ describe("a bare review link a stage reviewer outside the team was sent before a
   });
 
   it("opens the round Naomi sent back while the next round waits on a stage that doesn't name her; the team gets the head", async () => {
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     const asked = as("jordan");
     expect(await approve(templateId)).toEqual({
       ok: true,
@@ -1877,7 +1880,7 @@ describe("the stages backfill in the migration", () => {
   });
 
   it("someone who approved before the migration can't approve the stage their approval was matched to", async () => {
-    const templateId = await submitted("coral-offers", "maya");
+    const templateId = await submitted("t_coral", "maya");
     const version = (await versionOf(templateId))!;
     // The data as it stood before stage ids: under [First approver, Team approver] Jordan approved the
     // first stage; an admin then removed it and the version moved to position 0, the Team approver stage.

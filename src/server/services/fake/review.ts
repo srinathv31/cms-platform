@@ -11,13 +11,13 @@ import type { ReviewService } from "../review";
 import type { Changed } from "../types";
 import { writeFakeEffects } from "./effects";
 import type { FakeDeps } from "./index";
+import { businessZone } from "./settings";
 import {
   activeVersion,
-  businessZone,
   compareAndSetVersion,
   findRound,
   templateById,
-} from "./rows";
+} from "./version-rows";
 
 // The review lifecycle in memory: the same steps as the local implementation (services/local/review.ts) in the
 // same order, the same domain rules, and the writes into the fake's state. The clock is read before the

@@ -153,7 +153,7 @@ describe("searchActiveTemplates", () => {
     expect(balance).toEqual({
       id: id("balance-transfer"),
       name: "Balance Transfer Intro — Terms",
-      team: { id: "coral-offers", name: "Coral Offers" },
+      team: { id: "t_coral", name: "Coral Offers" },
       contentType: { key: "disclosure", name: "Disclosure" },
       activeVersion: 2,
       activatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
@@ -367,7 +367,7 @@ describe("getTemplateDetail", () => {
     expect(d).toMatchObject({
       id: id("balance-transfer"),
       name: "Balance Transfer Intro — Terms",
-      team: { id: "coral-offers", name: "Coral Offers" },
+      team: { id: "t_coral", name: "Coral Offers" },
       contentType: { key: "disclosure", name: "Disclosure" },
       asOf: BASE.toISOString(),
       activeVersion: 2,

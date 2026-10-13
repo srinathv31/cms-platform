@@ -36,6 +36,7 @@ export {
   moveApprovalStage,
   setSetting,
   setting,
+  teamIdOf,
   withAllowedChannels,
 } from "./platform";
 export type * from "./records";

@@ -3,12 +3,17 @@ import type { SeedCtx } from "./context";
 import { userName } from "./people";
 import { platformConfigDetails } from "./platform";
 
-export const TEAM_IDS = [
-  "coral-offers",
-  "deposits",
-  "card-statements",
-] as const;
+// A team's id is opaque and never its slug (decision 0053): the URL names a team by its slug, everything
+// stored names it by its id, and a place that swaps one for the other fails a test because they differ.
+export const TEAM_IDS = ["t_coral", "t_deposits", "t_cards"] as const;
 export type TeamId = (typeof TEAM_IDS)[number];
+
+/** Each seeded team's slug: its name in the URL. */
+export const TEAM_SLUGS: Record<TeamId, string> = {
+  t_coral: "coral-offers",
+  t_deposits: "deposits",
+  t_cards: "card-statements",
+};
 
 const TEAMS: {
   id: TeamId;
@@ -22,7 +27,7 @@ const TEAMS: {
   smsSender: string;
 }[] = [
   {
-    id: "coral-offers",
+    id: "t_coral",
     name: "Coral Offers",
     description:
       "Card offer disclosures: balance transfers, cash back and promotional terms.",
@@ -32,7 +37,7 @@ const TEAMS: {
     smsSender: "26725",
   },
   {
-    id: "deposits",
+    id: "t_deposits",
     name: "Deposits",
     description:
       "Savings and checking disclosures: rates, fees and account terms.",
@@ -42,7 +47,7 @@ const TEAMS: {
     smsSender: "33767",
   },
   {
-    id: "card-statements",
+    id: "t_cards",
     name: "Card Statements",
     description:
       "Statement inserts: rate changes, enrollment notices and annual notices.",
@@ -68,35 +73,35 @@ interface Member {
 export const MEMBERS: Member[] = [
   {
     user: "alex",
-    team: "coral-offers",
+    team: "t_coral",
     roles: ["team_admin", "approver"],
     addedDaysAgo: 400,
     addedBy: "riley",
   },
   {
     user: "jordan",
-    team: "coral-offers",
+    team: "t_coral",
     roles: ["approver"],
     addedDaysAgo: 380,
     addedBy: "alex",
   },
   {
     user: "maya",
-    team: "coral-offers",
+    team: "t_coral",
     roles: ["author"],
     addedDaysAgo: 370,
     addedBy: "alex",
   },
   {
     user: "priya",
-    team: "coral-offers",
+    team: "t_coral",
     roles: ["author"],
     addedDaysAgo: 340,
     addedBy: "alex",
   },
   {
     user: "sam",
-    team: "coral-offers",
+    team: "t_coral",
     roles: ["viewer"],
     addedDaysAgo: 300,
     addedBy: "alex",
@@ -104,7 +109,7 @@ export const MEMBERS: Member[] = [
   // Last signed in 95 days ago: flagged 5 days ago, suspended automatically 25 days from now.
   {
     user: "devon",
-    team: "coral-offers",
+    team: "t_coral",
     roles: ["viewer"],
     addedDaysAgo: 250,
     addedBy: "alex",
@@ -112,7 +117,7 @@ export const MEMBERS: Member[] = [
   },
   {
     user: "dana",
-    team: "coral-offers",
+    team: "t_coral",
     roles: ["viewer"],
     addedDaysAgo: 60,
     addedBy: "alex",
@@ -120,21 +125,21 @@ export const MEMBERS: Member[] = [
 
   {
     user: "naomi",
-    team: "deposits",
+    team: "t_deposits",
     roles: ["team_admin", "approver"],
     addedDaysAgo: 380,
     addedBy: "riley",
   },
   {
     user: "eli",
-    team: "deposits",
+    team: "t_deposits",
     roles: ["author"],
     addedDaysAgo: 370,
     addedBy: "naomi",
   },
   {
     user: "priya",
-    team: "deposits",
+    team: "t_deposits",
     roles: ["viewer"],
     addedDaysAgo: 120,
     addedBy: "naomi",
@@ -142,14 +147,14 @@ export const MEMBERS: Member[] = [
 
   {
     user: "hana",
-    team: "card-statements",
+    team: "t_cards",
     roles: ["team_admin", "approver"],
     addedDaysAgo: 360,
     addedBy: "riley",
   },
   {
     user: "marcus",
-    team: "card-statements",
+    team: "t_cards",
     roles: ["author"],
     addedDaysAgo: 350,
     addedBy: "hana",
@@ -160,7 +165,7 @@ export function seedTeams(ctx: SeedCtx) {
   for (const t of TEAMS) {
     ctx.sink.teams.push({
       id: t.id,
-      slug: t.id,
+      slug: TEAM_SLUGS[t.id],
       name: t.name,
       description: t.description,
       icon: t.icon,
@@ -184,7 +189,7 @@ export function seedTeams(ctx: SeedCtx) {
         `Created team ${t.name} with ${userName(admin.user)} as Team Admin`,
         {
           teamName: t.name,
-          slug: t.id,
+          slug: TEAM_SLUGS[t.id],
           userId: admin.user,
           userName: userName(admin.user),
         },

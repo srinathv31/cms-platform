@@ -126,8 +126,9 @@ not in wave 2.
 | `app_name`    | `NVARCHAR(100)` | yes  | The app name over the team's push notifications.                                                                                               |
 | `sms_sender`  | `VARCHAR(16)`   | yes  | The short code the team's SMS come from.                                                                                                       |
 
-Today: `createTeam` and the seed set `id = slug`, and about ten call sites use one for the other. Changed by lane F
-(to-do item 3), the seed's team ids included.
+Today: as above. `createTeam` draws an opaque id (`t_` and ten characters) and the seed's are literals (`t_coral`,
+`t_deposits`, `t_cards`); the identity service resolves a URL's slug to the id once (`identity.space`), and every
+check and query below it takes the id.
 
 #### `memberships`
 

@@ -102,7 +102,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
     {
       id: "UC-8Y49K2",
       key: "statement-rate-change",
-      teamId: "card-statements",
+      teamId: "t_cards",
       name: "Statement Insert — Rate Change",
       createdBy: "marcus",
       createdAt: 110,
@@ -141,7 +141,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
     {
       id: "UC-7W726J",
       key: "statement-paperless",
-      teamId: "card-statements",
+      teamId: "t_cards",
       name: "Statement Insert — Paperless Enrollment",
       createdBy: "marcus",
       createdAt: 95,
@@ -183,7 +183,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
     {
       id: "UC-SZZS5Y",
       key: "statement-privacy",
-      teamId: "card-statements",
+      teamId: "t_cards",
       name: "Statement Insert — Annual Privacy Notice",
       createdBy: "marcus",
       createdAt: 9,

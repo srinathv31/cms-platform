@@ -169,7 +169,7 @@ describe("the review loop (scenario 3)", () => {
 
   beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
       name: "Spring Travel Rewards — Terms",
@@ -640,7 +640,7 @@ describe("resubmitting answers the change request", () => {
   // Maya submitted; Jordan left a block comment and then asked for changes on the whole version.
   beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
       name: "Summer Dining Rewards — Terms",
@@ -706,7 +706,7 @@ describe("resubmitting answers the change request", () => {
     expect(await resolvedAudit(resolvedAt)).toEqual([
       expect.objectContaining({
         actorId: "maya",
-        teamId: "coral-offers",
+        teamId: "t_coral",
         templateId,
         versionId: v1Id,
         action: "thread.resolved",
@@ -791,7 +791,7 @@ describe("resubmitting answers the change request", () => {
 
   it("a submit with no open change request writes no thread.resolved row", async () => {
     const { templateId: fresh } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -854,7 +854,7 @@ describe("approveVersion over an Active version", () => {
 
   it("refuses a sunset date that isn't after today, and one that isn't a date", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -909,7 +909,7 @@ describe("a two-stage chain", () => {
 
   it("moves through the stages in order; only the named approver acts on Legal", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -1003,10 +1003,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
       .select({ id: memberships.id })
       .from(memberships)
       .where(
-        and(
-          eq(memberships.userId, "priya"),
-          eq(memberships.teamId, "coral-offers"),
-        ),
+        and(eq(memberships.userId, "priya"), eq(memberships.teamId, "t_coral")),
       );
     await db
       .insert(membershipRoles)
@@ -1026,7 +1023,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   it("Priya edits Maya's draft and Maya submits it: Priya can neither approve nor send it back", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -1090,7 +1087,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   it("writers carry across a change request; the approver who asked can approve the next round", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -1162,7 +1159,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   it("whoever submitted round one stays barred from round two, even without editing it", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -1221,7 +1218,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   it("a change request that finds a draft already open merges the version's writers into it", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -1269,7 +1266,7 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
   it("an approver who only sent it back becomes a writer once they edit the next round", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -1520,7 +1517,7 @@ describe("after the Active version is revoked (handoff review D1)", () => {
   // and still renders; Coral renders v2; then v2 is revoked. Nothing is Active.
   beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
       name: NAME,
@@ -1863,7 +1860,7 @@ describe("a variable renamed in a draft", () => {
   // v1 goes live with `first_name`, and Coral renders it, so it hears about the next version.
   beforeEach(async () => {
     ({ templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
       name: NAME,
@@ -2072,7 +2069,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
 
   it("refuses a summary the draft has moved past, and writes nothing", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -2115,7 +2112,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
 
   it("submits with the rev of a summary read after that save, freezing what it showed", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -2145,7 +2142,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
 
   it("refuses a call without a rev", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -2163,7 +2160,7 @@ describe("submit is a compare-and-set on the summary's rev", () => {
 describe("permission checks come first", () => {
   it("refuses a viewer, and an unknown template the same way, without writing", async () => {
     const { templateId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });
@@ -2233,7 +2230,7 @@ describe("the writers backfill in the migration", () => {
     // the round Jordan sends back carries both writers on; Priya submits another template Maya created.
     const edited = (
       await createTemplateWithDraft(db, {
-        teamId: "coral-offers",
+        teamId: "t_coral",
         createdBy: "maya",
         at: BASE,
       })
@@ -2255,7 +2252,7 @@ describe("the writers backfill in the migration", () => {
     expect(await submitNow(edited)).toEqual({ ok: true, number: 1, round: 2 });
     const submittedByPriya = (
       await createTemplateWithDraft(db, {
-        teamId: "coral-offers",
+        teamId: "t_coral",
         createdBy: "maya",
         at: BASE,
       })
@@ -2325,7 +2322,7 @@ describe("submitting an alert", () => {
   /** A draft turned into an Alert's: its template on the Alert content type, Push and SMS on. */
   async function alertDraft(sms: JSONContent) {
     const { templateId, draftId } = await createTemplateWithDraft(db, {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       createdBy: "maya",
       at: BASE,
     });

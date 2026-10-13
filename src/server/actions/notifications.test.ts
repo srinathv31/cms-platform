@@ -82,7 +82,7 @@ describe("getNotificationsData", () => {
       NOTIFICATION_KINDS.map((kind, i) => ({
         id: `nt_fallback_${i}`,
         userId: "morgan",
-        teamId: "coral-offers",
+        teamId: "t_coral",
         kind,
         title: "",
         body: null,
@@ -118,7 +118,7 @@ describe("getNotificationsData", () => {
         ].map((createdAt, i) => ({
           id: ids[i]!,
           userId: "morgan",
-          teamId: "coral-offers",
+          teamId: "t_coral",
           kind: "recert_due",
           title: "Recertification is due.",
           body: null,

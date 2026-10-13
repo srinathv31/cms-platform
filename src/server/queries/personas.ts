@@ -2,8 +2,12 @@ import "server-only";
 import { cache } from "react";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { membershipRoles, memberships, teams } from "@/server/db/schema/ucomp";
-import { getPersonas } from "@/server/viewer";
+import {
+  membershipRoles,
+  memberships,
+  teams,
+  users,
+} from "@/server/db/schema/ucomp";
 import type { PlatformRole, TeamRole } from "@/domain/types";
 
 export interface PersonaSummary {
@@ -29,6 +33,11 @@ const PLATFORM_LABEL: Record<PlatformRole, string> = {
 
 /** The role order inside a team reads from least to most authority. */
 const ROLE_ORDER: TeamRole[] = ["viewer", "author", "approver", "team_admin"];
+
+/** Switchable personas, in the order the switcher shows them. */
+export const getPersonas = cache(async () =>
+  db.query.users.findMany({ where: eq(users.isPersona, true) }),
+);
 
 /** All switchable personas with their one-line role summary. Order = the switcher's order. */
 export const getPersonaSummaries = cache(

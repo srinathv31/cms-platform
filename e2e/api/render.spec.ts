@@ -1253,7 +1253,7 @@ test.describe("consumers only", () => {
       "Active Deposits version",
       (x) =>
         x.state === "active" &&
-        x.teamId === "deposits" &&
+        x.teamId === "t_deposits" &&
         x.channels.includes("web"),
     );
     await asPersona(
@@ -1278,7 +1278,7 @@ test.describe("consumers only", () => {
     const draft = pick(
       await versions(),
       "open draft in Coral Offers",
-      (v) => v.state === "draft" && v.teamId === "coral-offers",
+      (v) => v.state === "draft" && v.teamId === "t_coral",
     );
     const values = validValues(draft.variables);
     await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
@@ -1351,7 +1351,7 @@ test.describe("consumers only", () => {
     const inReview = pick(
       await versions(),
       "Coral Offers version in review",
-      (v) => v.state === "in_review" && v.teamId === "coral-offers",
+      (v) => v.state === "in_review" && v.teamId === "t_coral",
     );
     await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
       for (const extra of [{ preview: true }, { preview: false }, {}]) {

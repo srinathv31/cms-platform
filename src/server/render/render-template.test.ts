@@ -33,6 +33,12 @@ const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 const { db, libsql: client, ids } = standaloneDatabasePerTest({ base: BASE });
 
+/** The seeded teams' slugs by id: a membership names both, and they differ (decision 0053). */
+const SLUGS: Record<string, string> = {
+  t_coral: "coral-offers",
+  t_deposits: "deposits",
+};
+
 function viewer(
   userId: string,
   teams: { id: string; roles: Viewer["memberships"][number]["roles"] }[],
@@ -45,14 +51,14 @@ function viewer(
     platformRole: null,
     memberships: teams.map((t) => ({
       teamId: t.id,
-      teamSlug: t.id,
+      teamSlug: SLUGS[t.id] ?? t.id,
       teamName: t.id,
       roles: t.roles,
       status: "active",
     })),
   };
 }
-const maya = viewer("maya", [{ id: "coral-offers", roles: ["author"] }]);
+const maya = viewer("maya", [{ id: "t_coral", roles: ["author"] }]);
 const morgan = viewer("morgan", []);
 
 const CUSTOMER = {
@@ -229,7 +235,7 @@ describe("runRender: version rules", () => {
 // preview may name a round, and a preview of an unreleased round its label names says so.
 describe("runRender: rounds", () => {
   const FEE = { ...CUSTOMER, annual_fee: "95" };
-  const eli = viewer("eli", [{ id: "deposits", roles: ["author"] }]);
+  const eli = viewer("eli", [{ id: "t_deposits", roles: ["author"] }]);
   const savingsValues = async (round?: number) =>
     (await findRound(
       db,
@@ -422,7 +428,7 @@ describe("runRender: previews", () => {
 
   it("lets the person the waiting stage names preview that version from outside the team, and nothing else", async () => {
     const naomi = viewer("naomi", [
-      { id: "deposits", roles: ["team_admin", "approver"] },
+      { id: "t_deposits", roles: ["team_admin", "approver"] },
     ]);
     const [stage] = await db
       .select()
@@ -482,7 +488,9 @@ describe("runRender: previews", () => {
     });
     try {
       const values = { ...CUSTOMER, annual_fee: "95" };
-      const naomi = viewer("naomi", [{ id: "deposits", roles: ["approver"] }]);
+      const naomi = viewer("naomi", [
+        { id: "t_deposits", roles: ["approver"] },
+      ]);
       expect(
         ok(
           (

@@ -41,7 +41,7 @@ function context(
   return {
     at: new Date(BASE.getTime() + tick * 1000),
     actorId: "jordan",
-    teamId: "coral-offers",
+    teamId: "t_coral",
     templateId: ids[template]!,
     versionId: "v_test",
     ...over,
@@ -92,7 +92,7 @@ describe("writeEffects: audit", () => {
     expect(rows).toEqual([
       expect.objectContaining({
         actorId: "jordan",
-        teamId: "coral-offers",
+        teamId: "t_coral",
         templateId: ids["cash-back"],
         versionId: ctx.versionId,
         action: "version.submitted",
@@ -146,7 +146,7 @@ describe("writeEffects: notifications", () => {
     const rows = await notificationsAt(ctx.at);
     expect(rows.map((r) => r.userId)).toEqual(["alex", "jordan"]);
     expect(rows[0]).toMatchObject({
-      teamId: "coral-offers",
+      teamId: "t_coral",
       kind: "review_requested",
       title:
         "Maya Chen submitted Cash Back Welcome Bonus — Terms v4 for review.",
@@ -172,7 +172,7 @@ describe("writeEffects: notifications", () => {
     const alex = await db.query.memberships.findFirst({
       where: and(
         eq(memberships.userId, "alex"),
-        eq(memberships.teamId, "coral-offers"),
+        eq(memberships.teamId, "t_coral"),
       ),
     });
     await db

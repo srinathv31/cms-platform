@@ -6,7 +6,7 @@ import { runAccessSweep } from "@/server/access-sweep";
 import { advanceClock } from "@/server/clock";
 import { resetDemo } from "@/server/reset";
 import { runSunsetSweep } from "@/server/sunset-sweep";
-import { getPersonas } from "@/server/viewer";
+import { getPersonas } from "@/server/queries/personas";
 import { advanceClockAction, resetDemoAction } from "./demo";
 import { switchPersona } from "./persona";
 
@@ -32,8 +32,10 @@ vi.mock("@/server/reset", () => ({ resetDemo: vi.fn() }));
 vi.mock("@/server/viewer", () => ({
   DEFAULT_PERSONA: "maya",
   PERSONA_COOKIE: "ucomp_persona",
-  getPersonas: vi.fn(async () => [{ id: "jordan" }]),
   getViewer: vi.fn(),
+}));
+vi.mock("@/server/queries/personas", () => ({
+  getPersonas: vi.fn(async () => [{ id: "jordan" }]),
 }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({ set: env.setCookie }),

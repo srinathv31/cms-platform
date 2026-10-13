@@ -41,7 +41,7 @@ test.describe("the preview route", () => {
       "open draft in Coral Offers with web on",
       (v) =>
         v.state === "draft" &&
-        v.teamId === "coral-offers" &&
+        v.teamId === "t_coral" &&
         v.channels.includes("web"),
     );
     const cid = correlation("preview-draft");
@@ -90,7 +90,7 @@ test.describe("the preview route", () => {
       "open draft in Coral Offers with pdf on",
       (v) =>
         v.state === "draft" &&
-        v.teamId === "coral-offers" &&
+        v.teamId === "t_coral" &&
         v.channels.includes("pdf"),
     );
     await asPersona(playwright, baseURL!, PERSONA_CAN_SEE, async (request) => {
@@ -121,19 +121,19 @@ test.describe("the preview route", () => {
       pick(
         all,
         "Coral Offers version in review",
-        (v) => v.state === "in_review" && v.teamId === "coral-offers",
+        (v) => v.state === "in_review" && v.teamId === "t_coral",
       ),
       pick(
         all,
         "Coral Offers revoked version",
-        (v) => v.state === "revoked" && v.teamId === "coral-offers",
+        (v) => v.state === "revoked" && v.teamId === "t_coral",
       ),
       pick(
         all,
         "Coral Offers Superseded version with an Active successor",
         (v) =>
           v.state === "superseded" &&
-          v.teamId === "coral-offers" &&
+          v.teamId === "t_coral" &&
           v.activeNumber !== null,
       ),
     ];
@@ -176,7 +176,7 @@ test.describe("the preview route", () => {
       "open draft in Coral Offers without email",
       (v) =>
         v.state === "draft" &&
-        v.teamId === "coral-offers" &&
+        v.teamId === "t_coral" &&
         !v.channels.includes("email"),
     );
     const enabled = DOCUMENT_CHANNELS.filter((c) => draft.channels.includes(c));
@@ -219,12 +219,12 @@ test.describe("the preview route", () => {
     const deposits = pick(
       all,
       "open draft in Deposits",
-      (v) => v.state === "draft" && v.teamId === "deposits",
+      (v) => v.state === "draft" && v.teamId === "t_deposits",
     );
     const coral = pick(
       all,
       "open draft in Coral Offers",
-      (v) => v.state === "draft" && v.teamId === "coral-offers",
+      (v) => v.state === "draft" && v.teamId === "t_coral",
     );
 
     for (const [persona, draft] of [
@@ -270,7 +270,7 @@ test.describe("the preview route", () => {
       "Active Coral Offers alert with push and SMS on",
       (v) =>
         v.state === "active" &&
-        v.teamId === "coral-offers" &&
+        v.teamId === "t_coral" &&
         v.channels.includes("push") &&
         v.channels.includes("sms"),
     );
@@ -332,7 +332,7 @@ test.describe("the preview route", () => {
       "open draft in Coral Offers with web on",
       (v) =>
         v.state === "draft" &&
-        v.teamId === "coral-offers" &&
+        v.teamId === "t_coral" &&
         v.channels.includes("web"),
     );
     const wrongOnDraft = required(draft).find((x) => x.type !== "text")!;

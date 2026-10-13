@@ -1,4 +1,3 @@
-import { can } from "@/domain/permissions";
 import { DEMO_MODE } from "@/server/config";
 import { requireRequestContext } from "@/server/context/request";
 import { getShell } from "@/server/queries/spaces";
@@ -37,7 +36,7 @@ export async function TopBarHole() {
         me={me}
         // The switcher is a demo tool (decision 0051). Request time: the viewer is read above.
         personas={DEMO_MODE ? personas : null}
-        canRequestAccess={can(viewer, "access.request").ok}
+        canRequestAccess={shell.canRequestAccess.ok}
       />
     </div>
   );

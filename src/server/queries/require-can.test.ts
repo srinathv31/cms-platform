@@ -15,7 +15,7 @@ const viewer = (over: Partial<Viewer> = {}): Viewer => ({
   platformRole: null,
   memberships: [
     {
-      teamId: "coral-offers",
+      teamId: "t_coral",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
       roles: ["team_admin"],
@@ -28,13 +28,13 @@ const viewer = (over: Partial<Viewer> = {}): Viewer => ({
 describe("requireCan", () => {
   it("goes on when the domain allows the action", () => {
     expect(() =>
-      requireCan(viewer(), "team.manageMembers", { teamId: "coral-offers" }),
+      requireCan(viewer(), "team.manageMembers", { teamId: "t_coral" }),
     ).not.toThrow();
   });
 
   it("is Not found when no role grants it", () => {
     expect(() =>
-      requireCan(viewer(), "team.manageMembers", { teamId: "deposits" }),
+      requireCan(viewer(), "team.manageMembers", { teamId: "t_deposits" }),
     ).toThrow(NOT_FOUND);
     expect(() =>
       requireCan(viewer(), "platform.manage", { teamId: null }),
@@ -44,7 +44,7 @@ describe("requireCan", () => {
   it("is Not found when a guard blocks it, the same as a missing role", () => {
     expect(() =>
       requireCan(viewer(), "team.manageMembers", {
-        teamId: "coral-offers",
+        teamId: "t_coral",
         subjectUserId: "u1",
       }),
     ).toThrow(NOT_FOUND);
@@ -55,7 +55,7 @@ describe("requireCan", () => {
       memberships: [{ ...viewer().memberships[0]!, status: "suspended" }],
     });
     expect(() =>
-      requireCan(suspended, "team.manageMembers", { teamId: "coral-offers" }),
+      requireCan(suspended, "team.manageMembers", { teamId: "t_coral" }),
     ).toThrow(NOT_FOUND);
   });
 });
