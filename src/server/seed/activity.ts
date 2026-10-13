@@ -21,7 +21,7 @@ export function seedActivity(ctx: SeedCtx) {
   const requestReason =
     "I'm joining the Offers content team next week and will draft the spring promotion disclosures.";
   sink.accessRequests.push({
-    id: ctx.id("ar"),
+    id: ctx.id("activity", "ar"),
     userId: "chris",
     teamId: coral,
     role: "author",
@@ -33,7 +33,7 @@ export function seedActivity(ctx: SeedCtx) {
     createdAt: ctx.at(1.5),
   });
   sink.auditEvents.push({
-    id: ctx.id("ae"),
+    id: ctx.id("activity", "ae"),
     at: ctx.at(1.5),
     actorId: "chris",
     teamId: coral,
@@ -42,7 +42,7 @@ export function seedActivity(ctx: SeedCtx) {
   });
 
   // ── Quarterly recertification, due in 30 days ──────────────────
-  const recertId = ctx.id("rc");
+  const recertId = ctx.id("activity", "rc");
   const dueAt = ctx.at(-30);
   const label = quarterLabel(dueAt.getTime());
   sink.recertifications.push({
@@ -64,7 +64,7 @@ export function seedActivity(ctx: SeedCtx) {
     });
   }
   sink.auditEvents.push({
-    id: ctx.id("ae"),
+    id: ctx.id("activity", "ae"),
     at: ctx.at(4),
     actorId: null,
     teamId: coral,
@@ -75,7 +75,7 @@ export function seedActivity(ctx: SeedCtx) {
   // ── Devon Lin: flagged for inactivity 5 days ago (90 days without a sign-in) ──
   for (const m of flaggedMembers(coral)) {
     sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: ctx.id("activity", "ae"),
       at: ctx.at(m.flaggedDaysAgo!),
       actorId: null,
       teamId: coral,
@@ -121,7 +121,7 @@ export function seedActivity(ctx: SeedCtx) {
     read?: boolean;
   }) =>
     sink.notifications.push({
-      id: ctx.id("nt"),
+      id: ctx.id("activity", "nt"),
       userId: n.user,
       teamId: coral,
       kind: n.kind,

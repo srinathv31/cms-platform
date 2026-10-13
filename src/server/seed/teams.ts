@@ -168,7 +168,7 @@ export function seedTeams(ctx: SeedCtx) {
       smsSender: t.smsSender,
     });
     ctx.sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: ctx.id(`team:${t.id}`, "ae"),
       at: ctx.at(t.createdDaysAgo),
       actorId: "riley",
       teamId: t.id,
@@ -178,7 +178,7 @@ export function seedTeams(ctx: SeedCtx) {
   }
 
   for (const m of MEMBERS) {
-    const id = ctx.id("m");
+    const id = ctx.id(`team:${m.team}`, "m");
     ctx.sink.memberships.push({
       id,
       userId: m.user,
@@ -195,7 +195,7 @@ export function seedTeams(ctx: SeedCtx) {
     for (const role of m.roles)
       ctx.sink.membershipRoles.push({ membershipId: id, role });
     ctx.sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: ctx.id(`team:${m.team}`, "ae"),
       at: ctx.at(m.addedDaysAgo),
       actorId: m.addedBy,
       teamId: m.team,

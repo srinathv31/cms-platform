@@ -34,6 +34,9 @@ import { trySubmit } from "@/server/testing/submit-check";
 import { createContext } from "./context";
 import { seedDatabase, type SeedResult } from "./index";
 import { mulberry32 } from "./rng";
+import { buildTemplate } from "./templates/build";
+import { seedCoralTemplates } from "./templates/coral";
+import type { SeedTemplate } from "./templates/types";
 
 const DAY = 86_400_000;
 const REQUIRED = ["offer_details", "rates_and_fees", "legal_notices"];
@@ -180,8 +183,8 @@ describe("ids", () => {
   });
 
   it("keeps the template ids e2e specs, golden files and screenshots name", () => {
-    // One more draw from the shared sequence before a template moves its id and every id after it. A row
-    // added to the seed draws from its own sequence instead (`ctx.keyedId`, `keyedIds` on a thread).
+    // They are literals in the spec (`SeedTemplate.id`): changing one is an edit here and in the spec, and
+    // in every spec and screenshot that names it.
     expect(result.templates).toEqual({
       "balance-transfer": "UC-D6KSGY",
       "cash-back": "UC-J530DX",
@@ -194,26 +197,73 @@ describe("ids", () => {
       "statement-rate-change": "UC-8Y49K2",
       "statement-paperless": "UC-7W726J",
       "statement-privacy": "UC-SZZS5Y",
-      // The alerts are built last, after every document.
       "payment-due-reminder": "UC-EFXFMS",
       "card-used-abroad": "UC-397J2A",
       "rate-change-heads-up": "UC-FYN38M",
     });
   });
 
-  it("draws a keyed id from a sequence of its own: the shared sequence goes on as if it hadn't", () => {
-    const plain = createContext(0);
-    const keyed = createContext(0);
-    const first = keyed.keyedId("high-yield-savings:v2r1:doc", "th");
-    expect(first).toBe(
-      createContext(0).keyedId("high-yield-savings:v2r1:doc", "th"),
+  it("gives every version the id its spec spells out, shaped like the ids the app generates", () => {
+    expect(versions).toHaveLength(23);
+    for (const v of versions)
+      expect(v.id).toMatch(/^v_[0-9a-hjkmnp-tv-z]{10}$/);
+    expect(new Set(versions.map((v) => v.id)).size).toBe(versions.length);
+  });
+
+  it("draws every other id from a sequence named for its scope and prefix", () => {
+    const first = createContext(0);
+    const again = createContext(0);
+    const id = first.id("template:cash-back", "ae");
+    expect(id).toMatch(/^ae_[0-9a-hjkmnp-tv-z]{10}$/);
+    expect(again.id("template:cash-back", "ae")).toBe(id);
+    // Another scope or prefix has a sequence of its own, and draws from it move nothing else's.
+    for (let i = 0; i < 5; i++) again.id("template:balance-transfer", "ae");
+    again.id("template:cash-back", "cn");
+    expect(first.id("template:cash-back", "ae")).toBe(
+      again.id("template:cash-back", "ae"),
     );
-    expect(keyed.keyedId("high-yield-savings:v2r1:doc", "cm")).toMatch(/^cm_/);
-    expect(keyed.keyedId("high-yield-savings:v2r2:doc", "th")).not.toBe(first);
-    expect([keyed.id("v"), keyed.templateId()]).toEqual([
-      plain.id("v"),
-      plain.templateId(),
-    ]);
+    expect(first.id("template:cash-back", "ae")).not.toBe(id);
+  });
+
+  it("adds a row to one template without moving another template's ids", () => {
+    const build = (extraRows: number) => {
+      const ctx = createContext(0);
+      // A row added to Balance Transfer's spec is one more draw from its sequence.
+      for (let i = 0; i < extraRows; i++)
+        ctx.id("template:balance-transfer", "ae");
+      seedCoralTemplates(ctx);
+      return ctx;
+    };
+    const eventIds = (ctx: ReturnType<typeof build>, key: string) =>
+      ctx.sink.auditEvents
+        .filter((e) => e.templateId === ctx.template(key).id)
+        .map((e) => e.id);
+    const noticeIds = (ctx: ReturnType<typeof build>, key: string) =>
+      ctx.sink.consumerNotices
+        .filter((n) => n.templateId === ctx.template(key).id)
+        .map((n) => n.id);
+    const plain = build(0);
+    const added = build(3);
+    for (const key of ["cash-back", "annual-fee-waiver", "holiday-points"]) {
+      expect(eventIds(added, key)).toEqual(eventIds(plain, key));
+      expect(noticeIds(added, key)).toEqual(noticeIds(plain, key));
+    }
+    expect(eventIds(added, "balance-transfer")).not.toEqual(
+      eventIds(plain, "balance-transfer"),
+    );
+  });
+
+  it("refuses an id the spec spells out twice or wrongly", () => {
+    const ctx = createContext(0);
+    ctx.claimId("UC-ABCDEF");
+    expect(() => ctx.claimId("UC-ABCDEF")).toThrow(/used twice/);
+    expect(() =>
+      buildTemplate(ctx, {
+        id: "UC-nope",
+        key: "x",
+        versions: [],
+      } as unknown as SeedTemplate),
+    ).toThrow(/template id/);
   });
 });
 

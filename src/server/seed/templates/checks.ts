@@ -5,12 +5,40 @@
 import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import { isReleased } from "@/domain/rounds";
+import { TEMPLATE_ID_PATTERN } from "@/server/ids";
 import { topLevelIds, variableKeys } from "../content";
 import { SEED_CONTENT_TYPES, type SeedContentType } from "../platform";
 import type { SeedTemplate, SeedVersion } from "./types";
 
 /** A seeded content type as `SEED_CONTENT_TYPES` describes it. */
 export type SeedType = (typeof SEED_CONTENT_TYPES)[SeedContentType];
+
+/** The ids the app generates for a version: `v_` and ten lowercase Crockford characters (`newId`). */
+const VERSION_ID_PATTERN = /^v_[0-9a-hjkmnp-tv-z]{10}$/;
+
+/**
+ * Fails if the ids a spec spells out aren't shaped like the ones the app generates, or two of its versions
+ * share a ref. (`SeedCtx.claimId` refuses an id used twice anywhere in the seed.)
+ */
+export function checkIds(spec: SeedTemplate) {
+  if (!TEMPLATE_ID_PATTERN.test(spec.id)) {
+    throw new Error(`Seed: ${spec.key} has the template id "${spec.id}"`);
+  }
+  const seen = new Set<string>();
+  for (const version of spec.versions) {
+    if (!VERSION_ID_PATTERN.test(version.id)) {
+      throw new Error(
+        `Seed: ${spec.key}/${version.ref} has the version id "${version.id}"`,
+      );
+    }
+    if (seen.has(version.ref)) {
+      throw new Error(
+        `Seed: ${spec.key} has two versions named "${version.ref}"`,
+      );
+    }
+    seen.add(version.ref);
+  }
+}
 
 /** A numbered version's round: 1 unless the seed says otherwise. Null for a draft. */
 export function roundOf(version: SeedVersion): number | null {

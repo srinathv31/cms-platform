@@ -14,9 +14,10 @@ import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
 import { blockId, blockText } from "../content";
 import { SEED_CONTENT_TYPES } from "../platform";
-import { int } from "../rng";
+import { int, type Rng } from "../rng";
 import { userName } from "../people";
 import {
+  checkIds,
   checkRounds,
   checkSendBacks,
   checkVersion,
@@ -46,8 +47,12 @@ interface TemplateBuild {
   versionRef(ref: string): VersionRef;
   /** The spec's version a ref names. */
   versionSpec(ref: string): SeedVersion;
-  /** Writes an audit event for this template. `newId` makes its id (the shared sequence unless a thread says otherwise). */
-  audit(event: AuditSpec, newId?: (prefix: string) => string): void;
+  /** A unique id for one of this template's rows, from this template's own sequence for that prefix. */
+  id(prefix: string): string;
+  /** This template's random draws (a version's `rev`, the saves in an editing session): a sequence no other template shares. */
+  random: Rng;
+  /** Writes an audit event for this template. */
+  audit(event: AuditSpec): void;
 }
 
 /**
@@ -95,7 +100,10 @@ function writersOf(spec: SeedTemplate, version: SeedVersion): string[] {
 
 export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   const type: SeedType = SEED_CONTENT_TYPES[spec.contentType ?? "disclosure"];
-  const templateId = ctx.templateId();
+  checkIds(spec);
+  const templateId = ctx.claimId(spec.id);
+  // Every row of this template draws its id, and every random number, from sequences named for it.
+  const scope = `template:${spec.key}`;
 
   const ref: TemplateRef = {
     id: templateId,
@@ -108,7 +116,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   checkSendBacks(spec);
   for (const version of spec.versions) {
     ref.versions[version.ref] = {
-      id: ctx.id("v"),
+      id: ctx.claimId(version.id),
       number: version.number,
       round: roundOf(version),
       state: version.state,
@@ -132,9 +140,11 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
     },
     versionSpec: (versionKey) =>
       spec.versions.find((v) => v.ref === versionKey)!,
-    audit(event, newId = ctx.id) {
+    id: (prefix) => ctx.id(scope, prefix),
+    random: ctx.random(scope),
+    audit(event) {
       ctx.sink.auditEvents.push({
-        id: newId("ae"),
+        id: build.id("ae"),
         at: ctx.at(event.at),
         actorId: event.actor,
         teamId: spec.teamId,
@@ -206,7 +216,8 @@ function emitVersion(build: TemplateBuild, version: SeedVersion) {
     stages: isDraft ? null : [{ id: stage.id, name: stage.name }],
     currentStage: 0,
     rev:
-      version.rev ?? (isDraft ? int(ctx.rng, 12, 40) : int(ctx.rng, 40, 190)),
+      version.rev ??
+      (isDraft ? int(build.random, 12, 40) : int(build.random, 40, 190)),
     createdBy: version.createdBy,
     writers: writersOf(spec, version),
     createdAt: ctx.at(version.createdAt),
@@ -248,12 +259,12 @@ function emitVersion(build: TemplateBuild, version: SeedVersion) {
       action: "draft.edited",
       version: built,
       details: {
-        saves: int(ctx.rng, 3, 28),
+        saves: int(build.random, 3, 28),
         ...(version.basedOn
           ? { basedOn: build.versionRef(version.basedOn).number }
           : {}),
       },
-      sessionKey: ctx.id("sess"),
+      sessionKey: build.id("sess"),
     });
   }
 
@@ -283,7 +294,7 @@ function emitApprovals(build: TemplateBuild, version: SeedVersion) {
 
   for (const approval of version.approvals ?? []) {
     ctx.sink.approvals.push({
-      id: ctx.id("ap"),
+      id: build.id("ap"),
       versionId: built.id,
       stageId: stage.id,
       stagePosition: 0,
@@ -340,7 +351,7 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
     if (replaced !== null) {
       for (const consumerId of consumers) {
         ctx.sink.consumerNotices.push({
-          id: ctx.id("cn"),
+          id: build.id("cn"),
           consumerId,
           templateId: build.ref.id,
           versionId: built.id,
@@ -375,7 +386,7 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
     });
     for (const consumerId of consumers) {
       ctx.sink.consumerNotices.push({
-        id: ctx.id("cn"),
+        id: build.id("cn"),
         consumerId,
         templateId: build.ref.id,
         versionId: built.id,
@@ -415,7 +426,7 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
     });
     for (const consumerId of consumers) {
       ctx.sink.consumerNotices.push({
-        id: ctx.id("cn"),
+        id: build.id("cn"),
         consumerId,
         templateId: build.ref.id,
         versionId: built.id,
@@ -462,12 +473,8 @@ function emitThreads(build: TemplateBuild) {
     const anchored = (originSpec.body.content ?? []).find(
       (b) => b.attrs?.id === blockKey,
     );
-    const newId = thread.keyedIds
-      ? (prefix: string) =>
-          ctx.keyedId(`${spec.key}:${thread.origin}:${blockKey}`, prefix)
-      : ctx.id;
 
-    const threadId = newId("th");
+    const threadId = build.id("th");
     const first = thread.comments[0];
     ctx.sink.commentThreads.push({
       id: threadId,
@@ -482,7 +489,7 @@ function emitThreads(build: TemplateBuild) {
     });
     for (const comment of thread.comments) {
       ctx.sink.comments.push({
-        id: newId("cm"),
+        id: build.id("cm"),
         threadId,
         authorId: comment.author,
         body: comment.body,
@@ -490,20 +497,17 @@ function emitThreads(build: TemplateBuild) {
         createdAt: ctx.at(comment.at),
       });
       if ((comment.kind ?? "comment") === "comment") {
-        build.audit(
-          {
-            at: comment.at,
-            actor: comment.author,
-            action: "comment.added",
-            version: origin,
-            details: {
-              threadId,
-              blockId: blockKey,
-              author: userName(comment.author),
-            },
+        build.audit({
+          at: comment.at,
+          actor: comment.author,
+          action: "comment.added",
+          version: origin,
+          details: {
+            threadId,
+            blockId: blockKey,
+            author: userName(comment.author),
           },
-          newId,
-        );
+        });
       }
     }
     if (thread.resolved && whole) {
@@ -524,33 +528,27 @@ function emitThreads(build: TemplateBuild) {
         );
       }
       const next = build.versionRef(answer.ref);
-      build.audit(
-        {
-          at: thread.resolved.at,
-          actor: thread.resolved.by,
-          action: "thread.resolved",
-          version: origin,
-          details: {
-            threadId,
-            blockId: blockKey,
-            auto: true,
-            resolvedWith: next.number,
-            resolvedWithRound: next.round,
-          },
+      build.audit({
+        at: thread.resolved.at,
+        actor: thread.resolved.by,
+        action: "thread.resolved",
+        version: origin,
+        details: {
+          threadId,
+          blockId: blockKey,
+          auto: true,
+          resolvedWith: next.number,
+          resolvedWithRound: next.round,
         },
-        newId,
-      );
+      });
     } else if (thread.resolved) {
-      build.audit(
-        {
-          at: thread.resolved.at,
-          actor: thread.resolved.by,
-          action: "comment.resolved",
-          version: origin,
-          details: { threadId, blockId: blockKey },
-        },
-        newId,
-      );
+      build.audit({
+        at: thread.resolved.at,
+        actor: thread.resolved.by,
+        action: "comment.resolved",
+        version: origin,
+        details: { threadId, blockId: blockKey },
+      });
     }
   }
 }

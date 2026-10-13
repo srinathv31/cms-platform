@@ -90,7 +90,6 @@ export async function seedDatabase(
   seedCoralTemplates(ctx);
   seedDepositsTemplates(ctx);
   seedCardStatementsTemplates(ctx);
-  // Last of the templates, so every id seeded before alerts existed stays the same.
   seedCoralAlerts(ctx);
   seedHistory(ctx);
   seedActivity(ctx);

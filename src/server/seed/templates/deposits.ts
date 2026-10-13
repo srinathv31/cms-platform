@@ -150,6 +150,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
   const templates: SeedTemplate[] = [
     // v1 Superseded; v2 Active, approved on round 3 after two send-backs (Naomi).
     {
+      id: "UC-ZKZSRZ",
       key: "high-yield-savings",
       teamId: "deposits",
       name: "High-Yield Savings — Rate Disclosure",
@@ -158,6 +159,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
       consumers: ["deposits-online"],
       versions: [
         {
+          id: "v_g46s65339s",
           ref: "v1",
           number: 1,
           state: "superseded",
@@ -181,6 +183,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           supersededAt: 70,
         },
         {
+          id: "v_33pxnjfj8j",
           ref: "v2r1",
           number: 2,
           round: 1,
@@ -207,6 +210,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           ],
         },
         {
+          id: "v_zchvphdgh4",
           ref: "v2r2",
           number: 2,
           round: 2,
@@ -234,6 +238,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           ],
         },
         {
+          id: "v_50p0z7c0jg",
           ref: "v2",
           number: 2,
           round: 3,
@@ -263,8 +268,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
           activatedAt: 70,
         },
       ],
-      // Each send-back's reason, answered by Eli's next submit. Added after the seed's ids were in use,
-      // so they draw their own (`keyedIds`).
+      // Each send-back's reason, answered by Eli's next submit.
       threads: [
         {
           origin: "v2r1",
@@ -278,7 +282,6 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
             },
           ],
           resolved: { by: "eli", at: 75.5 },
-          keyedIds: true,
         },
         {
           origin: "v2r2",
@@ -292,11 +295,11 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
             },
           ],
           resolved: { by: "eli", at: 74 },
-          keyedIds: true,
         },
       ],
     },
     {
+      id: "UC-A4S1YT",
       key: "checking-fees",
       teamId: "deposits",
       name: "Everyday Checking — Fee Schedule",
@@ -305,6 +308,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
       consumers: ["deposits-online"],
       versions: [
         {
+          id: "v_eet58sg0qy",
           ref: "v1",
           number: 1,
           state: "active",
@@ -334,6 +338,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
       ],
     },
     {
+      id: "UC-DNF479",
       key: "overdraft-protection",
       teamId: "deposits",
       name: "Overdraft Protection — Terms",
@@ -342,6 +347,7 @@ export function seedDepositsTemplates(ctx: SeedCtx) {
       consumers: ["deposits-online"],
       versions: [
         {
+          id: "v_rede9h8qpk",
           ref: "draft",
           number: null,
           state: "draft",

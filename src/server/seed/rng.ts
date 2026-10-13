@@ -1,11 +1,9 @@
-// Deterministic randomness for the seed. Same seed in, same structure out.
+// Deterministic randomness for the seed. A sequence is named (`SeedCtx.random`), and its name is its seed:
+// the same name gives the same numbers on every run.
 
 import type { Random01 } from "@/server/ids";
 
 export type Rng = Random01;
-
-/** The one fixed seed for the whole demo dataset. */
-export const SEED = 0x5ca1ab1e;
 
 export function mulberry32(seed: number): Rng {
   let a = seed >>> 0;

@@ -111,13 +111,10 @@ export function seedPlatform(ctx: SeedCtx) {
     },
   );
 
-  // The Alert's events came after the seed's ids were in use, so they draw from sequences of their own
-  // (`keyed`): one more draw from the shared sequence would move every template id after it.
   const configEvents: {
     daysAgo: number;
     area: string;
     summary: string;
-    keyed?: string;
   }[] = [
     {
       daysAgo: 430,
@@ -139,24 +136,21 @@ export function seedPlatform(ctx: SeedCtx) {
       area: "content_types",
       summary:
         "Created content type Alert with an SMS footer and a 3-part budget",
-      keyed: "platform:alert:content_types",
     },
     {
       daysAgo: 60,
       area: "approval_chains",
       summary: "Set Alert approval chain: Team approver",
-      keyed: "platform:alert:approval_chains",
     },
     {
       daysAgo: 60,
       area: "channel_rules",
       summary: "Allowed push and sms for Alert",
-      keyed: "platform:alert:channel_rules",
     },
   ];
   for (const e of configEvents) {
     ctx.sink.auditEvents.push({
-      id: e.keyed ? ctx.keyedId(e.keyed, "ae") : ctx.id("ae"),
+      id: ctx.id("platform", "ae"),
       at: ctx.at(e.daysAgo),
       actorId: "riley",
       action: "platform.config_changed",
