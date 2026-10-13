@@ -105,13 +105,13 @@ the merge of each wave, and wave 4.
 
 ### Item 8. Walk through every remaining decision before writing entities (lane B)
 
-- [ ] A dedicated, in-depth session (not a review) that goes through the fifteen decisions in the review's section 8
+- [x] A dedicated, in-depth session (not a review) that goes through the fifteen decisions in the review's section 8
       and the two below, and records each as a decision record before the Java team writes a single JPA entity:
       team and user ids, the JSON column policy per column, the notice sequence and filtered indexes, timestamps,
       stored sentences vs facts, typed audit and notice payloads (D10), document validation (JSON Schema or BFF),
       JSON number source text, the error shape, consumer identity, search paging, logs as time series, the PDF engine
       and font, the test seam, and test data with literal ids. The two that lane F needs first: team id = slug, and
-      sentences or facts in notifications.
+      sentences or facts in notifications. (wave 1)
 - The two data questions raised by the owner:
   - **Template ids and MSSQL.** Today `newTemplateId()` in `src/server/ids.ts` draws six Crockford base32
     characters from `crypto.getRandomValues` (about 1.07 billion values), and `freshTemplateId` in
@@ -318,6 +318,8 @@ engineering handoff.
   review (`src/domain/comments.ts`); the members table hides controls for roles that may not act rather than
   disabling them with a reason. Each is a small rule to confirm or change.
 - A readable template id (item 8): what makes an id readable to the business?
+- The `UC-` prefix (item 8, decision 0060): it is left from the product's old name and printed on every customer
+  PDF. Keep it, or change it while there are no consumers to break? Asked together with the readable id.
 
 ## Noted for the handoff doc, not for this repo
 
@@ -333,3 +335,16 @@ engineering handoff.
 - **DTOs and typed payloads (D10, M-11):** wait for the OpenAPI spec and the enterprise API design, then generate
   the types. Not hand-written here.
 - **Who upgrades Next.js:** PR #4 (16.4) is parked on an upstream prefetch loop; name an owner in the package.
+- **Deletion and cascades:** what can be deleted (a template, a team, a user) and what outlives what. Nothing can be
+  deleted today, and several references have no foreign key on purpose (logs outlive their targets; the data model
+  report's M7). Decide before anyone writes JPA cascades.
+- **A consumer registry screen (decision 0057):** nothing registers a consumer or links it to an Entra app
+  registration; consumers come from the seed.
+- **The exact UCOMP error shape (decision 0056):** `/api/v1` follows the existing UCOMP API's error format; write the
+  format down and map today's codes and each code's details onto it.
+- **The viewer's credential from the BFF to Java (decision 0070):** forward the user's token for the Java API's scope,
+  or an on-behalf-of exchange; decided with the sign-in work.
+- **Better Auth's Microsoft account id (decision 0054):** check whether it is `sub` (per app) or `oid` (per tenant),
+  and how Better Auth's tables map onto the app's `users` table.
+- **Before the Java PDF port (decision 0067):** whether customer PDFs must be PDF/UA (accessible) or PDF/A (archival),
+  and the enterprise font's licence for embedding and subsetting, with its coverage written into the render spec (R3).
