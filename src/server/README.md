@@ -177,7 +177,8 @@ which family the template is (`family`), which picks the editor or the composer.
 
 The templates are declared in [seed/templates/](seed/templates/), one `SeedTemplate` each, and `buildTemplate`
 ([seed/templates/build.ts](seed/templates/build.ts)) derives every row from it: the template, its versions,
-approvals, comment threads, audit events and consumer notices. A template names its content type (`contentType`,
+approvals, comment threads, audit events and consumer notices ([seed/README.md](seed/README.md) walks through it;
+[checks.ts](seed/templates/checks.ts) refuses a spec that breaks the content type's rules). A template names its content type (`contentType`,
 Disclosure unless it says Alert), and the build checks each version against it: the required sections in order, and
 only channels the type allows. Coral Offers has five disclosures ([coral.ts](seed/templates/coral.ts)), one in each
 lifecycle state, and three alerts ([coral-alerts.ts](seed/templates/coral-alerts.ts)): Payment Due Reminder (v1
