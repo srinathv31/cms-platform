@@ -10,7 +10,10 @@ import path from "node:path";
 // libSQL opens `file:C:/dir/app.db` and `file:C:\dir\app.db` alike; `file:///C:/dir/app.db` leaves a slash
 // before the drive letter, which Windows can't open. So the URL built here has the drive letter right
 // after `file:` and uses `/`, a spelling a shell passes on unchanged too (Git Bash eats backslashes).
-// A UNC path (`\\server\share\app.db`) isn't supported: libSQL reads `//server` as a host and refuses it.
+// A UNC path (`\\server\share\app.db`, `\\wsl$\Ubuntu\home\app.db`) needs two more slashes: `file://server/share`
+// would read `server` as a host, which libSQL refuses. `file:////server/share/app.db` has an empty host and the
+// path `//server/share/app.db`, which Windows opens as the UNC path. (Read off @libsql/core's `parseUri` and
+// checked against the local driver with the same shape on a POSIX path; not run against a share.)
 
 type PathApi = Pick<typeof path, "resolve" | "sep">;
 
@@ -51,5 +54,7 @@ export function fileUrlOfPath(
   pathApi: Pick<typeof path, "sep"> = path,
 ): string {
   const slashes = pathApi.sep === "\\" ? file.replaceAll("\\", "/") : file;
-  return `file:${slashes.replace(/[%#?]/g, encodeURIComponent)}`;
+  const escaped = slashes.replace(/[%#?]/g, encodeURIComponent);
+  // A path that begins with two slashes (a UNC path on Windows) must not run into the URL's own `//`.
+  return escaped.startsWith("//") ? `file://${escaped}` : `file:${escaped}`;
 }

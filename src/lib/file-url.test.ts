@@ -46,6 +46,18 @@ describe("filePathOfUrl", () => {
       expect(filePathOfUrl(url, WIN_CWD, win)).toBe("C:\\data\\app.db");
   });
 
+  it("reads a UNC path from the empty-host spelling and from a bare backslash path", () => {
+    expect(
+      filePathOfUrl("file:////server/share/data/app.db", WIN_CWD, win),
+    ).toBe("\\\\server\\share\\data\\app.db");
+    expect(
+      filePathOfUrl("file:////wsl$/Ubuntu/home/jo/app.db", WIN_CWD, win),
+    ).toBe("\\\\wsl$\\Ubuntu\\home\\jo\\app.db");
+    expect(filePathOfUrl("file:\\\\server\\share\\app.db", WIN_CWD, win)).toBe(
+      "\\\\server\\share\\app.db",
+    );
+  });
+
   it("decodes escapes, so a folder named with # ? or % survives", () => {
     expect(
       filePathOfUrl("file:C:/Code/C%23/50%25/app%3F.db", WIN_CWD, win),
@@ -85,6 +97,18 @@ describe("fileUrlOfPath", () => {
     );
   });
 
+  it("gives a UNC path an empty host, so libSQL doesn't read the server as one", () => {
+    expect(fileUrlOfPath("\\\\server\\share\\proj\\data\\e2e-0.db", win)).toBe(
+      "file:////server/share/proj/data/e2e-0.db",
+    );
+    expect(
+      fileUrlOfPath("\\\\wsl$\\Ubuntu\\home\\jo\\stencil\\app.db", win),
+    ).toBe("file:////wsl$/Ubuntu/home/jo/stencil/app.db");
+    expect(
+      fileUrlOfPath("\\\\wsl.localhost\\Ubuntu\\home\\jo\\C#\\app.db", win),
+    ).toBe("file:////wsl.localhost/Ubuntu/home/jo/C%23/app.db");
+  });
+
   it("escapes %, # and ?", () => {
     expect(fileUrlOfPath("/code/C#/50%/what?.db", posix)).toBe(
       "file:/code/C%23/50%25/what%3F.db",
@@ -98,6 +122,8 @@ describe("fileUrlOfPath", () => {
     for (const [file, api] of [
       ["C:\\Users\\Jo Smith\\C#\\100%\\app.db", win],
       ["D:\\data\\app.db", win],
+      ["\\\\server\\share\\C#\\100%\\app.db", win],
+      ["\\\\wsl$\\Ubuntu\\home\\jo\\app.db", win],
       ["/home/jo smith/C#/100%/app.db", posix],
     ] as const)
       expect(filePathOfUrl(fileUrlOfPath(file, api), "/", api)).toBe(file);
@@ -120,4 +146,23 @@ describe("with a real file (this machine's own path rules)", () => {
     again.close();
     expect(filePathOfUrl(url)).toBe(file);
   });
+
+  // The UNC spelling (`file:////server/share/…`) reaches libSQL as an empty host and the path
+  // `//server/share/…`. A POSIX system reads `//dir` as `/dir`, so the same shape opens a local file here.
+  it.skipIf(path.sep !== "/")(
+    "accepts the four-slash spelling and opens the file it names",
+    async () => {
+      const file = path.join(dir, "unc-shape.db");
+      const url = fileUrlOfPath(`/${file}`);
+      expect(url.startsWith("file:////")).toBe(true);
+      const client = createClient({ url });
+      await client.execute("CREATE TABLE t (n INTEGER)");
+      client.close();
+      const same = createClient({ url: fileUrlOfPath(file) });
+      await expect(
+        same.execute("SELECT count(*) FROM t"),
+      ).resolves.toBeTruthy();
+      same.close();
+    },
+  );
 });
