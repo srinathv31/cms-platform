@@ -2,6 +2,7 @@
 
 Status: Accepted
 Amended 2026-10-11: the document channels' preview posts to Stencil's own `/api/templates/{id}/preview`, not `/api/v1/.../render` with `preview: true` (A1, [0047](0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
+Amended 2026-10-12: Java renders every channel after the port ([0067](0067-java-renders-every-channel.md)), so the browser's `renderMessage` is then no longer the render's own function: the push and SMS previews either keep it, held to Java's output by the golden files and accepted as approximations ([0046](0046-phone-previews-are-approximations.md)), or call Java. That is decided with the port.
 Date: 2026-10-09
 
 ## Context

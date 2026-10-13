@@ -1,6 +1,7 @@
 # 0006. Page notices and search with an opaque cursor, notices in commit order
 
 Status: Accepted
+Amended 2026-10-12: on MSSQL, the serialized notice write this record asks of another backend is a counter row updated inside the writing transaction, not a `SEQUENCE` ([0062](0062-invariants-hold-in-the-database-not-in-one-writer.md)). Search pages in SQL on the same `(rank, name, id)` key, and its cursor's inner format may change with a `v` bump; notice cursors, which pollers keep, stay readable ([0059](0059-template-search-ranks-and-pages-in-sql.md)).
 Date: 2026-10-08
 
 ## Context

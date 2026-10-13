@@ -187,6 +187,19 @@ and round, one released version per number, and one open draft and one Active ve
 the one place a write waits (5 s for its turn); a write that still can't go fails, and nothing retries it. Migrations are in `src/server/db/migrations`; the
 [server README](../src/server/README.md#database) says how to add one.
 
+What the Java API's MSSQL schema does instead: team and user ids
+([0053](decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md),
+[0054](decisions/0054-users-are-better-auth-users-linked-to-entra-by-oid.md)), template and log ids
+([0060](decisions/0060-template-ids-are-random-and-retried-on-a-collision.md)), JSON columns
+([0061](decisions/0061-documents-stay-json-and-references-become-rows.md)), invariants and the notice sequence
+([0062](decisions/0062-invariants-hold-in-the-database-not-in-one-writer.md)), timestamps
+([0063](decisions/0063-instants-are-utc-datetime2-ordered-by-at-and-seq.md)), payloads
+([0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md),
+[0064](decisions/0064-payloads-are-facts-with-one-shape-per-event.md)), documents
+([0065](decisions/0065-documents-are-validated-against-a-generated-json-schema.md)), logs
+([0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and test data
+([0069](decisions/0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)).
+
 ## Time, identity, and demo data
 
 - **The demo clock.** `now()` in [clock.ts](../src/server/clock.ts) is real time plus `settings.clock_offset_days`.

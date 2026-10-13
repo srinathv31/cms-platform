@@ -1,6 +1,7 @@
 # 0026. A passed sunset is recorded by a sweep, in the audit log only
 
 Status: Accepted. Its "No consumer notice" part is superseded by [0032](0032-consumers-are-told-when-a-sunset-passes.md): consumers get a `sunset_passed` notice.
+Amended 2026-10-12: after the port, "once" is a `versions.sunset_recorded_at` column rather than the existence of the audit row, so no business rule reads the audit log; the audit row is still written, dated at the sunset ([0066](0066-the-audit-log-is-the-record-and-render-events-roll-up.md)).
 Date: 2026-10-09
 
 ## Context
