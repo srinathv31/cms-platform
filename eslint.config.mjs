@@ -188,37 +188,17 @@ const ratchet = (files, rules) => (files.length > 0 ? [{ files, rules }] : []);
 const SEAM_NOT_YET = [
   "src/server/actions/kit.ts",
   "src/server/clock.ts",
-  "src/server/queries/consumer-api.ts",
-  "src/server/queries/copilot.ts",
-  "src/server/queries/integration.ts",
-  "src/server/queries/library.ts",
-  "src/server/queries/palette.ts",
   "src/server/queries/people.ts",
-  "src/server/queries/usage.ts",
 ];
 
 // The BFF files that still read the clock (N1), still decide with can() (N2), and still import the backend's own
 // machinery (H4): the packages that own them (plan.md) clear them, and delete their lines. Integration empties all
 // three, with SEAM_NOT_YET.
 const CLOCK_NOT_YET = [
-  "src/components/library/library-view.tsx",
-  "src/components/usage/template-usage.tsx",
-  "src/components/usage/usage-dashboard.tsx",
   "src/server/actions/kit.ts",
-  "src/server/api/http.ts",
   "src/server/queries/dynamic.ts",
-  "src/server/queries/integration.ts",
-  "src/server/queries/library.ts",
-  "src/server/queries/usage.ts",
 ];
-const DECIDES_NOT_YET = [
-  "src/components/library/library-view.tsx",
-  "src/server/actions/kit.ts",
-  "src/server/queries/copilot.ts",
-  "src/server/queries/integration.ts",
-  "src/server/queries/palette.ts",
-  "src/server/queries/usage.ts",
-];
+const DECIDES_NOT_YET = ["src/server/actions/kit.ts"];
 const INTERNALS_NOT_YET = [];
 
 // The editor's public modules: the table under "Public API" in src/editor/README.md. Code outside src/editor

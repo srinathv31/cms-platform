@@ -10,12 +10,14 @@ import {
   getTemplateDetail,
   listNotices,
   searchActiveTemplates,
-} from "@/server/queries/consumer-api";
+} from "@/server/services/local/consumer-api";
 import { findRound } from "@/server/services/local/find-round";
-import { getIntegrationPanel } from "@/server/queries/integration";
+import type { RequestContext } from "@/server/context/request";
+import { integrationPanel } from "@/server/queries/integration";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
-import { getLibraryRows } from "@/server/queries/library";
+import { getLibrary } from "@/server/queries/library";
 import { searchPalette } from "@/server/queries/palette";
+import { services } from "@/server/services";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
 import { runRender } from "@/server/render/render-template";
 import { asShown } from "@/server/testing/notifications";
@@ -71,20 +73,20 @@ function as(userId: string) {
   return env.now;
 }
 
+/** The request context of Maya, who is asking the services directly. */
+const mayaContext = (): RequestContext => ({
+  viewer: people.maya!,
+  correlationId: "req_test",
+  credential: { kind: "in_process", userId: "maya" },
+});
+
 /** The name the ⌘K palette lists a template by, searched for by its id as Maya in Coral Offers. */
 async function paletteName(id: string) {
-  const result = await searchPalette(
-    {
-      viewer: people.maya!,
-      correlationId: "req_test",
-      credential: { kind: "in_process", userId: "maya" },
-    },
-    {
-      space: "coral-offers",
-      q: id,
-      template: null,
-    },
-  );
+  const result = await searchPalette(mayaContext(), {
+    space: "coral-offers",
+    q: id,
+    template: null,
+  });
   return result.ok
     ? result.templates.find((t) => t.id === id)?.name
     : undefined;
@@ -239,10 +241,12 @@ describe("a rename in a draft goes live only with its version", () => {
     expect(await found("card terms")).toEqual([]);
 
     // The SHARE sheet shows what consumers get.
-    const panel = await getIntegrationPanel(
+    const facts = await services().templates.integration(mayaContext(), {
       templateId,
-      "http://localhost:3000",
-    );
+    });
+    const panel = facts.ok
+      ? integrationPanel(facts, "http://localhost:3000")
+      : undefined;
     expect([panel?.template.name, panel?.jsonSchema.title]).toEqual([
       LIVE,
       `${LIVE} v2: values`,
@@ -277,7 +281,7 @@ describe("a rename in a draft goes live only with its version", () => {
     await renamedDraft();
     as("maya");
     expect(
-      (await getLibraryRows("coral-offers")).find((r) => r.id === templateId)
+      (await getLibrary("coral-offers")).rows.find((r) => r.id === templateId)
         ?.name,
     ).toBe(RENAMED);
     expect(await paletteName(templateId)).toBe(RENAMED);
@@ -402,7 +406,7 @@ describe("a template with no version at all", () => {
     try {
       expect(await paletteName(id)).toBe(id);
       expect(
-        (await getLibraryRows("coral-offers")).find((r) => r.id === id)?.name,
+        (await getLibrary("coral-offers")).rows.find((r) => r.id === id)?.name,
       ).toBe(id);
     } finally {
       await db.delete(templates).where(eq(templates.id, id));

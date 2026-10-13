@@ -1,778 +1,283 @@
-import type { Client } from "@libsql/client";
-import { inArray } from "drizzle-orm";
-import { beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  HEATMAP_WEEKS,
-  HISTORY_DAYS,
-  TREND_WEEKS,
-  USAGE_WINDOW_DAYS,
-} from "@/domain/golive-types";
-import { CHANNELS, type Viewer } from "@/domain/types";
-import type { Db } from "@/server/db/client";
-import * as schema from "@/server/db/schema/ucomp";
-import {
-  loadPersona,
-  seededDatabasePerTest,
-} from "@/server/testing/review-fixtures";
-import { getViewer } from "@/server/viewer";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type {
+  DashboardUsageFacts,
+  TemplateUsageFacts,
+  UsageCell,
+  UsageVersionFacts,
+} from "@/server/services/usage";
 import { getTemplateUsage, getUsageDashboard } from "./usage";
 
-// The Usage read models against a temporary database filled by the real seed (~27k render_log rows):
-//   - Balance Transfer v1 is Superseded with a sunset in 21 days and Coral still renders it; v2 Active;
-//   - Holiday Points v1 is Revoked (its renders stopped 34 days ago);
-//   - a handful of failed renders (Cash Back v2, Rate Change, High-Yield Savings v2).
+// The Usage read models as the BFF builds them: the usage service answers counts (DashboardUsageFacts,
+// TemplateUsageFacts); `usageDashboard` and `templateUsage` (src/domain/golive/usage.ts, tested there on facts
+// built by hand) add them up and word them. These tests check what the read models add: the question they put to
+// the service (the space's team by id, null for all teams), the space they pass through, the assembled screens,
+// and Not found: a refused read, and a template of another team than the URL's space. What the backend counts (the
+// windows, what counts as usage, the sunset's day) is the contract suite's.
 
-const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
-
-vi.mock("@/server/db/client", async () => {
-  const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  return tempDatabase("ucomp-usage-queries-");
-});
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
-vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
-
-const BASE = new Date("2026-10-04T12:00:00.000Z");
-const DAY = 86_400_000;
-
-let db: Db;
-let libsql: Client;
-const people: Record<string, Viewer> = {};
-
-const ids = seededDatabasePerTest({ base: BASE });
-
-beforeAll(async () => {
-  ({ db, libsql } = await import("@/server/db/client"));
-  for (const id of ["maya", "riley", "eli"])
-    people[id] = await loadPersona(db, id);
-});
-
-function as(userId: string) {
-  vi.mocked(getViewer).mockResolvedValue(people[userId]!);
-}
-
-/** Direct SQL: one number from render_log, usage rows only, for a team (or every team). */
-async function direct(
-  where: string,
-  team: string | null,
-  args: (string | number)[] = [],
-): Promise<number> {
-  const teamClause = team
-    ? "and template_id in (select id from templates where team_id = ?)"
-    : "";
-  const result = await libsql.execute({
-    sql: `select count(*) as n from render_log where is_preview = 0 and consumer_id is not null and coalesce(error_code, '') <> 'unknown_consumer' and at <= ? ${teamClause} and ${where}`,
-    args: [env.now.getTime(), ...(team ? [team] : []), ...args],
-  });
-  return Number(result.rows[0]!.n);
-}
-
-const since = () => env.now.getTime() - USAGE_WINDOW_DAYS * DAY;
-
-/** Insert render_log rows for a test and remove them after. */
-async function withRows(
-  rows: (typeof schema.renderLog.$inferInsert)[],
-  run: () => Promise<void>,
-) {
-  await db.insert(schema.renderLog).values(rows);
-  try {
-    await run();
-  } finally {
-    await db.delete(schema.renderLog).where(
-      inArray(
-        schema.renderLog.id,
-        rows.map((r) => r.id),
-      ),
-    );
-  }
-}
-
-async function versionIdOf(
-  templateId: string,
-  number: number,
-): Promise<string> {
-  const result = await libsql.execute({
-    sql: "select id from versions where template_id = ? and number = ?",
-    args: [templateId, number],
-  });
-  return String(result.rows[0]!.id);
-}
-
-function logRow(o: {
-  id: string;
-  at: number;
-  templateId: string;
-  versionId: string;
-  versionNumber: number | null;
-  consumerId: string | null;
-  channel?: (typeof schema.renderLog.$inferInsert)["channel"];
-  platform?: (typeof schema.renderLog.$inferInsert)["platform"];
-  isPreview?: boolean;
-  outcome?: "ok" | "error";
-  errorCode?: string;
-}) {
-  return {
-    id: o.id,
-    at: new Date(o.at),
-    templateId: o.templateId,
-    versionId: o.versionId,
-    versionNumber: o.versionNumber,
-    consumerId: o.consumerId,
-    channel: o.channel ?? ("pdf" as const),
-    platform: o.platform ?? null,
-    isPreview: o.isPreview ?? false,
-    correlationId: `req_${o.id}`,
-    outcome: o.outcome ?? ("ok" as const),
-    errorCode: o.outcome === "error" ? (o.errorCode ?? "invalid_values") : null,
-    durationMs: 100,
+const env = vi.hoisted(() => ({
+  dashboard: undefined as unknown,
+  template: undefined as unknown,
+  asked: [] as { method: string; input: unknown }[],
+}));
+vi.mock("@/server/context/request", () => ({
+  requireRequestContext: async () => ({
+    viewer: { userId: "maya" },
+    correlationId: "req_test",
+  }),
+}));
+vi.mock("@/server/services", () => ({
+  services: () => ({
+    usage: {
+      dashboard: async (_ctx: unknown, input: unknown) => {
+        env.asked.push({ method: "dashboard", input });
+        return env.dashboard;
+      },
+      template: async (_ctx: unknown, input: unknown) => {
+        env.asked.push({ method: "template", input });
+        return env.template;
+      },
+    },
+  }),
+}));
+// A team's id is never its slug (decision 0053).
+vi.mock("./spaces", () => {
+  const spaces: Record<string, { name: string; teamId: string | null }> = {
+    "coral-offers": { name: "Coral Offers", teamId: "t_coral" },
+    deposits: { name: "Deposits", teamId: "t_deposits" },
+    all: { name: "All teams", teamId: null },
   };
-}
+  return {
+    requireSpace: async (slug: string) => ({
+      slug,
+      isAll: slug === "all",
+      teamId: spaces[slug]!.teamId,
+      name: spaces[slug]!.name,
+    }),
+  };
+});
+
+const NOT_FOUND = /NEXT_HTTP_ERROR_FALLBACK;404/;
+const ASOF = "2026-10-04T12:00:00.000Z";
+const BALANCE_TRANSFER = "UC-AAAAAA";
+
+const template = {
+  id: BALANCE_TRANSFER,
+  name: "Balance Transfer Intro — Terms",
+  teamId: "t_coral",
+  teamSlug: "coral-offers",
+};
+
+const v2: UsageVersionFacts = {
+  templateId: BALANCE_TRANSFER,
+  number: 2,
+  state: "active",
+  activatedAt: "2026-09-01T12:00:00.000Z",
+  sunset: null,
+  revokedAt: null,
+};
+const v1: UsageVersionFacts = {
+  templateId: BALANCE_TRANSFER,
+  number: 1,
+  state: "superseded",
+  activatedAt: "2026-08-01T12:00:00.000Z",
+  sunset: {
+    at: "2026-10-25T04:00:00.000Z",
+    day: "2026-10-25",
+    passed: false,
+    daysAway: 21,
+  },
+  revokedAt: null,
+};
+
+/** Coral's renders of the template's v2 over the web: 90 succeeded and 10 failed in the window, 50 before it. */
+const cell: UsageCell = {
+  templateId: BALANCE_TRANSFER,
+  consumerId: "coral",
+  versionNumber: 2,
+  channel: "web",
+  platform: null,
+  ok30: 90,
+  err30: 10,
+  prev: 50,
+  lastAt: "2026-10-04T09:00:00.000Z",
+};
+
+const dashboardFacts = (
+  over: Partial<DashboardUsageFacts> = {},
+): { ok: true } & DashboardUsageFacts => ({
+  ok: true,
+  asOf: ASOF,
+  templates: [template],
+  versions: [v2, v1],
+  consumers: [{ id: "coral", name: "Coral" }],
+  cells: [cell],
+  sparks: [],
+  series: [],
+  ...over,
+});
+
+const templateFacts = (
+  over: Partial<TemplateUsageFacts> = {},
+): { ok: true } & TemplateUsageFacts => ({
+  ok: true,
+  asOf: ASOF,
+  template,
+  allowedChannels: ["pdf", "web", "email"],
+  versions: [v2, v1],
+  consumers: [{ id: "coral", name: "Coral" }],
+  cells: [cell],
+  sparks: [],
+  series: [],
+  recentErrors: [],
+  ...over,
+});
+
+const unavailable = (code: "space" | "template") => ({
+  ok: false as const,
+  status: 404 as const,
+  ...(code === "space"
+    ? REQUEST_REFUSALS.spaceUnavailable
+    : REQUEST_REFUSALS.templateUnavailable),
+});
+
+beforeEach(() => {
+  env.asked = [];
+  env.dashboard = dashboardFacts();
+  env.template = templateFacts();
+});
 
 describe("getUsageDashboard", () => {
-  it("Coral Offers: the numbers match direct SQL", async () => {
-    as("maya");
-    const d = await getUsageDashboard("coral-offers");
-    const s = since();
-    const prev = s - USAGE_WINDOW_DAYS * DAY;
-    // One denominator: a render is an attempt, succeeded or failed.
-    const ok = await direct("outcome = 'ok' and at >= ?", "t_coral", [s]);
-    const errors = await direct("outcome = 'error' and at >= ?", "t_coral", [
-      s,
+  it("asks the service for the space's team by id, and lays the counts out for that space", async () => {
+    const dashboard = await getUsageDashboard("coral-offers");
+    expect(env.asked).toEqual([
+      { method: "dashboard", input: { teamId: "t_coral" } },
     ]);
-    const renders = ok + errors;
-    const previous = await direct("at >= ? and at < ?", "t_coral", [prev, s]);
-
-    expect(d.space).toEqual({
-      slug: "coral-offers",
-      name: "Coral Offers",
-      isAll: false,
-    });
-    expect(d.today).toBe("2026-10-04");
-    expect(ok).toBeGreaterThan(1000);
-    expect(d.stats.renders).toMatchObject({ value: renders, previous });
-    expect(d.stats.renders.trendPct).toBe(
-      Math.round(((renders - previous) / previous) * 1000) / 10,
-    );
-    expect(d.stats.renders.display).toMatch(/^\d+(\.\d)?k$/);
-    expect(d.success).toEqual({
-      ok,
-      errors,
-      pct: Math.round((ok / renders) * 1000) / 10,
-    });
-    expect(errors).toBeGreaterThan(0);
-
-    // Every breakdown adds up to the same total.
-    const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-    expect(sum(Object.values(d.byChannel))).toBe(renders);
-    expect(sum(d.byTemplate.map((t) => t.renders))).toBe(renders);
-    expect(sum(d.byConsumer.map((c) => c.renders))).toBe(renders);
-    expect(sum(d.rows.map((r) => r.renders30d))).toBe(renders);
-    expect(sum(d.rows.map((r) => r.errors30d))).toBe(errors);
-    expect(d.onActive.active + d.onActive.other).toBe(renders);
-    // Failures reconcile: no row has more failures than renders, and the Failures card's rate is the same ratio.
-    expect(d.rows.every((r) => r.errors30d <= r.renders30d)).toBe(true);
-    expect(d.byTemplate.map((t) => t.renders)).toEqual(
-      [...d.byTemplate.map((t) => t.renders)].sort((a, b) => b - a),
-    );
-
-    const consumers = await libsql.execute({
-      sql: "select count(distinct consumer_id) as n from render_log where is_preview = 0 and consumer_id is not null and at >= ? and at <= ? and template_id in (select id from templates where team_id = 't_coral')",
-      args: [s, env.now.getTime()],
-    });
-    expect(d.stats.consumers.value).toBe(Number(consumers.rows[0]!.n));
-    expect(d.byConsumer.map((c) => c.consumer.name)).toEqual(["Coral"]);
-  });
-
-  it("Balance Transfer v1 is nearing sunset in 21 days, tagged on Coral's row, and is the gauge's 'other' share", async () => {
-    as("maya");
-    const d = await getUsageDashboard("coral-offers");
-    expect(d.stats.nearingSunset).toMatchObject({
-      value: 1,
-      display: "1",
-      soonest: {
-        templateName: "Balance Transfer Intro — Terms",
-        versionNumber: 1,
-        daysAway: 21,
-      },
-    });
-    const v1 = d.rows.find(
-      (r) => r.template.id === ids["balance-transfer"] && r.versionNumber === 1,
-    )!;
-    // The sunset is a day in the business time zone: October 25, 00:00 Eastern.
-    expect(v1).toMatchObject({
-      consumer: { id: "coral", name: "Coral" },
-      versionState: "superseded",
-      sunsetDay: "2026-10-25",
-      sunsetPassed: false,
-    });
-    expect(v1.tags).toEqual([{ tone: "warning", text: "sunset in 21 days" }]);
-    expect(v1.spark).toHaveLength(USAGE_WINDOW_DAYS);
-    expect(v1.spark.at(-1)).toBeGreaterThan(0); // the seed's latest v1 render was 37 minutes ago
-    expect(d.onActive.otherVersions).toEqual([
-      {
-        template: {
-          id: ids["balance-transfer"],
-          name: "Balance Transfer Intro — Terms",
+    expect(dashboard).toMatchObject({
+      space: { slug: "coral-offers", name: "Coral Offers", isAll: false },
+      asOf: ASOF,
+      today: "2026-10-04",
+      stats: {
+        renders: { value: 100, previous: 50, trendPct: 100 },
+        activeTemplates: { value: 1 },
+        consumers: { value: 1 },
+        nearingSunset: {
+          value: 1,
+          soonest: {
+            templateName: "Balance Transfer Intro — Terms",
+            versionNumber: 1,
+            daysAway: 21,
+          },
         },
-        versionNumber: 1,
-        renders: v1.renders30d,
       },
-    ]);
-
-    // Tagged rows first: danger (failed renders), then the warning, then the rest by renders.
-    const ranks = d.rows.map((r) =>
-      r.tags.some((t) => t.tone === "danger")
-        ? 0
-        : r.tags.some((t) => t.tone === "warning")
-          ? 1
-          : 2,
-    );
-    expect(ranks).toEqual([...ranks].sort());
-    expect(d.rows[0]!.tags[0]).toMatchObject({
-      tone: "danger",
-      text: expect.stringMatching(/^\d+ failed renders?$/),
+      success: { ok: 90, errors: 10, pct: 90 },
+      byChannel: { web: 100, pdf: 0, email: 0, push: 0, sms: 0 },
+      rows: [
+        {
+          consumer: { id: "coral", name: "Coral" },
+          template: { id: BALANCE_TRANSFER, teamSlug: "coral-offers" },
+          versionNumber: 2,
+          renders30d: 100,
+          errors30d: 10,
+        },
+      ],
     });
-    // The revoked Holiday Points v1 stopped rendering 34 days ago: not in the last 30 days.
-    expect(
-      d.rows.some(
-        (r) => r.template.id === ids["holiday-points"] && r.versionNumber === 1,
-      ),
-    ).toBe(false);
   });
 
-  it("series: an 18-week heatmap with levels 0–4, 13 weeks, 90 days, all matching SQL", async () => {
-    as("maya");
-    const d = await getUsageDashboard("coral-offers");
-    expect(d.heatmap.weeks).toHaveLength(HEATMAP_WEEKS);
-    const cells = d.heatmap.weeks.flat();
-    expect(new Set(cells.map((c) => c.level))).toEqual(
-      new Set([0, 1, 2, 3, 4]),
-    );
-    expect(cells.at(-1)!.date >= d.today).toBe(true);
-    const first = Date.parse(`${cells[0]!.date}T00:00:00Z`);
-    expect(d.heatmap.total).toBe(await direct("at >= ?", "t_coral", [first]));
-    expect(d.heatmap.busiest!.count).toBe(
-      Math.max(...cells.map((c) => c.count)),
-    );
-
-    expect(d.weekly).toHaveLength(TREND_WEEKS);
-    expect(d.daily).toHaveLength(HISTORY_DAYS);
-    expect(d.daily.at(-1)!.date).toBe(d.today);
-    const day = d.daily.find((x) => x.date === "2026-09-12")!; // the Cash Back burst of failures (22.3 days ago)
-    const start = Date.parse("2026-09-12T00:00:00Z");
-    expect(day.errors).toBe(
-      await direct("outcome = 'error' and at >= ? and at < ?", "t_coral", [
-        start,
-        start + DAY,
-      ]),
-    );
-    expect(day.count).toBe(
-      await direct("at >= ? and at < ?", "t_coral", [start, start + DAY]),
-    );
-    expect(day.errors).toBeLessThanOrEqual(day.count);
-    const week = d.weekly.at(-2)!;
-    const ws = Date.parse(`${week.weekStart}T00:00:00Z`);
-    expect(week.count).toBe(
-      await direct("at >= ? and at < ?", "t_coral", [ws, ws + 7 * DAY]),
-    );
-    // Every channel's renders, the Payment Due Reminder alert's push and SMS among them.
-    expect(
-      CHANNELS.reduce((sum, channel) => sum + week.channels[channel], 0),
-    ).toBe(week.count);
-    expect(week.channels.push).toBeGreaterThan(0);
-    expect(week.channels.sms).toBeGreaterThan(0);
-  });
-
-  it("previews and consumer-less rows never count", async () => {
-    as("maya");
-    const before = await getUsageDashboard("coral-offers");
-    const bt = ids["balance-transfer"]!;
-    const v2 = await versionIdOf(bt, 2);
-    const t = env.now.getTime() - 3_600_000;
-    await withRows(
-      [
-        logRow({
-          id: "rl_test_preview",
-          at: t,
-          templateId: bt,
-          versionId: v2,
-          versionNumber: 2,
-          consumerId: null,
-          isPreview: true,
-        }),
-        logRow({
-          id: "rl_test_preview_c",
-          at: t,
-          templateId: bt,
-          versionId: v2,
-          versionNumber: 2,
-          consumerId: "coral",
-          isPreview: true,
-        }),
-        logRow({
-          id: "rl_test_noconsumer",
-          at: t,
-          templateId: bt,
-          versionId: v2,
-          versionNumber: 2,
-          consumerId: null,
-        }),
-        logRow({
-          id: "rl_test_noconsumer_err",
-          at: t,
-          templateId: bt,
-          versionId: v2,
-          versionNumber: 2,
-          consumerId: null,
-          outcome: "error",
-        }),
-      ],
-      async () => {
-        const after = await getUsageDashboard("coral-offers");
-        expect(after).toEqual(before);
-      },
-    );
-  });
-
-  it("a caller refused as an unknown consumer is not a consumer: no row, no count, no recent error", async () => {
-    as("maya");
-    const before = await getUsageDashboard("coral-offers");
-    const bt = ids["balance-transfer"]!;
-    const v2 = await versionIdOf(bt, 2);
-    const t = env.now.getTime() - 3_600_000;
-    const typo = (id: string) =>
-      logRow({
-        id,
-        at: t,
-        templateId: bt,
-        versionId: v2,
-        versionNumber: 2,
-        consumerId: "corall",
-        outcome: "error",
-        errorCode: "unknown_consumer",
-      });
-    await withRows(
-      [typo("rl_test_typo_1"), typo("rl_test_typo_2"), typo("rl_test_typo_3")],
-      async () => {
-        expect(await getUsageDashboard("coral-offers")).toEqual(before);
-        const usage = await getTemplateUsage("coral-offers", bt);
-        expect(JSON.stringify(usage)).not.toContain("orall");
-      },
-    );
-  });
-
-  it("window boundaries follow the demo clock: exactly 30 days ago is in, a millisecond earlier is the previous window, the future is out", async () => {
-    as("maya");
-    const before = await getUsageDashboard("coral-offers");
-    const rc = ids["rate-change-notice"]!;
-    const v1 = await versionIdOf(rc, 1);
-    const s = since();
-    await withRows(
-      [
-        logRow({
-          id: "rl_test_edge_in",
-          at: s,
-          templateId: rc,
-          versionId: v1,
-          versionNumber: 1,
-          consumerId: "coral",
-        }),
-        logRow({
-          id: "rl_test_edge_prev",
-          at: s - 1,
-          templateId: rc,
-          versionId: v1,
-          versionNumber: 1,
-          consumerId: "coral",
-        }),
-        logRow({
-          id: "rl_test_future",
-          at: env.now.getTime() + 60_000,
-          templateId: rc,
-          versionId: v1,
-          versionNumber: 1,
-          consumerId: "coral",
-        }),
-      ],
-      async () => {
-        const after = await getUsageDashboard("coral-offers");
-        expect(after.stats.renders.value).toBe(before.stats.renders.value + 1);
-        expect(after.stats.renders.previous).toBe(
-          before.stats.renders.previous + 1,
-        );
-        expect(after.daily.at(-1)).toEqual(before.daily.at(-1));
-      },
-    );
-  });
-
-  it("advancing the clock past the sunset turns the tag to danger and empties 'nearing sunset'", async () => {
-    as("maya");
-    env.now = new Date(BASE.getTime() + 22 * DAY);
-    try {
-      const d = await getUsageDashboard("coral-offers");
-      expect(d.today).toBe("2026-10-26");
-      expect(d.stats.nearingSunset).toMatchObject({ value: 0, soonest: null });
-      const v1 = d.rows.find(
-        (r) =>
-          r.template.id === ids["balance-transfer"] && r.versionNumber === 1,
-      )!;
-      expect(v1.tags).toEqual([{ tone: "danger", text: "renders fail" }]);
-      expect(v1).toMatchObject({ sunsetDay: "2026-10-25", sunsetPassed: true });
-      expect(d.stats.renders.value).toBe(
-        await direct("at >= ?", "t_coral", [since()]),
-      );
-    } finally {
-      env.now = BASE;
-    }
-  });
-
-  it("'all' spans every team (Riley, platform admin)", async () => {
-    as("riley");
-    const d = await getUsageDashboard("all");
-    expect(d.space).toEqual({ slug: "all", name: "All teams", isAll: true });
-    expect(d.stats.renders.value).toBe(
-      await direct("at >= ?", null, [since()]),
-    );
-    expect(d.byConsumer.map((c) => c.consumer.name).sort()).toEqual([
-      "Coral",
-      "Deposits Online",
+  it("asks for every team (a null team id) in All teams, and says so in the space", async () => {
+    const dashboard = await getUsageDashboard("all");
+    expect(env.asked).toEqual([
+      { method: "dashboard", input: { teamId: null } },
     ]);
+    expect(dashboard.space).toEqual({
+      slug: "all",
+      name: "All teams",
+      isAll: true,
+    });
   });
 
-  // Speed, deterministically: a wall-clock budget failed under full-suite load (the machine, not the code).
-  // What keeps these fast is that each read model aggregates in a fixed number of SQL statements, however
-  // many render_log rows there are (~27k in the seed), never one per template, consumer or day. So count
-  // the statements; the time is logged for information only. Each count includes one read of the business
-  // time zone (a sunset's day and the days to it are read there).
-  it("reads in a fixed number of SQL statements, whatever the volume", async () => {
-    as("riley");
-    await getUsageDashboard("all");
-    const execute = vi.spyOn(libsql, "execute");
-    const batch = vi.spyOn(libsql, "batch");
-    try {
-      for (const [name, run, most] of [
-        ["dashboard, all teams", () => getUsageDashboard("all"), 7],
-        ["dashboard, one team", () => getUsageDashboard("coral-offers"), 8],
-        [
-          "template",
-          () => getTemplateUsage("coral-offers", ids["balance-transfer"]!),
-          10,
-        ], // one is the content type's channels
-      ] as const) {
-        execute.mockClear();
-        batch.mockClear();
-        const t0 = performance.now();
-        await run();
-        const statements = execute.mock.calls.length + batch.mock.calls.length;
-        console.info(
-          `usage read model (${name}): ${statements} statements, ${(performance.now() - t0).toFixed(1)} ms`,
-        );
-        expect(statements, name).toBeLessThanOrEqual(most);
-      }
-    } finally {
-      execute.mockRestore();
-      batch.mockRestore();
-    }
+  it("counts nothing for a space with no renders: a zero, no rate, no trend", async () => {
+    env.dashboard = dashboardFacts({ templates: [], versions: [], cells: [] });
+    const dashboard = await getUsageDashboard("deposits");
+    expect(dashboard.stats.renders).toMatchObject({
+      value: 0,
+      previous: 0,
+      trendPct: null,
+    });
+    expect(dashboard.success.pct).toBeNull();
+    expect(dashboard.rows).toEqual([]);
+  });
+
+  it("is Not found when the service refuses the space", async () => {
+    env.dashboard = unavailable("space");
+    await expect(getUsageDashboard("coral-offers")).rejects.toThrow(NOT_FOUND);
   });
 });
 
 describe("getTemplateUsage", () => {
-  it("Balance Transfer: both versions, Coral on each, 'still on v1', weekly by version", async () => {
-    as("maya");
-    const bt = ids["balance-transfer"]!;
-    const u = await getTemplateUsage("coral-offers", bt);
-    const s = since();
-    const ok = await direct("at >= ? and template_id = ?", null, [s, bt]);
-    const v1ok = await direct(
-      "at >= ? and template_id = ? and version_number = 1",
-      null,
-      [s, bt],
-    );
-
-    expect(u.template).toEqual({
-      id: bt,
-      name: "Balance Transfer Intro — Terms",
-      teamSlug: "coral-offers",
-    });
-    expect(u.stats.renders.value).toBe(ok);
-    expect(u.stats.consumers.value).toBe(1);
-    expect(u.versions.map((v) => [v.number, v.state])).toEqual([
-      [2, "active"],
-      [1, "superseded"],
+  it("asks the service for the template by id, and lays its counts out", async () => {
+    const usage = await getTemplateUsage("coral-offers", BALANCE_TRANSFER);
+    expect(env.asked).toEqual([
+      { method: "template", input: { templateId: BALANCE_TRANSFER } },
     ]);
-    const v1 = u.versions[1]!;
-    expect(v1).toMatchObject({
-      sunsetPassed: false,
-      revokedAt: null,
-      tags: [{ tone: "warning", text: "sunset in 21 days" }],
-    });
-    expect(v1.consumers).toEqual([
-      {
-        id: "coral",
-        name: "Coral",
-        renders30d: v1ok,
-        errors30d: 0,
-        lastRenderAt: new Date(BASE.getTime() - 37 * 60_000).toISOString(),
+    expect(usage).toMatchObject({
+      template: {
+        id: BALANCE_TRANSFER,
+        name: "Balance Transfer Intro — Terms",
+        teamSlug: "coral-offers",
       },
-    ]);
-    expect(u.stillOn).toEqual([
-      {
-        versionNumber: 1,
-        state: "superseded",
-        renders: v1ok,
-        pct: Math.round((v1ok / ok) * 100),
+      asOf: ASOF,
+      today: "2026-10-04",
+      stats: {
+        renders: { value: 100, previous: 50, trendPct: 100 },
+        consumers: { value: 1 },
+        errors: { value: 10 },
       },
-    ]);
-
-    expect(u.weeklyVersions).toEqual([1, 2]);
-    expect(u.weekly).toHaveLength(TREND_WEEKS);
-    for (const w of u.weekly)
-      expect(w.byVersion[1]! + w.byVersion[2]!).toBe(w.count);
-    expect(u.daily).toHaveLength(HISTORY_DAYS);
-    expect(u.rows.map((r) => r.versionNumber).sort()).toEqual([1, 2]);
-
-    // The two failed v1 renders 31 days ago: outside the window, still the most recent errors.
-    expect(u.stats.errors.value).toBe(0);
-    expect(u.recentErrors).toHaveLength(2);
-    expect(u.recentErrors[0]).toMatchObject({
-      consumer: { id: "coral", name: "Coral" },
-      versionNumber: 1,
-      channel: "web",
-      code: "invalid_values",
-      text: "A value had the wrong format.",
-    });
-  });
-
-  it("Holiday Points: the revoked v1 keeps its consumer (all time) and its danger tag", async () => {
-    as("maya");
-    const u = await getTemplateUsage("coral-offers", ids["holiday-points"]!);
-    const v1 = u.versions.find((v) => v.number === 1)!;
-    expect(v1.state).toBe("revoked");
-    expect(v1.revokedAt).not.toBeNull();
-    expect(v1.tags).toEqual([{ tone: "danger", text: "renders fail" }]);
-    expect(v1.consumers.map((c) => [c.name, c.renders30d])).toEqual([
-      ["Coral", 0],
-    ]);
-    expect(u.stillOn).toEqual([]);
-  });
-
-  it("High-Yield Savings: v2, sent back twice before its release, is its released row, never a sent-back round", async () => {
-    as("eli");
-    const templateId = ids["high-yield-savings"]!;
-    const u = await getTemplateUsage("deposits", templateId);
-    expect(u.versions.map((v) => [v.number, v.state])).toEqual([
-      [2, "active"],
-      [1, "superseded"],
-    ]);
-    const released = await libsql.execute({
-      sql: "select activated_at from versions where template_id = ? and number = 2 and state = 'active'",
-      args: [templateId],
-    });
-    expect(u.versions[0]!.activatedAt).toBe(
-      new Date(Number(released.rows[0]!.activated_at)).toISOString(),
-    );
-    expect(u.versions[0]!.consumers.map((c) => c.name)).toEqual([
-      "Deposits Online",
-    ]);
-    expect(
-      new Set(
-        u.rows.filter((r) => r.versionNumber === 2).map((r) => r.versionState),
-      ),
-    ).toEqual(new Set(["active"]));
-  });
-
-  it("one denominator: a template whose only render failed reads 1 render, 0% succeeded, 1 failed; with no renders there is no rate", async () => {
-    as("maya");
-    // A clock long before any seeded render: both windows are empty.
-    const templateId = ids["holiday-points"]!;
-    const versionId = await versionIdOf(templateId, 1);
-    env.now = new Date(BASE.getTime() - 400 * DAY);
-    try {
-      const none = await getTemplateUsage("coral-offers", templateId);
-      expect(none.success).toEqual({ ok: 0, errors: 0, pct: null });
-      expect(none.stats.renders.value).toBe(0);
-      await withRows(
-        [
-          logRow({
-            id: "rl_test_only_failure",
-            at: env.now.getTime() - 3_600_000,
-            templateId,
-            versionId,
-            versionNumber: 1,
-            consumerId: "coral",
-            outcome: "error",
-          }),
-        ],
-        async () => {
-          const u = await getTemplateUsage("coral-offers", templateId);
-          expect(u.success).toEqual({ ok: 0, errors: 1, pct: 0 });
-          expect(u.stats.renders.value).toBe(1);
-          expect(u.rows.map((r) => [r.renders30d, r.errors30d])).toEqual([
-            [1, 1],
-          ]);
-          expect(u.daily.at(-1)).toMatchObject({ count: 1, errors: 1 });
-        },
-      );
-    } finally {
-      env.now = BASE;
-    }
-  });
-
-  it("Balance Transfer, a document: renders by channel are PDF, Web and Email, and match direct SQL", async () => {
-    as("maya");
-    const bt = ids["balance-transfer"]!;
-    const u = await getTemplateUsage("coral-offers", bt);
-    const s = since();
-    const count = (channel: string) =>
-      direct("at >= ? and template_id = ? and channel = ?", null, [
-        s,
-        bt,
-        channel,
-      ]);
-
-    expect(u.channels).toEqual(["pdf", "web", "email"]);
-    expect(u.byChannel).toEqual({
-      pdf: await count("pdf"),
-      web: await count("web"),
-      email: await count("email"),
-      push: 0,
-      sms: 0,
-    });
-    expect(u.byChannel.pdf + u.byChannel.web + u.byChannel.email).toBe(
-      u.stats.renders.value,
-    );
-    expect(u.byChannel.web).toBeGreaterThan(0);
-    // No phone for a document.
-    expect(u.pushByPlatform).toEqual({ ios: 0, android: 0, unrecorded: 0 });
-    expect(u.recentErrors.every((e) => e.platform === null)).toBe(true);
-  });
-
-  it("Payment Due Reminder, an alert: renders by channel are Push and SMS, and Push splits into iPhone and Android", async () => {
-    as("maya");
-    const alert = ids["payment-due-reminder"]!;
-    const u = await getTemplateUsage("coral-offers", alert);
-    const s = since();
-    const count = (where: string) =>
-      direct(`at >= ? and template_id = ? and ${where}`, null, [s, alert]);
-
-    expect(u.channels).toEqual(["push", "sms"]);
-    expect(u.byChannel).toEqual({
-      pdf: 0,
-      web: 0,
-      email: 0,
-      push: await count("channel = 'push'"),
-      sms: await count("channel = 'sms'"),
-    });
-    expect(u.byChannel.push).toBeGreaterThan(0);
-    expect(u.byChannel.sms).toBeGreaterThan(0);
-    expect(u.byChannel.push + u.byChannel.sms).toBe(u.stats.renders.value);
-
-    expect(u.pushByPlatform).toEqual({
-      ios: await count("channel = 'push' and platform = 'ios'"),
-      android: await count("channel = 'push' and platform = 'android'"),
-      unrecorded: 0,
-    });
-    expect(u.pushByPlatform.ios).toBeGreaterThan(0);
-    expect(u.pushByPlatform.android).toBeGreaterThan(0);
-    expect(u.pushByPlatform.ios + u.pushByPlatform.android).toBe(
-      u.byChannel.push,
-    );
-
-    // The seeded failures: the Android push is the latest, then the three SMS, which have no phone.
-    expect(u.recentErrors.slice(0, 2)).toEqual([
-      expect.objectContaining({
-        channel: "push",
-        platform: "android",
-        code: "missing_variables",
-      }),
-      expect.objectContaining({
-        channel: "push",
-        platform: "android",
-        code: "missing_variables",
-      }),
-    ]);
-    expect(u.recentErrors.slice(2).map((e) => [e.channel, e.platform])).toEqual(
-      [
-        ["sms", null],
-        ["sms", null],
-        ["sms", null],
+      success: { ok: 90, errors: 10, pct: 90 },
+      channels: ["pdf", "web", "email"],
+      versions: [
+        { number: 2, state: "active" },
+        { number: 1, state: "superseded", sunsetPassed: false },
       ],
-    );
+    });
   });
 
-  it("the channel split counts live renders of the last 30 days only; a push with no recorded phone is its own count", async () => {
-    as("maya");
-    const alert = ids["payment-due-reminder"]!;
-    const versionId = await versionIdOf(alert, 1);
-    env.now = new Date(BASE.getTime() - 400 * DAY);
-    const at = env.now.getTime();
-    const row = (id: string, o: Partial<Parameters<typeof logRow>[0]>) =>
-      logRow({
-        id: `rl_split_${id}`,
-        at: at - 3_600_000,
-        templateId: alert,
-        versionId,
-        versionNumber: 1,
-        consumerId: "coral",
-        channel: "push",
-        ...o,
-      });
-    try {
-      await withRows(
-        [
-          row("ios", { platform: "ios" }),
-          row("ios-failed", {
-            platform: "ios",
-            outcome: "error",
-            errorCode: "missing_variables",
-          }),
-          row("android", { platform: "android" }),
-          // Logged before the platform was kept.
-          row("legacy", {}),
-          row("sms", { channel: "sms" }),
-          // Not usage, or not in the window: previews, an unregistered caller, 31 days ago.
-          row("preview", {
-            platform: "ios",
-            isPreview: true,
-            consumerId: null,
-          }),
-          row("unknown", {
-            platform: "ios",
-            outcome: "error",
-            errorCode: "unknown_consumer",
-          }),
-          row("old", { platform: "android", at: at - 31 * DAY }),
-        ],
-        async () => {
-          const u = await getTemplateUsage("coral-offers", alert);
-          expect(u.byChannel).toEqual({
-            pdf: 0,
-            web: 0,
-            email: 0,
-            push: 4,
-            sms: 1,
-          });
-          expect(u.pushByPlatform).toEqual({
-            ios: 2,
-            android: 1,
-            unrecorded: 1,
-          });
-          // The failed iPhone push names its phone, the earlier SMS failures none.
-          expect(u.recentErrors[0]).toMatchObject({
-            channel: "push",
-            platform: "ios",
-            code: "missing_variables",
-          });
-        },
-      );
-    } finally {
-      env.now = BASE;
-    }
-  });
-
-  it("404s for a template outside the space", async () => {
-    as("maya");
+  it("is found in its team's space and in All teams", async () => {
     await expect(
-      getTemplateUsage("coral-offers", ids["checking-fees"]!),
-    ).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
+      getTemplateUsage("coral-offers", BALANCE_TRANSFER),
+    ).resolves.toMatchObject({ template: { id: BALANCE_TRANSFER } });
+    await expect(
+      getTemplateUsage("all", BALANCE_TRANSFER),
+    ).resolves.toMatchObject({ template: { id: BALANCE_TRANSFER } });
+  });
+
+  it("is Not found in another team's space", async () => {
+    await expect(
+      getTemplateUsage("deposits", BALANCE_TRANSFER),
+    ).rejects.toThrow(NOT_FOUND);
+  });
+
+  it("compares the template's team with the space's by id, never by slug", async () => {
+    // A slug the URL doesn't use, on the right team's id: found.
+    env.template = templateFacts({
+      template: { ...template, teamId: "t_deposits", teamSlug: "coral-offers" },
+    });
+    await expect(
+      getTemplateUsage("deposits", BALANCE_TRANSFER),
+    ).resolves.toMatchObject({ template: { id: BALANCE_TRANSFER } });
+    // The URL's own slug on another team's id: Not found.
+    await expect(
+      getTemplateUsage("coral-offers", BALANCE_TRANSFER),
+    ).rejects.toThrow(NOT_FOUND);
+  });
+
+  it("is Not found when the service refuses the template", async () => {
+    env.template = unavailable("template");
+    await expect(
+      getTemplateUsage("coral-offers", BALANCE_TRANSFER),
+    ).rejects.toThrow(NOT_FOUND);
+    await expect(getTemplateUsage("all", BALANCE_TRANSFER)).rejects.toThrow(
+      NOT_FOUND,
+    );
   });
 });

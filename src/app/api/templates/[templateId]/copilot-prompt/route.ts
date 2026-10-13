@@ -13,7 +13,6 @@ export async function GET(
 ) {
   const context = await requestContextOrRefusal();
   if (!context.ok) return signedOutResponse();
-  const { viewer } = context.context;
   const { templateId } = await ctx.params;
-  return readResponse(await getCopilotPrompt(viewer, { templateId }));
+  return readResponse(await getCopilotPrompt(context.context, { templateId }));
 }

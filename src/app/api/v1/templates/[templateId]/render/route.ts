@@ -6,11 +6,8 @@ import {
   renderFailed,
   renderTarget,
 } from "@/domain/render";
-import {
-  correlationIdOf,
-  errorResponse,
-  withDemoDate,
-} from "@/server/api/http";
+import { correlationIdOf, errorResponse } from "@/server/api/http";
+import { withDemoDate } from "@/server/services/local/consumer-api";
 import {
   readRenderRequest,
   renderSuccessResponse,

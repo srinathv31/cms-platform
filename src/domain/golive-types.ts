@@ -166,7 +166,7 @@ export interface ResponseFormat {
   example: string | null;
 }
 
-// ── Consumer API queries (slice S1, src/server/queries/consumer-api.ts; no viewer, consumer-scoped) ──
+// ── Consumer API queries (slice S1, src/server/services/local/consumer-api.ts; no viewer, consumer-scoped) ──
 //
 //   requireConsumer(header: string | null): Promise<{ ok: true; consumer: { id: string; name: string } } | { ok: false; error: ApiError }>
 //   searchActiveTemplates(q: string, limit: number, after: SearchKey | null): Promise<SearchPage>
@@ -238,7 +238,9 @@ export interface UsageRow {
 /** /[team]/usage. Team space = that team's templates; "all" = every team the viewer can see. */
 export interface UsageDashboard {
   space: { slug: string; name: string; isAll: boolean };
-  today: string; // YYYY-MM-DD, demo clock
+  /** ISO: the backend's instant the counts were made at; a row's "last render" counts from it. */
+  asOf: string;
+  today: string; // YYYY-MM-DD, UTC day of `asOf`
   stats: {
     /** Renders (succeeded + failed) in the last 30 days vs the 30 before. Label: "Renders · 30 days". */
     renders: UsageStatCard & { previous: number; trendPct: number | null };
@@ -304,6 +306,8 @@ export interface UsageDashboard {
 /** The per-template Usage tab (…/templates/[templateId]/usage). Same sources, one template. */
 export interface TemplateUsageData {
   template: { id: string; name: string; teamSlug: string };
+  /** ISO: the backend's instant the counts were made at; a row's "last render" counts from it. */
+  asOf: string;
   today: string;
   stats: {
     renders: UsageStatCard & { previous: number; trendPct: number | null };
@@ -373,8 +377,8 @@ export interface TemplateUsageVersion {
 // Signatures (slice S2):
 //   getUsageDashboard(spaceSlug: string): Promise<UsageDashboard>                       // cache(); viewer-scoped (template.view)
 //   getTemplateUsage(spaceSlug: string, templateId: string): Promise<TemplateUsageData> // requireTemplate()
-// Aggregate in SQL (render_log is ~27k rows): group by day/consumer/version with `is_preview = 0 AND
-// consumer_id IS NOT NULL`. Days are UTC days of the demo clock (`now()` from server/clock).
+// The backend aggregates in SQL (render_log is ~27k rows; services/local/usage.ts): group by day/consumer/version with `is_preview = 0 AND
+// consumer_id IS NOT NULL`. Days are UTC days of the backend's clock (`asOf`); `usageDashboard` and `templateUsage` (domain/golive/usage.ts) lay the counts out.
 
 // ── Integration panel (slice S1 query + U3 UI) ────────────────────────────────────────────────
 
@@ -424,8 +428,8 @@ export interface IntegrationPanelData {
 }
 
 // Signatures:
-//   getIntegrationPanel(templateId: string, origin: string): Promise<IntegrationPanelData | null>  // src/server/queries/integration.ts (S1)
-//   loadIntegrationPanel(viewer, { templateId }): Promise<ReadResult<{ panel: IntegrationPanelData }>>   // src/server/queries/integration.ts
+//   integrationPanel(facts: IntegrationFacts, origin: string): IntegrationPanelData   // src/server/queries/integration.ts
+//   loadIntegrationPanel(ctx, { templateId }): Promise<ReadResult<{ panel: IntegrationPanelData }>>   // src/server/queries/integration.ts
 //     can("integration.view") on the template's team; origin from headers() (x-forwarded-proto + host).
 //     Served by GET /api/templates/[templateId]/integration. WorkspaceShare keeps its props (templateId,
 //     templateName, activeVersion) and fetches it on open (and on ring hover/focus as a prefetch), so

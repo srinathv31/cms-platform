@@ -14,7 +14,7 @@ import { GET as searchGET } from "@/app/api/v1/templates/route";
 import { GET } from "./route";
 
 // GET /api/v1/consumers/{consumerId}/notices end to end against a temporary seeded database. The
-// notices' shape is covered in src/server/queries/consumer-api.test.ts and src/domain/golive; this
+// notices' shape is covered in src/server/services/local/consumer-api.test.ts and src/domain/golive; this
 // file covers the HTTP contract and every error row api-v1.ts lists for it.
 
 const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));

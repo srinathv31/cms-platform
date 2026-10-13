@@ -8,11 +8,12 @@ import {
   auditEvents,
   commentThreads,
   comments,
+  renderLog,
   templates as templatesTable,
   versions,
 } from "@/server/db/schema/ucomp";
-import { newTemplateId } from "@/server/ids";
-import { listNotices } from "@/server/queries/consumer-api";
+import { newId, newTemplateId } from "@/server/ids";
+import { listNotices } from "@/server/services/local/consumer-api";
 import {
   loadPersona,
   seededDatabasePerTest,
@@ -20,9 +21,10 @@ import {
 import {
   probeVersion,
   probeVersionRow,
-  type ContractHarness,
+  type UsageHarness,
 } from "../contract/harness";
 import type { IdSource, TestHooks } from "../options";
+import { findRound } from "./find-round";
 import { localServices } from "./index";
 import { runScheduledJobs } from "./sweeps";
 
@@ -31,8 +33,11 @@ import { runScheduledJobs } from "./sweeps";
 // (`seededDatabasePerTest`, decision 0048). The test file mocks `@/server/db/client` with `tempDatabase()`;
 // one local harness per file (a second would close the first's mocked client).
 
-/** Call it inside the `describe` that runs the cases, so its hooks belong to that block. */
-export function localContractHarness(opts: { base: Date }): ContractHarness {
+/**
+ * Call it inside the `describe` that runs the cases, so its hooks belong to that block. It also records renders
+ * (`UsageHarness`): the Usage cases need the render log at exact instants.
+ */
+export function localContractHarness(opts: { base: Date }): UsageHarness {
   const templates = seededDatabasePerTest({ base: opts.base });
   let db: Db | undefined;
   let clock = opts.base;
@@ -93,6 +98,33 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
         limit: 100_000,
       });
       return page.notices;
+    },
+    renders: {
+      async record(renders) {
+        // One insert per render, in the order given: the rows' write order is the log's `seq` stand-in.
+        for (const r of renders) {
+          const version = await findRound(db!, r.templateId, r.versionNumber);
+          if (!version)
+            throw new Error(`No v${r.versionNumber} of ${r.templateId}.`);
+          const outcome = r.outcome ?? "ok";
+          await db!.insert(renderLog).values({
+            id: newId("rl"),
+            at: new Date(r.at),
+            templateId: r.templateId,
+            versionId: version.id,
+            versionNumber: r.versionNumber,
+            consumerId: r.consumerId,
+            channel: r.channel,
+            platform: r.platform ?? null,
+            isPreview: r.isPreview ?? false,
+            correlationId: "req_contract",
+            outcome,
+            errorCode:
+              outcome === "error" ? (r.errorCode ?? "invalid_values") : null,
+            durationMs: 1,
+          });
+        }
+      },
     },
     probe: {
       async version({ versionId }) {

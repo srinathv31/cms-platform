@@ -15,6 +15,7 @@ import { fakeComments } from "./comments";
 import { fakeDemo } from "./demo";
 import { fakeDrafts } from "./drafts";
 import { fakeIdentity } from "./identity";
+import { fakeLibrary } from "./library";
 import { fakeNotifications } from "./notifications";
 import { fakePlatform } from "./platform";
 import { fakeReview } from "./review";
@@ -60,7 +61,9 @@ export function fakeServices(
     identity,
     review: fakeReview(deps),
     versions: fakeVersions(deps),
-    templates: fakeTemplates(deps),
+    // The fake reads the Library and the palette (a case watches a command move a template there), not the SHARE
+    // panel or the Copilot prompt, which no command changes.
+    templates: { ...fakeTemplates(deps), ...fakeLibrary(deps) },
     drafts: fakeDrafts(deps),
     comments: { ...fakeComments(deps), ...fakeThreads(deps) },
     access: fakeAccess(deps),

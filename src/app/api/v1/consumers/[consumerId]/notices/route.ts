@@ -11,14 +11,14 @@ import {
   correlationIdOf,
   errorResponse,
   jsonResponse,
-  withDemoDate,
 } from "@/server/api/http";
 import { now } from "@/server/clock";
 import {
   listNotices,
   noticeEpoch,
   requireConsumer,
-} from "@/server/queries/consumer-api";
+  withDemoDate,
+} from "@/server/services/local/consumer-api";
 
 // GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=: UCOMP's outbox for one
 // consumer, oldest first, paged with an opaque cursor. Contract: ApiNoticeList in src/contracts/api-v1.ts.

@@ -62,7 +62,7 @@ behind them.
 | How a consumer proves who it is       | An `X-Consumer-Id: coral` header, with no credential                                                          | OAuth 2.0 client credentials with Entra ID; 401 and 403 as in section 3                  | The Java API, at the port                                                           | [0057](../decisions/0057-consumers-authenticate-with-client-credentials.md)                                                                             |
 | Error body                            | `{ "error": { "code", "message", "details"? } }`                                                              | The UCOMP API's error format, carrying a stable code and that code's details             | The Java API at the port; the CMS preview route in the same change                  | [0056](../decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md)                                                                            |
 | An unexpected failure on a GET route  | Next.js's default HTML 500 ([A4](../handoff-review.md#a4--medium-get-apiv1-routes-can-return-a-non-json-500)) | The error format, with a code and the correlation id                                     | The Java API                                                                        | A4                                                                                                                                                      |
-| The HTTP `Date` header                | The demo clock (`withDemoDate` in `src/server/api/http.ts`)                                                   | Real time; a demo clock, if one survives, in a header of its own                         | The Java API from the start; Node when the demo clock goes                          | [A7](../handoff-review.md#a7--medium-the-http-date-header-carries-the-demo-clock)                                                                       |
+| The HTTP `Date` header                | The demo clock (`withDemoDate` in `src/server/services/local/consumer-api.ts`)                                | Real time; a demo clock, if one survives, in a header of its own                         | The Java API from the start; Node when the demo clock goes                          | [A7](../handoff-review.md#a7--medium-the-http-date-header-carries-the-demo-clock)                                                                       |
 | The clock behind `asOf` and the rules | The demo clock (real time plus an offset the demo moves)                                                      | The server's clock, with a test-only offset in demo and test environments                | The Java API                                                                        | [0068](../decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)                                                                    |
 | Search                                | Loads every Active version and ranks in memory                                                                | Filters, ranks and pages in SQL, with the same matches and order                         | The Java API                                                                        | [0059](../decisions/0059-template-search-ranks-and-pages-in-sql.md)                                                                                     |
 | `team.id`                             | An opaque id (`t_coral`), never the slug: done in the backend seam work                                       | An opaque id, never equal to a slug                                                      | Node, in the backend seam work (to-do item 3)                                       | [0053](../decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)                                                                           |
@@ -118,7 +118,7 @@ security:
 ```
 
 **Node today:** a consumer names itself in `X-Consumer-Id` and proves nothing (`requireConsumer` in
-`src/server/queries/consumer-api.ts`). No header is 400 `consumer_required`; an id that isn't in `consumers` is 403
+`src/server/services/local/consumer-api.ts`). No header is 400 `consumer_required`; an id that isn't in `consumers` is 403
 `unknown_consumer`; a notices path that isn't the header's id is 403 `consumer_mismatch`. Two leaks are already
 stopped: an unregistered caller writes no `render_log` row, and the notices route no longer has a
 `consumer_not_found` code that told callers which ids exist. Consumers come from the seed. Coral, the simulated consumer in this repo,
@@ -284,7 +284,7 @@ Every operation also answers the 401, 403 and 429 of [section 3](#3-security), a
 ### 5.1 Search templates
 
 `GET /api/v1/templates?q=&limit=&after=` answers `ApiTemplateSearch`. Code: `src/app/api/v1/templates/route.ts` and
-`searchActiveTemplates` in `src/server/queries/consumer-api.ts`.
+`searchActiveTemplates` in `src/server/services/local/consumer-api.ts`.
 
 | Parameter | In    | Type             | Required | Meaning                                                                                                                                             | Example                         |
 | --------- | ----- | ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
@@ -329,7 +329,7 @@ of this list.".
 
 `GET /api/v1/templates/{templateId}?version=&since=` answers `ApiTemplateDetail`. Code:
 [the route](../../src/app/api/v1/templates/[templateId]/route.ts) and `getTemplateDetail` in
-`src/server/queries/consumer-api.ts`.
+`src/server/services/local/consumer-api.ts`.
 
 | Parameter    | In    | Type           | Required | Meaning                                                                                                                                                                                        | Example     |
 | ------------ | ----- | -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
@@ -452,7 +452,7 @@ Here v2's contract was `first_name` and `purchase_apr`, both required, and v3 re
 
 `GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=` answers `ApiNoticeList`. Code:
 [the route](../../src/app/api/v1/consumers/[consumerId]/notices/route.ts) and `listNotices` in
-`src/server/queries/consumer-api.ts`.
+`src/server/services/local/consumer-api.ts`.
 
 | Parameter    | In    | Type              | Required | Meaning                                                                                                      | Example     |
 | ------------ | ----- | ----------------- | -------- | ------------------------------------------------------------------------------------------------------------ | ----------- |
@@ -878,7 +878,7 @@ Decisions [0017](../decisions/0017-a-sunset-date-ends-at-midnight-in-the-busines
   rules, not `Date`.
 
 **Node today:** every `/api/v1` response's `Date` header, and every `asOf`, is the demo clock (real time plus an
-offset the demo's "Advance clock" moves; `withDemoDate` in `src/server/api/http.ts`). Coral stamps what it receives
+offset the demo's "Advance clock" moves; `withDemoDate` in `src/server/services/local/consumer-api.ts`). Coral stamps what it receives
 with that header. Both go with the demo clock.
 
 ## 9. Paging and cursors
@@ -938,7 +938,7 @@ Decisions [0006](../decisions/0006-page-notices-by-commit-order.md) and
 ## 10. Search: matching and order
 
 Decision [0059](../decisions/0059-template-search-ranks-and-pages-in-sql.md); code: `searchActiveTemplates` in
-`src/server/queries/consumer-api.ts` and `compareSearchKeys` in `src/domain/golive/cursor.ts`.
+`src/server/services/local/consumer-api.ts` and `compareSearchKeys` in `src/domain/golive/cursor.ts`.
 
 1. The candidates are the templates with an Active version. A template's name, for matching, ordering, the cursor and
    the result, is its Active version's.
@@ -1140,7 +1140,7 @@ Each of these needs a decision this brief doesn't make.
 | The four handlers                                                             | [src/app/api/v1](../../src/app/api/v1/templates/route.ts) and its siblings                                                                                  |
 | Shared headers and the error response                                         | `src/server/api/http.ts`                                                                                                                                    |
 | The render body and the render responses                                      | `src/server/api/render-http.ts`                                                                                                                             |
-| The GET routes' reads                                                         | `src/server/queries/consumer-api.ts`                                                                                                                        |
+| The GET routes' reads                                                         | `src/server/services/local/consumer-api.ts`                                                                                                                 |
 | Cursors                                                                       | `src/domain/golive/cursor.ts`                                                                                                                               |
 | The GET routes' parameters and sentences                                      | `src/domain/golive/api-errors.ts`                                                                                                                           |
 | Notices on the wire                                                           | `src/domain/golive/notices.ts`                                                                                                                              |

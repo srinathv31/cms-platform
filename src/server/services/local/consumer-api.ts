@@ -33,7 +33,8 @@ import {
 } from "@/domain/render";
 import { headOf, isReleased } from "@/domain/rounds";
 import { CHANNELS, type Channel } from "@/domain/types";
-import { readBusinessZone } from "@/server/services/local/business-zone";
+import { now } from "@/server/clock";
+import { readBusinessZone } from "./business-zone";
 import { db } from "@/server/db/client";
 import {
   consumerNotices,
@@ -50,14 +51,33 @@ import {
 // versions in review and the rounds sent back never leave UCOMP: a consumer never sees a round, and its
 // number means the number's released row. A template with no released version doesn't exist as far as a
 // consumer can tell.
+//
+// This is the backend's own API, not the BFF's: `/api/v1` is what the Java API serves to consumers directly
+// after the port (decision 0057), so its route handlers import this file as the local implementation's HTTP
+// surface, and it keeps its own tests. It sits beside the service implementations, and no service reads it.
+
+/**
+ * Wraps a /api/v1 handler so its response's HTTP `Date` header is the demo clock's now: the world clock
+ * in the demo. A consumer (Coral) stamps what it receives with that header, so after the clock advances
+ * its deliveries read on the same day as UCOMP's sunsets and notices.
+ */
+export function withDemoDate<A extends unknown[]>(
+  handler: (...args: A) => Promise<Response>,
+) {
+  return async (...args: A): Promise<Response> => {
+    const response = await handler(...args);
+    response.headers.set("Date", (await now()).toUTCString());
+    return response;
+  };
+}
 
 /**
  * The channels a consumer can render, in the contract's order (pdf, web, email): the ones turned on
  * for the version that its content type still allows. Channel rules can turn a channel off after a
  * version went Active, and the render route refuses it from then on (channel_not_allowed), so the API
- * never advertises it.
+ * never advertises it. The integration panel lists the same ones.
  */
-const published = (
+export const published = (
   versionChannels: readonly Channel[],
   allowed: readonly Channel[],
 ): Channel[] =>

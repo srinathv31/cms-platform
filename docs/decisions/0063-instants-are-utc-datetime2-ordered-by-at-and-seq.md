@@ -1,6 +1,7 @@
 # 0063. Instants are UTC `DATETIME2(3)`, and rows that share one are ordered by `seq`
 
 Status: Accepted
+Amended 2026-10-13: three more readers break a tie between rows at one instant by the later write first (`rowid` here, `seq` after the port): the palette's Recent (the viewer's audit rows), the template Usage tab's recent failures (the render log), and the SHARE panel's sample consumer (the latest render). Contract cases pin each (`services/contract/library.ts`, `usage.ts`, `share.ts`).
 Date: 2026-10-12
 
 ## Context

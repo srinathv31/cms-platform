@@ -112,3 +112,26 @@ it.each(["maya", "jordan", "eli", "riley"])(
     }
   },
 );
+it("lists every space's Library and palette alike, whether or not the person may enter it", async () => {
+  const spaces = [null, "t_coral", "t_deposits", "t_cards", "t_nope"];
+  for (const userId of ["maya", "jordan", "eli", "riley", "taylor", "morgan"])
+    for (const teamId of spaces) {
+      const [inFake, inLocal] = [await fake.as(userId), await local.as(userId)];
+      const where = `${userId} in ${teamId}`;
+      expect(
+        await fake.services().templates.library(inFake, { teamId }),
+        where,
+      ).toEqual(await local.services().templates.library(inLocal, { teamId }));
+      for (const q of [null, "terms", "in review", "statement insert"])
+        expect(
+          await fake
+            .services()
+            .templates.palette(inFake, { teamId, q, templateId: null }),
+          `${where} for ${q}`,
+        ).toEqual(
+          await local
+            .services()
+            .templates.palette(inLocal, { teamId, q, templateId: null }),
+        );
+    }
+});

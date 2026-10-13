@@ -4,12 +4,12 @@ import {
   type ApiError,
   type ApiErrorBody,
 } from "@/domain/golive-types";
-import { now } from "@/server/clock";
 import { newId } from "@/server/ids";
 
 // What every /api/v1 response shares: the correlation id (echoed, or generated), no-store, nosniff,
 // and the `{ error: { code, message, details? } }` body with the status the contract gives its code.
-// The render route and the consumer GET routes all answer through these.
+// The render route and the consumer GET routes all answer through these. The `Date` header is the
+// backend's own clock's (`withDemoDate`, in services/local/consumer-api.ts), so this file reads no clock.
 
 /** Visible ASCII, up to 128 characters; anything else gets a fresh id instead of being echoed. */
 const CORRELATION_ID = /^[\x21-\x7e]{1,128}$/;
@@ -44,19 +44,4 @@ export function errorResponse(
 /** A 200 JSON body with the base headers. */
 export function jsonResponse(body: unknown, correlationId: string): Response {
   return Response.json(body, { headers: baseHeaders(correlationId) });
-}
-
-/**
- * Wraps a /api/v1 handler so its response's HTTP `Date` header is the demo clock's now: the world clock
- * in the demo. A consumer (Coral) stamps what it receives with that header, so after the clock advances
- * its deliveries read on the same day as UCOMP's sunsets and notices.
- */
-export function withDemoDate<A extends unknown[]>(
-  handler: (...args: A) => Promise<Response>,
-) {
-  return async (...args: A): Promise<Response> => {
-    const response = await handler(...args);
-    response.headers.set("Date", (await now()).toUTCString());
-    return response;
-  };
 }

@@ -35,3 +35,21 @@ export function notMovedArea<T extends object>(area: string): T {
       typeof method === "string" ? notMoved(`${area}.${method}`) : undefined,
   });
 }
+
+/**
+ * An area some of whose methods have moved: the ones in `moved`, and `notMoved` for the rest. Several packages
+ * move the methods of one area (templates: commands, workspace reads, Library reads), each in a file of its own.
+ */
+export function movedArea<T extends object>(
+  area: string,
+  moved: Partial<T>,
+): T {
+  return new Proxy(moved as T, {
+    get: (target, method) =>
+      typeof method !== "string"
+        ? undefined
+        : method in target
+          ? target[method as keyof T]
+          : notMoved(`${area}.${method}`),
+  });
+}

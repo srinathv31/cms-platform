@@ -1,5 +1,6 @@
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { ApiNotice } from "@/domain/golive-types";
+import type { PushPlatform } from "@/domain/messages/push";
 import type {
   Channel,
   JSONContent,
@@ -55,6 +56,41 @@ export interface ContractHarness {
   ): Promise<ApiNotice[]>;
   /** What a command wrote that no moved read serves yet. It shrinks as areas move, and is gone by the end of 2b. */
   readonly probe: ContractProbe;
+}
+
+/** One render, as the render log holds it. */
+export interface RecordedRender {
+  /** ISO. */
+  at: string;
+  templateId: string;
+  /** The number of the version rendered: the row a consumer's number means (its released row, else its latest round). */
+  versionNumber: number;
+  /** null for a render nobody registered asked for. */
+  consumerId: string | null;
+  channel: Channel;
+  /** A push's phone. */
+  platform?: PushPlatform | null;
+  /** A preview (Stencil's own, never usage). */
+  isPreview?: boolean;
+  outcome?: "ok" | "error";
+  /** A failed render's code. */
+  errorCode?: string | null;
+}
+
+/**
+ * Puts renders in the render log with the exact instants a case needs, in the order given (the order is the
+ * log's write order, which breaks ties between equal instants). It stands in for consumers calling the render
+ * API: the local implementation inserts rows, and Java would take them at a test endpoint, since a case can't
+ * make the render API run at an instant of its choosing. Reads of the counts (`usage`) don't need the fake, so
+ * only the harnesses that run the Usage cases provide it.
+ */
+export interface RenderRecorder {
+  record(renders: readonly RecordedRender[]): Promise<void>;
+}
+
+/** A harness whose backend serves the Usage counts: it can also record renders. */
+export interface UsageHarness extends ContractHarness {
+  readonly renders: RenderRecorder;
 }
 
 /** An audit row, as facts. */
