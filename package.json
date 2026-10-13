@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "golden:update": "cross-env GOLDEN_UPDATE=1 vitest run src/server/render/golden/golden.test.ts",
+    "document-schema:update": "cross-env DOCUMENT_SCHEMA_UPDATE=1 vitest run src/server/render/document-json-schema.test.ts",
     "golden:import": "tsx --conditions=react-server scripts/golden-import.ts",
     "e2e": "playwright test",
     "gate:media": "playwright test --project=demo --project=stills-1280 && node e2e/media/collect.mjs",

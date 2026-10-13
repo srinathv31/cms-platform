@@ -1,6 +1,13 @@
 # 0065. Documents are validated against a JSON Schema generated from the editor's schema
 
 Status: Accepted
+Amended 2026-10-12: built (wave 2.1). `src/server/render/document-json-schema.ts` writes
+[docs/reference/document.schema.json](../reference/document.schema.json) (`npm run document-schema:update`), and
+`document-json-schema.test.ts` fails when the file is stale or when the schema and the document check disagree on a
+golden case, a starter, a seeded body or a mutation of one. The schema also holds the channel field shapes
+(`#/$defs/field-line`, `#/$defs/field-lines`). It is looser than the check in three rules the Java side keeps in code, the
+table grid, the 12-column limit and list depth, listed in [render spec](../render-spec.md) §2 with the block id sentence
+this record asks for.
 Date: 2026-10-12
 
 ## Context

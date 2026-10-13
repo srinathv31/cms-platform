@@ -98,7 +98,7 @@ A template body is TipTap (ProseMirror) JSON: `{ "type": "doc", "content": [ …
 
 | Attribute            | On                    | Allowed values                                                                                                                                                         | Absent / null means                                                 |
 | -------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `id`                 | blocks and list items | a non-empty string (stable block id); any other value is not refused and reads as no id                                                                                | no id (`null` on RenderDoc blocks; a list item's id is not carried) |
+| `id`                 | blocks and list items | a non-empty string (stable block id, UUID v4 as the editor writes it); any other value is not refused and reads as no id                                               | no id (`null` on RenderDoc blocks; a list item's id is not carried) |
 | `level`              | `heading`             | `1`, `2`, `3`                                                                                                                                                          | `1` (the schema's default); `null` or any other value is refused    |
 | `requiredKey`        | `heading`             | a required section's key, e.g. `"legal_notices"`; anything but a non-empty string means an ordinary heading                                                            | an ordinary heading                                                 |
 | `start`              | `orderedList`         | an integer from `0` to `9999`                                                                                                                                          | `1`                                                                 |
@@ -151,6 +151,24 @@ The field check refuses anything else in the channel's own words (section 3).
 | List nesting         | at most 9 levels (a list may have at most 8 list ancestors, bullet or ordered) |
 | Table columns        | at most 12                                                                     |
 | Table cell content   | paragraphs and lists only, at every depth (in the cell's lists' items too)     |
+
+### Block ids
+
+Block ids are UUID v4: the editor's UniqueID extension writes one to every block and list item that lacks one, lowercase and hyphenated (`xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`), and the BFF adds them at save (section 3) before a document goes anywhere else. The engine never generates or rewrites one. It reads any non-empty string as the id (the attribute table above), so a document with other ids, such as the golden files' `b1`, renders the same: ids anchor comments and redline and are never printed.
+
+### The JSON Schema
+
+The structure above is also published as a JSON Schema (draft 2020-12), generated from the editor's own schema so the two can't drift apart: [`docs/reference/document.schema.json`](reference/document.schema.json). The generator is `src/server/render/document-json-schema.ts` (decision [0065](decisions/0065-documents-are-validated-against-a-generated-json-schema.md)); `npm run document-schema:update` rewrites the file, and `npm test` fails when it is stale or when the schema and the document check disagree on a golden case, a starter, a seeded body or a mutation of one. An engine validates every document against it, on write and at render. The root is a body document; a channel field is validated against `#/$defs/field-line` (the `line` and `paragraph` shapes) or `#/$defs/field-lines` (`lines`).
+
+The schema states the node and mark names, where each node may go and how many children it takes (the content expressions), that each mark type appears at most once on a node, that a text node is not empty, the attribute enumerations and ranges that section 3's check refuses (heading `level`, list `start`, the numbering styles, each span an integer of at least 1), and the table cell rule: a list inside a table cell is a separate definition (`bulletList-in-cell`, `orderedList-in-cell`, `listItem-in-cell`) whose items hold only paragraphs and lists. It leaves attributes the check leaves open (`id`, `requiredKey`, a variable's `key`, a link's `href`) open too.
+
+It is looser than the document check in three rules, which an engine must still enforce in code, from the check's table in section 3:
+
+- A table's cells line up into rows and columns: each cell takes the next column a rowspan from above does not hold, no slot is taken twice, nothing runs past the last column or row, and every row is full. The schema only requires each span to be an integer of at least 1.
+- A table is at most 12 columns wide.
+- Lists nest at most 9 levels deep, bullet and ordered together, counted through table cells too.
+
+It is stricter than ProseMirror's parse in shape only: `attrs` must be an object and `content` and `marks` arrays when present, where the parse also reads `null` as absent. The editor and the save never write those. The checks of section 3 that are not about structure (characters, link addresses, the normalization) are not in the schema.
 
 ---
 

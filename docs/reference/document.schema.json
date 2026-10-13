@@ -1,0 +1,1226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Generated from the editor's schema by src/server/render/document-json-schema.ts. Do not edit: run `npm run document-schema:update`.",
+  "title": "Stencil document",
+  "description": "A template's stored body (docs/render-spec.md §2). Validate a channel field against #/$defs/field-line (the line and paragraph shapes) or #/$defs/field-lines. Looser than Stencil's own document check, so an implementation must still enforce, in code:\n- A table's cells line up into rows and columns: each cell takes the next column a rowspan from above does not hold, no slot is taken twice, nothing runs past the last column or row, and every row is full. The schema only requires each span to be an integer of at least 1.\n- A table is at most 12 columns wide.\n- Lists nest at most 9 levels deep, bullet and ordered together, counted through table cells too.",
+  "type": "object",
+  "required": [
+    "type",
+    "content"
+  ],
+  "properties": {
+    "type": {
+      "const": "doc"
+    },
+    "content": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/bulletList"
+          },
+          {
+            "$ref": "#/$defs/callout"
+          },
+          {
+            "$ref": "#/$defs/heading"
+          },
+          {
+            "$ref": "#/$defs/horizontalRule"
+          },
+          {
+            "$ref": "#/$defs/orderedList"
+          },
+          {
+            "$ref": "#/$defs/paragraph"
+          },
+          {
+            "$ref": "#/$defs/table"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "bold": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "bold"
+        }
+      }
+    },
+    "bulletList": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "bulletList"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/listItem"
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "bulletList-in-cell": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "bulletList"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/listItem-in-cell"
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      },
+      "description": "Inside a table cell, which holds only paragraphs and lists, at every depth (docs/render-spec.md §3)."
+    },
+    "callout": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "callout"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/paragraph"
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "field-hardBreak": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "hardBreak"
+        },
+        "content": {
+          "type": "array",
+          "items": false
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "field-line": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "description": "A one-line field (the line and paragraph shapes: an email subject or preheader, a push title, subtitle or body): one paragraph of text and variables, none of them marked, with no line breaks.",
+      "properties": {
+        "type": {
+          "const": "doc"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/field-line-paragraph"
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "field-line-paragraph": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "paragraph"
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/field-text"
+              },
+              {
+                "$ref": "#/$defs/field-variable"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "field-lines": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "description": "A field that keeps its line breaks (the lines shape: an SMS message): one paragraph of text, variables and hard breaks, none of them marked.",
+      "properties": {
+        "type": {
+          "const": "doc"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/field-lines-paragraph"
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "field-lines-paragraph": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "paragraph"
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/field-text"
+              },
+              {
+                "$ref": "#/$defs/field-variable"
+              },
+              {
+                "$ref": "#/$defs/field-hardBreak"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "field-text": {
+      "type": "object",
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "field-variable": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "variable"
+        },
+        "content": {
+          "type": "array",
+          "items": false
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "description": "A variable key. Not checked: a key that is not in the version's variable list renders nothing (docs/render-spec.md §8)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "hardBreak": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "hardBreak"
+        },
+        "content": {
+          "type": "array",
+          "items": false
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bold"
+              },
+              {
+                "$ref": "#/$defs/italic"
+              },
+              {
+                "$ref": "#/$defs/link"
+              },
+              {
+                "$ref": "#/$defs/underline"
+              }
+            ]
+          },
+          "allOf": [
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "bold"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "italic"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "link"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "underline"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        }
+      }
+    },
+    "heading": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "heading"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/hardBreak"
+              },
+              {
+                "$ref": "#/$defs/text"
+              },
+              {
+                "$ref": "#/$defs/variable"
+              }
+            ]
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            },
+            "requiredKey": {
+              "description": "The key of the required section the heading stands for. Anything but a non-empty string is an ordinary heading."
+            },
+            "level": {
+              "enum": [
+                1,
+                2,
+                3
+              ],
+              "default": 1
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "horizontalRule": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "horizontalRule"
+        },
+        "content": {
+          "type": "array",
+          "items": false
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "italic": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "italic"
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "link"
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "description": "Not checked here: a link that fails the link check loses its mark at save, and the resolver drops it (docs/render-spec.md §6)."
+            },
+            "target": {
+              "description": "Ignored by the engine.",
+              "default": "_blank"
+            },
+            "rel": {
+              "description": "Ignored by the engine.",
+              "default": "noopener noreferrer nofollow"
+            },
+            "class": {
+              "description": "Ignored by the engine."
+            },
+            "title": {
+              "description": "Ignored by the engine."
+            }
+          }
+        }
+      }
+    },
+    "listItem": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "listItem"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/paragraph"
+            }
+          ],
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bulletList"
+              },
+              {
+                "$ref": "#/$defs/callout"
+              },
+              {
+                "$ref": "#/$defs/heading"
+              },
+              {
+                "$ref": "#/$defs/horizontalRule"
+              },
+              {
+                "$ref": "#/$defs/orderedList"
+              },
+              {
+                "$ref": "#/$defs/paragraph"
+              },
+              {
+                "$ref": "#/$defs/table"
+              }
+            ]
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "listItem-in-cell": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "listItem"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/paragraph"
+            }
+          ],
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bulletList-in-cell"
+              },
+              {
+                "$ref": "#/$defs/orderedList-in-cell"
+              },
+              {
+                "$ref": "#/$defs/paragraph"
+              }
+            ]
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      },
+      "description": "Inside a table cell, which holds only paragraphs and lists, at every depth (docs/render-spec.md §3)."
+    },
+    "orderedList": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "orderedList"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/listItem"
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            },
+            "markerFormat": {
+              "enum": [
+                "decimal",
+                "lower-alpha",
+                "upper-alpha",
+                "lower-roman",
+                "upper-roman",
+                null
+              ]
+            },
+            "markerDelimiter": {
+              "enum": [
+                "period",
+                "paren-right",
+                "parens",
+                null
+              ]
+            },
+            "start": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9999,
+              "default": 1
+            },
+            "type": {
+              "description": "TipTap's own attribute: ignored, removed at save."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "orderedList-in-cell": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "orderedList"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/listItem-in-cell"
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            },
+            "markerFormat": {
+              "enum": [
+                "decimal",
+                "lower-alpha",
+                "upper-alpha",
+                "lower-roman",
+                "upper-roman",
+                null
+              ]
+            },
+            "markerDelimiter": {
+              "enum": [
+                "period",
+                "paren-right",
+                "parens",
+                null
+              ]
+            },
+            "start": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9999,
+              "default": 1
+            },
+            "type": {
+              "description": "TipTap's own attribute: ignored, removed at save."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      },
+      "description": "Inside a table cell, which holds only paragraphs and lists, at every depth (docs/render-spec.md §3)."
+    },
+    "paragraph": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "paragraph"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/hardBreak"
+              },
+              {
+                "$ref": "#/$defs/text"
+              },
+              {
+                "$ref": "#/$defs/variable"
+              }
+            ]
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "table"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tableRow"
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "A block's stable id. The editor writes a UUID v4 (TipTap's UniqueID). Any non-empty string is read as the id, and any other value as no id (docs/render-spec.md §2)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "tableCell": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "tableCell"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bulletList-in-cell"
+              },
+              {
+                "$ref": "#/$defs/orderedList-in-cell"
+              },
+              {
+                "$ref": "#/$defs/paragraph"
+              }
+            ]
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "colspan": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "default": 1
+            },
+            "rowspan": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "default": 1
+            },
+            "colwidth": {
+              "description": "Ignored, removed at save."
+            },
+            "align": {
+              "description": "Ignored, removed at save."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "tableHeader": {
+      "type": "object",
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "tableHeader"
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bulletList-in-cell"
+              },
+              {
+                "$ref": "#/$defs/orderedList-in-cell"
+              },
+              {
+                "$ref": "#/$defs/paragraph"
+              }
+            ]
+          }
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "colspan": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "default": 1
+            },
+            "rowspan": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "default": 1
+            },
+            "colwidth": {
+              "description": "Ignored, removed at save."
+            },
+            "align": {
+              "description": "Ignored, removed at save."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "tableRow": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "tableRow"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/tableCell"
+              },
+              {
+                "$ref": "#/$defs/tableHeader"
+              }
+            ]
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": false
+        }
+      }
+    },
+    "text": {
+      "type": "object",
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bold"
+              },
+              {
+                "$ref": "#/$defs/italic"
+              },
+              {
+                "$ref": "#/$defs/link"
+              },
+              {
+                "$ref": "#/$defs/underline"
+              }
+            ]
+          },
+          "allOf": [
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "bold"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "italic"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "link"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "underline"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        }
+      }
+    },
+    "underline": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "underline"
+        }
+      }
+    },
+    "variable": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "variable"
+        },
+        "content": {
+          "type": "array",
+          "items": false
+        },
+        "attrs": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "description": "A variable key. Not checked: a key that is not in the version's variable list renders nothing (docs/render-spec.md §8)."
+            }
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bold"
+              },
+              {
+                "$ref": "#/$defs/italic"
+              },
+              {
+                "$ref": "#/$defs/link"
+              },
+              {
+                "$ref": "#/$defs/underline"
+              }
+            ]
+          },
+          "allOf": [
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "bold"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "italic"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "link"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "underline"
+                  }
+                }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        }
+      }
+    }
+  }
+}
