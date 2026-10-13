@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { ClipboardCheck, X } from "lucide-react";
@@ -19,26 +19,10 @@ import {
   useWorkspaceSession,
 } from "../session/workspace-session";
 import { WS } from "../workspace-grid";
-
-/**
- * Something above the document that takes the first Escape: a menu, a popover or a dialog. Base UI's
- * popups and the sample-set editor are `menu`, `listbox` or `dialog` for as long as they are open.
- */
-const OPEN_POPUP = '[role="menu"], [role="listbox"], [role="dialog"]';
+import { useUnclaimedEscape } from "./rail-escape";
 
 /** How long focus waits for the other header row's Original tab to mount (`focusOriginalTab`) before it gives up. */
 const ORIGINAL_TAB_WAIT_MS = 1000;
-
-/**
- * Whether `target` is the template name in the header (name-field.tsx), which registers itself as a
- * focus target. Its own Escape puts the old name back and leaves the field, so an Escape there is
- * spoken for only while the name is mid-edit; with nothing to put back it is just a way out of the
- * field, and the preview closes.
- */
-function inNameField(targets: FocusTargets, target: Element | null): boolean {
-  const name = targets.get("name");
-  return name !== null && target !== null && name.contains(target);
-}
 
 /**
  * The rail's header row is swapping (the plain rail's widens, or the widened rail is put away), and
@@ -60,33 +44,6 @@ function focusOriginalTab(targets: FocusTargets, replaced: HTMLElement | null) {
 }
 
 /**
- * Whether an Escape is already spoken for by something that is open when it is pressed: a menu or
- * popover, the editor's `/` menu or `{{` picker (they point the editor at their list with
- * `aria-controls` while they are open), or a name that is mid-edit. Asked in the capture phase, before
- * they handle the key and close, because the editor closes its menu inside its own handler and React
- * has unmounted it by the time a bubbling listener runs.
- */
-function escapeIsSpokenFor(
-  event: KeyboardEvent,
-  targets: FocusTargets,
-  nameAtFocus: string | null,
-): boolean {
-  const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest(".ProseMirror")?.hasAttribute("aria-controls"))
-    return true;
-  if (
-    inNameField(targets, target) &&
-    targets.get("name")?.value.trim() !== nameAtFocus
-  )
-    return true;
-  // Only one on screen: a route kept mounted but hidden (`<Activity>`) can still hold an open dialog, such as
-  // the Library's New template, left open by the import or starter that navigated away from it.
-  return [...document.querySelectorAll(OPEN_POPUP)].some(
-    (el) => el.getClientRects().length > 0,
-  );
-}
-
-/**
  * The rail: Channels above Variables, a flush strip beside the header, tabs and document with its own
  * scroll. Wide canvas: always there. Narrow: closed until the tab bar's toggle opens it over the
  * right edge; Esc or the close button puts it away.
@@ -100,10 +57,10 @@ function escapeIsSpokenFor(
  * switch. Below the breakpoint the same thing is an overlay over the whole canvas.
  *
  * Esc closes the preview (or the narrow overlay), unless a menu, a popover, the editor's own `/` menu
- * or `{{` picker, or a name that is mid-edit took it. The Template name field closes it too, when
- * it has nothing to put back. Focus goes back to the tab bar's Preview toggle when the Esc would
- * otherwise leave it lost (it was in the rail, or on nothing); an Esc in the document leaves the
- * caret where it is.
+ * or `{{` picker, or a name that is mid-edit took it (the claims in rail-escape.ts). The Template name
+ * field closes it too, when it has nothing to put back. Focus goes back to the tab bar's Preview toggle
+ * when the Esc would otherwise leave it lost (it was in the rail, or on nothing); an Esc in the document
+ * leaves the caret where it is.
  *
  * A template with review comments gets a Comments view in the rail, beside Variables: the same header
  * row as the preview's (`RailHeader`: Comments | Variables, and Preview | Comments | Variables while
@@ -175,8 +132,6 @@ export function Rail({
   const aside = useRef<HTMLElement>(null);
   // The plain rail's Original tab, for focus to come back to when the widened Original view is put away.
   const originalTab = useFocusTarget("originalTab");
-  // What the name field said when it last got focus: an Esc there with the same text has no edit to put back.
-  const nameAtFocus = useRef<string | null>(null);
 
   // Before the first paint: widened at once, without the width transition (nothing moves on arrival).
   useLayoutEffect(() => {
@@ -211,69 +166,34 @@ export function Rail({
     wasOpen.current = open;
   }, [open]);
 
-  useEffect(() => {
-    const note = (el: Element | null) => {
-      const name = session.focusTargets.get("name");
-      if (name !== null && el === name) nameAtFocus.current = name.value.trim();
-    };
-    note(document.activeElement);
-    const onFocusIn = (event: FocusEvent) =>
-      note(event.target instanceof Element ? event.target : null);
-    document.addEventListener("focusin", onFocusIn);
-    return () => document.removeEventListener("focusin", onFocusIn);
-  }, [session]);
-
-  useEffect(() => {
-    if (!open) return;
-    let spokenFor = false;
-    const onCapture = (event: KeyboardEvent) => {
-      if (event.key === "Escape")
-        spokenFor = escapeIsSpokenFor(
-          event,
-          session.focusTargets,
-          nameAtFocus.current,
-        );
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || spokenFor) return;
-      // Outside the document and the name field, a handler that used the key says so. (ProseMirror
-      // swallows every Escape, so there `defaultPrevented` means nothing; the name field always
-      // prevents it, to leave the field, which is why it was asked about in the capture phase.)
-      const target = event.target instanceof Element ? event.target : null;
-      const inDocument = target?.closest(".ProseMirror") != null;
-      const inName = inNameField(session.focusTargets, target);
-      if (event.defaultPrevented && !inDocument && !inName) return;
-      // Focus goes back to the Preview toggle unless it is somewhere the author is working (the document).
-      const active = document.activeElement;
-      const lost =
-        active === null ||
-        active === document.body ||
-        (aside.current?.contains(active) ?? false);
-      // Back to what opened the rail when that is still on screen (below the breakpoint, the rail toggle
-      // that opened the overlay the Original tab is in); otherwise to the Preview toggle, or to the plain
-      // rail's Original tab when that is where the widened Original view came from.
-      const from = opener.current;
-      const backToOpener =
-        lost &&
-        from !== null &&
-        from.isConnected &&
-        from.getClientRects().length > 0;
-      if (backToOpener) from.focus({ preventScroll: true });
-      const widenedOriginalTab = session.focusTargets.get("originalTab");
-      closePreview(session, {
-        restoreFocus: !backToOpener && previewOpen && lost,
-      });
-      if (!backToOpener && previewOpen && lost && view === "original") {
-        focusOriginalTab(session.focusTargets, widenedOriginalTab);
-      }
-    };
-    document.addEventListener("keydown", onCapture, true);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onCapture, true);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, previewOpen, session, view]);
+  // An Escape that no menu, popover, picker or name mid-edit took (rail-escape.ts) puts the preview, or the
+  // narrow overlay, away.
+  const onUnclaimedEscape = useCallback(() => {
+    // Focus goes back to the Preview toggle unless it is somewhere the author is working (the document).
+    const active = document.activeElement;
+    const lost =
+      active === null ||
+      active === document.body ||
+      (aside.current?.contains(active) ?? false);
+    // Back to what opened the rail when that is still on screen (below the breakpoint, the rail toggle
+    // that opened the overlay the Original tab is in); otherwise to the Preview toggle, or to the plain
+    // rail's Original tab when that is where the widened Original view came from.
+    const from = opener.current;
+    const backToOpener =
+      lost &&
+      from !== null &&
+      from.isConnected &&
+      from.getClientRects().length > 0;
+    if (backToOpener) from.focus({ preventScroll: true });
+    const widenedOriginalTab = session.focusTargets.get("originalTab");
+    closePreview(session, {
+      restoreFocus: !backToOpener && previewOpen && lost,
+    });
+    if (!backToOpener && previewOpen && lost && view === "original") {
+      focusOriginalTab(session.focusTargets, widenedOriginalTab);
+    }
+  }, [previewOpen, session, view]);
+  useUnclaimedEscape(session.focusTargets, open, onUnclaimedEscape);
 
   const close = () => closePreview(session, { restoreFocus: false });
 
