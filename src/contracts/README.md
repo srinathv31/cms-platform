@@ -95,7 +95,13 @@ points (`MAX_VALUE_LENGTH`), else 422 `invalid_values` with `maxLength` on that 
 is never cut, because it prints exactly as sent. Every value is a JSON string, so `ApiRenderRequest.values` is
 `Record<string, string>`: a JSON number is 422 `invalid_values` too, with `sent: "number"` on that key's entry and a
 sentence that says to send `"21.90"`
-([decision 0058](../../docs/decisions/0058-render-values-are-strings.md)). The published JSON Schema gives every property the same
+([decision 0058](../../docs/decisions/0058-render-values-are-strings.md)). The published JSON Schema refuses a number
+too, but it stays stricter than the route in four ways, so a body that validates against it is always accepted and
+the reverse does not hold. Each example is read by the route and refused by the schema: a friendly form (a currency of
+`"$1,000"`, a state of `"new jersey"`); whitespace around a value (a percent of `" 21.99 "`); `null` (absent to the
+route); a blank string for an optional value that is not text (`{"promo_rate": ""}` on an optional percent, absent to
+the route). The route's acceptance is in [render spec](../../docs/render-spec.md) §5; the schema's patterns are in
+`src/domain/golive/json-schema.ts`. The published JSON Schema gives every property the same
 `maxLength`. Both limits are in `src/domain/render/types.ts`, and why the value limit is 1,000 is
 [decision 0011](../../docs/decisions/0011-cap-each-render-value.md).
 

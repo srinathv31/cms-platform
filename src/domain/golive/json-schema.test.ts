@@ -226,7 +226,7 @@ describe("contractJsonSchema: validated", () => {
         String(value),
       ).toBe(false);
     }
-    // Why: the route refuses every JSON number, so it accepts exactly what the schema does.
+    // Why: the route refuses every JSON number, as the schema's `type: "string"` does.
     for (const number of [1000, 1e21, 1e-7]) {
       expect(validateValues([v("x", "currency")], { x: number }).ok).toBe(
         false,

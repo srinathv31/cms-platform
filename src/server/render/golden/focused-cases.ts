@@ -1228,7 +1228,7 @@ const errorInvalidValuesOnly = make(
 
 /**
  * A JSON number in `values` is refused whatever its digits (spec section 5, decision 0058), so the route
- * accepts exactly what the published schema does: every value a JSON string. Nothing is missing, so the code
+ * and the published schema agree on a value's JSON type: a string. Nothing is missing, so the code
  * is `invalid_values`, one sentence per key naming the string form (never the value), and `details.invalid`
  * carries `sent: "number"` for each. It is refused for every type, `text` included (`nickname`), and an
  * integer is refused as much as a decimal (`annual_fee`). A string value beside the numbers is fine.

@@ -8,7 +8,8 @@
 // advertise them, so a consumer that validates against it always sends something the route accepts,
 // with any standard 2020-12 validator (format is only an annotation there, so the date pattern itself
 // checks the calendar). Every value is a JSON string, and the route refuses a JSON number
-// (decision 0058), so it accepts exactly what the schema accepts and no more:
+// (decision 0058), so a body the schema accepts is a body the route accepts; the route accepts more
+// (friendly forms, whitespace, null, blanks: render spec section 5), and the schema holds to:
 //   - every value is at most MAX_VALUE_LENGTH characters (`maxLength`, which counts code points, as the
 //     route does);
 //   - a required text must have a non-blank character (the route reads blank as missing);
