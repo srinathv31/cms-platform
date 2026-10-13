@@ -147,6 +147,9 @@ const SEAM_EXEMPT = [
   "src/app/api/v1/**",
   "**/*.test.{ts,tsx}",
 ];
+/** A ratchet's block: its rule as a warning for the files still listed, and nothing once the list is empty. */
+const ratchet = (files, rules) => (files.length > 0 ? [{ files, rules }] : []);
+
 // The files the seam rules still warn on, until their package moves them (plan.md). Delete a line as you clear it.
 const SEAM_NOT_YET = [
   "src/server/access-effects.ts",
@@ -196,8 +199,6 @@ const SEAM_NOT_YET = [
 // The BFF files that still read the clock (N1), still decide with can() (N2), and still import the backend's own
 // machinery (H4): the packages that own them (plan.md) clear them, and delete their lines. Integration empties all
 // three, with SEAM_NOT_YET.
-/** A ratchet's block: its rule as a warning for the files still listed, and nothing once the list is empty. */
-const ratchet = (files, rules) => (files.length > 0 ? [{ files, rules }] : []);
 const CLOCK_NOT_YET = [
   "src/components/activity/activity-content.tsx",
   "src/components/library/library-view.tsx",
@@ -549,18 +550,15 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  {
-    // The ratchet: the files still on the database or an implementation, waiting for their package to move them
-    // behind the seam (plan P1–P5). The same rule, as a warning; a package that clears a file deletes its line,
-    // and from then on the rule is an error there.
-    files: SEAM_NOT_YET,
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "warn",
-        { patterns: [noDatabase, noImplementations] },
-      ],
-    },
-  },
+  // The ratchet: the files still on the database or an implementation, waiting for their package to move them
+  // behind the seam (plan P1–P5). The same rule, as a warning; a package that clears a file deletes its line,
+  // and from then on the rule is an error there.
+  ...ratchet(SEAM_NOT_YET, {
+    "@typescript-eslint/no-restricted-imports": [
+      "warn",
+      { patterns: [noDatabase, noImplementations] },
+    ],
+  }),
   {
     // Only the backend reads the clock. Exempt like the rules above (the local implementation, /api/v1, the
     // reset, the seed, test support and tests are the backend's own); CLOCK_NOT_YET is the ratchet.
