@@ -2,10 +2,10 @@ import { expect, it, vi } from "vitest";
 import { fakeContractHarness } from "../fake/contract-harness";
 import { localContractHarness } from "../local/contract-harness";
 
-// The fake and the local implementation read the whole seeded world alike: every template's history, activity and
-// threads, for a person on each team and a platform role, and everyone's notifications, field for field. Where the
-// contract cases pick examples, this compares everything the seed holds, so a difference in a read the cases don't
-// name still fails.
+// The fake and the local implementation read the whole seeded world alike: every template's history, activity,
+// threads, workspace document, its versions in Compare, its Library and palette rows, for a person on each team and
+// a platform role, and everyone's notifications, field for field. Where the contract cases pick examples, this
+// compares everything the seed holds, so a difference in a read the cases don't name still fails.
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
@@ -135,3 +135,42 @@ it("lists every space's Library and palette alike, whether or not the person may
         );
     }
 });
+
+it.each(["maya", "jordan", "eli", "riley"])(
+  "answers every template's workspace document, and every version's content in Compare, alike for %s",
+  async (userId) => {
+    fake.setClock(BASE);
+    local.setClock(BASE);
+    const [asFake, asLocal] = [await fake.as(userId), await local.as(userId)];
+    for (const templateId of Object.values(local.templates)) {
+      expect(
+        await fake.services().templates.workspaceDocument(asFake, {
+          templateId,
+        }),
+        `${templateId}'s document`,
+      ).toEqual(
+        await local.services().templates.workspaceDocument(asLocal, {
+          templateId,
+        }),
+      );
+      const history = await local
+        .services()
+        .versions.history(asLocal, { templateId });
+      const ids = history.ok ? history.versions.map((v) => v.id) : [];
+      for (const [from, to] of ids.flatMap((id, i) => [
+        [id, id],
+        [ids[i + 1] ?? id, id],
+      ]))
+        expect(
+          await fake
+            .services()
+            .versions.compare(asFake, { templateId, from, to }),
+          `${templateId} ${from} → ${to}`,
+        ).toEqual(
+          await local
+            .services()
+            .versions.compare(asLocal, { templateId, from, to }),
+        );
+    }
+  },
+);

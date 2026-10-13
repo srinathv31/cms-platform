@@ -6,10 +6,7 @@ import type {
   ImportOriginalView,
 } from "@/domain/import-types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
-import {
-  requireRequestContext,
-  type RequestContext,
-} from "@/server/context/request";
+import type { RequestContext } from "@/server/context/request";
 import { decodeText } from "@/server/import/sniff";
 import { services } from "@/server/services";
 import { refusal, type ReadResult } from "@/server/services/results";
@@ -32,17 +29,6 @@ export function importOriginalRef(
     uploadedAt: original.uploadedAt,
     uploadedByName: original.uploadedBy.name,
   };
-}
-
-/** The template's imported original (the newest, should there ever be more), or null. */
-export async function getImportOriginalRef(
-  templateId: string,
-): Promise<ImportOriginalRef | null> {
-  const ctx = await requireRequestContext();
-  const found = await services().templates.importOriginalRef(ctx, {
-    templateId,
-  });
-  return found.ok && found.original ? importOriginalRef(found.original) : null;
 }
 
 /**

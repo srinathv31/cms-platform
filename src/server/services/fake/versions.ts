@@ -1,22 +1,31 @@
 import { sunsetDay, todayIn } from "@/domain/business-zone";
 import { DAY_MS } from "@/domain/dates";
+import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { versionActions } from "@/domain/lifecycle/version-actions";
 import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
+import { isRequestId } from "@/domain/request-ids";
 import type { ConsumerUsage, Person } from "@/domain/review-types";
 import { compareRounds, headOf } from "@/domain/rounds";
+import { contentTypeFamily } from "@/domain/types";
+import { messageRulesOf } from "./chain";
 import { notInFake } from "./not-in-fake";
 import { refusal } from "../results";
-import type { VersionFacts, VersionService } from "../versions";
+import type {
+  CompareVersionFacts,
+  VersionFacts,
+  VersionService,
+} from "../versions";
 import { businessZone } from "./settings";
 import { currentName, templateById } from "./version-rows";
 import type { FakeState } from "./state";
 import type { FakeDeps } from "./index";
 
 // One template's versions in memory: what services/local/versions.ts reads with SQL, read from the fake's
-// arrays, with the same domain decisions. Compare and the base version aren't here: the fake serves a read only
-// where a contract case observes a command through it (decision 0072).
+// arrays, with the same domain decisions. The history, and Compare (a version's name and content: how a contract
+// case reads what a command stored); not the base version, which no case needs (decision 0072: a read in the
+// fake only where a contract case observes a command through it).
 
 export function fakeVersions({ store, clock }: FakeDeps): VersionService {
   return {
@@ -98,7 +107,49 @@ export function fakeVersions({ store, clock }: FakeDeps): VersionService {
       };
     },
 
-    compare: notInFake("versions.compare"),
+    // Compare is how a contract case reads what a command stored in any version (its name and its content).
+    async compare(ctx, { templateId, from, to }) {
+      if (!isRequestId(templateId) || !isRequestId(from) || !isRequestId(to))
+        return refusal(400, REQUEST_REFUSALS.templateUnavailable);
+      const { state } = store;
+      const template = templateById(state, templateId);
+      if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
+      if (!can(ctx.viewer, "template.view", { teamId: template.teamId }).ok)
+        return refusal(403, REQUEST_REFUSALS.templateUnavailable);
+      const contentType = state.contentTypes.find(
+        (c) => c.id === template.contentTypeId,
+      );
+      const rules = messageRulesOf(state, template.contentTypeId);
+      const side = (id: string): CompareVersionFacts | undefined => {
+        const row = state.versions.find(
+          (v) => v.id === id && v.templateId === template.id,
+        );
+        if (!row) return undefined;
+        const draft = row.state === "draft";
+        return structuredClone({
+          id: row.id,
+          number: draft ? null : row.number,
+          round: draft ? null : row.round,
+          state: row.state,
+          name: row.name,
+          body: row.body,
+          channels: row.channels,
+          channelFields: row.channelFields,
+          smsFooter: smsFooterOf(row, rules.smsFooter),
+          variables: row.variables,
+        });
+      };
+      const older = side(from);
+      const newer = side(to);
+      if (!older || !newer)
+        return refusal(404, REQUEST_REFUSALS.versionUnavailable);
+      return {
+        ok: true,
+        family: contentTypeFamily(contentType?.allowedChannels ?? []),
+        from: older,
+        to: newer,
+      };
+    },
     baseVersion: notInFake("versions.baseVersion"),
   };
 }

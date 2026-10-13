@@ -9,15 +9,38 @@ import type { ContractHarness } from "./harness";
 // threads on its sent-back v1, Balance Transfer has an Active v2 with a resolved thread and nothing in review, so
 // no version of it takes comments. Sam is a viewer on Coral and Eli an author on Deposits.
 //
-// Each case sets the backend's clock, then compares what the reads and the probe show before and after. A refusal
-// is checked by its code: the sentence is the BFF's.
+// Each case sets the backend's clock, then compares what the reads show before and after: the template's threads
+// (`comments.threads`, against what its workspace shows), its audit rows (the Activity tab) and the bells. A
+// refusal is checked by its code: the sentence is the BFF's.
 
 export function commentsContract(h: ContractHarness, base: Date) {
   const minute = (n: number) => new Date(base.getTime() + n * 60_000);
 
-  /** A template's threads as the probe shows them now. */
-  const threadsOf = (key: string) =>
-    h.probe.threads({ templateId: h.templates[key]! });
+  /** A template's threads now, against what its workspace shows (the open draft, else the latest round). */
+  async function threadsOf(key: string) {
+    const read = await h.services().comments.threads(await h.as("taylor"), {
+      templateId: h.templates[key]!,
+    });
+    if (!read.ok) throw new Error(read.code);
+    return read.threads;
+  }
+
+  /** The template's audit rows, oldest first, as its Activity tab reads them. */
+  async function auditOf(templateId: string) {
+    const activity = await h
+      .services()
+      .audit.activity(await h.as("taylor"), { templateId });
+    if (!activity.ok) throw new Error(activity.code);
+    return [...activity.events]
+      .reverse()
+      .map(({ action, at, actorId, versionId, details }) => ({
+        action,
+        at,
+        actorId,
+        versionId,
+        details,
+      }));
+  }
 
   /** The bell's rows now, newest first. */
   async function bellOf(userId: string) {
@@ -39,7 +62,7 @@ export function commentsContract(h: ContractHarness, base: Date) {
     const templateId = h.templates[key]!;
     return {
       threads: await threadsOf(key),
-      audit: (await h.probe.template({ templateId }))!.audit,
+      audit: await auditOf(templateId),
       bells: Object.fromEntries(
         await Promise.all(
           people.map(async (userId) => [userId, await bellOf(userId)] as const),
@@ -48,12 +71,25 @@ export function commentsContract(h: ContractHarness, base: Date) {
     };
   }
 
-  /** A template's version rows as the probe shows them, by state. */
+  /** A template's version in `state`, with its name and content as Compare reads them. */
   async function versionIn(key: string, state: string) {
-    const rows = (await h.probe.template({ templateId: h.templates[key]! }))!
-      .versions;
-    return rows.find((v) => v.state === state)!;
+    const templateId = h.templates[key]!;
+    const taylor = await h.as("taylor");
+    const history = await h.services().versions.history(taylor, { templateId });
+    if (!history.ok) throw new Error(history.code);
+    const row = history.versions.find((v) => v.state === state)!;
+    const pair = await h
+      .services()
+      .versions.compare(taylor, { templateId, from: row.id, to: row.id });
+    if (!pair.ok) throw new Error(pair.code);
+    return pair.to;
   }
+
+  /** The threads in `after` that `before` didn't have (the threads read lists them in reading order). */
+  const added = <T extends { id: string }>(
+    before: readonly T[],
+    after: readonly T[],
+  ) => after.filter((t) => !before.some((b) => b.id === t.id));
 
   /** The id of the n-th top-level block of a version. */
   const blockAt = (
@@ -99,24 +135,26 @@ export function commentsContract(h: ContractHarness, base: Date) {
       if (!result.ok) return;
 
       const after = await written("cash-back", ["maya", "jordan"]);
-      expect(after.threads.slice(before.threads.length)).toEqual([
+      expect(added(before.threads, after.threads)).toEqual([
         {
           id: result.threadId,
-          originVersionId: v3.id,
           blockId,
           quote: "spend $1,000",
           status: "open",
-          resolvedBy: null,
-          resolvedAt: null,
-          createdAt: minute(1).toISOString(),
+          // It began on v3, round 2.
+          origin: { number: 3, round: 2, state: "in_review" },
           comments: [
             {
+              id: expect.any(String),
               authorId: "jordan",
               body: "Is the $1,000 threshold still right?",
               kind: "comment",
-              at: minute(1).toISOString(),
+              createdAt: minute(1).toISOString(),
             },
           ],
+          resolvedBy: null,
+          resolvedAt: null,
+          orphaned: false,
         },
       ]);
       expect(after.audit.slice(before.audit.length)).toEqual([
@@ -124,8 +162,6 @@ export function commentsContract(h: ContractHarness, base: Date) {
           action: "comment.added",
           at: minute(1).toISOString(),
           actorId: "jordan",
-          teamId: "t_coral",
-          templateId,
           versionId: v3.id,
           details: {
             threadId: result.threadId,
@@ -336,10 +372,11 @@ export function commentsContract(h: ContractHarness, base: Date) {
       const thread = after.threads.find((t) => t.id === threadId)!;
       expect(thread.comments.slice(1)).toEqual([
         {
+          id: expect.any(String),
           authorId: "maya",
           body: "Yes, confirmed with Product.",
           kind: "comment",
-          at: minute(2).toISOString(),
+          createdAt: minute(2).toISOString(),
         },
       ]);
       // A reply doesn't reopen or resolve anything.

@@ -8,6 +8,7 @@ import { versionActions } from "@/domain/lifecycle/version-actions";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
+import { isRequestId } from "@/domain/request-ids";
 import { compareRounds, headOf } from "@/domain/rounds";
 import { readBusinessZone } from "@/server/services/local/business-zone";
 import { db } from "@/server/db/client";
@@ -184,7 +185,7 @@ export function localVersions(deps: LocalDeps): VersionService {
     },
 
     async compare(ctx, { templateId, from, to }) {
-      if (!isId(templateId) || !isId(from) || !isId(to))
+      if (!isRequestId(templateId) || !isRequestId(from) || !isRequestId(to))
         return refusal(400, REQUEST_REFUSALS.templateUnavailable);
       const template = await findTemplate(templateId);
       if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
@@ -234,7 +235,7 @@ export function localVersions(deps: LocalDeps): VersionService {
     },
 
     async baseVersion(ctx, { templateId, versionId }) {
-      if (!isId(templateId) || !isId(versionId))
+      if (!isRequestId(templateId) || !isRequestId(versionId))
         return refusal(400, REQUEST_REFUSALS.templateUnavailable);
       const template = await findTemplate(templateId);
       if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
@@ -286,9 +287,4 @@ export function localVersions(deps: LocalDeps): VersionService {
       };
     },
   };
-}
-
-/** An id as a request names it: present, and 1 to 64 characters. */
-function isId(value: string | null | undefined): value is string {
-  return typeof value === "string" && value.length >= 1 && value.length <= 64;
 }

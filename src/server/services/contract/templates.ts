@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { ImportReport } from "@/domain/import-report";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
+import { REASONS } from "@/domain/permissions";
 import type { DraftContent } from "@/domain/lifecycle/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { JSONContent } from "@/domain/types";
@@ -11,9 +12,11 @@ import type { ContractHarness } from "./harness";
 // New template, Import, Edit and an imported file's original, as every implementation must show them
 // (TemplateService in src/server/services/templates.ts). The BFF builds the first draft and prepares its
 // documents; the backend stores it, so the cases hand it drafts of their own (a starter's fee schedule, a Blank,
-// an alert) and compare what the reads and the probe show before and after. Seed: Maya is an author on Coral
-// Offers, Sam its viewer, Eli an author on Deposits, Jordan an approver; Balance Transfer has an Active v2 and
-// nothing newer, Cash Back v3 is in review.
+// an alert) and compare what the reads show before and after: the Library (which templates exist), the
+// workspace's document (the draft as stored), Compare (a version's name and content), the Versions tab (its rows)
+// and the Activity tab (its audit rows). Seed: Maya and Priya are authors on Coral Offers (Priya wrote Balance
+// Transfer's v2), Sam its viewer, Eli an author on Deposits, Jordan an approver; Balance Transfer has an Active v2
+// and nothing newer, Cash Back v3 is in review.
 //
 // Each case sets the backend's clock, then acts. A refusal is checked by its code: the sentence is the BFF's.
 
@@ -148,6 +151,61 @@ export function templatesContract(h: ContractHarness, base: Date) {
     };
   };
 
+  /** Every template's id, as the All teams Library lists them to the Auditor, who sees every team. */
+  async function templateIds() {
+    const library = await h
+      .services()
+      .templates.library(await h.as("taylor"), { teamId: null });
+    if (!library.ok) throw new Error(library.code);
+    return library.rows.map((r) => r.id).sort();
+  }
+
+  /** The template's workspace document (its open draft, else its latest round) as the Auditor reads it. */
+  async function documentOf(templateId: string) {
+    const document = await h
+      .services()
+      .templates.workspaceDocument(await h.as("taylor"), { templateId });
+    if (!document.ok) throw new Error(document.code);
+    return document;
+  }
+
+  /** A version's name and content, as Compare reads it. */
+  async function contentOf(templateId: string, versionId: string) {
+    const pair = await h.services().versions.compare(await h.as("taylor"), {
+      templateId,
+      from: versionId,
+      to: versionId,
+    });
+    if (!pair.ok) throw new Error(pair.code);
+    return pair.to;
+  }
+
+  /** The template's rows as the Versions tab lists them (the open draft first, then newest first). */
+  async function rowsOf(templateId: string) {
+    const history = await h
+      .services()
+      .versions.history(await h.as("taylor"), { templateId });
+    if (!history.ok) throw new Error(history.code);
+    return history.versions;
+  }
+
+  /** The template's audit rows, oldest first, as its Activity tab reads them. */
+  async function auditOf(templateId: string) {
+    const activity = await h
+      .services()
+      .audit.activity(await h.as("taylor"), { templateId });
+    if (!activity.ok) throw new Error(activity.code);
+    return [...activity.events]
+      .reverse()
+      .map(({ action, at, actorId, versionId, details }) => ({
+        action,
+        at,
+        actorId,
+        versionId,
+        details,
+      }));
+  }
+
   /** The created template's id, or the failure. */
   function createdId(result: ActionResult<{ templateId: string }>) {
     if (!result.ok) throw new Error(`create refused: ${result.code}`);
@@ -239,45 +297,43 @@ export function templatesContract(h: ContractHarness, base: Date) {
   });
 
   describe("templates.create", () => {
-    it("makes the template and its first draft, dated by the backend's clock, with the author its only writer, and records it", async () => {
+    it("makes the template and its first draft, dated by the backend's clock, and records it", async () => {
       const draft = documentDraft();
+      const before = await templateIds();
       h.setClock(minute(1));
       const templateId = createdId(await create("maya", draft));
       expect(templateId).toMatch(/^UC-[0-9A-HJKMNP-TV-Z]{6}$/);
+      expect(await templateIds()).toEqual([...before, templateId].sort());
 
-      const stored = (await h.probe.template({ templateId }))!;
-      expect(stored).toMatchObject({
+      // One draft, as handed: a document of Coral Offers, its content stored as it came.
+      const document = await documentOf(templateId);
+      expect(document.template).toMatchObject({
+        id: templateId,
         teamId: CORAL,
-        contentTypeId: "ct_disclosure",
-        starterKey: "fee_schedule",
-        createdBy: "maya",
-        createdAt: minute(1).toISOString(),
+        family: "document",
       });
-      expect(stored.versions).toEqual([
-        {
-          id: expect.any(String),
-          state: "draft",
-          rev: 0,
-          name: "Fee schedule",
-          body: draft.body,
-          variables: draft.variables,
-          channels: ["pdf", "web"],
-          channelFields: {},
-          sampleSets: draft.sampleSets,
-          writers: ["maya"],
-          basedOnVersionId: null,
-          importUploadId: null,
-          createdBy: "maya",
-          createdAt: minute(1).toISOString(),
-        },
-      ]);
-      expect(stored.audit).toEqual([
+      expect(document.version).toEqual({
+        id: expect.any(String),
+        number: null,
+        round: null,
+        state: "draft",
+        rev: 0,
+        body: draft.body,
+        variables: draft.variables,
+        channels: ["pdf", "web"],
+        channelFields: {},
+        sampleSets: draft.sampleSets,
+      });
+      expect(document.importOriginal).toBeNull();
+      expect((await contentOf(templateId, document.version.id)).name).toBe(
+        "Fee schedule",
+      );
+      // The starter it came from is in the record of its making.
+      expect(await auditOf(templateId)).toEqual([
         {
           action: "template.created",
           at: minute(1).toISOString(),
           actorId: "maya",
-          teamId: CORAL,
-          templateId,
           versionId: null,
           details: { name: "Fee schedule", source: "starter:fee_schedule" },
         },
@@ -292,7 +348,7 @@ export function templatesContract(h: ContractHarness, base: Date) {
         template: { id: templateId, teamId: CORAL, name: "Fee schedule" },
         versions: [
           {
-            id: stored.versions[0]!.id,
+            id: document.version.id,
             number: null,
             state: "draft",
             createdBy: "maya",
@@ -310,9 +366,8 @@ export function templatesContract(h: ContractHarness, base: Date) {
           documentDraft({ name: "Untitled template", starterKey: null }),
         ),
       );
-      const stored = (await h.probe.template({ templateId: blank }))!;
-      expect(stored.starterKey).toBeNull();
-      expect(stored.audit.map((e) => e.details)).toEqual([
+      // No starter: the record of its making says Blank.
+      expect((await auditOf(blank)).map((e) => e.details)).toEqual([
         { name: "Untitled template", source: "blank" },
       ]);
 
@@ -324,20 +379,23 @@ export function templatesContract(h: ContractHarness, base: Date) {
           draft: alert,
         }),
       );
-      const made = (await h.probe.template({ templateId }))!;
-      expect(made).toMatchObject({
-        contentTypeId: "ct_alert",
-        starterKey: "payment_reminder",
+      const made = await documentOf(templateId);
+      expect(made.template).toMatchObject({
+        family: "message",
+        allowedChannels: ["push", "sms"],
       });
-      expect(made.versions[0]).toMatchObject({
+      expect(made.version).toMatchObject({
         channels: ["push", "sms"],
         channelFields: alert.channelFields,
         body: alert.body,
       });
+      expect((await auditOf(templateId)).map((e) => e.details)).toEqual([
+        { name: "Payment reminder", source: "starter:payment_reminder" },
+      ]);
     });
 
     it("refuses, in order, a viewer, a team that isn't there, a content type that is gone and channels the type doesn't allow, and writes nothing", async () => {
-      const before = await h.probe.templateIds();
+      const before = await templateIds();
       const refused = async (
         userId: string,
         over: {
@@ -378,7 +436,7 @@ export function templatesContract(h: ContractHarness, base: Date) {
         { draft: documentDraft({ channels: ["pdf", "push"] }) },
         REFUSALS.channelNotAllowed.code,
       );
-      expect((await h.probe.templateIds()).sort()).toEqual([...before].sort());
+      expect(await templateIds()).toEqual(before);
     });
 
     it("draws a new id and writes again when the one it drew is taken", async () => {
@@ -386,33 +444,40 @@ export function templatesContract(h: ContractHarness, base: Date) {
       const ids = drawing(taken, taken, "UC-RETRY2");
       h.ids(ids.source);
       h.setClock(minute(1));
-      const before = await h.probe.templateIds();
-      const existing = await h.probe.template({ templateId: taken });
+      const before = await templateIds();
+      const existing = {
+        rows: await rowsOf(taken),
+        audit: await auditOf(taken),
+        document: await documentOf(taken),
+      };
 
       const templateId = createdId(await create("maya"));
 
       expect(templateId).toBe("UC-RETRY2");
       expect(ids.drawn).toEqual([taken, taken, "UC-RETRY2"]);
-      expect((await h.probe.templateIds()).sort()).toEqual(
-        [...before, "UC-RETRY2"].sort(),
-      );
+      expect(await templateIds()).toEqual([...before, "UC-RETRY2"].sort());
       // One write: one first draft and one creation row, and the template whose id was taken is as it was.
-      const stored = (await h.probe.template({ templateId }))!;
-      expect(stored.versions).toHaveLength(1);
-      expect(stored.audit.map((e) => e.action)).toEqual(["template.created"]);
-      expect(await h.probe.template({ templateId: taken })).toEqual(existing);
+      expect(await rowsOf(templateId)).toHaveLength(1);
+      expect((await auditOf(templateId)).map((e) => e.action)).toEqual([
+        "template.created",
+      ]);
+      expect({
+        rows: await rowsOf(taken),
+        audit: await auditOf(taken),
+        document: await documentOf(taken),
+      }).toEqual(existing);
     });
 
     it("gives up when the third id it draws is taken too, and writes nothing", async () => {
       const taken = h.templates["balance-transfer"]!;
       const ids = drawing(taken);
       h.ids(ids.source);
-      const before = await h.probe.templateIds();
+      const before = await templateIds();
 
       await expect(create("maya")).rejects.toThrow();
 
       expect(ids.drawn).toEqual([taken, taken, taken]);
-      expect((await h.probe.templateIds()).sort()).toEqual([...before].sort());
+      expect(await templateIds()).toEqual(before);
     });
   });
 
@@ -444,23 +509,21 @@ export function templatesContract(h: ContractHarness, base: Date) {
       if (!result.ok) throw new Error(`import refused: ${result.code}`);
       const { templateId, uploadId } = result;
 
-      const stored = (await h.probe.template({ templateId }))!;
-      expect(stored.starterKey).toBeNull();
-      expect(stored.versions).toEqual([
-        expect.objectContaining({
-          state: "draft",
-          name: "Rates",
-          writers: ["maya"],
-          importUploadId: uploadId,
-        }),
+      const document = await documentOf(templateId);
+      expect(document.template.teamId).toBe(CORAL);
+      expect(document.version.state).toBe("draft");
+      expect((await rowsOf(templateId)).map((v) => v.id)).toEqual([
+        document.version.id,
       ]);
-      expect(stored.audit).toEqual([
+      expect((await contentOf(templateId, document.version.id)).name).toBe(
+        "Rates",
+      );
+      // No starter: the record of its making names the file.
+      expect(await auditOf(templateId)).toEqual([
         {
           action: "template.created",
           at: minute(1).toISOString(),
           actorId: "maya",
-          teamId: CORAL,
-          templateId,
           versionId: null,
           details: {
             name: "Rates",
@@ -500,9 +563,11 @@ export function templatesContract(h: ContractHarness, base: Date) {
         report: reportOf("docx", "Rates.docx"),
         compareHtml: "<p>Hello {{First Name}}</p>",
       });
-      expect(
-        await h.services().templates.importOriginalRef(maya, { templateId }),
-      ).toEqual({ ok: true, original });
+      // The workspace carries the original on every version, by who uploaded it.
+      expect((await documentOf(templateId)).importOriginal).toEqual({
+        ...original,
+        uploadedBy: "maya",
+      });
     });
 
     it("keeps a PDF and a text file's report beside the original, with no Compare HTML", async () => {
@@ -554,20 +619,18 @@ export function templatesContract(h: ContractHarness, base: Date) {
           code: "upload_unavailable",
         });
       expect(
-        await h.services().templates.importOriginalRef(naomi, { templateId }),
+        await h.services().templates.workspaceDocument(naomi, { templateId }),
       ).toMatchObject({ ok: false, status: 404, code: "template_unavailable" });
     });
 
     it("has no original for a template that wasn't imported", async () => {
       expect(
-        await h.services().templates.importOriginalRef(await h.as("maya"), {
-          templateId: h.templates["balance-transfer"]!,
-        }),
-      ).toEqual({ ok: true, original: null });
+        (await documentOf(h.templates["balance-transfer"]!)).importOriginal,
+      ).toBeNull();
     });
 
     it("refuses as create does, before it stores anything", async () => {
-      const before = await h.probe.templateIds();
+      const before = await templateIds();
       for (const [userId, over, code] of [
         ["sam", {}, "generic"],
         ["maya", { teamId: DEPOSITS }, "generic"],
@@ -592,7 +655,7 @@ export function templatesContract(h: ContractHarness, base: Date) {
           compareHtml: null,
         }),
       ).toMatchObject({ ok: false, code: REFUSALS.channelNotAllowed.code });
-      expect((await h.probe.templateIds()).sort()).toEqual([...before].sort());
+      expect(await templateIds()).toEqual(before);
     });
 
     it("draws a new id when the one it drew is taken, and keeps one original", async () => {
@@ -610,16 +673,30 @@ export function templatesContract(h: ContractHarness, base: Date) {
   });
 
   describe("templates.startDraft", () => {
-    /** The template's rows as the probe shows them. */
-    const versionsOf = async (templateId: string) =>
-      (await h.probe.template({ templateId }))!.versions;
+    /** A decision on the round in review as `userId`: its code, or "ok". */
+    const deciding = async (
+      userId: string,
+      templateId: string,
+      versionNumber: number,
+    ) => {
+      const answer = await h
+        .services()
+        .review.requestChanges(await h.as(userId), {
+          templateId,
+          versionNumber,
+          round: 1,
+          reason: "Who may decide this?",
+        });
+      return answer.ok ? "ok" : answer.code;
+    };
 
     it("opens a draft copied from the Active version, with the person who pressed Edit as its only writer, and records it", async () => {
       const templateId = h.templates["balance-transfer"]!;
-      const [active] = (await versionsOf(templateId)).filter(
+      const active = (await rowsOf(templateId)).find(
         (v) => v.state === "active",
-      );
-      const auditBefore = (await h.probe.template({ templateId }))!.audit;
+      )!;
+      const activeContent = await contentOf(templateId, active.id);
+      const auditBefore = await auditOf(templateId);
       h.setClock(minute(1));
 
       const result = await h
@@ -633,35 +710,50 @@ export function templatesContract(h: ContractHarness, base: Date) {
       });
       if (!result.ok) return;
 
-      const draft = (await versionsOf(templateId)).find(
-        (v) => v.id === result.draftId,
-      )!;
-      expect(draft).toMatchObject({
+      // The draft: the Active version's content, at rev 0, as the workspace and Compare read it.
+      expect((await rowsOf(templateId))[0]).toMatchObject({
+        id: result.draftId,
+        number: null,
         state: "draft",
-        rev: 0,
-        name: active!.name,
-        body: active!.body,
-        variables: active!.variables,
-        channels: active!.channels,
-        sampleSets: active!.sampleSets,
-        basedOnVersionId: active!.id,
         createdBy: "maya",
-        // Not the Active version's writers: whoever wrote an earlier release may still decide the next one.
-        writers: ["maya"],
         createdAt: minute(1).toISOString(),
       });
-      const audit = (await h.probe.template({ templateId }))!.audit;
-      expect(audit.slice(auditBefore.length)).toEqual([
+      const document = await documentOf(templateId);
+      expect(document.version).toMatchObject({
+        id: result.draftId,
+        state: "draft",
+        rev: 0,
+        body: activeContent.body,
+        variables: activeContent.variables,
+        channels: activeContent.channels,
+        channelFields: activeContent.channelFields,
+      });
+      expect(await contentOf(templateId, result.draftId)).toMatchObject({
+        name: activeContent.name,
+      });
+      expect((await auditOf(templateId)).slice(auditBefore.length)).toEqual([
         {
           action: "draft.started",
           at: minute(1).toISOString(),
           actorId: "maya",
-          teamId: CORAL,
-          templateId,
           versionId: result.draftId,
           details: { basedOn: 2 },
         },
       ]);
+
+      // Maya is its only writer: Priya wrote v2, but not this draft, so once it is submitted she is refused
+      // deciding it only as an author (no approval of hers), not as one of its writers (maker-checker).
+      h.setClock(minute(2));
+      expect(
+        await h.services().review.submit(await h.as("maya"), {
+          templateId,
+          rev: document.version.rev,
+        }),
+      ).toMatchObject({ ok: true, number: 3, round: 1 });
+      expect(await deciding("maya", templateId, 3)).toBe(
+        REASONS.ownVersion.code,
+      );
+      expect(await deciding("priya", templateId, 3)).toBe(REASONS.generic.code);
     });
 
     it("opens the draft that is open already, writing nothing (a second click, or another tab)", async () => {
@@ -670,8 +762,9 @@ export function templatesContract(h: ContractHarness, base: Date) {
         .services()
         .templates.startDraft(await h.as("maya"), { templateId });
       if (!first.ok) throw new Error(first.code);
-      const rows = await versionsOf(templateId);
-      const audit = (await h.probe.template({ templateId }))!.audit;
+      const rows = await rowsOf(templateId);
+      const audit = await auditOf(templateId);
+      const document = await documentOf(templateId);
 
       // Priya, another author on the team, presses Edit on the draft Maya started: she gets it, as it is.
       const second = await h
@@ -683,14 +776,13 @@ export function templatesContract(h: ContractHarness, base: Date) {
         draftId: first.draftId,
         teamSlug: "coral-offers",
       });
-      expect(await versionsOf(templateId)).toEqual(rows);
-      expect((await h.probe.template({ templateId }))!.audit).toEqual(audit);
+      expect(await rowsOf(templateId)).toEqual(rows);
+      expect(await auditOf(templateId)).toEqual(audit);
+      expect(await documentOf(templateId)).toEqual(document);
 
       // Annual Fee Waiver has Maya's draft from the seed: Edit opens it.
       const annualFee = h.templates["annual-fee-waiver"]!;
-      const open = await versionsOf(annualFee).then((all) =>
-        all.find((v) => v.state === "draft")!,
-      );
+      const open = (await rowsOf(annualFee)).find((v) => v.state === "draft")!;
       expect(
         await h
           .services()
@@ -700,7 +792,7 @@ export function templatesContract(h: ContractHarness, base: Date) {
 
     it("lets one of two Edits at once in, and the other opens that draft", async () => {
       const templateId = h.templates["rate-change-notice"]!;
-      const auditBefore = (await h.probe.template({ templateId }))!.audit;
+      const auditBefore = await auditOf(templateId);
       h.hooks({
         beforeCompareAndSet: (target) =>
           target.table === "drafts" && target.id === templateId
@@ -714,7 +806,7 @@ export function templatesContract(h: ContractHarness, base: Date) {
         .templates.startDraft(await h.as("maya"), { templateId });
 
       // The competing Edit's draft stands, and this one opened it: one draft, and no second record of it.
-      const drafts = (await versionsOf(templateId)).filter(
+      const drafts = (await rowsOf(templateId)).filter(
         (v) => v.state === "draft",
       );
       expect(drafts).toHaveLength(1);
@@ -724,14 +816,12 @@ export function templatesContract(h: ContractHarness, base: Date) {
         draftId: drafts[0]!.id,
         teamSlug: "coral-offers",
       });
-      expect((await h.probe.template({ templateId }))!.audit).toEqual(
-        auditBefore,
-      );
+      expect(await auditOf(templateId)).toEqual(auditBefore);
     });
 
     it("refuses someone who can't edit and a template that isn't there alike, then a newer version in review", async () => {
       const cashBack = h.templates["cash-back"]!;
-      const before = await versionsOf(cashBack);
+      const before = await rowsOf(cashBack);
       for (const [userId, templateId] of [
         ["sam", h.templates["balance-transfer"]!],
         ["eli", h.templates["balance-transfer"]!],
@@ -750,7 +840,7 @@ export function templatesContract(h: ContractHarness, base: Date) {
           .services()
           .templates.startDraft(await h.as("maya"), { templateId: cashBack }),
       ).toMatchObject({ ok: false, code: REFUSALS.newerInReview.code });
-      expect(await versionsOf(cashBack)).toEqual(before);
+      expect(await rowsOf(cashBack)).toEqual(before);
     });
   });
 }

@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { ChannelFields } from "@/domain/channel-fields";
 import type {
+  Channel,
   DraftPatch,
   DraftSaveResponse,
   JSONContent,
+  SampleSet,
+  Variable,
+  VersionState,
 } from "@/domain/types";
-import type { ContractHarness, ProbeVersion } from "./harness";
+import type { ContractHarness } from "./harness";
 
 // Autosave's behaviour, as every implementation must show it (DraftService in src/server/services/drafts.ts), from
 // the seed: Annual Fee Waiver (Coral Offers, a Disclosure: PDF, web and email allowed) has an open draft Maya
@@ -15,8 +20,9 @@ import type { ContractHarness, ProbeVersion } from "./harness";
 // SMS text. Cash Back v3 is in review. Maya and Priya are authors on Coral Offers; Jordan approves there, Sam views,
 // Eli is an author on Deposits, Morgan has no team, Riley is the platform admin.
 //
-// Each case sets the backend's clock, saves through the service, and compares the draft as stored (the probe's
-// `version`) and the reads before and after. A save arrives prepared (the BFF's route prepares every document), so
+// Each case sets the backend's clock, saves through the service, and compares the draft as the reads show it before
+// and after: its rev and content in the workspace's document, its name in Compare, its writers by who may then
+// decide it (maker-checker). A save arrives prepared (the BFF's route prepares every document), so
 // the documents here are already in stored form and come back exactly as sent. A refusal is checked by its code.
 // The editing session's audit row isn't pinned: the Java API keeps one row per save (decision 0066).
 
@@ -37,10 +43,26 @@ const line = (text: string): JSONContent => ({
   content: [{ type: "paragraph", content: [{ type: "text", text }] }],
 });
 
+/** A version's state, name and content, as the reads show them. */
+interface StoredVersion {
+  state: VersionState;
+  name: string;
+  body: JSONContent;
+  variables: Variable[];
+  channels: Channel[];
+  channelFields: ChannelFields;
+}
+
+/** The open draft: its content, and where autosave starts (`rev`) with its sample sets. */
+interface StoredDraft extends StoredVersion {
+  rev: number;
+  sampleSets: SampleSet[];
+}
+
 export function draftsContract(h: ContractHarness, base: Date) {
   const minute = (n: number) => new Date(base.getTime() + n * 60_000);
 
-  /** A template's open draft, as the Versions read lists it, and as stored. */
+  /** A template's open draft, as the Versions read lists it, and as the reads show it now (`current()` again). */
   async function draftOf(key: string) {
     const templateId = h.templates[key]!;
     const history = await h
@@ -49,22 +71,79 @@ export function draftsContract(h: ContractHarness, base: Date) {
     if (!history.ok) throw new Error(history.code);
     const row = history.versions.find((v) => v.state === "draft");
     if (!row) throw new Error(`${key} has no open draft.`);
-    return { templateId, versionId: row.id, stored: await stored(row.id) };
+    const current = () => storedDraft(templateId, row.id);
+    return { templateId, versionId: row.id, stored: await current(), current };
   }
 
   /** A template's version by number, as the Versions read lists it. */
   async function versionOf(key: string, number: number) {
+    const templateId = h.templates[key]!;
     const history = await h
       .services()
-      .versions.history(await h.as("maya"), { templateId: h.templates[key]! });
+      .versions.history(await h.as("maya"), { templateId });
     if (!history.ok) throw new Error(history.code);
-    return history.versions.find((v) => v.number === number && v.head)!;
+    return {
+      templateId,
+      ...history.versions.find((v) => v.number === number && v.head)!,
+    };
   }
 
-  async function stored(versionId: string): Promise<ProbeVersion> {
-    const version = await h.probe.version({ versionId });
-    if (!version) throw new Error(`No version ${versionId}.`);
-    return version;
+  /** A version as the reads show it: its state (the Versions tab), and its name and content (Compare). */
+  async function stored(
+    templateId: string,
+    versionId: string,
+  ): Promise<StoredVersion> {
+    const taylor = await h.as("taylor");
+    const [history, pair] = await Promise.all([
+      h.services().versions.history(taylor, { templateId }),
+      h.services().versions.compare(taylor, {
+        templateId,
+        from: versionId,
+        to: versionId,
+      }),
+    ]);
+    if (!history.ok) throw new Error(history.code);
+    if (!pair.ok) throw new Error(pair.code);
+    const { name, body, variables, channels, channelFields } = pair.to;
+    return {
+      state: history.versions.find((v) => v.id === versionId)!.state,
+      name,
+      body,
+      variables,
+      channels,
+      channelFields,
+    };
+  }
+
+  /** The open draft as the reads show it: `stored`, with its rev and sample sets from the workspace's document. */
+  async function storedDraft(
+    templateId: string,
+    versionId: string,
+  ): Promise<StoredDraft> {
+    const document = await h
+      .services()
+      .templates.workspaceDocument(await h.as("taylor"), { templateId });
+    if (!document.ok) throw new Error(document.code);
+    if (document.version.id !== versionId)
+      throw new Error(`${versionId} isn't ${templateId}'s open draft.`);
+    return {
+      ...(await stored(templateId, versionId)),
+      rev: document.version.rev,
+      sampleSets: document.version.sampleSets,
+    };
+  }
+
+  /** Whether `userId` may decide the round in review, as its code or "ok": maker-checker shows who wrote it. */
+  async function deciding(userId: string, templateId: string, round: number) {
+    const answer = await h
+      .services()
+      .review.requestChanges(await h.as(userId), {
+        templateId,
+        versionNumber: 1,
+        round,
+        reason: "Who may decide this?",
+      });
+    return answer.ok ? "ok" : answer.code;
   }
 
   /** The CMS's name for the template: its open draft's. */
@@ -93,9 +172,10 @@ export function draftsContract(h: ContractHarness, base: Date) {
         templateId,
         versionId,
         stored: before,
+        current,
       } = await draftOf("annual-fee-waiver");
       const v1 = await versionOf("annual-fee-waiver", 1);
-      const v1Before = await stored(v1.id);
+      const v1Before = await stored(templateId, v1.id);
       h.setClock(minute(1));
       expect(
         await save("maya", versionId, {
@@ -108,7 +188,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
         rev: before.rev + 1,
         savedAt: minute(1).toISOString(),
       });
-      expect(await stored(versionId)).toEqual({
+      expect(await current()).toEqual({
         ...before,
         rev: before.rev + 1,
         body: doc("Edited"),
@@ -118,7 +198,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
       expect(await templateName(templateId)).toBe(
         "Annual Fee Waiver — New Accounts",
       );
-      expect(await stored(v1.id)).toEqual(v1Before);
+      expect(await stored(templateId, v1.id)).toEqual(v1Before);
 
       h.setClock(minute(2));
       expect(
@@ -133,7 +213,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
         rev: before.rev + 2,
         savedAt: minute(2).toISOString(),
       });
-      expect(await stored(versionId)).toMatchObject({
+      expect(await current()).toMatchObject({
         rev: before.rev + 2,
         body: doc("Edited"),
         variables: [],
@@ -143,9 +223,11 @@ export function draftsContract(h: ContractHarness, base: Date) {
     });
 
     it("keeps the channel fields the patch doesn't name, and clears one with null", async () => {
-      const { versionId, stored: before } = await draftOf(
-        "rate-change-heads-up",
-      );
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("rate-change-heads-up");
       expect(before.channelFields.push?.body).toBeDefined();
       expect(before.channelFields.sms?.text).toBeDefined();
 
@@ -154,7 +236,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
         rev: before.rev,
         "push.title": line("Your APR is changing"),
       });
-      expect((await stored(versionId)).channelFields).toEqual({
+      expect((await current()).channelFields).toEqual({
         ...before.channelFields,
         push: {
           ...before.channelFields.push,
@@ -169,39 +251,48 @@ export function draftsContract(h: ContractHarness, base: Date) {
       });
       const push = { ...before.channelFields.push };
       delete push.title;
-      expect((await stored(versionId)).channelFields).toEqual({
+      expect((await current()).channelFields).toEqual({
         ...before.channelFields,
         push,
       });
     });
 
-    it("adds whoever saves to the version's writers, once, in the order they first wrote", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
-      expect(before.writers).not.toContain("priya");
+    it("adds whoever saves to the version's writers: once it is submitted, they may not decide it (maker-checker)", async () => {
+      const {
+        templateId,
+        versionId,
+        stored: before,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
-      await save("priya", versionId, {
-        rev: before.rev,
-        sessionKey: TWO,
-        body: doc("Priya's"),
-      });
-      expect((await stored(versionId)).writers).toEqual([
-        ...before.writers,
-        "priya",
-      ]);
+      expect(
+        await save("priya", versionId, {
+          rev: before.rev,
+          sessionKey: TWO,
+          body: doc("Priya's"),
+        }),
+      ).toMatchObject({ ok: true });
       h.setClock(minute(2));
-      await save("maya", versionId, { rev: before.rev + 1, name: "Renamed" });
-      await save("priya", versionId, {
-        rev: before.rev + 2,
-        sessionKey: TWO,
-        body: doc("Priya's again"),
-      });
-      expect((await stored(versionId)).writers).toEqual([
-        ...new Set([...before.writers, "maya", "priya"]),
-      ]);
+      expect(
+        await h.services().review.submit(await h.as("maya"), {
+          templateId,
+          rev: before.rev + 1,
+        }),
+      ).toMatchObject({ ok: true, number: 1, round: 2 });
+      // Maya submitted it; Priya wrote in it, so she may not decide it either.
+      expect(await deciding("maya", templateId, 2)).toBe(
+        REASONS.ownVersion.code,
+      );
+      expect(await deciding("priya", templateId, 2)).toBe(
+        REASONS.wroteVersion.code,
+      );
     });
 
     it("refuses a rev that isn't the current one draft_changed with the current rev, and writes nothing", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       for (const rev of [before.rev - 1, 0, before.rev + 1, 99])
         expect(
@@ -211,11 +302,15 @@ export function draftsContract(h: ContractHarness, base: Date) {
           code: REQUEST_REFUSALS.draftChanged.code,
           rev: before.rev,
         });
-      expect(await stored(versionId)).toEqual(before);
+      expect(await current()).toEqual(before);
     });
 
     it("takes the resend of a save whose response was lost: the same session carries on from the current rev", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       const r = before.rev;
       h.setClock(minute(1));
       // It lands; the client never hears, and sends its next save with the rev it had.
@@ -230,7 +325,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
       expect(
         await save("maya", versionId, { rev: r, body: doc("Second try") }),
       ).toEqual({ ok: true, rev: r + 2, savedAt: minute(2).toISOString() });
-      expect(await stored(versionId)).toMatchObject({
+      expect(await current()).toMatchObject({
         rev: r + 2,
         body: doc("Second try"),
         // The first save's other fields stay.
@@ -243,17 +338,25 @@ export function draftsContract(h: ContractHarness, base: Date) {
     });
 
     it("takes it again when several responses in a row were lost", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       for (const [i, text] of ["One", "Two", "Three"].entries())
         expect(
           await save("maya", versionId, { rev: before.rev, body: doc(text) }),
         ).toMatchObject({ ok: true, rev: before.rev + i + 1 });
-      expect((await stored(versionId)).body).toEqual(doc("Three"));
+      expect((await current()).body).toEqual(doc("Three"));
     });
 
     it("is a conflict when another session wrote in between, even the same person's other tab", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       const r = before.rev;
       h.setClock(minute(1));
       await save("maya", versionId, { rev: r, body: doc("Tab one") }); // r+1, its answer lost
@@ -270,14 +373,18 @@ export function draftsContract(h: ContractHarness, base: Date) {
           code: REQUEST_REFUSALS.draftChanged.code,
           rev: r + 2,
         });
-      expect(await stored(versionId)).toMatchObject({
+      expect(await current()).toMatchObject({
         rev: r + 2,
         body: doc("Tab two"),
       });
     });
 
     it("is a conflict for another person who borrows the session's key", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       await save("maya", versionId, { rev: before.rev, body: doc("Maya's") });
       expect(
@@ -290,7 +397,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
         code: REQUEST_REFUSALS.draftChanged.code,
         rev: before.rev + 1,
       });
-      expect((await stored(versionId)).body).toEqual(doc("Maya's"));
+      expect((await current()).body).toEqual(doc("Maya's"));
     });
 
     it("is a conflict for a rev from the future, even from the session that wrote the current one", async () => {
@@ -310,10 +417,14 @@ export function draftsContract(h: ContractHarness, base: Date) {
     });
 
     it("still refuses a resend the draft can't take, and writes nothing", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       await save("maya", versionId, { rev: before.rev, body: doc("Mine") });
-      const landed = await stored(versionId);
+      const landed = await current();
       // Behind, but the session owns the current rev: the channels are what refuse it.
       expect(
         await save("maya", versionId, {
@@ -321,7 +432,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
           channels: ["pdf", "push"],
         }),
       ).toMatchObject({ ok: false, code: REFUSALS.channelNotAllowed.code });
-      expect(await stored(versionId)).toEqual(landed);
+      expect(await current()).toEqual(landed);
     });
 
     it("refuses version_not_draft for a version that has left draft, before the rev, and writes nothing", async () => {
@@ -333,19 +444,23 @@ export function draftsContract(h: ContractHarness, base: Date) {
       ]);
       h.setClock(minute(1));
       for (const version of [inReview, sentBack]) {
-        const before = await stored(version.id);
+        const before = await stored(version.templateId, version.id);
         expect(
           await save("maya", version.id, { rev: 0, body: doc("Too late") }),
         ).toMatchObject({
           ok: false,
           code: REQUEST_REFUSALS.versionNotDraft.code,
         });
-        expect(await stored(version.id)).toEqual(before);
+        expect(await stored(version.templateId, version.id)).toEqual(before);
       }
     });
 
     it("refuses version_gone for no such version, and the permission refusal for anyone who may not edit the team's drafts, before the state", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       const inReview = await versionOf("cash-back", 3);
       h.setClock(minute(1));
       expect(
@@ -358,11 +473,15 @@ export function draftsContract(h: ContractHarness, base: Date) {
             `${userId} on ${id}`,
           ).toMatchObject({ ok: false, code: REASONS.generic.code });
       }
-      expect(await stored(versionId)).toEqual(before);
+      expect(await current()).toEqual(before);
     });
 
     it("refuses channels the content type doesn't allow, and none at all", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       expect(
         await save("maya", versionId, {
@@ -373,11 +492,15 @@ export function draftsContract(h: ContractHarness, base: Date) {
       expect(
         await save("maya", versionId, { rev: before.rev, channels: [] }),
       ).toMatchObject({ ok: false, code: REFUSALS.noChannels.code });
-      expect(await stored(versionId)).toEqual(before);
+      expect(await current()).toEqual(before);
     });
 
     it("refuses draft_changed, and writes nothing, when another write lands between the save's read and its write", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       h.hooks({ beforeCompareAndSet: () => "competing_write" });
       const answer = await save("maya", versionId, {
@@ -391,7 +514,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
       });
       // The rev it answers is the one the competing write left: past the one the save was based on.
       expect(!answer.ok && answer.rev).toBeGreaterThan(before.rev);
-      expect(await stored(versionId)).toEqual(before);
+      expect(await current()).toEqual(before);
       // Nothing is left half done: the next save at the current rev lands.
       expect(
         await save("maya", versionId, { rev: before.rev, body: doc("Again") }),
@@ -399,7 +522,11 @@ export function draftsContract(h: ContractHarness, base: Date) {
     });
 
     it("lets exactly one of two saves at once from different sessions with the same rev land", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       const answers = await Promise.all([
         save("maya", versionId, { rev: before.rev, body: doc("Tab one") }),
@@ -416,11 +543,15 @@ export function draftsContract(h: ContractHarness, base: Date) {
         code: REQUEST_REFUSALS.draftChanged.code,
         rev: before.rev + 1,
       });
-      expect((await stored(versionId)).rev).toBe(before.rev + 1);
+      expect((await current()).rev).toBe(before.rev + 1);
     });
 
     it("takes both of two resends at once from the session that owns the rev, one after the other", async () => {
-      const { versionId, stored: before } = await draftOf("annual-fee-waiver");
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
       h.setClock(minute(1));
       await save("maya", versionId, { rev: before.rev, body: doc("Mine") });
       const answers = await Promise.all([
@@ -428,7 +559,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
         save("maya", versionId, { rev: before.rev, body: doc("y") }),
       ]);
       expect(answers.every((a) => a.ok)).toBe(true);
-      expect((await stored(versionId)).rev).toBe(before.rev + 3);
+      expect((await current()).rev).toBe(before.rev + 3);
     });
   });
 

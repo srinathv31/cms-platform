@@ -268,14 +268,4 @@ export interface TemplateService {
       compareHtml: string | null;
     }>
   >;
-
-  /**
-   * The template's imported original, or null when it wasn't imported (the newest, should there ever be more):
-   * the cheap fact the workspace carries to show the Original tab. Refuses 404 `template_unavailable` for a
-   * template that isn't there or isn't the viewer's to see.
-   */
-  importOriginalRef(
-    ctx: RequestContext,
-    input: { templateId: string },
-  ): Promise<ReadResult<{ original: ImportedOriginal | null }>>;
 }

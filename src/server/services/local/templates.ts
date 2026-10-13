@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   createTemplateFrom,
   editLatest,
@@ -485,27 +485,6 @@ export function localTemplates(
       if (original.kind === "docx" && compareHtml === null)
         return refusal(404, REQUEST_REFUSALS.uploadUnavailable);
       return { ok: true, original, report, compareHtml };
-    },
-
-    async importOriginalRef(ctx, { templateId }) {
-      const template = await db.query.templates.findFirst({
-        where: eq(templates.id, templateId),
-      });
-      if (
-        !template ||
-        !can(ctx.viewer, "template.view", { teamId: template.teamId }).ok
-      )
-        return refusal(404, REQUEST_REFUSALS.templateUnavailable);
-      // The newest, should there ever be more than one.
-      const row = await db
-        .select(uploadColumns)
-        .from(uploads)
-        .innerJoin(users, eq(users.id, uploads.createdBy))
-        .where(eq(uploads.templateId, templateId))
-        .orderBy(desc(uploads.createdAt))
-        .limit(1)
-        .then((rows) => rows[0]);
-      return { ok: true, original: row ? importedOriginal(row) : null };
     },
   };
 }

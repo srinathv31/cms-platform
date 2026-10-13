@@ -37,7 +37,7 @@ interface StoredUpload {
 
 export function fakeTemplates(
   deps: FakeDeps,
-): Omit<TemplateService, "library" | "palette"> {
+): Omit<TemplateService, "library" | "palette" | "workspaceDocument"> {
   const { store, clock, hooks, ids } = deps;
   const files = new Map<string, StoredUpload>();
 
@@ -348,26 +348,7 @@ export function fakeTemplates(
       };
     },
 
-    async importOriginalRef(ctx, { templateId }) {
-      const { state } = store;
-      const template = templateById(state, templateId);
-      if (
-        !template ||
-        !can(ctx.viewer, "template.view", { teamId: template.teamId }).ok
-      )
-        return refusal(404, REQUEST_REFUSALS.templateUnavailable);
-      // The newest, should there ever be more than one.
-      const row = state.uploads
-        .filter((u) => u.templateId === templateId)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-      return {
-        ok: true,
-        original: row ? importedOriginal(state, row) : null,
-      };
-    },
-
     workspaceHeader: notInFake("templates.workspaceHeader"),
-    workspaceDocument: notInFake("templates.workspaceDocument"),
     integration: notInFake("templates.integration"),
     copilotPrompt: notInFake("templates.copilotPrompt"),
   };

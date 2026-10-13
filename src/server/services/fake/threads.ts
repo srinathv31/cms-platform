@@ -57,7 +57,7 @@ export function fakeThreads({
 }
 
 /** The twin of `loadThreads`: the template's threads against `anchors`, through a frozen round when given. */
-function fakeThreadsOf(
+export function fakeThreadsOf(
   state: FakeState,
   templateId: string,
   anchors: readonly string[],

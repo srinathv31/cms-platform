@@ -22,6 +22,7 @@ import { FakeStore } from "./store";
 import { fakeTemplates } from "./templates";
 import { fakeThreads } from "./threads";
 import { fakeVersions } from "./versions";
+import { fakeWorkspace } from "./workspace";
 
 // The in-memory fake of the service interfaces (decision 0068): the real domain rules over arrays instead of a
 // database, so the BFF's tests run without one and still meet a backend that behaves. It stays honest because
@@ -30,7 +31,7 @@ import { fakeVersions } from "./versions";
 //
 // It is kept slim (decision 0072): every command is implemented in full, and a read only where a contract case
 // needs it to observe a command (the version history, the bell, a template's activity and threads, the Library
-// and the palette). The other reads answer `notInFake`: the BFF's read models are tested on facts handed
+// and the palette, the workspace's document). The other reads answer `notInFake`: the BFF's read models are tested on facts handed
 // straight to their pure shaping functions, and the reads' contract cases run against the local implementation.
 //
 // Not for production: no persistence and no concurrency beyond JavaScript's own turn-taking.
@@ -59,9 +60,13 @@ export function fakeServices(
     identity,
     review: fakeReview(deps),
     versions: fakeVersions(deps),
-    // The fake reads the Library and the palette (a case watches a command move a template there), not the SHARE
-    // panel or the Copilot prompt, which no command changes.
-    templates: { ...fakeTemplates(deps), ...fakeLibrary(deps) },
+    // The fake reads the Library and the palette (a case watches a command move a template there) and the
+    // workspace's document (what a command stored in a draft), not the SHARE panel or the Copilot prompt.
+    templates: {
+      ...fakeTemplates(deps),
+      ...fakeLibrary(deps),
+      ...fakeWorkspace(deps),
+    },
     drafts: fakeDrafts(deps),
     comments: { ...fakeComments(deps), ...fakeThreads(deps) },
     access: fakeAccess(deps),
