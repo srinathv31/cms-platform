@@ -20,7 +20,7 @@ Contents: [Layout](#layout) · [From a template spec to rows](#from-a-template-s
 | [templates/](templates/)                                                   | The templates, one `SeedTemplate` each, and the code that turns them into rows. See below.                                                                                                                        |
 | [content.ts](content.ts), [variables.ts](variables.ts)                     | Builders for the TipTap JSON the templates use (block ids are derived from the template and block key), and the variable definitions with their sample sets.                                                      |
 | [history.ts](history.ts)                                                   | About 90 days of render log: daily streams, previews, a few failures and the latest renders.                                                                                                                      |
-| [activity.ts](activity.ts)                                                 | Access requests, the recertification, and the notifications.                                                                                                                                                      |
+| [activity.ts](activity.ts)                                                 | Access requests, the recertification, and the notifications, stored as the runtime stores them: each kind's facts and a link by team id.                                                                          |
 | [sim.ts](sim.ts)                                                           | Coral, the simulated consumer: its offers, customers, links and which notices it has read.                                                                                                                        |
 | [fixture.ts](fixture.ts), [fixture.test.ts](fixture.test.ts)               | The JSON fixture a Java loader reads (`npm run seed:export`, [scripts/seed-export.ts](../../../scripts/seed-export.ts)), and its tests. See [The fixture](#the-fixture).                                          |
 | [seed.test.ts](seed.test.ts), [redline-seed.test.ts](redline-seed.test.ts) | What the seed promises: shapes, ids, lifecycle states, determinism. See [Tests](#tests).                                                                                                                          |
@@ -63,8 +63,11 @@ spelling. An approval is one `version.activated` by the approver (the seed's cha
 `wasActive`, and its notice names the `activeVersion` consumers move to. A draft's editing sessions add up to its
 `rev` (`saves`, `fields`, `since`, `rev`), and a draft copied from a version starts with `draft.started`. The access
 and platform events carry the facts their builders write: `access.requested` has `userId` and `userName`,
-`access.granted` its `role`, `platform.config_changed` the fields of its area (built with `configChanged`, one
-event per channel for a channel rule), and a recertification is started by its Team Admin. `checks.ts` refuses a
+`access.granted` its `role`, `platform.config_changed` the fields of its area and no sentence (built with
+`configChanged`, one event per channel for a channel rule), and a recertification is started by its Team Admin. A
+notification stores its kind's facts (names read from the rows the template builder wrote), a link placed in the
+team by id (`recipientLink`), and as its body only a person's words (a submit note, a reason), as the transitions
+write them ([decision 0055](../../../docs/decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). `checks.ts` refuses a
 spec the one-stage chain couldn't have produced: an approval exactly when it was activated, at that moment, and
 replacing a version at the same moment.
 
@@ -88,9 +91,9 @@ pinned template id, edit its literal, the list in [seed.test.ts](seed.test.ts), 
 
 A team's id is a literal too, and never its slug ([decision 0053](../../../docs/decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)):
 `t_coral`, `t_deposits` and `t_cards` (`TEAM_IDS` in [teams.ts](teams.ts)), with the slugs `coral-offers`,
-`deposits` and `card-statements` the URLs use (`TEAM_SLUGS`). A spec and a row name a team by its id; a link the
-seed stores (a notification's `href`) names it by its slug. Because the two differ, code that swaps one for the
-other fails a test.
+`deposits` and `card-statements` the URLs use (`TEAM_SLUGS`). A spec, a row and a stored link (a notification's)
+name a team by its id; only a URL names it by its slug. Because the two differ, code that swaps one for the other
+fails a test.
 
 Every other row's id is drawn, not written. `ctx.id(scope, prefix)` draws from a sequence named for the scope and
 the prefix: `template:<key>` for a template's audit events, approvals, threads, comments and notices; `team:<id>`
@@ -153,11 +156,12 @@ UTC) so the file is the same on every run. About 31,000 rows, almost all of them
   audit event's `sunsetAt` beside the `sunsetDay` it falls on, so a loader at any time of day keeps the two in step.
   `settings.seeded_at` is `{ "daysAgo": 0 }`, the reset itself.
 
-- **Wording the fixture can't make relative.** A few sentences carry a date as text: the quarter label of a
-  recertification (`Q1 2026`, the quarter of its `due_at` in UTC, in `recertifications.label` and its audit event),
-  and the notification sentences built from it or from a date. A loader derives the label from the resolved `due_at`;
-  the notification sentences go when notifications store facts instead
-  ([decision 0055](../../../docs/decisions/0055-notifications-store-facts-and-are-worded-on-read.md)).
+- **Wording the fixture can't make relative.** One piece of text carries a date: the quarter label of a
+  recertification (`Q1 2026`, the quarter of its `due_at` in UTC, in `recertifications.label` and its audit event).
+  A loader derives it from the resolved `due_at`. Notifications store facts, an instant where a sentence would name
+  a date, and the quarter is worded from the deadline when read
+  ([decision 0055](../../../docs/decisions/0055-notifications-store-facts-and-are-worded-on-read.md)), so they load
+  as any other row.
 - **The render history is one realization.** Its times are drawn with business hours and weekdays in mind, at the
   moment the file was built; loaded at another moment, they keep their distance from the reset, not their weekday.
 - **Seed version**: `seedVersion` is `SEED_VERSION` ([index.ts](index.ts)), bumped when the seed's shape changes.
@@ -170,9 +174,8 @@ the contract suite's agreement test also checks the fixture.
 [fixture.test.ts](fixture.test.ts) checks that the export is the same on every run, that its ids and row counts are
 those of a seeded database, that every marker resolves back to the value the seed built, that loaded at the moment
 it was built it is the seeded database row for row (no required column empty), that loaded at another moment (a
-later quarter, another time of day) it is the seed built then but for the render times and the notification
-sentences, that no absolute time is left (a seed built a week later is the same file, but for the notification
-sentences), and what each marker means.
+later quarter, another time of day) it is the seed built then but for the render times, that no absolute time is left
+(a seed built a week later is the same file), and what each marker means.
 
 ## Tests
 

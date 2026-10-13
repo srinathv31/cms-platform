@@ -10,7 +10,7 @@ Date: 2026-10-12
 (`src/server/queries/usage.ts`: 30- and 60-day windows, a 13-week trend, an 18-week heatmap), for each version's last
 render with no lower bound (`src/server/queries/versions.ts`, `review-shared.ts`), for the integration panel's latest
 consumer (`integration.ts`), and for the notice audience, the consumers with a render in the 90 days before the event
-(`recentConsumers` in `src/server/effects.ts`, [0032](0032-consumers-are-told-when-a-sunset-passes.md)).
+(`recentConsumers` in `src/server/services/local/effects.ts`, [0032](0032-consumers-are-told-when-a-sunset-passes.md)).
 
 `audit_events` feeds the Audit page, its CSV export and the Activity tab, and two business rules read it: the sunset
 sweep writes its row once by checking whether a `version.sunset_passed` row exists (`src/server/sunset-sweep.ts`,

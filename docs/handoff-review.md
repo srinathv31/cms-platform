@@ -14,9 +14,9 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 1    | 3      | 5   | 9     |
+| Open         | 0        | 1    | 3      | 4   | 8     |
 | Partly fixed | 1        | 4    | 6      | 2   | 13    |
-| Fixed        | 1        | 21   | 31     | 33  | 86    |
+| Fixed        | 1        | 21   | 31     | 34  | 87    |
 | Deferred     | 0        | 2    | 1      | 0   | 3     |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), PR #66 (N26 and N27), and PRs #67–#72 (A1, T3, T5, T7 and N20).
@@ -356,7 +356,7 @@ If the backend moves to the Spring Boot API with this app as its BFF, these find
 | [B5 · Medium](#b5--medium-autosave-conflict-recovery-reads-the-audit-log)                         | `rev` and the last save session live on the version row, not in the audit log.                                                                                                                                                                                                                                                                                                                                 |
 | [A4 · Medium](#a4--medium-get-apiv1-routes-can-return-a-non-json-500)                             | Every route maps a failure to the contract's error body with a correlation id, in the error format [decision 0056](decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md) settles, together with the route half of [A3](#a3--medium-six-error-shapes-and-some-actions-throw).                                                                                                                      |
 | [A8 · Low](#a8--low-sample-urls-are-built-from-request-headers)                                   | The consumer base URL comes from configuration (`CONSUMER_API_BASE_URL`).                                                                                                                                                                                                                                                                                                                                      |
-| [A9 · Low](#a9--low-notifications-store-app-urls)                                                 | Notifications store the `NotificationLink` descriptor, and the BFF builds the link when it reads them.                                                                                                                                                                                                                                                                                                         |
+| [A9 · Low](#a9--low-notifications-store-app-urls)                                                 | Done: notifications store a link descriptor by team id, and the BFF builds the link when it reads them.                                                                                                                                                                                                                                                                                                        |
 | [D11 · Low](#d11--low-javascript-only-behavior-that-wont-port-cleanly)                            | Dates are validated by round trip (`2026-02-30` must fail, not become March 2), ids compare by code point, and lookups go through `Map`.                                                                                                                                                                                                                                                                       |
 
 ### The enterprise font
@@ -816,8 +816,8 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A9 · Low: Notifications store app URLs
 
-- **Status:** Open
-- **Where:** `src/server/effects.ts` line 101
+- **Status:** Fixed. Notifications store their kind, the kind's facts and a link descriptor that names its team by id ([decision 0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md)); the bell words them (`describeNotification` in `src/domain/notifications.ts`) and builds the href (`src/server/notification-href.ts`) when it reads them. Lane F, step 2b-0b.
+- **Where:** `src/server/services/local/effects.ts` (`writeEffects`, which stored the href then)
 - **What happens:** Hrefs built from Next routes are persisted, though the domain already has a `NotificationLink` descriptor. Route changes break old notifications, and a Java backend can't build Next routes.
 - **Fix:** Store the descriptor and build the href when reading.
 - **Evidence:** traced
@@ -851,7 +851,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### B4 · Medium: SQLite workarounds are spread through the code
 
 - **Status:** Partly fixed. Waiting is contained in the database client: `createAppClient` (`src/lib/serialized-writes.ts`) is the one place a write waits, 5 s for its turn, and nothing retries above it; the copies in `effects.ts`, `drafts/apply-patch.ts` and the simulator's `withBusyRetry` are gone, and import runs on `inTransaction` too. `rowid` ordering, `strftime` day buckets and the in-memory filtering remain.
-- **Where:** `src/server/effects.ts` line 222; `src/server/queries/library.ts` line 59
+- **Where:** `src/server/services/local/effects.ts`; `src/server/queries/library.ts` line 59
 - **What happens:** A process-wide write lock, three busy-retry copies (and one transaction with none), `rowid` ordering for audit and notifications, `strftime` day buckets, and in-memory filtering: the library loads every version of every team, and the audit page loads the whole log.
 - **Fix:** Contain retries in the DB client, order by ULID or sequence, filter in SQL.
 - **Evidence:** traced

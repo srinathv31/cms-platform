@@ -98,7 +98,9 @@ load." in the tab's place, under the header and the tab bar ([Errors](../src/app
    checks the permission, reads its own clock once, then runs one transaction: re-read the version, call the
    domain transition, write the
    changes with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row,
-   notifications, consumer notices) with `writeEffects`. A refusal anywhere rolls the transaction back and is the
+   notifications, consumer notices) with `writeEffects`. A notification is stored as its kind's facts and a link by
+   team id; the BFF words it and builds its href when the bell reads it
+   ([0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). A refusal anywhere rolls the transaction back and is the
    answer. After the port, the Java API does this step.
 4. The transition (`setSunset` in [lifecycle/sunset.ts](../src/domain/lifecycle/sunset.ts)) decides; the command only writes. A
    refusal is a value with a stable `code`, which code branches on, and a `reason`, the sentence the person reads
@@ -206,7 +208,7 @@ What the Java API's MSSQL schema does instead: team and user ids
 ([0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and test data
 ([0069](decisions/0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)).
 [Porting the data model](reference/data-model.md) puts them together table by table, with every audit action's and
-notice kind's payload.
+notice kind's payload and every notification kind's facts.
 
 ## Time, identity, and demo data
 

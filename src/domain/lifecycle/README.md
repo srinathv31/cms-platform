@@ -2,8 +2,10 @@
 
 Every transition a version goes through, from the first draft to a revoke, as pure rules: facts and `now` in,
 `{ ok: true, changes, effects }` or a refusal out. `changes` are the field values to write; `effects` are the side
-records (audit events, notifications, consumer notices) that [server/effects.ts](../../server/effects.ts) writes in
-the same transaction. Nothing here touches the database, the framework or the clock. The server actions (such as
+records (audit events, notifications, consumer notices) that
+[server/services/local/effects.ts](../../server/services/local/effects.ts) writes in the same transaction. A
+notification carries its kind's facts (names as they were) and a link, never a sentence: the bell words it when it
+reads it ([notifications.ts](../notifications.ts), decision 0055). Nothing here touches the database, the framework or the clock. The server actions (such as
 [server/actions/review.ts](../../server/actions/review.ts)) call these inside one transaction; read models call the
 predicates (`sunsetPassed`, `contractBaseline`, `reviewBaseline`) so a screen never decides one itself.
 

@@ -9,7 +9,7 @@ Several invariants hold only because `src/lib/serialized-writes.ts` makes every 
 ([B3](../handoff-review.md#b3--medium-invariants-rely-on-sqlites-single-writer), H-2 of the
 [October 12 review](../quality-review-2026-10-12.md)):
 
-- **The notice sequence.** `takeNoticeSeqs` (`src/server/effects.ts`) reads `settings.consumer_notice_seq` and
+- **The notice sequence.** `takeNoticeSeqs` (`src/server/services/local/effects.ts`) reads `settings.consumer_notice_seq` and
   `MAX(seq)`, then writes. [0006](0006-page-notices-by-commit-order.md) requires `seq` in commit order, so a consumer
   paging by `seq` never skips a notice.
 - **One pending access request per user and team, and one open recertification per team**: checked in TypeScript
