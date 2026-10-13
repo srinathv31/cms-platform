@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient, type Client } from "@libsql/client";
 import { getTableColumns, getTableName } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DAY_MS } from "@/domain/dates";
@@ -13,6 +13,7 @@ import {
   FIXTURE_BASE,
   buildFixture,
   isTimeMarker,
+  loadFixture,
   resolveJson,
   resolveMarker,
   stringifyFixture,
@@ -25,6 +26,7 @@ import { buildSeed, seedDatabase, type SeedResult } from "./index";
 
 const dirs: string[] = [];
 let client: Client;
+let db: LibSQLDatabase<typeof ucomp>;
 let seeded: SeedResult;
 let fixture: SeedFixture;
 
@@ -32,7 +34,7 @@ beforeAll(async () => {
   const dir = mkdtempSync(join(tmpdir(), "ucomp-seed-fixture-"));
   dirs.push(dir);
   client = createClient({ url: fileUrlOfPath(join(dir, "seed.db")) });
-  const db = drizzle(client, { schema: ucomp });
+  db = drizzle(client, { schema: ucomp });
   await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
   seeded = await seedDatabase(db, { base: FIXTURE_BASE });
   fixture = buildFixture();
@@ -95,9 +97,12 @@ describe("the seed fixture", () => {
       const columns = Object.entries(getTableColumns(t));
       rows.forEach((row, i) => {
         for (const [key, column] of columns) {
-          const original = (row as Record<string, unknown>)[key] ?? null;
+          const given = (row as Record<string, unknown>)[key];
+          const original = given ?? null;
           const value = exported[i]![column.name];
           const where = `${getTableName(t)}[${i}].${column.name}`;
+          // A column the seed leaves out holds the database's default (the next case checks it).
+          if (given === undefined && column.hasDefault) continue;
           if (original === null) expect(value, where).toBeNull();
           else if (column.dataType === "date") {
             expect(isTimeMarker(value), where).toBe(true);
@@ -113,6 +118,46 @@ describe("the seed fixture", () => {
         }
       });
     }
+  });
+
+  it("loads, at the moment it was built, as the seeded database: every row and column, defaults included", async () => {
+    const loaded = loadFixture(fixture, FIXTURE_BASE);
+    for (const { table: t } of buildSeed(FIXTURE_BASE).tables) {
+      const name = getTableName(t);
+      const rows = loaded.tables.find((l) => l.name === name)!.rows;
+      expect(rows, name).toEqual(await db.select().from(t));
+      for (const [key, column] of Object.entries(getTableColumns(t)))
+        if (column.notNull)
+          expect(
+            rows.filter((r) => r[key] === null),
+            `${name}.${column.name}`,
+          ).toEqual([]);
+    }
+  });
+
+  it("loads at another moment as the seed built then, but for its render times and notification sentences", () => {
+    // Another quarter, and another time of day: 23:30 the evening before in New York.
+    const later = new Date("2026-05-17T03:30:00.000Z");
+    const comparable = (tables: ReturnType<typeof loadFixture>["tables"]) =>
+      tables
+        // The render history is one realization of the reset's calendar (business hours, weekdays): built at
+        // another moment, the seed draws other times. A loader loads the realization the file holds.
+        .filter((t) => t.name !== "render_log")
+        .map((t) =>
+          t.name === "notifications"
+            ? {
+                ...t,
+                rows: t.rows.map((r) => ({ ...r, title: null, body: null })),
+              }
+            : t,
+        );
+    const loaded = loadFixture(fixture, later);
+    expect(comparable(loaded.tables)).toEqual(
+      comparable(loadFixture(buildFixture(later), later).tables),
+    );
+    // The label a loader derives from the recertification's deadline, 30 days on.
+    const recerts = loaded.tables.find((t) => t.name === "recertifications");
+    expect(recerts!.rows.map((r) => r.label)).toEqual(["Q2 2026"]);
   });
 
   it("holds no absolute time: a seed built a week later is the same file", () => {

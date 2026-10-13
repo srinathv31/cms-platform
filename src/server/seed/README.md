@@ -125,8 +125,10 @@ UTC) so the file is the same on every run. About 31,000 rows, almost all of them
 
 - **Tables** come in the order to insert them: a row refers only to rows in tables before it. `name` is the table
   and each row's keys are the column names, as in [the schema](../db/schema/ucomp.ts) (`sim_*` is
-  [the simulator's](../db/schema/sim.ts); the Coral simulator stays a Node app, so a loader may skip those). A column
-  with no value is `null`. A column that holds JSON (`body`, `payload`, `details`, …) holds it as JSON.
+  [the simulator's](../db/schema/sim.ts); the Coral simulator stays a Node app, so a loader may skip those). A row is
+  complete: a column the seed leaves out holds the schema's default, as the database stores it, so a loader inserts
+  every column as written. A column with no value is `null`. A column that holds JSON (`body`, `payload`,
+  `details`, …) holds it as JSON.
 - **Ids** are the ones the database gets: a template's and a version's are the spec's literals, every other row's is
   its drawn id ([Ids](#ids)). `templates` maps each seed key to its template id.
 - **Time is relative to the reset**, and the file has no absolute instant or date. A marker is an object with
@@ -150,11 +152,21 @@ UTC) so the file is the same on every run. About 31,000 rows, almost all of them
   and the notification sentences built from it or from a date. A loader derives the label from the resolved `due_at`;
   the notification sentences go when notifications store facts instead
   ([decision 0055](../../../docs/decisions/0055-notifications-store-facts-and-are-worded-on-read.md)).
+- **The render history is one realization.** Its times are drawn with business hours and weekdays in mind, at the
+  moment the file was built; loaded at another moment, they keep their distance from the reset, not their weekday.
 - **Seed version**: `seedVersion` is `SEED_VERSION` ([index.ts](index.ts)), bumped when the seed's shape changes.
 
+`loadFixture(fixture, resetAt)` is a loader in TypeScript, the reference for the Java one: every table in order,
+every marker resolved against `resetAt`, the recertification labels derived, the rows in the shape Drizzle reads
+them. The in-memory fake of the service interfaces ([services/fake](../services/fake/state.ts)) is built with it, so
+the contract suite's agreement test also checks the fixture.
+
 [fixture.test.ts](fixture.test.ts) checks that the export is the same on every run, that its ids and row counts are
-those of a seeded database, that every marker resolves back to the value the seed built, that no absolute time is
-left (a seed built a week later is the same file, but for the notification sentences), and what each marker means.
+those of a seeded database, that every marker resolves back to the value the seed built, that loaded at the moment
+it was built it is the seeded database row for row (no required column empty), that loaded at another moment (a
+later quarter, another time of day) it is the seed built then but for the render times and the notification
+sentences, that no absolute time is left (a seed built a week later is the same file, but for the notification
+sentences), and what each marker means.
 
 ## Tests
 

@@ -1,4 +1,5 @@
 import type { AnyNotificationKind } from "@/domain/access-types";
+import { quarterLabel } from "@/domain/access/recertification";
 import { formatLongDate } from "@/domain/dates";
 import { reviewPath, versionLabel, type NumberedRound } from "@/domain/rounds";
 import type { SeedCtx, VersionRef } from "./context";
@@ -7,11 +8,6 @@ import { userName } from "./people";
 
 // Access requests, recertification and notifications. Lifecycle audit events and consumer notices
 // come from the template builder, so they always agree with the version rows.
-
-function quarterLabel(ms: number): string {
-  const d = new Date(ms);
-  return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
-}
 
 export function seedActivity(ctx: SeedCtx) {
   const { sink } = ctx;
@@ -49,7 +45,7 @@ export function seedActivity(ctx: SeedCtx) {
   // ── Quarterly recertification, due in 30 days ──────────────────
   const recertId = ctx.id("activity", "rc");
   const dueAt = ctx.at(-30);
-  const label = quarterLabel(dueAt.getTime());
+  const label = quarterLabel(dueAt);
   sink.recertifications.push({
     id: recertId,
     teamId: coral,
