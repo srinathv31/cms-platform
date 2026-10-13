@@ -19,13 +19,13 @@ percent_zero
 21.90%
 percent_symbol
 21.99%
-percent_json
-21.90%
+percent_whole
+22%
 number_long
 1.999999
 number_grouped
 1,234,567.891
-number_json
+number_whole
 20,000
 date_us
 March 4, 2027

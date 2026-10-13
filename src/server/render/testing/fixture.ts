@@ -4,7 +4,6 @@
 
 import type { JSONContent } from "@tiptap/core";
 import type { ChannelFields } from "@/domain/channel-fields";
-import { parseJsonWithNumberText } from "@/domain/render/json-number-text";
 import { CHANNELS, type Channel } from "@/domain/types";
 import type { Variable } from "@/editor/model/types";
 import type { EngineInput } from "../engine";
@@ -23,7 +22,10 @@ export interface RenderFixture {
   /** The render time (ISO): the PDF's creation and modification date. */
   at: string;
   variables: Variable[];
-  /** As a request sends them: JSON numbers are read from their source text (21.90 stays "21.90"). */
+  /**
+   * As a request sends them. Strings, except in a case that shows a refusal (a JSON number, a boolean:
+   * the engine refuses those, whatever their digits).
+   */
   values: Record<string, unknown>;
   /** The document: what PDF, web and email render. A message case's is never read. */
   body: JSONContent;
@@ -46,10 +48,9 @@ export function engineInput(fixture: RenderFixture): EngineInput {
 /** JSON the way the files are written: two spaces, a newline at the end. */
 export const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 
-/** Reads a fixture's JSON. JSON numbers in `values` keep their exact digits, as the render route reads them. */
+/** Reads a fixture's JSON. */
 export function parseRenderFixture(text: string): RenderFixture {
-  const parsed = parseJsonWithNumberText(text);
-  const raw = parsed.json as Partial<RenderFixture> | null;
+  const raw = JSON.parse(text) as Partial<RenderFixture> | null;
   if (!raw || typeof raw !== "object")
     throw new Error("A render fixture must be a JSON object.");
   for (const key of ["templateId", "templateName", "at"] as const) {
@@ -95,7 +96,7 @@ export function parseRenderFixture(text: string): RenderFixture {
     ...(raw.round === undefined ? {} : { round: raw.round }),
     at: raw.at!,
     variables: raw.variables,
-    values: parsed.numbersAsText(raw.values),
+    values: raw.values,
     body: raw.body,
     channelFields: raw.channelFields,
     channels: CHANNELS.filter((c) => channels.includes(c)),

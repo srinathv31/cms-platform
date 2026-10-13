@@ -86,8 +86,16 @@ export interface ApiSmsTooLongDetails {
 /** missing_variables / invalid_values: keys only, never values. */
 export interface ApiValueErrorDetails {
   missing: string[];
-  /** `maxLength` is set when the value was longer than that many characters (1000), whatever its type. */
-  invalid: { key: string; expected: ApiVariableType; maxLength?: number }[];
+  /**
+   * `maxLength` is set when the value was longer than that many characters (1000), whatever its type.
+   * `sent` is "number" when the value was a JSON number: every value is a JSON string.
+   */
+  invalid: {
+    key: string;
+    expected: ApiVariableType;
+    maxLength?: number;
+    sent?: "number";
+  }[];
 }
 
 /** version_sunset / version_revoked / version_not_released. */
@@ -305,7 +313,7 @@ export interface ApiJsonSchema {
 export interface ApiJsonSchemaProperty {
   title: string; // the variable's label
   description: string; // "Currency, canonical form like 1000 or 1000.50. Renders as $1,000.50, digits exactly as sent."
-  type: "string"; // the canonical forms are strings (the route also takes JSON numbers, read from their source text; not advertised)
+  type: "string"; // every value is a JSON string, never a JSON number (the route refuses a number: 422 invalid_values)
   minLength?: number; // a required text: 1, with pattern "\\S" (blank counts as missing)
   maxLength: number; // every value: 1000 characters (Unicode code points); a longer one is 422 invalid_values
   pattern?: string;
@@ -393,9 +401,10 @@ export interface ApiNotice {
 /**
  * The body a consumer sends. A `"draft"` version is never served here (400 bad_request), and a field that isn't listed
  * (`preview`, `round`) is ignored.
- * At most 1,000,000 bytes (else 413 body_too_large); each value at most 1000 characters, counted in
- * Unicode code points (else 422 invalid_values, "first_name must be at most 1,000 characters."). A value
- * is never cut: it prints exactly as sent, or is refused.
+ * At most 1,000,000 bytes (else 413 body_too_large); each value a JSON string, never a JSON number (else
+ * 422 invalid_values, `purchase_apr must be a JSON string, like "21.90", not a number.`), and at most 1000
+ * characters, counted in Unicode code points (else 422 invalid_values, "first_name must be at most 1,000
+ * characters."). A value is never cut: it prints exactly as sent, or is refused.
  */
 export interface ApiRenderRequest {
   version: number;
@@ -406,7 +415,7 @@ export interface ApiRenderRequest {
    * iPhone's has the subtitle.
    */
   platform?: ApiPushPlatform;
-  values: Record<string, string | number>;
+  values: Record<string, string>;
   /** pdf, web and email only (else 400 bad_request, "encoding is only for channels pdf, web and email."). */
   encoding?: "base64";
 }

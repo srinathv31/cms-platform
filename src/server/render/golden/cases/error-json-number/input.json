@@ -1,0 +1,73 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Values sent as JSON numbers",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    },
+    {
+      "key": "purchase_apr",
+      "label": "Purchase APR",
+      "type": "percent",
+      "required": true,
+      "sample": "21.99"
+    },
+    {
+      "key": "annual_fee",
+      "label": "Annual fee",
+      "type": "currency",
+      "required": true,
+      "sample": "95"
+    },
+    {
+      "key": "home_state",
+      "label": "Home state",
+      "type": "us_state",
+      "required": true,
+      "sample": "NJ"
+    },
+    {
+      "key": "nickname",
+      "label": "Nickname",
+      "type": "text",
+      "required": false,
+      "sample": "Maya"
+    }
+  ],
+  "values": {
+    "first_name": "Maya",
+    "purchase_apr": 21.90,
+    "annual_fee": 95,
+    "home_state": "NJ",
+    "nickname": 7
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "This document is never rendered."
+          }
+        ],
+        "attrs": {
+          "id": "b1"
+        }
+      }
+    ]
+  },
+  "channelFields": {},
+  "channels": [
+    "pdf",
+    "web",
+    "email"
+  ]
+}

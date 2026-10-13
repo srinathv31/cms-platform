@@ -723,18 +723,25 @@ describe("POST …/render: 403, 404 and 422", () => {
     expect(JSON.stringify(error)).not.toContain("Atlantis");
   });
 
-  it("a JSON number in values is read from its exact source text: 21.90 renders 21.90%, 1e1 is refused", async () => {
+  it('a JSON number in values is refused whatever its digits: send the string "21.90" (decision 0058)', async () => {
     const body = (apr: string) =>
       `{"version":2,"channel":"web","values":{"first_name":"Maya","last_name":"Chen","purchase_apr":${apr},"home_state":"NJ"}}`;
-    const res = await post("balance-transfer", body("21.90"));
+    for (const number of ["21.90", "21", "1e1", "1000000000000000000000"]) {
+      const error = await expectError(
+        await post("balance-transfer", body(number)),
+        422,
+        "invalid_values",
+        'purchase_apr must be a JSON string, like "21.90", not a number.',
+      );
+      expect(error.details).toEqual({
+        missing: [],
+        invalid: [{ key: "purchase_apr", expected: "percent", sent: "number" }],
+      });
+    }
+    // The same digits as a string render, every one kept.
+    const res = await post("balance-transfer", body('"21.90"'));
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("21.90%");
-    await expectError(
-      await post("balance-transfer", body("1e1")),
-      422,
-      "invalid_values",
-      "purchase_apr must be a percentage, like 21.99.",
-    );
   });
 
   it("a channel the version hasn't turned on is 422", async () => {

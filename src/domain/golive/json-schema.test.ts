@@ -185,7 +185,7 @@ describe("contractJsonSchema: validated", () => {
     );
   });
 
-  it("numbers are canonical decimal strings, exactly the route's grammar; JSON numbers aren't advertised", () => {
+  it("numbers are canonical decimal strings, exactly the route's grammar; a JSON number fails the schema and the route alike", () => {
     for (const value of [
       "1000",
       "1000.50",
@@ -217,7 +217,7 @@ describe("contractJsonSchema: validated", () => {
       "-0.00",
       "１２",
       "",
-      1000,
+      1000, // a JSON number: `type: "string"` fails it
       1e21,
       1e-7,
     ]) {
@@ -226,10 +226,12 @@ describe("contractJsonSchema: validated", () => {
         String(value),
       ).toBe(false);
     }
-    // Why: a JSON number in exponent notation is refused by the route.
-    expect(validateValues([v("x", "currency")], { x: 1e21 }).ok).toBe(false);
-    expect(validateValues([v("x", "currency")], { x: 1e-7 }).ok).toBe(false);
-    expect(validateValues([v("x", "currency")], { x: 1000 }).ok).toBe(true);
+    // Why: the route refuses every JSON number, so it accepts exactly what the schema does.
+    for (const number of [1000, 1e21, 1e-7]) {
+      expect(validateValues([v("x", "currency")], { x: number }).ok).toBe(
+        false,
+      );
+    }
   });
 
   it("a required text must not be blank; an optional one may be", () => {

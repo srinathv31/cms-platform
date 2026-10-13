@@ -8,10 +8,6 @@ import {
   type ChannelFieldId,
 } from "@/domain/channel-fields";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
-import {
-  parseJsonWithNumberText,
-  type JsonWithNumberText,
-} from "@/domain/render/json-number-text";
 import { CHANNELS, VARIABLE_TYPES } from "@/domain/types";
 import type { DraftPatch, JSONContent } from "@/domain/types";
 import { formatCount } from "@/domain/numbers";
@@ -125,10 +121,8 @@ const variable = z.strictObject({
 const sampleSet = z.strictObject({
   id: z.string().min(1).max(100),
   name: z.string().max(200),
-  values: z.record(
-    z.string().max(100),
-    z.union([z.string().max(MAX_VALUE_LENGTH), z.number().finite()]),
-  ),
+  // Strings only, whatever the variable's type (decision 0058): the same rule as the render route's values.
+  values: z.record(z.string().max(100), z.string().max(MAX_VALUE_LENGTH)),
 });
 
 const variables = z
@@ -216,33 +210,15 @@ export function parseDraftPatch(input: unknown): ParseResult {
   return { ok: true, patch };
 }
 
-/**
- * A sample set's values hold digits exactly as sent: a JSON number becomes its source text
- * ({"apr": 21.90} is "21.90", not 21.9), then follows the same grammar as a string when the preview
- * validates it. Anything that isn't a list of sample-set objects is left for the schema to refuse.
- */
-function sampleValuesAsText(parsed: JsonWithNumberText): unknown {
-  const { json } = parsed;
-  if (!isRecord(json) || !Array.isArray(json.sampleSets)) return json;
-  return {
-    ...json,
-    sampleSets: json.sampleSets.map((set: unknown) =>
-      isRecord(set) && isRecord(set.values)
-        ? { ...set, values: parsed.numbersAsText(set.values) }
-        : set,
-    ),
-  };
-}
-
 /** Reads and parses a request body with the size guard. `text` is the raw body. */
 export function parseDraftPatchText(text: string): ParseResult {
   if (text.length > MAX_BODY_SIZE)
     return { ok: false, message: TOO_LARGE_MESSAGE };
-  let parsed: JsonWithNumberText;
+  let parsed: unknown;
   try {
-    parsed = parseJsonWithNumberText(text);
+    parsed = JSON.parse(text);
   } catch {
     return { ok: false, message: "The request body is not valid JSON." };
   }
-  return parseDraftPatch(sampleValuesAsText(parsed));
+  return parseDraftPatch(parsed);
 }

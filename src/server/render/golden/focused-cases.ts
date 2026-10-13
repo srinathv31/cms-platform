@@ -54,7 +54,10 @@ export interface FocusedCase {
   input: RenderFixture;
 }
 
-/** A JSON number written exactly as given (Node 24): 21.90 stays 21.90 in input.json. */
+/**
+ * A JSON number written exactly as given (Node 24's `JSON.rawJSON`): 21.90 stays 21.90 in input.json. Only a
+ * case that shows the refusal of a JSON number sends one (`error-json-number`); every other value is a string.
+ */
 const num = (text: string) =>
   (JSON as unknown as { rawJSON(text: string): object }).rawJSON(text);
 
@@ -1043,10 +1046,10 @@ const valuesFormats = make("values-formats", "Variable value formats", {
     variable("percent_three", "Three places", "percent", true, "6.875"),
     variable("percent_zero", "Trailing zero", "percent", true, "21.90"),
     variable("percent_symbol", "With symbol", "percent", true, "21.99 %"),
-    variable("percent_json", "JSON number", "percent", true, "21.90"),
+    variable("percent_whole", "Whole percent", "percent", true, "22"),
     variable("number_long", "Many digits", "number", true, "1.999999"),
     variable("number_grouped", "Grouped", "number", true, "1,234,567.891"),
-    variable("number_json", "JSON number", "number", true, "20000"),
+    variable("number_whole", "Whole number", "number", true, "20000"),
     variable("date_us", "US date", "date", true, "3/4/2027"),
     variable("date_words", "Spelled", "date", true, "Sept 30, 2027"),
     variable("date_iso", "ISO", "date", true, "2028-02-29"),
@@ -1065,10 +1068,10 @@ const valuesFormats = make("values-formats", "Variable value formats", {
     percent_three: "6.875",
     percent_zero: "21.90",
     percent_symbol: "21.99 %",
-    percent_json: num("21.90"),
+    percent_whole: "22",
     number_long: "1.999999",
     number_grouped: "1,234,567.891",
-    number_json: num("20000"),
+    number_whole: "20000",
     date_us: "3/4/2027",
     date_words: "Sept 30, 2027",
     date_iso: "2028-02-29",
@@ -1091,10 +1094,10 @@ const valuesFormats = make("values-formats", "Variable value formats", {
         "percent_three",
         "percent_zero",
         "percent_symbol",
-        "percent_json",
+        "percent_whole",
         "number_long",
         "number_grouped",
-        "number_json",
+        "number_whole",
         "date_us",
         "date_words",
         "date_iso",
@@ -1185,7 +1188,7 @@ const errorMissingAndInvalid = make(
       variable("cash_fee", "Cash fee", "currency", true, "5"),
       variable("promo", "Promo", "text", false, ""),
     ],
-    values: { purchase_apr: "1,00", annual_fee: "007", cash_fee: num("1e3") },
+    values: { purchase_apr: "1,00", annual_fee: "007", cash_fee: "1e3" },
     body: doc(para("This document is never rendered.")),
   },
 );
@@ -1193,8 +1196,8 @@ const errorMissingAndInvalid = make(
 /**
  * Nothing is missing, so the code is `invalid_values` (not `missing_variables`): one sentence per invalid key,
  * in the version's variable order, each type's noun once. An optional variable is checked when it has a
- * value; a key the version doesn't list is ignored; a JSON number with an exponent and a JSON boolean are
- * invalid, and the number is read from its source text.
+ * value; a key the version doesn't list is ignored; an exponent in a string and a JSON boolean are invalid.
+ * The twin that sends JSON numbers is `error-json-number`.
  */
 const errorInvalidValuesOnly = make(
   "error-invalid-values-only",
@@ -1212,12 +1215,41 @@ const errorInvalidValuesOnly = make(
     values: {
       first_name: "Maya",
       purchase_apr: "1,00",
-      annual_fee: num("1e3"),
+      annual_fee: "1e3",
       opened_on: "2027-02-29",
       home_state: "N.J.",
       points: "007",
       nickname: true,
       not_a_variable: "ignored",
+    },
+    body: doc(para("This document is never rendered.")),
+  },
+);
+
+/**
+ * A JSON number in `values` is refused whatever its digits (spec section 5, decision 0058), so the route
+ * accepts exactly what the published schema does: every value a JSON string. Nothing is missing, so the code
+ * is `invalid_values`, one sentence per key naming the string form (never the value), and `details.invalid`
+ * carries `sent: "number"` for each. It is refused for every type, `text` included (`nickname`), and an
+ * integer is refused as much as a decimal (`annual_fee`). A string value beside the numbers is fine.
+ */
+const errorJsonNumber = make(
+  "error-json-number",
+  "Values sent as JSON numbers",
+  {
+    variables: [
+      first,
+      variable("purchase_apr", "Purchase APR", "percent", true, "21.99"),
+      variable("annual_fee", "Annual fee", "currency", true, "95"),
+      variable("home_state", "Home state", "us_state", true, "NJ"),
+      variable("nickname", "Nickname", "text", false, "Maya"),
+    ],
+    values: {
+      first_name: "Maya",
+      purchase_apr: num("21.90"),
+      annual_fee: num("95"),
+      home_state: "NJ",
+      nickname: num("7"),
     },
     body: doc(para("This document is never rendered.")),
   },
@@ -1844,6 +1876,7 @@ export const FOCUSED_CASES: FocusedCase[] = [
   glyphs,
   errorMissingAndInvalid,
   errorInvalidValuesOnly,
+  errorJsonNumber,
   errorValueTooLong,
   wideTable,
   deepLists,

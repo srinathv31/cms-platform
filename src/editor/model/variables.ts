@@ -174,9 +174,6 @@ export function isValidKey(key: string): boolean {
 // parseFloat or Intl touches them. Canonical = the digits as sent, with the allowed decoration
 // removed. Display = canonical plus the type's symbol and thousands commas. Nothing is rounded, cut,
 // padded or rewritten: "21.90" stays 21.90, "1.999999" stays 1.999999, "95" is $95.
-//
-// A JS number given here (an internal caller; the render route reads JSON numbers as their source
-// text) is read as its JSON text, `String(n)`: 95 is "95", and 1e21 is "1e+21", which is refused.
 
 export type ValidationResult =
   { ok: true; value: string } | { ok: false; message: string };
@@ -229,7 +226,7 @@ export function validateValue(
   type: VariableType,
   value: VariableValue,
 ): ValidationResult {
-  const given = String(value);
+  const given = value;
   const raw = given.trim();
   if (raw === "") return { ok: false, message: "Enter a value" };
   if (longerThan(given, MAX_VALUE_LENGTH))
