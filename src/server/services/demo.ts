@@ -5,21 +5,32 @@
 // Typed for step 2b: they still run in src/server/actions/demo.ts, src/server/actions/persona.ts and
 // src/server/queries/personas.ts.
 
-import type { ClockReadout } from "@/server/queries/clock";
-import type { PersonaSummary } from "@/server/queries/personas";
-import type { ActionResult } from "./types";
+import type {
+  ActionResult,
+  ReadResult,
+  RequestContext,
+  Unsettled,
+} from "./types";
 
 export interface DemoService {
   /** Drops and reseeds the data. Refuses `reset_needs_local_file` for a database that isn't a local file. */
-  reset(): Promise<ActionResult>;
-  /** Moves the clock forward and runs the sweeps the move crossed. */
-  advanceClock(input: {
-    days: number;
-  }): Promise<ActionResult<{ offsetDays: number }>>;
-  /** What the Demo pill shows. */
-  clockReadout(): Promise<ClockReadout>;
+  reset(ctx: RequestContext): Promise<ActionResult>;
+  /** Moves the clock forward and runs the scheduled jobs the move crossed. */
+  advanceClock(
+    ctx: RequestContext,
+    input: { days: number },
+  ): Promise<ActionResult<{ offsetDays: number }>>;
+  /** What the Demo pill shows: the clock's offset and its instant. */
+  clockReadout(
+    ctx: RequestContext,
+  ): Promise<ReadResult<Unsettled<"P2: the demo clock's facts">>>;
   /** The personas the switcher offers. */
-  personas(): Promise<PersonaSummary[]>;
-  /** A persona was switched to: run the sweeps, then stamp their last sign-in. */
-  personaSwitched(input: { userId: string }): Promise<ActionResult>;
+  personas(
+    ctx: RequestContext,
+  ): Promise<ReadResult<Unsettled<"P2: the personas' facts">>>;
+  /** A persona was switched to: run the scheduled jobs, then stamp their last sign-in. */
+  personaSwitched(
+    ctx: RequestContext,
+    input: { userId: string },
+  ): Promise<ActionResult>;
 }

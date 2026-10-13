@@ -85,10 +85,11 @@ export async function loadSunsetFacts(r: Reader): Promise<SunsetFacts[]> {
  * and returns them. A read outside the transaction keeps the common case (nothing new) free of a write lock;
  * when there is work, the transaction reads again and decides from that, so two sweeps at once write each row
  * and each notice once. The row is dated at the sunset; the notices are created now, when they can first be
- * read, and go to the consumers that rendered the template from 90 days before the sunset on.
+ * read, and go to the consumers that rendered the template from 90 days before the sunset on. It runs at the
+ * demo clock's now, or at `instant` (the contract suite's scheduled-jobs run).
  */
-export async function runSunsetSweep(): Promise<PassedSunset[]> {
-  const at = await now();
+export async function runSunsetSweep(instant?: Date): Promise<PassedSunset[]> {
+  const at = instant ?? (await now());
   const found = sweepSunsets({
     versions: await loadSunsetFacts(db),
     now: at,

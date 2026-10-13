@@ -2,50 +2,59 @@
 
 The service interfaces are everything the BFF (the server actions, the read models, the route handlers) asks the
 backend: one interface per area, each method taking the request context first and answering an `ActionResult` (a
-command) or a `ReadResult` (a read). Behind them, the backend holds the data and runs the rules and the permission
-checks ([decision 0070](../../../docs/decisions/0070-rules-and-permission-checks-sit-behind-the-service-interfaces.md)).
+command) or a `ReadResult` (a read). Behind them, the backend holds the data, reads its own clock, and runs the rules
+and the permission checks ([decision 0070](../../../docs/decisions/0070-rules-and-permission-checks-sit-behind-the-service-interfaces.md)).
 Today the backend is this app's own code over SQLite, the **local implementation**; after the port it is the Java
 API, reached through an HTTP implementation of the same interfaces. The BFF's own surface (the actions, the GET routes,
 autosave, the read models' shapes) doesn't change when the backend does. Rendering already works this way
-([render/engine.ts](../render/engine.ts)).
+([render/engine.ts](../render/engine.ts)). [Decision 0072](../../../docs/decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)
+records the seam and the alternatives turned down.
 
 ```text
  browser ──► server action ─┐
-           GET route ───────┤  BFF: parse (zod), word, lay out, refresh. Reads the request context once.
-           page (RSC) ──────┘
-                 │  services().<area>.<method>(ctx, input)
+           GET route ───────┤  BFF: parse (zod), word, lay out, refresh. Reads ONE request context:
+           page (RSC) ──────┘  the viewer, a correlation id, a credential slot. No clock.
+                 │  services().<area>.<method>(ctx, input)  →  facts (+ asOf), decided can, codes
                  ▼
           ┌─ interfaces (this folder) ─┐
           ▼              ▼              ▼
      local/ (today)   fake/ (tests)   http/ (later: the Java API, types generated from its OpenAPI spec)
      Drizzle + domain  arrays + domain
+     its own clock     a test's clock
 ```
 
 ## Layout
 
-| Path                                                                                                                                                                                                                                                                                                                                                                     | What it holds                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [types.ts](types.ts)                                                                                                                                                                                                                                                                                                                                                     | `Services`, one property per area, and the shapes every method shares (`ActionResult`, `ReadResult`, `Changed`).                                                                                                                                                                                                                                                                                       |
-| [index.ts](index.ts)                                                                                                                                                                                                                                                                                                                                                     | `services()`: the implementation `STENCIL_BACKEND` names ([config.ts](../config.ts)), built once. The only way the BFF reaches the backend.                                                                                                                                                                                                                                                            |
-| [review.ts](review.ts), [versions.ts](versions.ts), [templates.ts](templates.ts), [drafts.ts](drafts.ts), [comments.ts](comments.ts), [access.ts](access.ts), [platform.ts](platform.ts), [notifications.ts](notifications.ts), [audit.ts](audit.ts), [usage.ts](usage.ts), [render.ts](render.ts), [identity.ts](identity.ts), [clock.ts](clock.ts), [demo.ts](demo.ts) | One interface per area, with what each method promises: its input, its answer, and its refusals in order.                                                                                                                                                                                                                                                                                              |
-| [refuse.ts](refuse.ts)                                                                                                                                                                                                                                                                                                                                                   | `refuse`, `check`, `permit`, `RefusalError`, `answerFor`: how an implementation stops a command with a refusal and undoes its writes.                                                                                                                                                                                                                                                                  |
-| [not-moved.ts](not-moved.ts)                                                                                                                                                                                                                                                                                                                                             | `notMoved`, `notMovedArea`: what a method answers while its area still runs outside the seam (it throws; nothing calls it).                                                                                                                                                                                                                                                                            |
-| [local/](local/)                                                                                                                                                                                                                                                                                                                                                         | The local implementation: [command.ts](local/command.ts) (`runCommand`, the command kit), [review.ts](local/review.ts), [versions.ts](local/versions.ts), [version-rows.ts](local/version-rows.ts) (the version reads and the compare-and-set the review commands share), [index.ts](local/index.ts), and [contract-harness.ts](local/contract-harness.ts) for the contract suite.                     |
-| [fake/](fake/)                                                                                                                                                                                                                                                                                                                                                           | The in-memory fake: [state.ts](fake/state.ts) (the tables, seeded from the same seed), [store.ts](fake/store.ts) (a command's writes and their undo), [rows.ts](fake/rows.ts), [effects.ts](fake/effects.ts), one file per area, [index.ts](fake/index.ts), and the test support: [testing.ts](fake/testing.ts) for BFF tests, [contract-harness.ts](fake/contract-harness.ts) for the contract suite. |
-| [contract/](contract/)                                                                                                                                                                                                                                                                                                                                                   | The contract suite: [harness.ts](contract/harness.ts) (what an implementation provides to run it), the cases per area ([review.ts](contract/review.ts), [versions.ts](contract/versions.ts)), and their runners (`*.test.ts`).                                                                                                                                                                         |
+| Path                                                                                                                                                                                                                                                                                                                                               | What it holds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [types.ts](types.ts)                                                                                                                                                                                                                                                                                                                               | `Services`, one property per area, and the shapes every method shares (`ActionResult`, `ReadResult`, `Changed`, `Unsettled`).                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| [results.ts](results.ts)                                                                                                                                                                                                                                                                                                                           | `ReadResult`, `ReadRefusal` (400/401/403/404/409) and `refusal()`: a read's answer. [api/reads.ts](../api/reads.ts) turns one into a route's response.                                                                                                                                                                                                                                                                                                                                                                                                |
+| [options.ts](options.ts)                                                                                                                                                                                                                                                                                                                           | What an implementation is built with: its `Clock`, and `TestHooks` only tests set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [index.ts](index.ts)                                                                                                                                                                                                                                                                                                                               | `services()`: the implementation `STENCIL_BACKEND` names ([config.ts](../config.ts)), built once. The only way the BFF reaches the backend.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| [review.ts](review.ts), [versions.ts](versions.ts), [templates.ts](templates.ts), [drafts.ts](drafts.ts), [comments.ts](comments.ts), [access.ts](access.ts), [platform.ts](platform.ts), [notifications.ts](notifications.ts), [audit.ts](audit.ts), [usage.ts](usage.ts), [render.ts](render.ts), [identity.ts](identity.ts), [demo.ts](demo.ts) | One interface per area: what each method promises, its input, its answer, and its refusals in order. A result whose facts aren't settled yet is `Unsettled<"P4a: …">`, naming the package that settles it.                                                                                                                                                                                                                                                                                                                                            |
+| [refuse.ts](refuse.ts)                                                                                                                                                                                                                                                                                                                             | `refuse`, `check`, `permit`, `RefusalError`, `answerFor`: how an implementation stops a command with a refusal and undoes its writes.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| [not-moved.ts](not-moved.ts)                                                                                                                                                                                                                                                                                                                       | `notMoved`, `notMovedArea`: what a method answers while its area still runs outside the seam (it throws; nothing calls it).                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| [local/](local/)                                                                                                                                                                                                                                                                                                                                   | The local implementation: [command.ts](local/command.ts) (`runCommand`, the command kit), [review.ts](local/review.ts), [versions.ts](local/versions.ts), [index.ts](local/index.ts) (`localServices`), and [contract-harness.ts](local/contract-harness.ts) for the contract suite. The version reads and compare-and-set the review commands share are in [version-rows.ts](../version-rows.ts) until the last legacy review action moves (plan P1).                                                                                                |
+| [fake/](fake/)                                                                                                                                                                                                                                                                                                                                     | The in-memory fake: [state.ts](fake/state.ts) (the tables, seeded from the same seed), [store.ts](fake/store.ts) (a command's writes and their undo), [rows.ts](fake/rows.ts) (lookups and the compare-and-set), [effects.ts](fake/effects.ts), [sweeps.ts](fake/sweeps.ts), [consumer-api.ts](fake/consumer-api.ts) (the notices `/api/v1` serves), one file per area, [index.ts](fake/index.ts), and the test support: [testing.ts](fake/testing.ts) for BFF command tests, [contract-harness.ts](fake/contract-harness.ts) for the contract suite. |
+| [contract/](contract/)                                                                                                                                                                                                                                                                                                                             | The contract suite: [harness.ts](contract/harness.ts) (what an implementation provides to run it), the cases per area ([review.ts](contract/review.ts), [versions.ts](contract/versions.ts)), their runners (`*.test.ts`), and [agreement.test.ts](contract/agreement.test.ts).                                                                                                                                                                                                                                                                       |
 
 The request context the methods take is [src/server/context/request.ts](../context/request.ts).
 
 ## The request context
 
-`findRequestContext()` reads, once per request, who is asking (the viewer), the request's instant (`now`, on the
-demo clock), a correlation id, and a credential slot an HTTP implementation will fill with the user's token for the
-Java API (the sign-in work decides how). It is the one place the BFF reads the persona and the clock: a service never
-reads a cookie, the viewer or the time itself.
+`findRequestContext()` reads, once per request, who is asking (the viewer, from the sign-in stand-in in
+[viewer.ts](../viewer.ts)), a correlation id, and a credential slot an HTTP implementation will fill with the user's
+token for the Java API (the sign-in work decides how). It is the one reader of the persona cookie: a service never
+reads a cookie or the viewer itself. A server action or a route reads it once at its top and passes it down (outside a
+render, React's `cache` doesn't memoize).
 
-It fails closed: with no viewer there is no context. An action answers `signed_out`, a read route 401, a page the Not
-found page (`requestContextOrRefusal`, `requireRequestContext`). It never stands in a default person; the persona
-cookie's fallback to Maya is the sign-in stand-in's (handoff review S2) and goes with real sign-in.
+It carries **no time**. The backend dates its own writes by its own clock, and a read that decides anything by time
+(a sunset passed, renders in the last 30 days, today in the business zone, `can`) answers the instant it decided at,
+`asOf`, which the BFF words its dates from.
+
+It **fails closed**: with no viewer there is no context. An action answers `signed_out`, a read route 401, a page goes to
+the sign-in hook (`signInRequired()` in [context/sign-in.ts](../context/sign-in.ts), the one place real sign-in plugs
+in). With `DEMO_MODE` off, a missing or unknown persona cookie is signed out; only the demo falls back to Maya.
 
 ## How the BFF calls a service
 
@@ -69,81 +78,101 @@ cookie's fallback to Maya is the sign-in stand-in's (handoff review S2) and goes
   ```
 
 - **A read model** (a page's data) reads `requireRequestContext()`, asks the service for facts, and words and lays
-  them out: labels, sentences, people, grouping. It decides nothing. `getVersions` in
-  [queries/versions.ts](../queries/versions.ts) over `VersionService.history`.
-- **A GET route** (a read a screen makes on demand) reads `requestContextOrRefusal()`, calls the service's read, and
-  answers its `ReadResult` with `readResponse()` ([api/reads.ts](../api/reads.ts)).
-- **Autosave** reads the body and prepares the documents in the route, then calls `DraftService.save`.
+  them out with a pure function (labels, sentences, people, grouping); it decides nothing. `getVersions` in
+  [queries/versions.ts](../queries/versions.ts) over `VersionService.history`, shaped by `versionsData(history)`.
+  Call services from a `cache`d read model with primitive arguments, so one render asks once.
+- **A GET route** (a read a screen makes on demand) reads `requestContextOrRefusal()` (401 without a viewer), calls
+  the service's read, and answers its `ReadResult` with `readResponse()` ([api/reads.ts](../api/reads.ts)).
+- **Autosave** reads the body and prepares the documents in the route, then calls `DraftService.save`. **New template
+  and Import** build and prepare the draft in the BFF (the starters, the importer) and hand it to `templates.create`
+  or `templates.createImported`: the backend stores documents, it doesn't build them.
 
 A refusal crosses the seam as `{ ok: false, code, reason }`. The code is the contract
 ([decision 0025](../../../docs/decisions/0025-refusals-carry-stable-codes.md)); the reason is the BFF's sentence,
 which the HTTP implementation will word from the code (and the facts the Java API sends with it).
 
-## The local implementation
+## The rules
 
-Today's Drizzle code, moved behind the interfaces, calling `src/domain` for every decision. A command runs on
-`runCommand` ([local/command.ts](local/command.ts)): `authorize` reads what the input names outside a transaction and
-checks the permission; `transaction` re-reads, asks the domain transition, writes with a compare-and-set, and writes
-the effects through [effects.ts](../effects.ts), all in one `inTransaction`. It dates everything by the context's
-`now`.
-
-Only the local implementation, [db/](../db/) and the seed import Drizzle or the database client. A lint rule
-(`@typescript-eslint/no-restricted-imports` in [eslint.config.mjs](../../../eslint.config.mjs)) warns everywhere
-else; its warnings are the list of what hasn't moved yet. Schema row types may be imported as types.
+- **Facts only across the seam**: ids, ISO instants, `YYYY-MM-DD` days, codes, decided `PermissionResult`s, `Person`
+  lists for the ids a screen names. No English but a refusal's reason, no app URLs. Lint forbids the interface files
+  from importing the BFF's view models and modules (`@/server/queries`, `@/domain/{access,golive,import}-types`, …).
+- **`services()` is the only way in.** Lint forbids importing `services/local` or `services/fake` anywhere but
+  [index.ts](index.ts), `/api/v1`, the seed, the reset and tests, and confines Drizzle to the local implementation,
+  `src/server/db` and the seed. `SEAM_NOT_YET` in [eslint.config.mjs](../../../eslint.config.mjs) is the ratchet: the
+  files still on the database, where the rule only warns. Delete a line when you clear a file.
+- **A rule both implementations need lives in `src/domain`.** An `if` that would appear in both `local/` and `fake/`
+  belongs in the domain first (`sunsetUnchanged`, `notificationRecipients`, `versionActions`).
+- **Every compare-and-set has a contract case** through `TestHooks.beforeCompareAndSet`, and a lost one is
+  `version_changed`.
 
 `/api/v1` is the backend's own API, not the BFF's: after the port the Java API serves it to consumers directly. Its
-route handlers are the local implementation's HTTP surface and will call the local implementation directly.
+route handlers are the local implementation's HTTP surface and may call the local implementation directly.
+
+## The local implementation
+
+Today's Drizzle code, moved behind the interfaces, calling `src/domain` for every decision. `localServices({ clock,
+hooks })` builds it; `services()` builds it with the demo clock ([clock.ts](../clock.ts)) and no hooks. A command runs
+on `runCommand` ([local/command.ts](local/command.ts)): `authorize` reads what the input names outside a transaction
+and checks the permission; then the clock, once; then `transaction` re-reads, asks the domain, writes with a
+compare-and-set, and writes the effects through [effects.ts](../effects.ts), all in one `inTransaction`.
 
 ## The fake
 
 [fake/](fake/) implements the same interfaces over arrays, running the same domain rules
 ([decision 0068](../../../docs/decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)). Its data is
 the seed, built in memory in the order `seedDatabase` builds it, so the template ids and everything else match the
-database's. A command runs synchronously inside `FakeStore.command`: JavaScript runs it to the end before another
-starts, and a refusal (or a bug) undoes its writes. Read and write through the `FakeTx` it hands you.
+database's. A command reads the clock, then runs synchronously inside `FakeStore.command`: JavaScript runs it to the
+end before another starts, and a refusal (or a bug) undoes its writes. Read and write through the `FakeTx` it hands you.
 
-BFF tests run on it ([fake/testing.ts](fake/testing.ts)):
+It stays **slim**: every command is implemented in full, and a read only where a contract case must observe a command.
+That is the price of BFF tests without a database, and a cost the Node team keeps as the backend changes (decision
+0072 says so); the contract suite keeps it honest.
+
+BFF tests of commands run on it ([fake/testing.ts](fake/testing.ts)):
 
 ```ts
 vi.mock("@/server/services", () => import("@/server/services/fake/testing"));
 vi.mock("@/server/context/request", () => import("@/server/services/fake/testing"));
-const backend = fakeBackendPerTest({ base: BASE }); // a copy of the seeded fake for every test
-backend.as("alex"); // the request context from here on
+const backend = fakeBackendPerTest({ base: BASE }); // a copy of the seeded fake for every test, clock at BASE
+backend.as("alex"); // who is asking from here on
 expect(await setSunset({ … })).toEqual({ ok: true });
 ```
 
-See [actions/review.fake.test.ts](../actions/review.fake.test.ts) and [queries/versions.test.ts](../queries/versions.test.ts).
-A BFF test checks what the BFF adds: the parse, the answer's shape, what refreshes, the wording and the layout. What
-the service decides belongs to the contract suite.
+See [actions/review.fake.test.ts](../actions/review.fake.test.ts). A read model's tests hand facts straight to its
+shaping function ([queries/versions.test.ts](../queries/versions.test.ts)). Either checks only what the BFF adds: the
+parse, the answer's shape, what refreshes, the wording and the layout. What the service decides belongs to the
+contract suite.
 
 ## The contract suite
 
 One set of behavioural cases per area ([contract/](contract/)), written against the interfaces and run against every
 implementation: the fake and the local one today, the Java API (through the HTTP implementation, against a test
-environment) later. A case starts from the seed, acts only through the services, travels in time by asking for a
-context at a later instant (`harness.as(userId, at)`; the Java API's test-only clock offset), and reads what a command
-wrote that no read serves yet (audit rows, consumer notices, notifications) through the probe. It covers what
-implementations get wrong: the refusal codes and their order, a double click at the same moment, notices numbered in
-commit order, and every decided `can`. [contract/agreement.test.ts](contract/agreement.test.ts) compares the fake's and
-the local implementation's reads of the whole seeded world, field for field.
+environment) later. A case starts from the seed, sets the backend's clock to an exact instant (`setClock`; Java's
+test clock must allow it, decision 0068), acts only through the services, and compares what the reads show before and
+after: never finds a write by its instant. It reads consumer notices through `/api/v1`, and what no read serves yet
+(audit rows, notifications) through the probe, which answers facts and goes when those reads move. Test hooks reach
+what a serializing database never shows: `hooks({ beforeCompareAndSet })` commits a competing write between a command's
+read and its write, and `runScheduledJobs(at)` runs the backend's sweeps at an instant. Refusals are compared by
+code; the sentence is the BFF's. [contract/agreement.test.ts](contract/agreement.test.ts) compares the fake's and the
+local implementation's history of every seeded template, field for field.
 
-To add a case, add it to the area's cases file; both runners pick it up. To run the suite against another
-implementation, give it a `ContractHarness` ([contract/harness.ts](contract/harness.ts)).
+To add a case, add it to the area's cases file; its runner runs it against both. One local harness per test file.
 
 ## Moving an area behind the seam
 
-1. Type its interface (already done for every area) and settle its read results as facts: ids, ISO instants, days,
-   codes, decided `PermissionResult`s, `Person` lists. No English but a refusal's reason; the BFF words the rest.
-2. Move its Drizzle code into `local/<area>.ts`, with the command steps on `runCommand` and the decisions from
-   `src/domain`. A rule still written in the server code moves into `src/domain` first.
-3. Write `fake/<area>.ts` over the fake's state, with the same steps and the same domain calls.
-4. Port its tests: what the service decides into `contract/<area>.ts` (run by `contract/<area>.test.ts`), what the
-   BFF adds into a test on the fake beside the action or read model.
-5. Point the action (`call`), the read model or the route at `services()`, delete the old code, and replace the area's
-   `notMoved`/`notMovedArea` entries in `local/index.ts` and `fake/index.ts`.
+1. Settle its interface: replace each `Unsettled<…>` with a facts type beside the interface (ids, ISO instants, days,
+   codes, decided `PermissionResult`s, `Person` lists; `asOf` on a read that decides by time).
+2. Move a rule the server code still writes into `src/domain` first.
+3. Move its Drizzle code into `local/<area>.ts`, commands on `runCommand`, dated by `deps.clock`.
+4. Write `fake/<area>.ts`: every command; a read only where a contract case must observe a command.
+5. Write the cases in `contract/<area>.ts` (+ runner): the refusal codes in order, a before/after diff of every write,
+   one compare-and-set case per guarded table, the scheduled jobs through `runScheduledJobs`.
+6. Point the action (`call`), the read model (a pure shaping function over the facts) or the route at `services()`;
+   port the BFF's own tests; delete the old code and its database tests; delete the files you cleared from
+   `SEAM_NOT_YET`; replace the area's `notMoved` entries in `local/index.ts` and `fake/index.ts`.
 
-| Area                                                                                                      | Behind the seam      |
-| --------------------------------------------------------------------------------------------------------- | -------------------- |
-| review                                                                                                    | `setSunset`          |
-| versions                                                                                                  | `history`            |
-| identity, clock, templates, drafts, comments, access, platform, notifications, audit, usage, render, demo | not yet (typed only) |
+| Area                                                                                               | Behind the seam |
+| -------------------------------------------------------------------------------------------------- | --------------- |
+| review                                                                                             | `setSunset`     |
+| versions                                                                                           | `history`       |
+| identity, templates, drafts, comments, access, platform, notifications, audit, usage, render, demo | not yet         |

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
-import { readResponse } from "@/server/api/reads";
+import { readResponse, signedOutResponse } from "@/server/api/reads";
+import { requestContextOrRefusal } from "@/server/context/request";
 import { loadVersionsToCompare } from "@/server/queries/compare";
-import { getViewer } from "@/server/viewer";
 
 // The Compare dialog's two versions, read when it opens and on each change of pair:
 // GET ?from=<version id>&to=<version id> → { ok: true, family, from, to } | { ok: false, code, reason }, with 400, 403
@@ -12,7 +12,9 @@ export async function GET(
   request: NextRequest,
   ctx: RouteContext<"/api/templates/[templateId]/compare">,
 ) {
-  const viewer = await getViewer();
+  const context = await requestContextOrRefusal();
+  if (!context.ok) return signedOutResponse();
+  const { viewer } = context.context;
   const { templateId } = await ctx.params;
   const query = request.nextUrl.searchParams;
   return readResponse(

@@ -1,11 +1,14 @@
 import "server-only";
-import { and, eq, gte, inArray, max } from "drizzle-orm";
+import { and, eq, gte, inArray, max, type SQL } from "drizzle-orm";
 import { noticeAudienceSince } from "@/domain/golive/audience";
-import type {
-  LifecycleEffect,
-  NotificationLink,
-  Recipients,
-} from "@/domain/review-types";
+import {
+  linkMayMove,
+  notificationRecipients,
+  recipientLink,
+  type RecipientFacts,
+  type RecipientMembership,
+} from "@/domain/recipients";
+import type { LifecycleEffect } from "@/domain/review-types";
 import type { Db } from "@/server/db/client";
 import {
   auditEvents,
@@ -120,45 +123,41 @@ export async function writeEffects(
       }
 
       case "notification": {
-        const userIds = (
-          await resolveRecipients(tx, effect.to, ctx.teamId)
-        ).filter((id) => id !== ctx.actorId);
+        // Who it reaches and where each link opens are the domain's rules (domain/recipients.ts); this reads
+        // the facts they need.
+        const members =
+          effect.to.kind === "team_role"
+            ? await membershipsWhere(tx, eq(memberships.teamId, ctx.teamId))
+            : [];
+        const userIds = notificationRecipients(
+          effect.to,
+          ctx.teamId,
+          members,
+          ctx.actorId,
+        );
         if (userIds.length === 0) break;
         const teamSlug = await teamSlugOf();
-        // A stage reviewer outside the template's team opens the version from their own space: a review
-        // link moves there, and a template link that names a version becomes that version's review.
-        const link = effect.link;
-        const outsideReview: NotificationLink | null =
-          link.to === "template" && link.reviewVersion !== undefined
-            ? {
-                to: "review",
-                templateId: link.templateId,
-                versionNumber: link.reviewVersion.number,
-                round: link.reviewVersion.round,
-              }
-            : null;
-        const spaces =
-          link.to === "review" || outsideReview
-            ? await recipientSpaces(tx, userIds, teamSlug)
-            : null;
-        const hrefFor = (userId: string): string => {
-          const own = spaces?.get(userId);
-          return own
-            ? notificationHref(own, outsideReview ?? link)
-            : notificationHref(teamSlug, link);
-        };
+        const people = linkMayMove(effect.link)
+          ? await recipientFacts(tx, userIds)
+          : new Map<string, RecipientFacts>();
         await tx.insert(notifications).values(
-          userIds.map((userId) => ({
-            id: newId("nt"),
-            userId,
-            teamId: ctx.teamId,
-            kind: effect.notification,
-            title: effect.title,
-            body: effect.body ?? null,
-            href: hrefFor(userId),
-            createdAt,
-            readAt: null,
-          })),
+          userIds.map((userId) => {
+            const person = people.get(userId);
+            const opens = person
+              ? recipientLink(person, teamSlug, effect.link)
+              : { teamSlug, link: effect.link };
+            return {
+              id: newId("nt"),
+              userId,
+              teamId: ctx.teamId,
+              kind: effect.notification,
+              title: effect.title,
+              body: effect.body ?? null,
+              href: notificationHref(opens.teamSlug, opens.link),
+              createdAt,
+              readAt: null,
+            };
+          }),
         );
         written.notifications += userIds.length;
         break;
@@ -217,78 +216,62 @@ async function versionName(
   return rows[0]?.name ?? ctx.templateId;
 }
 
-/**
- * The space each recipient opens a review link in: the template's team when they can see it (an
- * active membership there, or a platform role); otherwise their own first space by name, as the
- * team switcher lists it (a stage that names someone outside the team: `requireReviewVersion`).
- */
-async function recipientSpaces(
+/** Memberships, with their team and roles, as the recipient rules read them. */
+async function membershipsWhere(
+  tx: Tx,
+  where: SQL,
+): Promise<RecipientMembership[]> {
+  const rows = await tx
+    .select({
+      id: memberships.id,
+      userId: memberships.userId,
+      status: memberships.status,
+      teamId: teams.id,
+      teamSlug: teams.slug,
+      teamName: teams.name,
+    })
+    .from(memberships)
+    .innerJoin(teams, eq(teams.id, memberships.teamId))
+    .where(where);
+  const roles = rows.length
+    ? await tx
+        .select()
+        .from(membershipRoles)
+        .where(
+          inArray(
+            membershipRoles.membershipId,
+            rows.map((r) => r.id),
+          ),
+        )
+    : [];
+  return rows.map(({ id, ...m }) => ({
+    ...m,
+    roles: roles.filter((r) => r.membershipId === id).map((r) => r.role),
+  }));
+}
+
+/** Each recipient's platform role and memberships: where their links open (`recipientLink`). */
+async function recipientFacts(
   tx: Tx,
   userIds: readonly string[],
-  teamSlug: string,
-): Promise<Map<string, string>> {
-  const [people, rows] = await Promise.all([
+): Promise<Map<string, RecipientFacts>> {
+  const [people, held] = await Promise.all([
     tx
       .select({ id: users.id, platformRole: users.platformRole })
       .from(users)
       .where(inArray(users.id, [...userIds])),
-    tx
-      .selectDistinct({
-        userId: memberships.userId,
-        slug: teams.slug,
-        name: teams.name,
-      })
-      .from(memberships)
-      .innerJoin(teams, eq(teams.id, memberships.teamId))
-      .innerJoin(
-        membershipRoles,
-        eq(membershipRoles.membershipId, memberships.id),
-      )
-      .where(
-        and(
-          inArray(memberships.userId, [...userIds]),
-          eq(memberships.status, "active"),
-        ),
-      ),
+    membershipsWhere(tx, inArray(memberships.userId, [...userIds])),
   ]);
-  const spaces = new Map<string, string>();
-  for (const userId of userIds) {
-    if (people.find((p) => p.id === userId)?.platformRole) continue;
-    const mine = rows.filter((r) => r.userId === userId);
-    if (mine.length === 0 || mine.some((r) => r.slug === teamSlug)) continue;
-    spaces.set(
-      userId,
-      [...mine].sort((a, b) => a.name.localeCompare(b.name))[0]!.slug,
-    );
-  }
-  return spaces;
-}
-
-/** The users a notification goes to, before the actor is taken out. Sorted, without repeats. */
-export async function resolveRecipients(
-  tx: Tx,
-  to: Recipients,
-  teamId: string,
-): Promise<string[]> {
-  if (to.kind === "user") return [to.userId];
-  const rows = await tx
-    .select({ userId: memberships.userId })
-    .from(memberships)
-    .innerJoin(
-      membershipRoles,
-      eq(membershipRoles.membershipId, memberships.id),
-    )
-    .where(
-      and(
-        eq(memberships.teamId, teamId),
-        eq(memberships.status, "active"),
-        eq(membershipRoles.role, to.role),
-      ),
-    );
-  const except = new Set(to.exceptUserIds ?? []);
-  return [...new Set(rows.map((r) => r.userId))]
-    .filter((id) => !except.has(id))
-    .sort();
+  return new Map(
+    people.map((p) => [
+      p.id,
+      {
+        userId: p.id,
+        platformRole: p.platformRole ?? null,
+        memberships: held.filter((m) => m.userId === p.id),
+      },
+    ]),
+  );
 }
 
 /** The settings row that holds the last `consumer_notices.seq` handed out. */

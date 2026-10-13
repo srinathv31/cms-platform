@@ -64,7 +64,9 @@ export async function switchPersona(
     .where(eq(users.id, personaId));
   revalidatePath("/", "layout");
 
-  const viewer = await getViewer(); // first read in this request: reflects the new cookie
+  // First read in this request: reflects the new cookie, which names a seeded persona (checked above).
+  const viewer = await getViewer();
+  if (!viewer) throw new Error(`Persona ${personaId} isn't a user.`);
   const fallback = defaultSpace(viewer);
   const home = (fallback ? `/${fallback}/library` : "/request-access") as Route;
   const segment = firstSegment(currentPath);

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
-import { readResponse } from "@/server/api/reads";
+import { readResponse, signedOutResponse } from "@/server/api/reads";
+import { requestContextOrRefusal } from "@/server/context/request";
 import { searchPalette } from "@/server/queries/palette";
-import { getViewer } from "@/server/viewer";
 
 // The ⌘K palette's search, asked when it opens and as the viewer types:
 // GET ?q=<what was typed>&template=<the template whose pages they are on> →
@@ -12,7 +12,9 @@ export async function GET(
   request: NextRequest,
   ctx: RouteContext<"/api/palette/[space]">,
 ) {
-  const viewer = await getViewer();
+  const context = await requestContextOrRefusal();
+  if (!context.ok) return signedOutResponse();
+  const { viewer } = context.context;
   const { space } = await ctx.params;
   const query = request.nextUrl.searchParams;
   return readResponse(

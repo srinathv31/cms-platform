@@ -1,22 +1,19 @@
-// Team access: asking for a role, deciding requests, the members table, recertification and inactivity.
-// Each command runs the access sweeps first, in their own transaction, once its permission has passed
-// (`accessAction` in src/server/actions/access.ts); after the port the sweeps are the backend's scheduled jobs.
+// Team access: asking for a role, deciding requests, the members table, recertification and inactivity. The
+// deadlines (recertification lapses, the inactivity flag and suspension) are the backend's scheduled jobs; the
+// local implementation also runs them before each access command, its own lazy trigger.
 //
-// Typed for step 2b from today's read models; they still run in src/server/actions/access.ts and
-// src/server/queries/access.ts.
+// Typed for step 2b: they still run in src/server/actions/access.ts and src/server/queries/access.ts.
 
-import type {
-  AccessRequestsSection,
-  InactivitySection,
-  MembersSection,
-  RecertDecision,
-  RecertificationSection,
-  RequestAccessData,
-  RequestableRole,
-  SidebarCardModel,
-} from "@/domain/access-types";
 import type { TeamRole } from "@/domain/types";
-import type { ActionResult, ReadResult, RequestContext } from "./types";
+import type {
+  ActionResult,
+  ReadResult,
+  RequestContext,
+  Unsettled,
+} from "./types";
+
+/** A role a person may ask for: Team Admins are appointed, never requested. */
+export type RequestableRole = "viewer" | "author" | "approver";
 
 export interface AccessService {
   requestAccess(
@@ -49,7 +46,7 @@ export interface AccessService {
   ): Promise<ActionResult>;
   decideRecertItem(
     ctx: RequestContext,
-    input: { recertId: string; userId: string; decision: RecertDecision },
+    input: { recertId: string; userId: string; decision: "keep" | "remove" },
   ): Promise<ActionResult>;
   startRecertification(
     ctx: RequestContext,
@@ -57,27 +54,31 @@ export interface AccessService {
   ): Promise<ActionResult<{ recertId: string }>>;
 
   /** The request-access page: the teams the viewer may ask to join, and their own requests. */
-  requestAccessData(ctx: RequestContext): Promise<RequestAccessData>;
+  requestAccessData(
+    ctx: RequestContext,
+  ): Promise<ReadResult<Unsettled<"P4b: the request-access facts">>>;
   members(
     ctx: RequestContext,
     input: { teamId: string },
-  ): Promise<ReadResult<{ section: MembersSection }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the members table's facts">>>;
   requests(
     ctx: RequestContext,
     input: { teamId: string },
-  ): Promise<ReadResult<{ section: AccessRequestsSection }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the access requests' facts">>>;
   recertification(
     ctx: RequestContext,
     input: { teamId: string },
-  ): Promise<ReadResult<{ section: RecertificationSection }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the recertification's facts">>>;
   inactivity(
     ctx: RequestContext,
     input: { teamId: string },
-  ): Promise<ReadResult<{ section: InactivitySection }>>;
-  /** The one dismissible sidebar card per space, keyed by team id. */
+  ): Promise<ReadResult<Unsettled<"P4b: the inactivity facts">>>;
+  /** The one dismissible sidebar card per space, by team id. */
   sidebarCards(
     ctx: RequestContext,
-  ): Promise<Record<string, SidebarCardModel | null>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the sidebar cards' facts">>>;
   /** The card for a viewer with no space yet (their pending request). */
-  homeCard(ctx: RequestContext): Promise<SidebarCardModel | null>;
+  homeCard(
+    ctx: RequestContext,
+  ): Promise<ReadResult<Unsettled<"P4b: the home card's facts">>>;
 }

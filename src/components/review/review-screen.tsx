@@ -4,7 +4,7 @@ import { parseRoundParam } from "@/domain/rounds";
 import { now } from "@/server/clock";
 import { getReviewScreen } from "@/server/queries/review";
 import { getPeople, personOf } from "@/server/queries/review-shared";
-import { getViewer } from "@/server/viewer";
+import { requireRequestContext } from "@/server/context/request";
 import { RV } from "./review-grid";
 import { ReviewSkeleton } from "./review-skeleton";
 import { ReviewWorkspace } from "./review-workspace";
@@ -27,7 +27,7 @@ async function ReviewData({
   const data = await getReviewScreen(team, templateId, Number(version), round);
   const nowDate = await now();
   // Who is looking, for the comments they write (shown with their name at once, before the server confirms them).
-  const viewer = await getViewer();
+  const { viewer } = await requireRequestContext();
   const me = personOf(await getPeople(), viewer.userId);
   // A different version or round is a different screen: its own document, threads and dialogs.
   return (

@@ -1,23 +1,25 @@
-// The audit log as people read it: the Audit page of a space, its CSV export, and one template's Activity tab.
-// The log is the system of record (decision 0066); these read it and never write.
+// The audit log as people read it: the Audit page of a space, the rows its CSV export writes (the BFF words
+// them into the file), and one template's Activity tab. The log is the system of record (decision 0066); these
+// read it and never write.
 //
 // Typed for step 2b: they still run in src/server/queries/audit.ts and src/server/queries/activity.ts.
 
-import type { AuditFilters, AuditPageData } from "@/domain/access-types";
-import type { ActivityItem } from "@/server/queries/activity";
-import type { ReadResult, RequestContext } from "./types";
+import type { ReadResult, RequestContext, Unsettled } from "./types";
+
+/** The Audit page's filters: by team id (never slug), person, action, template and day range. */
+export type AuditFilters = Unsettled<"P4b: the audit filters, by team id">;
 
 export interface AuditService {
   page(
     ctx: RequestContext,
     input: { teamId: string | null; filters: AuditFilters },
-  ): Promise<ReadResult<{ page: AuditPageData }>>;
-  export(
+  ): Promise<ReadResult<Unsettled<"P4b: the audit page's facts">>>;
+  exportRows(
     ctx: RequestContext,
     input: { teamId: string | null; filters: AuditFilters },
-  ): Promise<ReadResult<{ filename: string; csv: string; count: number }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the audit events an export writes">>>;
   activity(
     ctx: RequestContext,
     input: { templateId: string },
-  ): Promise<ReadResult<{ items: ActivityItem[] }>>;
+  ): Promise<ReadResult<Unsettled<"P4a: the activity's facts">>>;
 }

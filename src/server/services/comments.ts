@@ -3,8 +3,12 @@
 //
 // Typed for step 2b: they still run in src/server/actions/comments.ts and src/server/queries/threads.ts.
 
-import type { ThreadView } from "@/server/queries/threads";
-import type { ActionResult, ReadResult, RequestContext } from "./types";
+import type {
+  ActionResult,
+  ReadResult,
+  RequestContext,
+  Unsettled,
+} from "./types";
 
 export interface CommentService {
   add(
@@ -37,5 +41,5 @@ export interface CommentService {
   threads(
     ctx: RequestContext,
     input: { templateId: string; versionId?: string },
-  ): Promise<ReadResult<{ threads: ThreadView[] }>>;
+  ): Promise<ReadResult<Unsettled<"P4a: the threads' facts">>>;
 }

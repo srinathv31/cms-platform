@@ -8,7 +8,7 @@ import {
 } from "@/server/drafts/parse-patch";
 import { draftAccessRefusal, saveDraft } from "@/server/drafts/save-draft";
 import { readBodyCapped } from "@/server/api/read-body";
-import { getViewer } from "@/server/viewer";
+import { requestContextOrRefusal } from "@/server/context/request";
 
 // Autosave. A route handler rather than a server action because actions run one at a time per
 // client, which would queue saves behind a slow one. Request-time only: it reads the persona cookie.
@@ -32,7 +32,9 @@ export async function PUT(
   { params }: { params: Promise<{ versionId: string }> },
 ) {
   const { versionId } = await params;
-  const viewer = await getViewer();
+  const context = await requestContextOrRefusal();
+  if (!context.ok) return respond(context);
+  const { viewer } = context.context;
 
   // Permission first, before a byte of the body is read.
   const refused = await draftAccessRefusal(viewer, versionId);

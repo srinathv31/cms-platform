@@ -48,7 +48,7 @@ import {
   loadVersion,
   updateVersion,
   type FoundVersion,
-} from "@/server/services/local/version-rows";
+} from "@/server/version-rows";
 import type { Changed } from "@/server/services/types";
 import { draftRow } from "@/server/templates/create";
 import { check, refuse, serverAction, type CommitContext } from "./kit";
@@ -60,7 +60,7 @@ import { check, refuse, serverAction, type CommitContext } from "./kit";
 //
 // `setSunset` runs behind the service interfaces: it parses its input and calls `services().review`, which
 // does the rest (src/server/services/local/review.ts). The others still run here on the server action kit
-// (kit.ts), with the version helpers the local implementation shares (services/local/version-rows.ts):
+// (kit.ts), with the version helpers the local implementation shares (src/server/version-rows.ts):
 //   1. `authorize`: the version (or the template), read only to learn its team and its people, and
 //      `check` on that team. An unknown one is refused like a forbidden one, and then as gone;
 //   2. ONE transaction that re-reads the version, asks the domain transition (domain/lifecycle/),

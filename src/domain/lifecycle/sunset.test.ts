@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { REFUSALS } from "./refusals";
-import { setSunset, sweepSunsets, type SunsetFacts } from "./sunset";
+import {
+  setSunset,
+  sunsetUnchanged,
+  sweepSunsets,
+  type SunsetFacts,
+} from "./sunset";
 import { VERSION_STATES } from "../types";
 import {
   NOW,
@@ -359,5 +364,40 @@ describe("sweepSunsets", () => {
       expect(sweep([facts({ state })]), state).toEqual([]);
     }
     expect(sweep([facts({ number: null })])).toEqual([]);
+  });
+});
+
+describe("sunsetUnchanged", () => {
+  const superseded = { state: "superseded" as const, sunsetAt: MARCH_1 };
+
+  it("is the day the version already has, while it can still be moved", () => {
+    expect(sunsetUnchanged(superseded, MARCH_1_DAY, ZONE, NOW)).toBe(true);
+    expect(sunsetUnchanged(superseded, TOMORROW_DAY, ZONE, NOW)).toBe(false);
+    expect(
+      sunsetUnchanged(
+        { ...superseded, sunsetAt: null },
+        MARCH_1_DAY,
+        ZONE,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("is no repeat once the sunset has passed, or for a version that isn't Superseded", () => {
+    expect(sunsetUnchanged(superseded, MARCH_1_DAY, ZONE, MARCH_1)).toBe(false);
+    expect(
+      sunsetUnchanged(
+        { ...superseded, state: "active" },
+        MARCH_1_DAY,
+        ZONE,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("reads the day in the zone: the same day in another zone is another instant", () => {
+    expect(
+      sunsetUnchanged(superseded, MARCH_1_DAY, "America/Los_Angeles", NOW),
+    ).toBe(false);
   });
 });

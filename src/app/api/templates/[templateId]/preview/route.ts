@@ -8,7 +8,7 @@ import {
   renderSuccessResponse,
 } from "@/server/api/render-http";
 import { renderTemplate } from "@/server/render/render-template";
-import { getViewer } from "@/server/viewer";
+import { findRequestContext } from "@/server/context/request";
 
 // Stencil's own preview of a version or the open draft: POST { version: "draft" | n, round?, channel,
 // platform?, values, encoding? } → the render engine's output for the signed-in person, with the same
@@ -16,7 +16,7 @@ import { getViewer } from "@/server/viewer";
 // (src/domain/render/types.ts), plus `X-Stencil-Preview: true`. The consumer API is POST
 // /api/v1/templates/{id}/render and serves consumers only (decision 0047).
 //
-// The person comes from the session (`getViewer()`), never from a header the caller names, and may
+// The person comes from the session (the request context), never from a header the caller names, and may
 // preview what `previewAllowed` says (render-template.ts): the template's team, the stage a version in
 // review waits on, or a decider with active access. Any state previews: a draft, a version in review,
 // a revoked or a Superseded one. Every request that reaches a known version is logged as a preview
@@ -34,8 +34,9 @@ export async function POST(
 ) {
   const { templateId } = await ctx.params;
   const correlationId = correlationIdOf(request);
-  // The person first, before a byte of the body is read (as drafts and imports do).
-  const viewer = await getViewer();
+  // The person first, before a byte of the body is read (as drafts and imports do). Nobody signed in is no
+  // viewer, which the pipeline refuses as 403 `preview_forbidden`, in the render API's error shape.
+  const viewer = (await findRequestContext())?.viewer ?? null;
 
   const read = await readRenderRequest(request);
   if (!read.ok) return errorResponse(read.error, correlationId);

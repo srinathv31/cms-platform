@@ -1,220 +1,332 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
-import { fakeBackendPerTest } from "@/server/services/fake/testing";
-import { getVersions } from "./versions";
+import type { VersionActions } from "@/domain/lifecycle/version-actions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { ContractChange } from "@/domain/types";
+import type { VersionFacts, VersionHistory } from "@/server/services/versions";
+import { getVersions, versionsData } from "./versions";
 
-// The Versions tab's read model as the BFF builds it, against the in-memory fake (decision 0068): the
-// timeline's layout (a number once, as its head, with its rounds), the labels and contract lines it words,
-// the people it names, and the Not found answers. What the service decides (the `can` results, the sunset's
-// day, which row is a number's head) is the contract suite's (src/server/services/contract/versions.ts).
-//
-// The seed at BASE: Cash Back v3 in review on round 2, v2 Active, v1 Superseded; High-Yield Savings
-// (Deposits) v2 Active on round 3, v1 Superseded; Annual Fee Waiver v1 sent back, with an open draft;
-// Balance Transfer v1 Superseded under v2; Holiday Points v1 Revoked.
+// The Versions tab's read model as the BFF builds it: facts in (VersionHistory, what the service answers),
+// the timeline out. `versionsData` is pure, so its tests hand it facts directly; what the service decides (the
+// `can` results, the sunset's day, which row is a number's head) is the contract suite's
+// (src/server/services/contract/versions.ts). `getVersions` is checked for what it adds: the space, Not found,
+// and sign-in.
 
-vi.mock("@/server/services", () => import("@/server/services/fake/testing"));
-vi.mock(
-  "@/server/context/request",
-  () => import("@/server/services/fake/testing"),
-);
-// The space guard still reads the database (spaces move behind the services with B1): here it resolves the
-// slug against the fake's teams.
+const env = vi.hoisted(() => ({
+  signedIn: true,
+  history: undefined as unknown,
+}));
+vi.mock("@/server/context/request", async () => {
+  const { signInRequired } = await import("@/server/context/sign-in");
+  return {
+    requireRequestContext: async () =>
+      env.signedIn
+        ? { viewer: { userId: "jordan" }, correlationId: "req_test" }
+        : signInRequired(),
+  };
+});
+vi.mock("@/server/services", () => ({
+  services: () => ({ versions: { history: async () => env.history } }),
+}));
 vi.mock("./spaces", () => ({
-  requireSpace: async (slug: string) => {
-    const team = backend.state.teams.find((t) => t.slug === slug);
-    return {
-      slug,
-      isAll: slug === "all",
-      teamId: team?.id ?? null,
-      name: team?.name ?? "All teams",
-    };
-  },
+  requireSpace: async (slug: string) => ({
+    slug,
+    isAll: slug === "all",
+    teamId: slug === "all" ? null : `t_${slug}`,
+    name: slug,
+  }),
 }));
 
-const BASE = new Date("2026-10-04T12:00:00.000Z");
 const NOT_FOUND = /NEXT_HTTP_ERROR_FALLBACK;404/;
-const backend = fakeBackendPerTest({ base: BASE });
+const ASOF = "2026-10-04T12:00:00.000Z";
+const ALL_OK: VersionActions = {
+  setSunset: { ok: true },
+  startRevoke: { ok: true },
+  confirmRevoke: { ok: true },
+  cancelRevoke: { ok: true },
+};
 
-describe("getVersions", () => {
-  it("shows a number once, as its head, with every round in its review history, labelled", async () => {
-    backend.as("eli");
-    const highYield = await getVersions(
-      "deposits",
-      backend.templates["high-yield-savings"]!,
+/** One version row as the service answers it; a released head unless `over` says otherwise. */
+function row(
+  over: Partial<VersionFacts> & Pick<VersionFacts, "id">,
+): VersionFacts {
+  return {
+    number: 1,
+    round: 1,
+    state: "superseded",
+    head: true,
+    createdBy: "maya",
+    createdAt: "2026-09-01T12:00:00.000Z",
+    submittedBy: "maya",
+    submittedAt: "2026-09-02T12:00:00.000Z",
+    submitNote: null,
+    activatedAt: null,
+    supersededAt: null,
+    sunsetAt: null,
+    sunsetDay: null,
+    sunsetPassed: false,
+    revoke: null,
+    contractChanges: [],
+    decisions: [],
+    lastRenderAt: null,
+    renders30d: 0,
+    can: ALL_OK,
+    ...over,
+  };
+}
+
+function history(
+  versions: VersionFacts[],
+  over: Partial<VersionHistory> = {},
+): VersionHistory {
+  return {
+    asOf: ASOF,
+    template: {
+      id: "UC-AAAAAA",
+      teamId: "t_coral",
+      teamSlug: "coral",
+      name: "High-Yield Savings — Terms",
+    },
+    versions,
+    consumerUsage: [],
+    sunsetCalendar: { zone: "America/New_York", today: "2026-10-04" },
+    people: [
+      { id: "eli", name: "Eli Park", initials: "EP", hue: 10 },
+      { id: "naomi", name: "Naomi Ross", initials: "NR", hue: 20 },
+      { id: "maya", name: "Maya Chen", initials: "MC", hue: 30 },
+    ],
+    ...over,
+  };
+}
+
+const decided = (
+  kind: "approved" | "changes_requested",
+  by: string,
+  reason: string | null = null,
+) => ({
+  kind,
+  stageName: "Team approver",
+  by,
+  at: "2026-09-10T12:00:00.000Z",
+  reason,
+});
+
+describe("versionsData", () => {
+  it("shows a number once, as its head, with every round in its review history, labelled", () => {
+    const data = versionsData(
+      history([
+        row({
+          id: "v2r3",
+          number: 2,
+          round: 3,
+          state: "active",
+          submittedBy: "eli",
+          decisions: [decided("approved", "naomi")],
+        }),
+        row({
+          id: "v2r2",
+          number: 2,
+          round: 2,
+          state: "changes_requested",
+          head: false,
+          decisions: [decided("changes_requested", "naomi", "The preheader.")],
+        }),
+        row({
+          id: "v2r1",
+          number: 2,
+          round: 1,
+          state: "changes_requested",
+          head: false,
+          decisions: [decided("changes_requested", "naomi", "The limit.")],
+        }),
+        row({ id: "v1", number: 1, round: 1 }),
+      ]),
     );
     expect(
-      highYield.items.map((i) => [
-        i.number,
-        i.round,
-        i.label,
-        i.state,
-        i.approvedOnRound,
-      ]),
+      data.items.map((i) => [i.number, i.round, i.label, i.approvedOnRound]),
     ).toEqual([
-      [2, 3, "v2", "active", "Approved on round 3"],
-      [1, 1, "v1", "superseded", null],
+      [2, 3, "v2", "Approved on round 3"],
+      [1, 1, "v1", null],
     ]);
-    const [v2, v1] = highYield.items;
+    const [v2, v1] = data.items;
     expect(v1!.rounds, "one round: no history").toBeNull();
-    expect(v2!.decisions).toEqual([
-      expect.objectContaining({
-        kind: "approved",
-        by: expect.objectContaining({ id: "naomi", name: expect.any(String) }),
-      }),
-    ]);
-    expect(v2!.rounds).toEqual([
-      expect.objectContaining({
-        round: 3,
-        state: "active",
-        submittedBy: expect.objectContaining({ id: "eli" }),
-        decision: expect.objectContaining({
-          kind: "approved",
-          by: expect.objectContaining({ id: "naomi" }),
-          stageName: "Team approver",
-        }),
-      }),
-      expect.objectContaining({
-        round: 2,
-        state: "changes_requested",
-        decision: expect.objectContaining({
-          kind: "changes_requested",
-          reason: expect.stringContaining("preheader"),
-        }),
-      }),
-      expect.objectContaining({
-        round: 1,
-        state: "changes_requested",
-        decision: expect.objectContaining({
-          kind: "changes_requested",
-          reason: expect.stringContaining("withdrawal limit"),
-        }),
-      }),
+    expect(v2!.author).toEqual({
+      id: "eli",
+      name: "Eli Park",
+      initials: "EP",
+      hue: 10,
+    });
+    expect(
+      v2!.rounds!.map((r) => [r.round, r.decision?.kind, r.decision?.reason]),
+    ).toEqual([
+      [3, "approved", undefined],
+      [2, "changes_requested", "The preheader."],
+      [1, "changes_requested", "The limit."],
     ]);
     // Compare offers every row, the rounds included, newest first; it opens on the heads.
-    expect(
-      highYield.compareOptions.map((o) => [o.label, o.state, o.head]),
-    ).toEqual([
-      ["v2 · Round 3", "active", true],
-      ["v2 · Round 2", "changes_requested", false],
-      ["v2 · Round 1", "changes_requested", false],
-      ["v1", "superseded", true],
+    expect(data.compareOptions.map((o) => [o.label, o.head])).toEqual([
+      ["v2 · Round 3", true],
+      ["v2 · Round 2", false],
+      ["v2 · Round 1", false],
+      ["v1", true],
     ]);
+  });
 
-    backend.as("maya");
-    const cashBack = await getVersions(
-      "coral-offers",
-      backend.templates["cash-back"]!,
-    );
-    expect(
-      cashBack.items.map((i) => [i.number, i.round, i.label, i.state]),
-    ).toEqual([
-      [3, 2, "v3 · Round 2", "in_review"],
-      [2, 1, "v2", "active"],
-      [1, 1, "v1", "superseded"],
-    ]);
-    // A round in review has no closing decision yet.
-    expect(
-      cashBack.items[0]!.rounds?.map((r) => [
-        r.round,
-        r.state,
-        r.decision?.kind ?? null,
+  it("puts the open draft first, unlabelled, and leaves a round in review without a closing decision", () => {
+    const data = versionsData(
+      history([
+        row({
+          id: "draft",
+          number: null,
+          round: null,
+          state: "draft",
+          submittedBy: null,
+          submittedAt: null,
+        }),
+        row({
+          id: "v1r2",
+          number: 1,
+          round: 2,
+          state: "in_review",
+          decisions: [],
+        }),
+        row({
+          id: "v1r1",
+          number: 1,
+          round: 1,
+          state: "changes_requested",
+          head: false,
+          decisions: [decided("changes_requested", "naomi", "Fix it.")],
+        }),
       ]),
-    ).toEqual([
-      [2, "in_review", null],
-      [1, "changes_requested", "changes_requested"],
-    ]);
-
-    const waiver = await getVersions(
-      "coral-offers",
-      backend.templates["annual-fee-waiver"]!,
     );
-    expect(waiver.items.map((i) => [i.number, i.label, i.state])).toEqual([
+    expect(data.items.map((i) => [i.number, i.label, i.state])).toEqual([
       [null, null, "draft"],
-      [1, "v1 · Round 1", "changes_requested"],
+      [1, "v1 · Round 2", "in_review"],
     ]);
-    expect(waiver.compareOptions.map((o) => [o.label, o.head])).toEqual([
-      ["Draft", true],
-      ["v1 · Round 1", true],
+    expect(data.items[0]!.submittedAt).toBeUndefined();
+    expect(
+      data.items[1]!.rounds!.map((r) => [r.round, r.decision?.kind ?? null]),
+    ).toEqual([
+      [2, null],
+      [1, "changes_requested"],
+    ]);
+    expect(data.compareOptions.map((o) => o.label)).toEqual([
+      "Draft",
+      "v1 · Round 2",
+      "v1 · Round 1",
     ]);
   });
 
-  it("words each contract change as a line, flagged breaking or not", async () => {
-    backend.as("jordan");
-    const cashBack = await getVersions(
-      "coral-offers",
-      backend.templates["cash-back"]!,
-    );
-    const v3 = cashBack.items.find((i) => i.number === 3)!;
-    expect(v3.contractItems.length).toBeGreaterThan(0);
-    expect(v3.contractItems.map((c) => c.text)).toEqual(v3.contractLines);
-    expect(v3.contractItems).toContainEqual({
-      text: "v3 adds required `annual_fee` (Currency).",
+  it("words each contract change as a line, flagged breaking or not", () => {
+    const annualFee: ContractChange = {
+      kind: "added",
+      key: "annual_fee",
       breaking: true,
+      type: "currency",
+      required: true,
+    };
+    const [v3] = versionsData(
+      history([
+        row({
+          id: "v3",
+          number: 3,
+          state: "in_review",
+          contractChanges: [annualFee],
+        }),
+      ]),
+    ).items;
+    expect(v3!.contractItems).toEqual([
+      { text: "v3 adds required `annual_fee` (Currency).", breaking: true },
+    ]);
+    expect(v3!.contractLines).toEqual(v3!.contractItems.map((c) => c.text));
+  });
+
+  it("names people (a stand-in for a user that's gone), and reads a revoke with its people", () => {
+    const [revoked] = versionsData(
+      history([
+        row({
+          id: "v1",
+          state: "revoked",
+          submittedBy: "gone",
+          revoke: {
+            reason: "Wrong APR",
+            startedBy: "naomi",
+            startedAt: "2026-09-20T12:00:00.000Z",
+            confirmedBy: "maya",
+            confirmedAt: "2026-09-21T12:00:00.000Z",
+          },
+        }),
+      ]),
+    ).items;
+    expect(revoked!.author).toMatchObject({ id: "gone", name: "gone" });
+    expect(revoked!.revoke).toEqual({
+      reason: "Wrong APR",
+      startedBy: expect.objectContaining({ name: "Naomi Ross" }),
+      startedAt: "2026-09-20T12:00:00.000Z",
+      confirmedBy: expect.objectContaining({ name: "Maya Chen" }),
+      confirmedAt: "2026-09-21T12:00:00.000Z",
     });
   });
 
-  it("names people, carries the service's decisions as they are, and counts from the request's instant", async () => {
-    backend.as("jordan");
-    const data = await getVersions(
-      "coral-offers",
-      backend.templates["balance-transfer"]!,
+  it("carries the service's decisions and days as they are, and counts from its asOf", () => {
+    const passed = { ok: false as const, ...REFUSALS.sunsetPassed };
+    const data = versionsData(
+      history([
+        row({
+          id: "v1",
+          sunsetAt: "2026-10-25T04:00:00.000Z",
+          sunsetDay: "2026-10-25",
+          sunsetPassed: true,
+          can: { ...ALL_OK, setSunset: passed },
+        }),
+      ]),
     );
-    expect(data.template).toEqual({
-      id: backend.templates["balance-transfer"],
-      name: "Balance Transfer Intro — Terms",
-      teamSlug: "coral-offers",
-    });
-    const [v2, v1] = data.items;
-    expect(v1).toMatchObject({
-      author: expect.objectContaining({
-        id: "priya",
-        name: expect.any(String),
-      }),
+    expect(data.items[0]).toMatchObject({
       sunsetDay: "2026-10-25",
-      can: { setSunset: { ok: true } },
+      sunsetPassed: true,
+      can: { setSunset: passed },
     });
-    expect(v2!.can.setSunset).toEqual({
-      ok: false,
-      ...REFUSALS.sunsetNotSuperseded,
-    });
-    expect(data.now).toBe(BASE.toISOString());
+    expect(data.now).toBe(ASOF);
     expect(data.sunsetCalendar).toEqual({
       zone: "America/New_York",
       today: "2026-10-04",
     });
+  });
+});
 
-    const holiday = await getVersions(
-      "coral-offers",
-      backend.templates["holiday-points"]!,
-    );
-    expect(
-      holiday.items.find((i) => i.state === "revoked")!.revoke,
-    ).toMatchObject({
-      startedBy: expect.objectContaining({ name: expect.any(String) }),
-      confirmedBy: expect.objectContaining({ name: expect.any(String) }),
+describe("getVersions", () => {
+  beforeEach(() => {
+    env.signedIn = true;
+    env.history = { ok: true, ...history([row({ id: "v1" })]) };
+  });
+
+  it("reads the template in its team's space, and in All teams", async () => {
+    await expect(getVersions("coral", "UC-AAAAAA")).resolves.toMatchObject({
+      template: { id: "UC-AAAAAA", teamSlug: "coral" },
+      now: ASOF,
+    });
+    await expect(getVersions("all", "UC-AAAAAA")).resolves.toMatchObject({
+      template: { id: "UC-AAAAAA" },
     });
   });
 
-  it("is Not found for a template in another team's space, and for one the viewer can't see", async () => {
-    backend.as("jordan");
-    await expect(
-      getVersions("deposits", backend.templates["balance-transfer"]!),
-    ).rejects.toThrow(NOT_FOUND);
-    backend.as("maya");
-    await expect(
-      getVersions("coral-offers", backend.templates["high-yield-savings"]!),
-    ).rejects.toThrow(NOT_FOUND);
-    // The All teams space holds every team's templates.
-    backend.as("riley");
-    await expect(
-      getVersions("all", backend.templates["high-yield-savings"]!),
-    ).resolves.toMatchObject({ template: { teamSlug: "deposits" } });
+  it("is Not found in another team's space, and when the service refuses", async () => {
+    await expect(getVersions("deposits", "UC-AAAAAA")).rejects.toThrow(
+      NOT_FOUND,
+    );
+    env.history = {
+      ok: false,
+      status: 404,
+      ...REQUEST_REFUSALS.templateUnavailable,
+    };
+    await expect(getVersions("coral", "UC-AAAAAA")).rejects.toThrow(NOT_FOUND);
   });
 
-  it("is Not found when nobody is signed in", async () => {
-    backend.signOut();
-    await expect(
-      getVersions("coral-offers", backend.templates["balance-transfer"]!),
-    ).rejects.toThrow(NOT_FOUND);
+  it("sends a signed-out person to sign in", async () => {
+    env.signedIn = false;
+    await expect(getVersions("coral", "UC-AAAAAA")).rejects.toThrow(
+      /NEXT_REDIRECT/,
+    );
   });
 });

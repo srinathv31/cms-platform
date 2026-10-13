@@ -25,6 +25,114 @@ const noEditorBarrel = {
     "There is no @/editor barrel (it was removed: it loaded the React editor UI). Import the server-safe modules that define what you need: @/editor/schema, @/editor/model/*, @/editor/paste/*.",
 };
 
+// The backend seam's import rules (blocks under "The backend seam" below).
+const noDatabase = {
+  group: [
+    "drizzle-orm",
+    "drizzle-orm/*",
+    "@libsql/*",
+    "**/db/client",
+    "**/db/schema/*",
+  ],
+  allowTypeImports: true,
+  message:
+    "Only the local implementation (src/server/services/local) talks to the database. Reach data through services() (src/server/services/README.md).",
+};
+const noImplementations = {
+  group: [
+    "@/server/services/local",
+    "@/server/services/local/**",
+    "@/server/services/fake",
+    "@/server/services/fake/**",
+    "**/services/local",
+    "**/services/local/**",
+    "**/services/fake",
+    "**/services/fake/**",
+  ],
+  message:
+    "Reach the backend through services() (src/server/services/index.ts), never an implementation: with another backend configured, the local one isn't there.",
+};
+const noViewModels = {
+  group: [
+    "@/server/queries/**",
+    "@/server/render/**",
+    "@/server/import/**",
+    "@/server/starters/**",
+    "@/server/api/**",
+    "@/components/**",
+    "@/domain/access-types",
+    "@/domain/golive-types",
+    "@/domain/import-types",
+  ],
+  message:
+    "The service interfaces carry facts: not the BFF's view models (worded, with app URLs) or its modules. Declare a facts type beside the interface, or Unsettled<…> until its package settles it (decision 0072).",
+};
+// Not checked by the seam rules: the local implementation and the database itself, the seed and the reset, the
+// shared database test support, the simulator (its own app and database), and tests.
+const SEAM_EXEMPT = [
+  "src/server/services/local/**",
+  "src/server/services/index.ts",
+  "src/server/db/**",
+  "src/server/seed/**",
+  "src/server/reset.ts",
+  "src/server/testing/**",
+  "src/lib/fresh-database.ts",
+  "src/lib/serialized-writes.ts",
+  "src/simulator/**",
+  "src/app/(simulator)/**",
+  "src/app/api/v1/**",
+  "**/*.test.{ts,tsx}",
+];
+// The files the seam rules still warn on, until their package moves them (plan.md). Delete a line as you clear it.
+const SEAM_NOT_YET = [
+  "src/server/access-effects.ts",
+  "src/server/access-sweep.ts",
+  "src/server/actions/access.ts",
+  "src/server/actions/comments.ts",
+  "src/server/actions/create-template.ts",
+  "src/server/actions/kit.ts",
+  "src/server/actions/notifications.ts",
+  "src/server/actions/persona.ts",
+  "src/server/actions/platform.ts",
+  "src/server/actions/review.ts",
+  "src/server/actions/templates.ts",
+  "src/server/business-zone.ts",
+  "src/server/clock.ts",
+  "src/server/drafts/apply-patch.ts",
+  "src/server/drafts/save-draft.ts",
+  "src/server/effects.ts",
+  "src/server/import/create.ts",
+  "src/server/queries/access.ts",
+  "src/server/queries/activity.ts",
+  "src/server/queries/audit.ts",
+  "src/server/queries/base-version.ts",
+  "src/server/queries/compare.ts",
+  "src/server/queries/consumer-api.ts",
+  "src/server/queries/copilot.ts",
+  "src/server/queries/find-round.ts",
+  "src/server/queries/import.ts",
+  "src/server/queries/integration.ts",
+  "src/server/queries/library.ts",
+  "src/server/queries/notifications.ts",
+  "src/server/queries/palette.ts",
+  "src/server/queries/personas.ts",
+  "src/server/queries/platform.ts",
+  "src/server/queries/review-shared.ts",
+  "src/server/queries/review.ts",
+  "src/server/queries/spaces.ts",
+  "src/server/queries/submit-summary.ts",
+  "src/server/queries/template-name.ts",
+  "src/server/queries/threads.ts",
+  "src/server/queries/usage.ts",
+  "src/server/queries/workspace.ts",
+  "src/server/render/log.ts",
+  "src/server/render/render-template.ts",
+  "src/server/sunset-sweep.ts",
+  "src/server/templates/create.ts",
+  "src/server/version-rows.ts",
+  "src/server/viewer.ts",
+];
+
 // The editor's public modules: the table under "Public API" in src/editor/README.md. Code outside src/editor
 // imports these and nothing else, so the editor can change what is behind them. A module is public when the
 // README lists it, and the README lists it when it is a sensible part of the API: keep the two the same.
@@ -243,44 +351,56 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // ── The backend seam (src/server/services/README.md, decision 0072) ──────────
+  // A separate rule from the core no-restricted-imports above (typescript-eslint's, which can let type imports
+  // through), so the blocks there keep their own options. Flat config keeps one set of options per rule per file:
+  // each block below lists every seam pattern that applies to its files.
   {
-    // The backend seam (src/server/services/README.md): only the local implementation talks to the database.
-    // Everything else (the BFF's actions, read models and routes, the fake, the components) reaches data through
-    // `services()`. Row types from the schema may be imported as types (the fake keeps its rows in that shape).
-    // A warning while the areas move behind the services: the warnings are the list of what is left to move.
-    // A separate rule from the core no-restricted-imports above, so the blocks there keep their own options.
+    // Only the local implementation, the database module and the seed talk to the database, and only
+    // services/index.ts (with /api/v1, the seed, the reset and tests) reaches an implementation: everything else
+    // goes through services(). Row types from the schema may be imported as types (the fake keeps its rows in
+    // that shape).
     files: ["src/**/*.{ts,tsx}"],
-    ignores: [
-      "src/server/services/local/**",
-      "src/server/db/**",
-      "src/server/seed/**",
-      "src/server/reset.ts",
-      "src/server/testing/**",
-      "src/lib/fresh-database.ts",
-      "src/lib/serialized-writes.ts",
-      "src/simulator/**",
-      "src/app/(simulator)/**",
-      "**/*.test.{ts,tsx}",
-    ],
+    ignores: SEAM_EXEMPT,
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [noDatabase, noImplementations] },
+      ],
+    },
+  },
+  {
+    // The interfaces themselves carry facts, never the BFF's worded view models or its modules.
+    files: ["src/server/services/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [noDatabase, noImplementations, noViewModels] },
+      ],
+    },
+  },
+  {
+    // /api/v1 is the backend's own API (the Java API serves it after the port): its handlers call the local
+    // implementation directly, but still not the database.
+    files: ["src/app/api/v1/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [noDatabase] },
+      ],
+    },
+  },
+  {
+    // The ratchet: the files still on the database or an implementation, waiting for their package to move them
+    // behind the seam (plan P1–P5). The same rule, as a warning; a package that clears a file deletes its line,
+    // and from then on the rule is an error there.
+    files: SEAM_NOT_YET,
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "warn",
-        {
-          patterns: [
-            {
-              group: [
-                "drizzle-orm",
-                "drizzle-orm/*",
-                "@libsql/*",
-                "**/db/client",
-                "**/db/schema/*",
-              ],
-              allowTypeImports: true,
-              message:
-                "Only the local implementation (src/server/services/local) talks to the database. Reach data through services() (src/server/services/README.md).",
-            },
-          ],
-        },
+        { patterns: [noDatabase, noImplementations] },
       ],
     },
   },

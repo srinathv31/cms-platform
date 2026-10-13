@@ -1,18 +1,15 @@
 // Platform settings (Platform Admin): teams, content types and their required sections, which channels a
 // content type allows, its approval chain, and the business time zone sunsets are read in.
 //
-// Typed for step 2b from today's read models; they still run in src/server/actions/platform.ts and
-// src/server/queries/platform.ts.
+// Typed for step 2b: they still run in src/server/actions/platform.ts and src/server/queries/platform.ts.
 
-import type {
-  ApprovalChainsSection,
-  BusinessZoneSection,
-  ChannelRulesSection,
-  ContentTypesSection,
-  TeamsSection,
-} from "@/domain/access-types";
 import type { ApproverRule, Channel, RequiredSection } from "@/domain/types";
-import type { ActionResult, ReadResult, RequestContext } from "./types";
+import type {
+  ActionResult,
+  ReadResult,
+  RequestContext,
+  Unsettled,
+} from "./types";
 
 export interface PlatformService {
   createTeam(
@@ -44,17 +41,19 @@ export interface PlatformService {
     input: { zone: string },
   ): Promise<ActionResult>;
 
-  teams(ctx: RequestContext): Promise<ReadResult<{ section: TeamsSection }>>;
+  teams(
+    ctx: RequestContext,
+  ): Promise<ReadResult<Unsettled<"P4b: the teams' facts">>>;
   contentTypes(
     ctx: RequestContext,
-  ): Promise<ReadResult<{ section: ContentTypesSection }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the content types' facts">>>;
   channelRules(
     ctx: RequestContext,
-  ): Promise<ReadResult<{ section: ChannelRulesSection }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the channel rules' facts">>>;
   approvalChains(
     ctx: RequestContext,
-  ): Promise<ReadResult<{ section: ApprovalChainsSection }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the approval chains' facts">>>;
   businessZone(
     ctx: RequestContext,
-  ): Promise<ReadResult<{ section: BusinessZoneSection }>>;
+  ): Promise<ReadResult<Unsettled<"P4b: the business zone's facts">>>;
 }

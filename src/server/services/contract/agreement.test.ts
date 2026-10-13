@@ -25,11 +25,13 @@ it.each(["maya", "jordan", "eli", "riley"])(
   async (userId) => {
     for (const at of [BASE, new Date(BASE.getTime() + 60 * 86_400_000)])
       for (const templateId of Object.values(local.templates)) {
+        fake.setClock(at);
+        local.setClock(at);
         const [fromFake, fromLocal] = await Promise.all([
-          fake.services().versions.history(await fake.as(userId, at), {
+          fake.services().versions.history(await fake.as(userId), {
             templateId,
           }),
-          local.services().versions.history(await local.as(userId, at), {
+          local.services().versions.history(await local.as(userId), {
             templateId,
           }),
         ]);

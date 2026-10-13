@@ -1,9 +1,11 @@
 import { noticeAudienceSince } from "@/domain/golive/audience";
-import type {
-  LifecycleEffect,
-  NotificationLink,
-  Recipients,
-} from "@/domain/review-types";
+import {
+  notificationRecipients,
+  recipientLink,
+  type RecipientFacts,
+  type RecipientMembership,
+} from "@/domain/recipients";
+import type { LifecycleEffect } from "@/domain/review-types";
 import type { EffectContext, EffectsWritten } from "@/server/effects";
 import { newId } from "@/server/ids";
 import { notificationHref } from "@/server/notification-href";
@@ -11,8 +13,9 @@ import type { FakeState } from "./state";
 import type { FakeTx } from "./store";
 
 // The fake's effects writer: what a transition asks for (audit rows, notifications, consumer notices),
-// written into the command's `FakeTx` by the rules `writeEffects` (src/server/effects.ts) follows against
-// the database. Who receives what is decided the same way, so the contract suite can hold the two to it.
+// written into the command's `FakeTx`. Who a notification reaches and where its link opens are the domain's
+// rules (domain/recipients.ts), the same ones `writeEffects` (src/server/effects.ts) follows; the consumer
+// audience is the domain's window (domain/golive/audience.ts).
 
 const NOTICE_SEQ_KEY = "consumer_notice_seq";
 
@@ -53,28 +56,20 @@ export function writeFakeEffects(
       }
 
       case "notification": {
-        const userIds = recipients(state, effect.to, ctx.teamId).filter(
-          (id) => id !== ctx.actorId,
+        const userIds = notificationRecipients(
+          effect.to,
+          ctx.teamId,
+          membershipsOf(state),
+          ctx.actorId,
         );
         if (userIds.length === 0) break;
         const slug = teamSlugOf(state, ctx);
-        // A stage reviewer outside the template's team opens the version from their own space.
-        const link = effect.link;
-        const outsideReview: NotificationLink | null =
-          link.to === "template" && link.reviewVersion !== undefined
-            ? {
-                to: "review",
-                templateId: link.templateId,
-                versionNumber: link.reviewVersion.number,
-                round: link.reviewVersion.round,
-              }
-            : null;
-        const spaces =
-          link.to === "review" || outsideReview
-            ? recipientSpaces(state, userIds, slug)
-            : null;
         for (const userId of userIds) {
-          const own = spaces?.get(userId);
+          const opens = recipientLink(
+            recipientFacts(state, userId),
+            slug,
+            effect.link,
+          );
           tx.insert("notifications", {
             id: newId("nt"),
             userId,
@@ -82,9 +77,7 @@ export function writeFakeEffects(
             kind: effect.notification,
             title: effect.title,
             body: effect.body ?? null,
-            href: own
-              ? notificationHref(own, outsideReview ?? link)
-              : notificationHref(slug, link),
+            href: notificationHref(opens.teamSlug, opens.link),
             createdAt,
             readAt: null,
           });
@@ -126,54 +119,34 @@ function teamSlugOf(state: FakeState, ctx: EffectContext): string {
   return state.teams.find((t) => t.id === template?.teamId)?.slug ?? ctx.teamId;
 }
 
-/** The users a notification goes to, before the actor is taken out. Sorted, without repeats. */
-function recipients(
-  state: FakeState,
-  to: Recipients,
-  teamId: string,
-): string[] {
-  if (to.kind === "user") return [to.userId];
-  const except = new Set(to.exceptUserIds ?? []);
-  const holders = state.memberships.filter(
-    (m) =>
-      m.teamId === teamId &&
-      m.status === "active" &&
-      state.membershipRoles.some(
-        (r) => r.membershipId === m.id && r.role === to.role,
-      ),
-  );
-  return [...new Set(holders.map((m) => m.userId))]
-    .filter((id) => !except.has(id))
-    .sort();
+/** Every membership, with its team and roles, as the recipient rules read them (domain/recipients.ts). */
+function membershipsOf(state: FakeState): RecipientMembership[] {
+  return state.memberships.flatMap((m) => {
+    const team = state.teams.find((t) => t.id === m.teamId);
+    if (!team) return [];
+    return [
+      {
+        userId: m.userId,
+        teamId: team.id,
+        teamSlug: team.slug,
+        teamName: team.name,
+        status: m.status,
+        roles: state.membershipRoles
+          .filter((r) => r.membershipId === m.id)
+          .map((r) => r.role),
+      },
+    ];
+  });
 }
 
-/**
- * The space each recipient opens a review link in: none (the template's team) when they can see that team
- * (an active membership with a role there, or a platform role); otherwise their own first space by name.
- */
-function recipientSpaces(
-  state: FakeState,
-  userIds: readonly string[],
-  teamSlug: string,
-): Map<string, string> {
-  const spaces = new Map<string, string>();
-  for (const userId of userIds) {
-    if (state.users.find((u) => u.id === userId)?.platformRole) continue;
-    const mine = state.memberships
-      .filter(
-        (m) =>
-          m.userId === userId &&
-          m.status === "active" &&
-          state.membershipRoles.some((r) => r.membershipId === m.id),
-      )
-      .flatMap((m) => state.teams.filter((t) => t.id === m.teamId));
-    if (mine.length === 0 || mine.some((t) => t.slug === teamSlug)) continue;
-    spaces.set(
-      userId,
-      [...mine].sort((a, b) => a.name.localeCompare(b.name))[0]!.slug,
-    );
-  }
-  return spaces;
+/** One recipient's platform role and memberships: where their links open (`recipientLink`). */
+function recipientFacts(state: FakeState, userId: string): RecipientFacts {
+  return {
+    userId,
+    platformRole:
+      state.users.find((u) => u.id === userId)?.platformRole ?? null,
+    memberships: membershipsOf(state).filter((m) => m.userId === userId),
+  };
 }
 
 /** Registered consumers with a non-preview render of the template in the notice window before `ctx.at`. */

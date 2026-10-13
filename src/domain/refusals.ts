@@ -165,6 +165,14 @@ export const REQUEST_REFUSALS = {
   ),
   /** The compare-and-set missed: someone changed the row between the read and the write. */
   draftChanged: refusal("draft_changed", "This draft changed. Try again."),
+  /**
+   * A command's compare-and-set on a version missed: someone else changed it between the command's read and its
+   * write (on a database that doesn't serialize writes, two people acting at once). Nothing was written.
+   */
+  versionChanged: refusal(
+    "version_changed",
+    "This version changed. Reload and try again.",
+  ),
   activeChanged: refusal(
     "active_changed",
     "The Active version changed. Try again.",

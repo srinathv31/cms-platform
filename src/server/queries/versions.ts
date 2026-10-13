@@ -117,7 +117,7 @@ export interface VersionsData {
   consumerUsage: ConsumerUsage[];
   /** The sunset dialog's picker. */
   sunsetCalendar: SunsetCalendar;
-  /** ISO: the request's instant, which the facts were decided at; the timeline counts its dates from it. */
+  /** ISO: the backend's instant the facts were decided at (`asOf`); the timeline counts its dates from it. */
   now: string;
 }
 
@@ -153,12 +153,12 @@ export const getVersions = cache(
       (space.teamId !== null && history.template.teamId !== space.teamId)
     )
       notFound();
-    return versionsData(history, ctx.now);
+    return versionsData(history);
   },
 );
 
 /** The Versions tab from the service's facts: each number once, as its head, with labels, lines and people. */
-export function versionsData(history: VersionHistory, now: Date): VersionsData {
+export function versionsData(history: VersionHistory): VersionsData {
   const people: People = new Map(history.people.map((p) => [p.id, p]));
   // Every row, the open draft first, then newest first (the service's order).
   const rows = history.versions;
@@ -256,6 +256,6 @@ export function versionsData(history: VersionHistory, now: Date): VersionsData {
     compareOptions,
     consumerUsage: history.consumerUsage,
     sunsetCalendar: history.sunsetCalendar,
-    now: now.toISOString(),
+    now: history.asOf,
   };
 }

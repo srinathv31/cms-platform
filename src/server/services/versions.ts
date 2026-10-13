@@ -12,9 +12,7 @@ import type {
   RevokeRecord,
   VersionState,
 } from "@/domain/types";
-import type { BaseVersionContent } from "@/server/queries/base-version";
-import type { ComparePair } from "@/server/queries/compare";
-import type { ReadResult, RequestContext } from "./types";
+import type { ReadResult, RequestContext, Unsettled } from "./types";
 
 /** A decision on a round: one `approvals` row. */
 export interface DecisionFacts {
@@ -54,7 +52,7 @@ export interface VersionFacts {
   sunsetAt: string | null;
   /** YYYY-MM-DD: the sunset's day in the business time zone. */
   sunsetDay: string | null;
-  /** The sunset has come: renders of it fail (`sunsetPassed`, on the request's instant). */
+  /** The sunset has come: renders of it fail (`sunsetPassed`, at `asOf`). */
   sunsetPassed: boolean;
   revoke: RevokeRecord | null;
   /** The contract changes frozen at submit; null for a draft. */
@@ -63,7 +61,7 @@ export interface VersionFacts {
   decisions: DecisionFacts[];
   /** ISO: the latest non-preview render by a registered consumer; null when none. */
   lastRenderAt: string | null;
-  /** Non-preview renders by registered consumers in the 30 days before the request. */
+  /** Non-preview renders by registered consumers in the 30 days before `asOf`. */
   renders30d: number;
   /** What the viewer may do on it now (`versionActions`). */
   can: VersionActions;
@@ -71,6 +69,8 @@ export interface VersionFacts {
 
 /** Everything the Versions tab shows, as facts. */
 export interface VersionHistory {
+  /** ISO: the backend's instant the facts were read and decided at (`sunsetPassed`, `renders30d`, `can`, today). */
+  asOf: string;
   /**
    * `name` is the CMS's name for the template: its open draft's, otherwise its newest version's. `teamSlug`
    * is its team's URL name, for links; compare teams by `teamId` (decision 0053).
@@ -100,11 +100,11 @@ export interface VersionService {
   compare(
     ctx: RequestContext,
     input: { templateId: string; from: string | null; to: string | null },
-  ): Promise<ReadResult<ComparePair>>;
+  ): Promise<ReadResult<Unsettled<"P4a: two versions' content, as facts">>>;
 
   /** The content the draft on screen was started from ("Revert to v3"). */
   baseVersion(
     ctx: RequestContext,
     input: { templateId: string; versionId: string | null },
-  ): Promise<ReadResult<{ base: BaseVersionContent }>>;
+  ): Promise<ReadResult<Unsettled<"P4a: the base version's content">>>;
 }

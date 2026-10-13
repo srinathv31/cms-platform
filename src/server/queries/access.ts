@@ -67,7 +67,7 @@ import {
   teams,
   users,
 } from "@/server/db/schema/ucomp";
-import { getViewer } from "@/server/viewer";
+import { requireRequestContext } from "@/server/context/request";
 import { demoNow } from "./dynamic";
 import { requireCan } from "./require-can";
 
@@ -151,7 +151,7 @@ async function teamSection(
   action:
     "team.manageMembers" | "team.decideAccessRequest" = "team.manageMembers",
 ) {
-  const viewer = await getViewer();
+  const { viewer } = await requireRequestContext();
   const team = await teamBySlug(slug);
   requireCan(viewer, action, { teamId: team.id });
   const nowDate = await demoNow();
@@ -200,7 +200,7 @@ function myRequest(
 /** Every team (with its Team Admins and the viewer's roles), the viewer's latest request per team, and ended access. */
 export const getRequestAccessData = cache(
   async (): Promise<RequestAccessData> => {
-    const viewer = await getViewer();
+    const { viewer } = await requireRequestContext();
     const people = await getUsers();
     const teamRows = await db.select().from(teams).orderBy(teams.name);
     const all = await loadMembershipFacts(db);
@@ -629,7 +629,7 @@ export const getInactivitySection = cache(
  */
 export const getSidebarCards = cache(
   async (): Promise<Record<string, SidebarCardModel | null>> => {
-    const viewer = await getViewer();
+    const { viewer } = await requireRequestContext();
     const teamRows = await db
       .select({ slug: teams.slug, name: teams.name })
       .from(teams);
@@ -718,7 +718,7 @@ export const getSidebarCards = cache(
  * Additive to the contract: `getShell` folds it in as `ShellData.homeCard`.
  */
 export const getHomeCard = cache(async (): Promise<SidebarCardModel | null> => {
-  const viewer = await getViewer();
+  const { viewer } = await requireRequestContext();
   const [newest] = await db
     .select({
       id: accessRequests.id,

@@ -4,16 +4,18 @@
 //
 // Typed for step 2b: the route still calls src/server/drafts/save-draft.ts.
 
-import type { Refused } from "@/domain/refusals";
 import type { DraftPatch, DraftSaveResponse } from "@/domain/types";
-import type { RequestContext } from "./types";
+import type { ActionResult, RequestContext } from "./types";
 
 export interface DraftService {
-  /** `version_gone` or the permission refusal, or null when the viewer may save to the draft. Asked before the body is read. */
+  /**
+   * May the viewer save to the draft? `version_gone` or the permission refusal otherwise. Asked before the body
+   * is read; an HTTP implementation may answer `ok` and leave the check to `save`, saving a round trip.
+   */
   saveAccess(
     ctx: RequestContext,
     input: { versionId: string },
-  ): Promise<Refused | null>;
+  ): Promise<ActionResult>;
 
   /**
    * Saves a prepared patch. A stale `rev` is `draft_changed` with the current one, unless the save session

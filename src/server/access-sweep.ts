@@ -190,10 +190,11 @@ export async function applySweep(
  * Applies everything the demo clock crossed since the last sweep (lapses at a review's deadline,
  * the 90-day flag, the 120-day automatic suspension) and returns what it did. A read outside the
  * transaction keeps the common case (nothing to do) free of a write lock; when there is work, the
- * transaction reads again and decides from that, so two sweeps at once apply it only once.
+ * transaction reads again and decides from that, so two sweeps at once apply it only once. It runs at the demo
+ * clock's now, or at `instant` (the contract suite's scheduled-jobs run).
  */
-export async function runAccessSweep(): Promise<SweepResult> {
-  const at = await now();
+export async function runAccessSweep(instant?: Date): Promise<SweepResult> {
+  const at = instant ?? (await now());
   if (isEmpty(sweepAccess(await loadSweepInput(db, at)))) {
     return { membershipChanges: [], recertsClosed: [], effects: [] };
   }

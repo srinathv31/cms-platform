@@ -122,7 +122,7 @@ describe("serverAction", () => {
     expect(now).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses input that doesn't parse, before anything is read", async () => {
+  it("refuses input that doesn't parse, before authorize runs or the clock is read", async () => {
     const authorize = vi.fn();
     expect(await write({ key: "", value: "x" }, { authorize })).toEqual({
       ok: false,
@@ -133,8 +133,7 @@ describe("serverAction", () => {
       ...REQUEST_REFUSALS.invalidInput(),
     });
     expect(authorize).not.toHaveBeenCalled();
-    // The request context reads the clock once, with the viewer, before the input is parsed.
-    expect(now).toHaveBeenCalledTimes(2);
+    expect(now).not.toHaveBeenCalled();
   });
 
   it("answers input that doesn't parse with the action's own refusal, fixed or from the parser's problem", async () => {
@@ -164,6 +163,7 @@ describe("serverAction", () => {
     ).toEqual({ ok: false, ...REASONS.generic });
     expect(await stored("kit_forbidden")).toBeUndefined();
     expect(after).not.toHaveBeenCalled();
+    expect(now).not.toHaveBeenCalled();
   });
 
   it("returns a domain rule's refusal through `permit`", async () => {
@@ -318,13 +318,15 @@ describe("serverAction with a service call", () => {
       ),
     ).toEqual({ ok: true, key: "done" });
     expect(call).toHaveBeenCalledWith(
-      expect.objectContaining({ viewer: admin, now: env.now }),
+      expect.objectContaining({ viewer: admin }),
       { key: "k", value: "v" },
     );
     expect(after).toHaveBeenCalledWith(
       { ok: true, key: "done" },
       expect.objectContaining({ input: { key: "k", value: "v" } }),
     );
+    // The backend dates its own writes: the BFF reads no clock for it.
+    expect(now).not.toHaveBeenCalled();
   });
 
   it("answers the service's refusal as it is, without `after`", async () => {

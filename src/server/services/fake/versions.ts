@@ -6,19 +6,20 @@ import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ConsumerUsage, Person } from "@/domain/review-types";
 import { compareRounds, headOf } from "@/domain/rounds";
-import { refusal } from "@/server/api/reads";
 import { notMoved } from "../not-moved";
+import { refusal } from "../results";
 import type { VersionFacts, VersionService } from "../versions";
 import { businessZone, currentName, templateById } from "./rows";
 import type { FakeState } from "./state";
-import type { FakeStore } from "./store";
+import type { FakeDeps } from "./index";
 
 // One template's versions in memory: what services/local/versions.ts reads with SQL, read from the fake's
 // arrays, with the same domain decisions.
 
-export function fakeVersions(store: FakeStore): VersionService {
+export function fakeVersions({ store, clock }: FakeDeps): VersionService {
   return {
     async history(ctx, { templateId }) {
+      const now = await clock();
       const { state } = store;
       const template = templateById(state, templateId);
       if (
@@ -28,7 +29,6 @@ export function fakeVersions(store: FakeStore): VersionService {
         return refusal(404, REQUEST_REFUSALS.templateUnavailable);
       const team = state.teams.find((t) => t.id === template.teamId)!;
 
-      const now = ctx.now;
       const since = now.getTime() - 30 * DAY_MS;
       const zone = businessZone(state);
       const rows = state.versions.filter((v) => v.templateId === template.id);
@@ -82,6 +82,7 @@ export function fakeVersions(store: FakeStore): VersionService {
 
       return {
         ok: true,
+        asOf: now.toISOString(),
         template: {
           id: template.id,
           teamId: template.teamId,

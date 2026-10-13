@@ -11,7 +11,12 @@ import {
 import { createDraft } from "@/domain/lifecycle/drafts";
 import { REFUSALS as LIFECYCLE_REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS, can } from "@/domain/permissions";
-import { refuse, type Refused, type RefusalCode } from "@/domain/refusals";
+import {
+  REQUEST_REFUSALS,
+  refuse,
+  type Refused,
+  type RefusalCode,
+} from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";
 import { defaultSampleSets } from "@/editor/model/sample-sets";
 import { now } from "@/server/clock";
@@ -63,14 +68,15 @@ const IMPORT_STATUS: Partial<Record<RefusalCode, number>> = {
   [IMPORT_REFUSALS.notPdf.code]: 415,
   [IMPORT_REFUSALS.notWord.code]: 415,
   [LIFECYCLE_REFUSALS.noContentType.code]: 409,
+  [REQUEST_REFUSALS.signedOut.code]: 401,
 };
 const IMPORT_CODES: ReadonlySet<string> = new Set(
   Object.values(IMPORT_REFUSALS).map((entry) => entry.code),
 );
 
 /**
- * The HTTP status for an import's answer: 200 · 400 the file is refused · 403 the viewer may not
- * create here (any other refusal) · 409 no content type makes documents · 413 too large · 415 not a
+ * The HTTP status for an import's answer: 200 · 400 the file is refused · 401 nobody is signed in · 403 the
+ * viewer may not create here (any other refusal) · 409 no content type makes documents · 413 too large · 415 not a
  * kind we take.
  */
 export function importStatus(response: ImportResponse): number {

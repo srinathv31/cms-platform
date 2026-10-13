@@ -1,18 +1,20 @@
 import "server-only";
 import type { AccessService } from "../access";
 import type { AuditService } from "../audit";
-import type { ClockService } from "../clock";
 import type { CommentService } from "../comments";
 import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
 import type { IdentityService } from "../identity";
 import { notMovedArea } from "../not-moved";
+import type { ImplementationOptions } from "../options";
 import type { NotificationService } from "../notifications";
 import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
 import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
+import { now } from "@/server/clock";
+import type { LocalDeps } from "./command";
 import { localReview } from "./review";
 import { localVersions } from "./versions";
 
@@ -20,12 +22,16 @@ import { localVersions } from "./versions";
 // TypeScript domain. It is what the Java API replaces. Each area lives in its own file here; an area whose
 // code still sits in src/server/actions/ or src/server/queries/ answers `notMovedArea` until it moves.
 
-export function localServices(): Services {
+export function localServices(options: ImplementationOptions = {}): Services {
+  // The demo clock: the real time plus the clock offset Advance clock moves (src/server/clock.ts).
+  const deps: LocalDeps = {
+    clock: options.clock ?? now,
+    hooks: options.hooks ?? {},
+  };
   return {
     identity: notMovedArea<IdentityService>("identity"),
-    clock: notMovedArea<ClockService>("clock"),
-    review: localReview,
-    versions: localVersions,
+    review: localReview(deps),
+    versions: localVersions(deps),
     templates: notMovedArea<TemplateService>("templates"),
     drafts: notMovedArea<DraftService>("drafts"),
     comments: notMovedArea<CommentService>("comments"),

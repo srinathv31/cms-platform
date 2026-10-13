@@ -1,6 +1,7 @@
 // Sunset: the date a Superseded version stops rendering, and the sweep that records it passing.
 //
-//   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes.
+//   setSunset      Superseded → Superseded with a sunset date (or a moved one), until that date passes; the
+//                  day it already has is no change (`sunsetUnchanged`).
 //                  A sunset date ends renders at 00:00 on that day in the business time zone (business-zone.ts).
 //   sweepSunsets   the clock passed a sunset → its `version.sunset_passed` audit row, dated when renders stopped,
 //                  and its `sunset_passed` consumer notice, once. Not a state change: `sunsetPassed` alone
@@ -120,6 +121,24 @@ export function setSunset(input: {
     changes: { sunsetAt: sunset.at, sunsetSetBy: actorId },
     effects,
   };
+}
+
+/**
+ * Setting the day a version already has, while it can still be moved: a double click, with nothing to write
+ * (the caller answers it as done and writes no row). Once the sunset has passed, the same day is no repeat:
+ * `setSunset` refuses it like any other.
+ */
+export function sunsetUnchanged(
+  version: { state: VersionState; sunsetAt: Date | null },
+  sunsetDay: string,
+  zone: string,
+  now: Date,
+): boolean {
+  return (
+    version.state === "superseded" &&
+    version.sunsetAt?.getTime() === sunsetInstant(sunsetDay, zone).getTime() &&
+    !sunsetPassed(version, now)
+  );
 }
 
 /**

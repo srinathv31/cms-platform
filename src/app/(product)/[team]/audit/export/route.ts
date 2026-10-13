@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { parseAuditFilters } from "@/domain/audit";
-import { readResponse } from "@/server/api/reads";
+import { readResponse, signedOutResponse } from "@/server/api/reads";
 import { getAuditExport } from "@/server/queries/audit";
-import { getViewer } from "@/server/viewer";
+import { requestContextOrRefusal } from "@/server/context/request";
 
 // The Audit page's "Export N events": the same filters as the page (`?team&person&action&template&
 // from&to`), every matching event (no page limit), as RFC 4180 CSV. Times are ISO instants on the
@@ -18,8 +18,10 @@ export async function GET(
   for (const [key, value] of request.nextUrl.searchParams)
     (params[key] ??= []).push(value);
 
+  const context = await requestContextOrRefusal();
+  if (!context.ok) return signedOutResponse();
   const result = await getAuditExport(
-    await getViewer(),
+    context.context.viewer,
     team,
     parseAuditFilters(params),
   );

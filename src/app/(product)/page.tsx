@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { Stream } from "@/components/primitives/stream";
 import { defaultSpace } from "@/domain/permissions";
-import { getViewer } from "@/server/viewer";
+import { requireRequestContext } from "@/server/context/request";
 
 async function GoHome(): Promise<never> {
-  const viewer = await getViewer();
+  const { viewer } = await requireRequestContext();
   const space = defaultSpace(viewer);
   redirect(space ? `/${space}/library` : "/request-access");
 }

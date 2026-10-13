@@ -18,7 +18,7 @@ import {
   importTemplate,
 } from "@/server/import/create";
 import { readBodyCapped } from "@/server/api/read-body";
-import { getViewer } from "@/server/viewer";
+import { requestContextOrRefusal } from "@/server/context/request";
 
 // Import a file: POST /api/imports?team=<slug>, multipart/form-data { file } → ImportResponse: the new
 // template, or a refusal as every refusal is, `{ ok: false, code, reason }` (src/domain/refusals.ts),
@@ -42,7 +42,9 @@ function respond(body: ImportResponse): Response {
 }
 
 export async function POST(request: NextRequest) {
-  const viewer = await getViewer();
+  const context = await requestContextOrRefusal();
+  if (!context.ok) return respond(context);
+  const { viewer } = context.context;
   const teamSlug = new URL(request.url).searchParams.get("team") ?? "";
 
   // Permission first, before a byte of the body is read.

@@ -9,7 +9,7 @@ import { notificationFallback } from "@/domain/audit";
 import { db } from "@/server/db/client";
 import { notifications, teams } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
-import { getViewer } from "@/server/viewer";
+import { requireRequestContext } from "@/server/context/request";
 import { formatAgo } from "@/domain/dates";
 
 /** The bell holds this many, newest first. */
@@ -22,7 +22,7 @@ export const NOTIFICATIONS_LIMIT = 30;
  */
 export const getNotificationsData = cache(
   async (): Promise<NotificationsData> => {
-    const viewer = await getViewer();
+    const { viewer } = await requireRequestContext();
     const nowDate = await demoNow();
     const [rows, unread, teamRows] = await Promise.all([
       db

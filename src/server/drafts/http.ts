@@ -9,6 +9,7 @@ import type { DraftSaveResponse } from "@/domain/types";
  * wrong (it doesn't parse, a document or the channels fail their check): 400.
  */
 export const DRAFT_SAVE_STATUS: Partial<Record<RefusalCode, number>> = {
+  [REQUEST_REFUSALS.signedOut.code]: 401,
   [REASONS.generic.code]: 403,
   [REQUEST_REFUSALS.versionGone.code]: 404,
   [REQUEST_REFUSALS.versionNotDraft.code]: 409,

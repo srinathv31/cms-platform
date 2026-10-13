@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { IMPORT_MIME } from "@/domain/import-types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
-import { readResponse, refusal } from "@/server/api/reads";
+import { readResponse, refusal, signedOutResponse } from "@/server/api/reads";
 import { getImportOriginalFile } from "@/server/queries/import";
-import { getViewer } from "@/server/viewer";
+import { requestContextOrRefusal } from "@/server/context/request";
 
 // An imported template's original, exactly as uploaded (the Original tab draws a PDF from it).
 // 404 (`{ ok: false, code, reason }`, like every other refusal) when the upload doesn't exist or the
@@ -13,7 +13,9 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ uploadId: string }> },
 ) {
-  const viewer = await getViewer();
+  const context = await requestContextOrRefusal();
+  if (!context.ok) return signedOutResponse();
+  const { viewer } = context.context;
   const { uploadId } = await params;
   const found = await getImportOriginalFile(viewer, uploadId);
   if (!found)

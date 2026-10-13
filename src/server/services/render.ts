@@ -5,18 +5,27 @@
 //
 // Typed for step 2b: the preview route still calls src/server/render/render-template.ts.
 
-import type {
-  RenderInput,
-  RenderResult,
-} from "@/server/render/render-template";
-import type { RequestContext } from "./types";
+import type { PushPlatform } from "@/domain/messages/push";
+import type { Channel } from "@/domain/types";
+import type { RequestContext, Unsettled } from "./types";
 
-/** What the preview route asks for: the render input without who is asking. */
-export type PreviewRequest = Omit<
-  RenderInput,
-  "preview" | "consumerId" | "viewer" | "correlationId"
->;
+/** What the preview route asks for. */
+export interface PreviewRequest {
+  templateId: string;
+  version: number | "draft";
+  /** Which round of `version`; its head when absent. */
+  round?: number;
+  channel: Channel;
+  /** Required with push, refused with any other channel. */
+  platform?: PushPlatform;
+  /** The sample values, by variable key (strings only, decision 0058). */
+  values: Readonly<Record<string, unknown>>;
+  encoding?: "base64";
+}
 
 export interface RenderService {
-  preview(ctx: RequestContext, input: PreviewRequest): Promise<RenderResult>;
+  preview(
+    ctx: RequestContext,
+    input: PreviewRequest,
+  ): Promise<Unsettled<"P5: the render result">>;
 }

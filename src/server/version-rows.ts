@@ -10,11 +10,13 @@ import { templates, versions } from "@/server/db/schema/ucomp";
 import type { EffectContext, Tx } from "@/server/effects";
 import { findRound } from "@/server/queries/find-round";
 import { loadChain, stageApproverIds } from "@/server/queries/review-shared";
-import { refuse } from "../refuse";
+import { refuse } from "@/server/services/refuse";
+import type { TestHooks } from "@/server/services/options";
 
 // The version rows the review commands read and write: found outside the transaction to learn whom to check,
-// read again inside it, and updated with a compare-and-set. Shared by every review command (the ones still in
-// src/server/actions/review.ts import them from here until they move behind the seam).
+// read again inside it, and updated with a compare-and-set. Shared by the local implementation's review
+// commands (src/server/services/local/review.ts) and the ones still in src/server/actions/review.ts; it moves
+// into the local implementation with the last of those (plan P1).
 
 /** The template, read only to learn its team (and the version's people) for the permission check. */
 export async function findTemplate(templateId: string) {
@@ -120,9 +122,10 @@ export function assertStage(
 }
 
 /**
- * Compare-and-set: the update lands only if the row still has the state, rev and stage it was read
- * with. Inside the transaction nothing can interleave, so a miss means the caller's read was wrong;
- * it is refused rather than written over.
+ * Compare-and-set: the update lands only if the row still has the state, rev and stage it was read with, and
+ * a miss is refused (`whenMissed`) rather than written over. SQLite serializes writes, so here a miss needs a
+ * test's `hooks.beforeCompareAndSet` to change the row in between; a database that doesn't serialize writes
+ * (the Java API's) reaches it when two people act at once, and answers `version_changed`.
  */
 export async function updateVersion(
   tx: Tx,
@@ -135,7 +138,16 @@ export async function updateVersion(
   set: Partial<typeof versions.$inferInsert>,
   at: Date,
   whenMissed: Refusal,
+  hooks: TestHooks = {},
 ) {
+  if (
+    hooks.beforeCompareAndSet?.({ table: "versions", id: version.id }) ===
+    "competing_write"
+  )
+    await tx
+      .update(versions)
+      .set({ rev: sql`${versions.rev} + 1` })
+      .where(eq(versions.id, version.id));
   const [saved] = await tx
     .update(versions)
     .set({ ...set, rev: sql`${versions.rev} + 1`, updatedAt: at })

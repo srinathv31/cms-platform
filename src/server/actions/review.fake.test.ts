@@ -2,6 +2,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
+import { services } from "@/server/services";
 import { fakeBackendPerTest } from "@/server/services/fake/testing";
 import { setSunset } from "./review";
 
@@ -46,15 +47,14 @@ describe("setSunset", () => {
   });
 
   it("sends the day picked as the sunset's day", async () => {
-    backend.as("alex");
+    const ctx = backend.as("alex");
     await sunset("2026-11-20");
-    const v1 = backend.state.versions.find(
-      (v) =>
-        v.templateId === backend.templates["balance-transfer"] &&
-        v.number === 1,
-    );
-    // 00:00 Eastern on the day picked.
-    expect(v1?.sunsetAt).toEqual(new Date("2026-11-20T05:00:00.000Z"));
+    const history = await services().versions.history(ctx, {
+      templateId: backend.templates["balance-transfer"]!,
+    });
+    expect(
+      history.ok && history.versions.find((v) => v.number === 1)?.sunsetDay,
+    ).toBe("2026-11-20");
   });
 
   it("refreshes nothing when the service had nothing to write (the same day again)", async () => {
@@ -65,7 +65,7 @@ describe("setSunset", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("answers the service's refusal as it is, and refreshes nothing", async () => {
+  it("answers the service's refusal as it is, its sentence included, and refreshes nothing", async () => {
     backend.as("alex");
     expect(await sunset("2026-11-20", 2)).toEqual({
       ok: false,
@@ -76,10 +76,7 @@ describe("setSunset", () => {
 
   it("refuses input that doesn't parse before asking the service", async () => {
     backend.as("alex");
-    const spy = vi.spyOn(
-      (await import("@/server/services")).services().review,
-      "setSunset",
-    );
+    const spy = vi.spyOn(services().review, "setSunset");
     expect(
       await setSunset({
         templateId: backend.templates["balance-transfer"]!,

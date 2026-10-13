@@ -7,6 +7,7 @@ import {
   requestContextOrRefusal,
   type RequestContext,
 } from "@/server/context/request";
+import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { inTransaction, type Tx } from "@/server/effects";
 import { answerFor, refuse } from "@/server/services/refuse";
@@ -14,13 +15,13 @@ import { answerFor, refuse } from "@/server/services/refuse";
 // The server action kit: the one shape every mutation in this folder has (AGENTS.md, "Server code"), written
 // once. An action declares its steps and `serverAction` runs them in this order:
 //
-//   1. The request context (src/server/context/request.ts): the viewer and the instant, read once. Nobody
-//      signed in is refused (`signed_out`) before anything else.
+//   1. The request context (src/server/context/request.ts): who is asking. Nobody signed in is refused
+//      (`signed_out`) before anything else.
 //   2. The input, parsed with zod. Input that doesn't parse is refused: `invalid_input`, or the action's own
 //      refusal (`invalid`).
 //   3. `call`: the service (src/server/services), with the context and the parsed input. The backend checks
-//      the permission, asks the domain, writes with a compare-and-set and writes the effects, or refuses;
-//      the BFF decides nothing itself (decision 0070).
+//      the permission, reads its own clock, asks the domain, writes with a compare-and-set and writes the
+//      effects, or refuses; the BFF decides nothing itself and supplies no time (decisions 0070, 0072).
 //   4. `after`, only when the service answered `ok`: `revalidatePath()`, `refresh()`, and `redirect()` last.
 //
 // A refusal is the service's `{ ok: false, code, reason }`, answered as it is. Anything thrown is a bug: it
@@ -28,8 +29,9 @@ import { answerFor, refuse } from "@/server/services/refuse";
 // as Next expects.
 //
 // Actions that haven't moved behind the services yet still declare `authorize` and `transaction` instead of
-// `call` (`ActionSteps` below): the kit runs those against the database itself, with the same order and the
-// same refusal handling as the local implementation's command kit (src/server/services/local/command.ts).
+// `call` (`ActionSteps` below): the kit runs those against the database itself, as the local implementation's
+// command kit does (src/server/services/local/command.ts): `authorize`, then the demo clock (`now()`, once),
+// then one transaction.
 //
 // Not "use server": that would make every export here a public endpoint.
 
@@ -118,7 +120,7 @@ export async function serverAction<I, F, T extends object>(
       viewer: ctx.viewer,
       input,
       found,
-      now: ctx.now,
+      now: await now(),
     };
     const result = await inTransaction(db, async (tx) => {
       const answer = await steps.transaction(tx, commit);

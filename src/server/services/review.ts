@@ -1,26 +1,24 @@
 // The review lifecycle behind the seam: the transitions in src/domain/lifecycle, each run against the
 // version's current state with a compare-and-set, its effects (audit rows, notifications, consumer notices)
-// written with it or not at all. A version is named by its template and number, and a decision by its round
-// as well: approve and request changes act on exactly the round the approver was shown; sunset and revoke on
-// the number's head (its released row).
+// written with it or not at all, all dated by the backend's clock. A version is named by its template and
+// number, and a decision by its round as well: approve and request changes act on exactly the round the
+// approver was shown; sunset and revoke on the number's head (its released row).
 //
 // Every command checks the permission first, and answers a version that doesn't exist exactly as one the
-// viewer may not act on (`generic`), then `version_gone`. A refusal writes nothing.
+// viewer may not act on (`generic`), then `version_gone`. Someone else changing the version between the
+// command's read and its write is `version_changed`. A refusal writes nothing.
 //
 // `setSunset` runs behind the seam (local and fake). The others are typed here and still run in
-// src/server/actions/review.ts until they move.
+// src/server/actions/review.ts and src/server/queries/review.ts until they move.
 
 import type { OutputKey } from "@/domain/review-outputs";
 import type { SubmitSummary } from "@/domain/submit-types";
-import type {
-  ReviewQueue,
-  ReviewScreenData,
-} from "@/server/queries/review-models";
 import type {
   ActionResult,
   Changed,
   ReadResult,
   RequestContext,
+  Unsettled,
 } from "./types";
 
 /** A released version: the number's head. */
@@ -39,12 +37,12 @@ export interface ReviewService {
    * Sets, or moves, the day a Superseded version stops rendering: 00:00 on `sunsetDay` (YYYY-MM-DD) in the
    * business time zone, which must come after today there (decision 0017). Consumers still rendering the
    * template get a `sunset_scheduled` notice; the version's submitter is notified unless they set it. The
-   * day it already has answers `{ ok: true, changed: false }` and writes nothing (a double click). Once
-   * the sunset has passed, any day is refused (`sunset_passed`, decision 0002).
+   * day it already has answers `{ ok: true, changed: false }` and writes nothing (a double click,
+   * `sunsetUnchanged`). Once the sunset has passed, any day is refused (`sunset_passed`, decision 0002).
    *
    * Refuses, in this order: `generic` (no `version.setSunset` on the template's team, or no such
    * version), `version_gone`, `invalid_date`, then the transition's `sunset_not_superseded`,
-   * `sunset_passed`, `sunset_after_today`.
+   * `sunset_passed`, `sunset_after_today`, and `version_changed` when the write loses its compare-and-set.
    */
   setSunset(
     ctx: RequestContext,
@@ -91,7 +89,7 @@ export interface ReviewService {
   queue(
     ctx: RequestContext,
     input: { teamId: string | null },
-  ): Promise<ReadResult<{ queue: ReviewQueue }>>;
+  ): Promise<ReadResult<Unsettled<"P4a: the review queue's facts">>>;
 
   /** How many rounds wait on the viewer in a space: the sidebar badge. */
   badgeCount(
@@ -108,7 +106,7 @@ export interface ReviewService {
       versionNumber: number;
       round: number | null;
     },
-  ): Promise<ReadResult<{ screen: ReviewScreenData }>>;
+  ): Promise<ReadResult<Unsettled<"P4a: the review screen's facts">>>;
 
   /** What submit would freeze, with the draft's `rev` (the submit dialog). */
   submitSummary(

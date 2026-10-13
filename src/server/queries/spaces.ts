@@ -7,7 +7,6 @@ import { recertifications, teams } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
 import { requireCan } from "./require-can";
 import { requireRequestContext } from "@/server/context/request";
-import { getViewer } from "@/server/viewer";
 import { ALL_SPACE, can, spacesFor, type Space } from "@/domain/permissions";
 import type { SidebarCardModel } from "@/domain/access-types";
 import type { Viewer } from "@/domain/types";
@@ -63,7 +62,7 @@ export interface ShellData {
 
 /** Everything the sidebar needs, for every space at once, so a team switch never refetches. */
 export const getShell = cache(async (): Promise<ShellData> => {
-  const viewer = await getViewer();
+  const { viewer } = await requireRequestContext();
   const teamRows = await db
     .select({
       id: teams.id,

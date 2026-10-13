@@ -41,7 +41,7 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { countPendingSunsets, getBusinessZone } from "@/server/business-zone";
-import { getViewer } from "@/server/viewer";
+import { requireRequestContext } from "@/server/context/request";
 import { demoNow } from "./dynamic";
 import { requireCan } from "./require-can";
 import { getPeople, iso, personOf } from "./review-shared";
@@ -64,7 +64,7 @@ import { getPeople, iso, personOf } from "./review-shared";
 
 /** Platform Admin only; anyone else gets a 404 (the Platform group isn't shown to them). */
 async function requireManage() {
-  const viewer = await getViewer();
+  const { viewer } = await requireRequestContext();
   requireCan(viewer, "platform.manage", { teamId: null });
   return viewer;
 }

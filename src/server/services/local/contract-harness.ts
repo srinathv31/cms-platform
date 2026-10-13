@@ -1,43 +1,70 @@
 import { asc, eq, sql } from "drizzle-orm";
-import { beforeAll } from "vitest";
+import { beforeAll, beforeEach } from "vitest";
 import type { Db } from "@/server/db/client";
-import {
-  auditEvents,
-  consumerNotices,
-  notifications,
-} from "@/server/db/schema/ucomp";
+import { auditEvents, notifications } from "@/server/db/schema/ucomp";
+import { listNotices } from "@/server/queries/consumer-api";
+import { runSunsetSweep } from "@/server/sunset-sweep";
 import {
   loadPersona,
   seededDatabasePerTest,
 } from "@/server/testing/review-fixtures";
 import type { ContractHarness } from "../contract/harness";
+import type { TestHooks } from "../options";
 import { localServices } from "./index";
 
 // The local implementation as the contract suite runs it (src/server/services/README.md, "The contract
 // suite"). Test support, not a test file: the real seed on a database of its own for every test
-// (`seededDatabasePerTest`, decision 0048). The test file mocks `@/server/db/client` with `tempDatabase()`.
+// (`seededDatabasePerTest`, decision 0048). The test file mocks `@/server/db/client` with `tempDatabase()`;
+// one local harness per file (a second would close the first's mocked client).
 
 /** Call it inside the `describe` that runs the cases, so its hooks belong to that block. */
 export function localContractHarness(opts: { base: Date }): ContractHarness {
   const templates = seededDatabasePerTest({ base: opts.base });
   let db: Db | undefined;
+  let clock = opts.base;
+  let hooks: TestHooks = {};
   beforeAll(async () => {
     ({ db } = await import("@/server/db/client"));
   });
-  const services = localServices();
-  const iso = (date: Date) => date.toISOString();
+  beforeEach(() => {
+    clock = opts.base;
+    hooks = {};
+  });
+  const services = localServices({
+    clock: async () => clock,
+    // Read when a command reaches its compare-and-set, so a case can set them at any point.
+    hooks: {
+      beforeCompareAndSet: (target) => hooks.beforeCompareAndSet?.(target),
+    },
+  });
 
   return {
     name: "local",
     templates,
     services: () => services,
-    async as(userId, at) {
+    setClock(at) {
+      clock = at;
+    },
+    async as(userId) {
       return {
         viewer: await loadPersona(db!, userId),
-        now: at,
         correlationId: "req_contract",
-        credential: { kind: "in_process" },
+        credential: { kind: "in_process", userId },
       };
+    },
+    hooks(next) {
+      hooks = next;
+    },
+    async runScheduledJobs(at) {
+      // The sunset sweep; the access sweep joins when the fake has its twin (plan P2).
+      await runSunsetSweep(at);
+    },
+    async consumerNotices(consumerId, templateId) {
+      const page = await listNotices(consumerId, {
+        templateId,
+        limit: 100_000,
+      });
+      return page.notices;
     },
     probe: {
       async auditEvents({ versionId }) {
@@ -45,10 +72,10 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
           .select()
           .from(auditEvents)
           .where(eq(auditEvents.versionId, versionId))
-          .orderBy(asc(auditEvents.at), sql`rowid`);
+          .orderBy(sql`rowid`);
         return rows.map((e) => ({
           action: e.action,
-          at: iso(e.at),
+          at: e.at.toISOString(),
           actorId: e.actorId,
           teamId: e.teamId,
           templateId: e.templateId,
@@ -56,35 +83,13 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
           details: e.details,
         }));
       },
-      async consumerNotices({ templateId }) {
-        const rows = await db!
-          .select()
-          .from(consumerNotices)
-          .where(eq(consumerNotices.templateId, templateId))
-          .orderBy(asc(consumerNotices.seq));
-        return rows.map((n) => ({
-          seq: n.seq,
-          consumerId: n.consumerId,
-          templateId: n.templateId,
-          versionId: n.versionId,
-          kind: n.kind,
-          payload: n.payload,
-          createdAt: iso(n.createdAt),
-        }));
-      },
       async notifications({ userId }) {
         const rows = await db!
-          .select()
+          .select({ userId: notifications.userId, kind: notifications.kind })
           .from(notifications)
           .where(eq(notifications.userId, userId))
-          .orderBy(asc(notifications.createdAt), sql`rowid`);
-        return rows.map((n) => ({
-          userId: n.userId,
-          kind: n.kind,
-          title: n.title,
-          href: n.href,
-          createdAt: iso(n.createdAt),
-        }));
+          .orderBy(asc(sql`rowid`));
+        return rows;
       },
     },
   };

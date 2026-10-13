@@ -5,7 +5,11 @@ import {
 } from "@/domain/business-zone";
 import { compareRounds, isReleased } from "@/domain/rounds";
 import type { TeamRole, Viewer } from "@/domain/types";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { TestHooks } from "../options";
+import { refuse } from "../refuse";
 import type { FakeState, TemplateRow, VersionRow } from "./state";
+import type { FakeTx } from "./store";
 
 // The lookups the fake's areas share, each the in-memory twin of a query the local implementation runs: the
 // same rows, in the same order, so the two answer alike (the contract suite checks they do).
@@ -103,4 +107,32 @@ export function viewerOf(state: FakeState, userId: string): Viewer | null {
         ];
       }),
   };
+}
+
+/**
+ * The compare-and-set on a version (`updateVersion` in src/server/version-rows.ts): writes `patch` only while
+ * the row still has the state, rev and stage it was read with (`read`), bumping its rev; refused
+ * `version_changed` otherwise. A test's `hooks.beforeCompareAndSet` can change the row in between, as another
+ * writer would.
+ */
+export function compareAndSetVersion(
+  tx: FakeTx,
+  row: VersionRow,
+  read: Pick<VersionRow, "state" | "rev" | "currentStage">,
+  patch: Partial<VersionRow>,
+  at: Date,
+  hooks: TestHooks,
+): void {
+  if (
+    hooks.beforeCompareAndSet?.({ table: "versions", id: row.id }) ===
+    "competing_write"
+  )
+    tx.update("versions", row, { rev: row.rev + 1 });
+  if (
+    row.state !== read.state ||
+    row.rev !== read.rev ||
+    row.currentStage !== read.currentStage
+  )
+    refuse(REQUEST_REFUSALS.versionChanged);
+  tx.update("versions", row, { ...patch, rev: row.rev + 1, updatedAt: at });
 }
