@@ -1,19 +1,13 @@
 import "server-only";
 import { cache } from "react";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { recertifications, teams } from "@/server/db/schema/ucomp";
 import { demoNow } from "./dynamic";
+import { requireCan } from "./require-can";
 import { getViewer } from "@/server/viewer";
-import {
-  ALL_SPACE,
-  can,
-  canSeeSpace,
-  defaultSpace,
-  spacesFor,
-  type Space,
-} from "@/domain/permissions";
+import { ALL_SPACE, can, spacesFor, type Space } from "@/domain/permissions";
 import type { SidebarCardModel } from "@/domain/access-types";
 import type { Viewer } from "@/domain/types";
 import { getHomeCard, getSidebarCards } from "./access";
@@ -143,8 +137,9 @@ export interface SpaceContext {
 }
 
 /**
- * Resolves the `[team]` segment for the current viewer.
- * Unknown slug → 404. A real team the viewer can't see → their default space (or request-access).
+ * Resolves the `[team]` segment for the current viewer. Not found for an unknown slug, and the same page for
+ * a team (or "All teams") the viewer can't see: seeing a space is `template.view` there, as
+ * `canSeeSpace` answers it for the team switcher and the persona switch.
  */
 export const requireSpace = cache(
   async (slug: string): Promise<SpaceContext> => {
@@ -155,11 +150,7 @@ export const requireSpace = cache(
       : ((await db.query.teams.findFirst({ where: eq(teams.slug, slug) })) ??
         null);
     if (!isAll && !team) notFound();
-
-    if (!canSeeSpace(viewer, slug)) {
-      const fallback = defaultSpace(viewer);
-      redirect(fallback ? `/${fallback}/library` : "/request-access");
-    }
+    requireCan(viewer, "template.view", { teamId: team?.id ?? ALL_SPACE });
     return {
       viewer,
       slug,

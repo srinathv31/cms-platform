@@ -22,8 +22,8 @@ import { getViewer } from "@/server/viewer";
 // a revoked or a Superseded one. Every request that reaches a known version is logged as a preview
 // (`is_preview`, no consumer) and never counts in Usage.
 //
-// A POST handler always runs at request time, Cache Components or not. The body is read within
-// MAX_BODY_BYTES (render-http.ts).
+// A POST handler always runs at request time, Cache Components or not. The person is resolved first,
+// then the body is read within MAX_BODY_BYTES (render-http.ts).
 
 /** A preview's round: a whole number from 1. */
 const Round = z.int().min(1);
@@ -34,6 +34,8 @@ export async function POST(
 ) {
   const { templateId } = await ctx.params;
   const correlationId = correlationIdOf(request);
+  // The person first, before a byte of the body is read (as drafts and imports do).
+  const viewer = await getViewer();
 
   const read = await readRenderRequest(request);
   if (!read.ok) return errorResponse(read.error, correlationId);
@@ -69,7 +71,7 @@ export async function POST(
       preview: true,
       consumerId: null,
       correlationId,
-      viewer: await getViewer(),
+      viewer,
     });
     if (!result.ok) return errorResponse(result.error, correlationId);
     return renderSuccessResponse(result, {

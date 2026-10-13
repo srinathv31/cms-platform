@@ -5,6 +5,7 @@ import type { Client } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, beforeEach } from "vitest";
+import { fileUrlOfPath } from "@/lib/file-url";
 import { createAppClient } from "@/lib/serialized-writes";
 
 // Test support: a database per test. Not app code, and only test files import it.
@@ -19,7 +20,7 @@ const MIGRATIONS = "./src/server/db/migrations";
 
 function open<S extends Record<string, unknown>>(path: string, schema: S) {
   // As the app opens it (writes take turns, other connections' locks are waited out).
-  const libsql = createAppClient({ url: `file:${path}` });
+  const libsql = createAppClient({ url: fileUrlOfPath(path) });
   return { libsql, db: drizzle(libsql, { schema }) };
 }
 
@@ -107,7 +108,7 @@ export function tempDatabase<S extends Record<string, unknown>>(
   return {
     /** The file the handles follow now. */
     get DATABASE_URL() {
-      return `file:${currentPath}`;
+      return fileUrlOfPath(currentPath);
     },
     libsql: libsql.proxy as Client,
     db: db.proxy as typeof first.db,

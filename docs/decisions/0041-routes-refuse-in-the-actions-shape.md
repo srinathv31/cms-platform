@@ -1,6 +1,7 @@
 # 0041. The browser's routes refuse in the shape server actions do
 
 Status: Accepted
+Amended 2026-10-12: `/api/v1`'s errors follow the existing UCOMP API's error format with a stable code and each code's details, not necessarily RFC 9457 problem details; the browser's routes keep this record's shape ([0056](0056-api-v1-errors-follow-the-ucomp-api-error-format.md)).
 Date: 2026-10-11
 
 ## Context

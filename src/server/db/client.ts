@@ -4,8 +4,8 @@ import { drizzle } from "drizzle-orm/libsql";
 import * as ucomp from "./schema/ucomp";
 import { createAppClient } from "@/lib/serialized-writes";
 
-// Local SQLite file by default. Point DATABASE_URL at libsql://… (+ DATABASE_AUTH_TOKEN)
-// to use Turso with no code change.
+// Local SQLite file by default. A remote libsql:// database (+ DATABASE_AUTH_TOKEN) opens, but is not
+// a supported deployment: see the header of `src/lib/serialized-writes.ts`.
 export const DATABASE_URL = process.env.DATABASE_URL ?? "file:./data/ucomp.db";
 
 // Writes inside this process take turns, and SQLite waits out another process's lock instead of

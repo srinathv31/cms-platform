@@ -9,6 +9,7 @@ import {
   type ImportResponse,
 } from "@/domain/import-types";
 import { createDraft } from "@/domain/lifecycle/drafts";
+import { REFUSALS as LIFECYCLE_REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS, can } from "@/domain/permissions";
 import { refuse, type Refused, type RefusalCode } from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";
@@ -17,6 +18,7 @@ import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { teams, uploads } from "@/server/db/schema/ucomp";
 import { prepareBody } from "@/server/documents/prepare";
+import { inTransaction } from "@/server/effects";
 import { newId } from "@/server/ids";
 import {
   conformToContentType,
@@ -50,13 +52,17 @@ export interface ImportOptions {
 const refuseFile = (name: ImportRefusalName): ImportResponse =>
   refuse(IMPORT_REFUSALS[name]);
 
-/** The statuses of the refusals that aren't a plain 400: the file is too large, or not a kind we take. */
+/**
+ * The statuses of the refusals that aren't a plain 400 or 403: the file is too large, or not a kind we
+ * take, or no content type makes documents (Platform settings, not the file or the person).
+ */
 const IMPORT_STATUS: Partial<Record<RefusalCode, number>> = {
   [IMPORT_REFUSALS.size.code]: 413,
   [IMPORT_REFUSALS.type.code]: 415,
   [IMPORT_REFUSALS.legacyDoc.code]: 415,
   [IMPORT_REFUSALS.notPdf.code]: 415,
   [IMPORT_REFUSALS.notWord.code]: 415,
+  [LIFECYCLE_REFUSALS.noContentType.code]: 409,
 };
 const IMPORT_CODES: ReadonlySet<string> = new Set(
   Object.values(IMPORT_REFUSALS).map((entry) => entry.code),
@@ -64,7 +70,8 @@ const IMPORT_CODES: ReadonlySet<string> = new Set(
 
 /**
  * The HTTP status for an import's answer: 200 · 400 the file is refused · 403 the viewer may not
- * create here (any refusal that isn't about the file) · 413 too large · 415 not a kind we take.
+ * create here (any other refusal) · 409 no content type makes documents · 413 too large · 415 not a
+ * kind we take.
  */
 export function importStatus(response: ImportResponse): number {
   if (response.ok) return 200;
@@ -111,9 +118,10 @@ export async function importTemplate(
   const converted = await convertFile(kind, file.bytes);
   if (!converted.ok) return refuseFile(converted.code);
 
-  // Import makes documents (`importUnavailable`): a file's text becomes the body.
+  // Import makes documents (`importUnavailable`): a file's text becomes the body. No content type makes
+  // them: refused, as New template refuses it.
   const chosen = await newTemplateType("document");
-  if (!chosen.ok) throw new Error(chosen.reason);
+  if (!chosen.ok) return chosen;
   const { contentType } = chosen;
   const finished = finishImport({
     file: converted.file,
@@ -175,7 +183,7 @@ export async function importTemplate(
       },
       root,
     );
-    await db.transaction(async (tx) => {
+    await inTransaction(db, async (tx) => {
       await insertNewTemplate(tx, {
         templateId,
         teamId: team.id,

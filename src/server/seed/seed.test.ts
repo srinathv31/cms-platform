@@ -20,6 +20,7 @@ import {
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import { headOf, isReleased } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
+import { fileUrlOfPath } from "@/lib/file-url";
 import * as ucomp from "@/server/db/schema/ucomp";
 import * as sim from "@/server/db/schema/sim";
 import {
@@ -99,7 +100,9 @@ const dirs: string[] = [];
 async function freshDb(base: Date) {
   const dir = mkdtempSync(join(tmpdir(), "ucomp-seed-"));
   dirs.push(dir);
-  const client: Client = createClient({ url: `file:${join(dir, "seed.db")}` });
+  const client: Client = createClient({
+    url: fileUrlOfPath(join(dir, "seed.db")),
+  });
   const db = drizzle(client, { schema: ucomp });
   await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
   const result = await seedDatabase(db, { base });

@@ -78,8 +78,9 @@ the merge of each wave, and wave 4.
 
 ### Item 1. Prettier, default configuration
 
-- [ ] Add Prettier as a dev dependency, run it with the default configuration (`--config=empty`, no project
+- [x] Add Prettier as a dev dependency, run it with the default configuration (`--config=empty`, no project
       overrides), commit the result as one formatting-only PR, and add `prettier --check` to the checks in AGENTS.md.
+      (wave 0, PR #76)
 - Why: there is no formatter today, and formatting consistency comes from one author. With a team it drifts in a week
   and every PR carries whitespace diffs.
 - Start at: `package.json` scripts; AGENTS.md "Commands" table; expect a large diff in `e2e/` and `src/components/`
@@ -89,28 +90,28 @@ the merge of each wave, and wave 4.
 
 ### Item 4. The four Medium bugs (lane A)
 
-- [ ] M-1: two retry layers compound to a worst case of about 90 s (`src/lib/serialized-writes.ts:29`,
+- [x] M-1: two retry layers compound to a worst case of about 90 s (`src/lib/serialized-writes.ts:29`,
       `src/server/effects.ts:301-310`, the copy in `src/server/drafts/apply-patch.ts:68-77`). One place waits and
-      fails fast; delete the copy; document the worst case.
-- [ ] M-2: import throws a 500 where it should refuse (`src/server/import/create.ts:96-97`): `return chosen`.
-- [ ] M-3: three answers for "you may not read this section" (`src/server/queries/access.ts:117-124` throws,
+      fails fast; delete the copy; document the worst case. (wave 1)
+- [x] M-2: import throws a 500 where it should refuse (`src/server/import/create.ts:96-97`): `return chosen`. (wave 1)
+- [x] M-3: three answers for "you may not read this section" (`src/server/queries/access.ts:117-124` throws,
       `queries/platform.ts:58-62` and `queries/audit.ts:83` return 404, `queries/spaces.ts:141-144` redirects): one
-      `requireCan(viewer, action, resource)` that answers `notFound()`.
-- [ ] M-4: pasting Markdown text containing U+0000 throws inside the clipboard parser
-      (`src/editor/paste/markdown.ts:293-321`): strip control characters first.
+      `requireCan(viewer, action, resource)` that answers `notFound()`. (wave 1)
+- [x] M-4: pasting Markdown text containing U+0000 throws inside the clipboard parser
+      (`src/editor/paste/markdown.ts:293-321`): strip control characters first. (wave 1)
 - With them, the small security items that need no sign-in: static security headers in `next.config.ts` (M-20),
   the notices route answering 403 before 404 and the preview route resolving the viewer before reading the body
   (M-21), and no `render_log` row for an `unknown_consumer` attempt (M-7).
 
 ### Item 8. Walk through every remaining decision before writing entities (lane B)
 
-- [ ] A dedicated, in-depth session (not a review) that goes through the fifteen decisions in the review's section 8
+- [x] A dedicated, in-depth session (not a review) that goes through the fifteen decisions in the review's section 8
       and the two below, and records each as a decision record before the Java team writes a single JPA entity:
       team and user ids, the JSON column policy per column, the notice sequence and filtered indexes, timestamps,
       stored sentences vs facts, typed audit and notice payloads (D10), document validation (JSON Schema or BFF),
       JSON number source text, the error shape, consumer identity, search paging, logs as time series, the PDF engine
       and font, the test seam, and test data with literal ids. The two that lane F needs first: team id = slug, and
-      sentences or facts in notifications.
+      sentences or facts in notifications. (wave 1)
 - The two data questions raised by the owner:
   - **Template ids and MSSQL.** Today `newTemplateId()` in `src/server/ids.ts` draws six Crockford base32
     characters from `crypto.getRandomValues` (about 1.07 billion values), and `freshTemplateId` in
@@ -131,10 +132,10 @@ the merge of each wave, and wave 4.
 
 ### Item 10. Demo tools behind a demo flag (lane C)
 
-- [ ] Put the demo reset, the clock advance and the persona switcher behind one `DEMO_MODE` flag read from a new
+- [x] Put the demo reset, the clock advance and the persona switcher behind one `DEMO_MODE` flag read from a new
       config module under src/server (which lane F extends later), off by default; `resetDemo()` refuses any
       database that isn't a local file. Coral and the two dev labs stay for now (the labs already answer 404 in
-      production).
+      production). (wave 1)
 - Why: S1 (Critical, deferred) is the one finding a production deployment cannot carry even for a day, and the flag
   is small. The removal itself waits for real sign-in, as the backlog says.
 - Start at: `src/server/actions/demo.ts`, `src/server/actions/persona.ts`, `src/server/reset.ts:67-86`,
@@ -142,23 +143,23 @@ the merge of each wave, and wave 4.
 
 ### Item 11. Windows readiness, with the dependency pins (lane D)
 
-- [ ] Every work laptop is Windows. `cross-env` for the POSIX-only npm scripts (`golden:update`, and the documented
+- [x] Every work laptop is Windows. `cross-env` for the POSIX-only npm scripts (`golden:update`, and the documented
       `E2E_WORKERS=1 …`, `E2E_PORT=3000 …` prefixes, with a PowerShell note in README.md); a
       `pretypecheck` that removes a stale `.next/dev/types`; check path handling in `src/server/import/store.ts`,
-      `src/server/render/channels/pdf-fonts.ts` and `e2e/storage.ts` on a Windows checkout (M-31, M-32, T8).
-- [ ] In the same `package.json` change: exact pins for `@react-pdf/renderer` and `pdfjs-dist`, since the PDF
-      adapter depends on their internals (M-19), with a comment saying why.
+      `src/server/render/channels/pdf-fonts.ts` and `e2e/storage.ts` on a Windows checkout (M-31, M-32, T8). (wave 1)
+- [x] In the same `package.json` change: exact pins for `@react-pdf/renderer` and `pdfjs-dist`, since the PDF
+      adapter depends on their internals (M-19), with a comment saying why. (wave 1)
 - Owner's call (2026-10-12): `.claude/skills/` and `.agents/` stay tracked. The owner uses them, and the handoff
   copies the source into a new repository rather than moving this one, so they are simply left out of the copy.
 - Why: an env-prefixed script fails in cmd.exe and PowerShell.
 
 ### Golden corpus gaps (lane E, promoted 2026-10-12)
 
-- [ ] The corpus is the Java engine's acceptance test, the work is pure Node with no rework risk, and a hole here
+- [x] The corpus is the Java engine's acceptance test, the work is pure Node with no rework risk, and a hole here
       becomes a bug the Java team ships and then a dispute about which engine is right. Add `error-invalid-values-only`,
       `error-value-too-long` (a 1,001-code-point value), `error-push-field`, `error-sms-field`, a `round` fixture and
       one `*-round-2` case, and a web/email-only `characters-scripts` case with RTL and CJK text (M-16); fix the two
-      comments in `src/domain/render/types.ts` that contradict the spec (M-17).
+      comments in `src/domain/render/types.ts` that contradict the spec (M-17). (wave 1)
 - Start at: `src/server/render/golden/focused-cases.ts`, `golden/README.md`, `docs/render-spec.md` §13.
 
 ## Wave 2
@@ -317,6 +318,8 @@ engineering handoff.
   review (`src/domain/comments.ts`); the members table hides controls for roles that may not act rather than
   disabling them with a reason. Each is a small rule to confirm or change.
 - A readable template id (item 8): what makes an id readable to the business?
+- The `UC-` prefix (item 8, decision 0060): it is left from the product's old name and printed on every customer
+  PDF. Keep it, or change it while there are no consumers to break? Asked together with the readable id.
 
 ## Noted for the handoff doc, not for this repo
 
@@ -332,3 +335,16 @@ engineering handoff.
 - **DTOs and typed payloads (D10, M-11):** wait for the OpenAPI spec and the enterprise API design, then generate
   the types. Not hand-written here.
 - **Who upgrades Next.js:** PR #4 (16.4) is parked on an upstream prefetch loop; name an owner in the package.
+- **Deletion and cascades:** what can be deleted (a template, a team, a user) and what outlives what. Nothing can be
+  deleted today, and several references have no foreign key on purpose (logs outlive their targets; the data model
+  report's M7). Decide before anyone writes JPA cascades.
+- **A consumer registry screen (decision 0057):** nothing registers a consumer or links it to an Entra app
+  registration; consumers come from the seed.
+- **The exact UCOMP error shape (decision 0056):** `/api/v1` follows the existing UCOMP API's error format; write the
+  format down and map today's codes and each code's details onto it.
+- **The viewer's credential from the BFF to Java (decision 0070):** forward the user's token for the Java API's scope,
+  or an on-behalf-of exchange; decided with the sign-in work.
+- **Better Auth's Microsoft account id (decision 0054):** check whether it is `sub` (per app) or `oid` (per tenant),
+  and how Better Auth's tables map onto the app's `users` table.
+- **Before the Java PDF port (decision 0067):** whether customer PDFs must be PDF/UA (accessible) or PDF/A (archival),
+  and the enterprise font's licence for embedding and subsetting, with its coverage written into the render spec (R3).

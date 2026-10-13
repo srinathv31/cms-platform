@@ -19,14 +19,17 @@ import { NAV_ICON_STROKE } from "./nav";
 import { usePersonaSwitch } from "./persona-switch";
 import { UserAvatar } from "./user-avatar";
 
-/** Avatar → who you are, plus the persona switcher (the demo's way to change viewer). */
+/**
+ * Avatar → who you are, plus the persona switcher (the demo's way to change viewer). The switcher is a demo
+ * tool: `personas` is null unless the server runs in demo mode (decision 0051), and the menu has no switcher.
+ */
 export function ProfileMenu({
   me,
   personas,
   canRequestAccess,
 }: {
   me: PersonaSummary;
-  personas: PersonaSummary[];
+  personas: PersonaSummary[] | null;
   /** False for the Auditor, who is read-only everywhere and holds no team role. */
   canRequestAccess: boolean;
 }) {
@@ -36,7 +39,7 @@ export function ProfileMenu({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
-        aria-label={`${me.name}, profile and persona`}
+        aria-label={`${me.name}, ${personas ? "profile and persona" : "profile"}`}
         className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       >
         <UserAvatar initials={me.initials} hue={me.hue} className="size-9" />
@@ -73,38 +76,42 @@ export function ProfileMenu({
             </DropdownMenuItem>
           </>
         ) : null}
-        <DropdownMenuSeparator className="mx-1 bg-hairline" />
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-2.5 pt-2.5 pb-1.5">
-            <span className="caps-label">Switch persona</span>
-          </DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={me.id}
-            onValueChange={(id) => {
-              setOpen(false);
-              switchTo(id);
-            }}
-          >
-            {personas.map((p) => (
-              <DropdownMenuRadioItem
-                key={p.id}
-                value={p.id}
-                closeOnClick
-                className="gap-3 rounded-lg py-2 pr-9 pl-2.5"
+        {personas ? (
+          <>
+            <DropdownMenuSeparator className="mx-1 bg-hairline" />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-2.5 pt-2.5 pb-1.5">
+                <span className="caps-label">Switch persona</span>
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={me.id}
+                onValueChange={(id) => {
+                  setOpen(false);
+                  switchTo(id);
+                }}
               >
-                <UserAvatar initials={p.initials} hue={p.hue} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] leading-5 font-medium">
-                    {p.name}
-                  </span>
-                  <span className="block truncate text-[12.5px] leading-[18px] text-text-muted">
-                    {p.summary}
-                  </span>
-                </span>
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuGroup>
+                {personas.map((p) => (
+                  <DropdownMenuRadioItem
+                    key={p.id}
+                    value={p.id}
+                    closeOnClick
+                    className="gap-3 rounded-lg py-2 pr-9 pl-2.5"
+                  >
+                    <UserAvatar initials={p.initials} hue={p.hue} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] leading-5 font-medium">
+                        {p.name}
+                      </span>
+                      <span className="block truncate text-[12.5px] leading-[18px] text-text-muted">
+                        {p.summary}
+                      </span>
+                    </span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

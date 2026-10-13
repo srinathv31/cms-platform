@@ -42,8 +42,9 @@ export type { BulletStyle, MarkerDelimiter, MarkerFormat };
  * keep a short value from wrapping). Invariants:
  *   - `text` is never empty and is NFC-normalized;
  *   - it never contains a line break (U+000A, U+000D, U+2028, U+2029: those become `break`s), a tab
- *     (a tab becomes one space), other C0/C1 controls, or the zero-width characters U+200B–U+200D,
- *     U+2060, U+FEFF (those render as nothing);
+ *     (a tab becomes one space), another C0/C1 control character, or an invisible character: the soft
+ *     hyphen, zero-width and direction marks, variation selectors and the rest of the set in
+ *     docs/render-spec.md section 4 (`INVISIBLE_CHARACTERS` in @/editor/model/links), which render as nothing;
  *   - spaces are exactly as typed: leading, trailing and repeated U+0020 and U+00A0 are content;
  *   - adjacent runs with identical marks are merged, except that a variable's run never merges.
  */
@@ -59,7 +60,10 @@ export interface RenderText {
   variable?: string;
 }
 
-/** A hard line break. Paragraph and heading content never ends with one (they are stripped). */
+/**
+ * A hard line break. Every break the author typed stays, one at the very end of a paragraph or heading
+ * included: it leaves an empty last line in every channel (docs/render-spec.md section 4, "Hard breaks").
+ */
 export interface RenderBreak {
   type: "break";
 }
@@ -476,9 +480,9 @@ export interface RenderErrorBody {
 // ── render_log ───────────────────────────────────────────────────────────────
 
 /**
- * One row per render that reached a known template and version (requests rejected before that are
- * not logged). The ONLY fields written; there is deliberately no place for values, the request body,
- * or rendered output.
+ * One row per render that reached a known template and version (requests rejected before that, and a
+ * caller that isn't a registered consumer, are not logged). The ONLY fields written; there is
+ * deliberately no place for values, the request body, or rendered output.
  */
 export interface RenderLogEntry {
   templateId: string;

@@ -3,8 +3,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient, type Client } from "@libsql/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createAppClient, serializeWrites } from "@/lib/serialized-writes";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fileUrlOfPath } from "@/lib/file-url";
+import {
+  createAppClient,
+  serializeWrites,
+  WRITE_TURN_WAIT_MS,
+} from "@/lib/serialized-writes";
 
 // Against real SQLite files: the bug lives in how the local driver behaves after SQLITE_BUSY.
 
@@ -15,13 +20,14 @@ const open = (client: Client) => (opened.push(client), client);
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "ucomp-serialized-writes-"));
-  url = `file:${join(dir, "test.db")}`;
+  url = fileUrlOfPath(join(dir, "test.db"));
   const setup = createClient({ url });
   await setup.execute("CREATE TABLE t (x INTEGER)");
   setup.close();
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   for (const client of opened.splice(0)) client.close();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -123,7 +129,7 @@ describe("serializeWrites", () => {
     await exited;
   });
 
-  it("gives up after its wait with SQLITE_BUSY, which the callers' retries understand, and frees the queue", async () => {
+  it("gives up after its wait with SQLITE_BUSY and frees the queue", async () => {
     const client = open(serializeWrites(createClient({ url }), { waitMs: 20 }));
     const tx = await client.transaction("write");
     await expect(
@@ -156,5 +162,47 @@ describe("serializeWrites", () => {
     await expect(failing.transaction("write")).rejects.toThrow("locked");
     await client.execute("INSERT INTO t VALUES (2)");
     expect(await count(client)).toBe(2);
+  });
+});
+
+describe("how long a write waits", () => {
+  // The app's one wait for the database (the module header): 5 s for a turn, then SQLITE_BUSY.
+  it("waits WRITE_TURN_WAIT_MS (5 s) for its turn, then fails as SQLITE_BUSY", async () => {
+    expect(WRITE_TURN_WAIT_MS).toBe(5_000);
+    const client = open(createAppClient({ url }));
+    // The lock is shared by every client in the process: whatever happens, let go of it.
+    const held = await client.transaction("write");
+    try {
+      vi.useFakeTimers();
+      const outcome = vi.fn();
+      client.execute("INSERT INTO t VALUES (1)").then(
+        () => outcome("written"),
+        (error: { code?: string }) => outcome(error.code),
+      );
+      await vi.advanceTimersByTimeAsync(WRITE_TURN_WAIT_MS - 1);
+      expect(outcome, "a moment before the limit").not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(outcome).toHaveBeenCalledWith("SQLITE_BUSY");
+    } finally {
+      vi.useRealTimers();
+      await held.rollback();
+    }
+    expect(await count(client)).toBe(0);
+  });
+
+  it("gets its turn when the write ahead of it ends inside the wait", async () => {
+    const client = open(createAppClient({ url }));
+    const held = await client.transaction("write");
+    let write: Promise<unknown> | undefined;
+    try {
+      vi.useFakeTimers();
+      write = client.execute("INSERT INTO t VALUES (1)");
+      await vi.advanceTimersByTimeAsync(WRITE_TURN_WAIT_MS - 1);
+    } finally {
+      vi.useRealTimers();
+      await held.commit();
+    }
+    await write;
+    expect(await count(client)).toBe(1);
   });
 });

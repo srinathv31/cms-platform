@@ -1,0 +1,54 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "A value at the limit",
+  "versionNumber": 1,
+  "blocks": [
+    {
+      "type": "heading",
+      "id": "b1",
+      "level": 1,
+      "section": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "A value at the limit"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Before."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b4",
+      "content": [
+        {
+          "type": "text",
+          "text": "Memo: "
+        },
+        {
+          "type": "text",
+          "text": "Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀",
+          "variable": "memo"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": "b5",
+      "content": [
+        {
+          "type": "text",
+          "text": "After."
+        }
+      ]
+    }
+  ]
+}

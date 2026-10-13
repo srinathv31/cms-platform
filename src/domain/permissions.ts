@@ -1,5 +1,6 @@
 // Who may do what: the one central permission check (build plan, "Personas and permissions").
-// Server mutations call `assertCan`; the UI calls `can` to hide, show or disable actions.
+// Server actions check it through the kit (`check()`), pages through `requireCan`; the UI reads the
+// decided `can` in a read model to show or disable an action.
 // Pure TypeScript with no framework imports, so it ports directly to the Spring Boot API.
 //
 // A decision has two steps:
@@ -8,7 +9,7 @@
 //      every team and in the cross-team "All teams" space. Grants add up across roles.
 //   2. Guards: separation-of-duties rules that block an action even when a role grants it.
 
-import { refusal, refuse, type Refusal, type RefusalCode } from "./refusals";
+import { refusal, refuse, type Refusal } from "./refusals";
 import type {
   Action,
   PermissionResource,
@@ -160,30 +161,6 @@ export function can(
     return refuse(REASONS.generic);
   }
   return blocked ? refuse(blocked) : { ok: true };
-}
-
-export class PermissionError extends Error {
-  readonly action: Action;
-  readonly code: RefusalCode;
-  readonly reason: string;
-
-  constructor(action: Action, { code, reason }: Refusal) {
-    super(reason);
-    this.name = "PermissionError";
-    this.action = action;
-    this.code = code;
-    this.reason = reason;
-  }
-}
-
-/** Throws a `PermissionError` carrying the refusal's code and reason when `can` says no. */
-export function assertCan(
-  viewer: Viewer,
-  action: Action,
-  resource?: PermissionResource,
-): void {
-  const result = can(viewer, action, resource);
-  if (!result.ok) throw new PermissionError(action, result);
 }
 
 function granted(

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createClient, type Client } from "@libsql/client";
+import type { Client } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
@@ -15,6 +15,8 @@ import type {
   Variable,
   Viewer,
 } from "@/domain/types";
+import { fileUrlOfPath } from "@/lib/file-url";
+import { createAppClient } from "@/lib/serialized-writes";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { accessRefusal, applyDraftPatch } from "./apply-patch";
@@ -139,7 +141,8 @@ async function seed() {
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "ucomp-drafts-"));
-  client = createClient({ url: `file:${join(dir, "drafts.db")}` });
+  // Opened as the app opens its database: two saves at once take turns rather than collide.
+  client = createAppClient({ url: fileUrlOfPath(join(dir, "drafts.db")) });
   db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: "./src/server/db/migrations" });
 }, 30_000);

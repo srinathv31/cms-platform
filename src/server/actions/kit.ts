@@ -26,7 +26,7 @@ import { getViewer } from "@/server/viewer";
 //      refuse what the request can't be (the record is gone, the note is too long). It returns what
 //      the transaction needs.
 //   4. `now()`, once.
-//   5. `transaction`: ONE `inTransaction`, retried when SQLite is busy. Re-read, ask the domain, write
+//   5. `transaction`: ONE `inTransaction`, run once (a busy database fails it). Re-read, ask the domain, write
 //      with a compare-and-set, and write the effects (audit rows, notifications, consumer notices).
 //   6. `after`, only when the transaction committed with `ok`: `revalidatePath()`, `refresh()`, and
 //      `redirect()` last.

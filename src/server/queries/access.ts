@@ -49,7 +49,7 @@ import {
   type RequestAccessData,
   type SidebarCardModel,
 } from "@/domain/access-types";
-import { ALL_SPACE, assertCan, can, spacesFor } from "@/domain/permissions";
+import { ALL_SPACE, can, spacesFor } from "@/domain/permissions";
 import type { Person } from "@/domain/review-types";
 import { refuse, type Refusal, type Refused } from "@/domain/refusals";
 import { TEAM_ROLES, type PermissionResult, type Viewer } from "@/domain/types";
@@ -69,6 +69,7 @@ import {
 } from "@/server/db/schema/ucomp";
 import { getViewer } from "@/server/viewer";
 import { demoNow } from "./dynamic";
+import { requireCan } from "./require-can";
 
 // Read models for team access: the Request access page (anyone), the four Team sections of the
 // settings modal (the team's Team Admins) and the sidebar cards. Every date is relative to the demo
@@ -144,7 +145,7 @@ async function teamBySlug(slug: string) {
   return team;
 }
 
-/** A Team section: the viewer must manage the team's members (Team Admin). Throws `PermissionError`. */
+/** A Team section: the viewer must manage the team's members (Team Admin); anyone else gets a 404. */
 async function teamSection(
   slug: string,
   action:
@@ -152,7 +153,7 @@ async function teamSection(
 ) {
   const viewer = await getViewer();
   const team = await teamBySlug(slug);
-  assertCan(viewer, action, { teamId: team.id });
+  requireCan(viewer, action, { teamId: team.id });
   const nowDate = await demoNow();
   const people = await getUsers();
   return {

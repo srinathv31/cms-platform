@@ -329,6 +329,13 @@ async function libraryRows(page: Page): Promise<LibraryRow[]> {
 
 const names = (rows: LibraryRow[]) => rows.map((r) => r.name).sort();
 
+/** The page a viewer may not read: Not found, as for a team that doesn't exist (decision 0052). */
+async function expectNotFound(page: Page) {
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Not found" }),
+  ).toBeVisible();
+}
+
 async function expectLanded(page: Page, spec: PersonaSpec) {
   await expect(page).toHaveURL(new RegExp(`${spec.landing}$`));
 }
@@ -436,8 +443,11 @@ test.describe("shell and library, per persona", () => {
         await expect(
           sidebarFooter(page).getByRole("link", { name: "Settings" }),
         ).toHaveCount(0);
-        // Having no team, Morgan cannot open anyone's library: it falls back to request access.
+        // Having no team, Morgan cannot open anyone's library: it is Not found, as a team that doesn't
+        // exist (decision 0052), and Back to library takes him to request access.
         await page.goto("/coral-offers/library");
+        await expectNotFound(page);
+        await page.getByRole("button", { name: "Back to library" }).click();
         await expect(page).toHaveURL(/\/request-access$/);
         return;
       }
@@ -532,11 +542,12 @@ test.describe("shell and library, per persona", () => {
     )!;
     expect(insert.team).toBe("Card Statements");
 
+    // Card Statements' library is Not found for Maya, as a team that doesn't exist (decision 0052).
     await asPersona(page, "maya");
     await page.goto("/card-statements/library");
-    await expect(page).toHaveURL(/\/coral-offers\/library$/);
-    const rows = await libraryRows(page);
-    for (const n of CARD_STATEMENTS) expect(names(rows)).not.toContain(n);
+    await expectNotFound(page);
+    for (const n of CARD_STATEMENTS)
+      await expect(page.getByText(n, { exact: false })).toHaveCount(0);
 
     // The same template under the Coral space, or under its own space, is not Maya's to open.
     for (const href of [
@@ -571,8 +582,10 @@ test.describe("shell and library, per persona", () => {
     await expect(
       page.getByRole("button", { name: "New template" }),
     ).toHaveCount(0);
-    // But she can't open Card Statements: she is sent home.
+    // But she can't open Card Statements: it is Not found, and Back to library takes her home.
     await page.goto("/card-statements/library");
+    await expectNotFound(page);
+    await page.getByRole("button", { name: "Back to library" }).click();
     await expect(page).toHaveURL(/\/coral-offers\/library$/);
   });
 

@@ -2,7 +2,12 @@ import { resetDemo } from "@/server/reset";
 
 async function main() {
   const started = Date.now();
-  const { counts } = await resetDemo();
+  const result = await resetDemo();
+  if (!result.ok) {
+    console.error(`Demo not reset. ${result.reason}`);
+    process.exit(1);
+  }
+  const { counts } = result;
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
   console.log(
     `Demo reset in ${((Date.now() - started) / 1000).toFixed(1)}s: ` +

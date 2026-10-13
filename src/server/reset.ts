@@ -2,7 +2,9 @@ import "server-only";
 import { mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { migrate } from "drizzle-orm/libsql/migrator";
-import { db, libsql } from "./db/client";
+import { resetRefusal } from "@/domain/demo";
+import type { ActionResult } from "@/domain/review-types";
+import { DATABASE_URL, db, libsql } from "./db/client";
 import { settings } from "./db/schema/ucomp";
 import { CLOCK_OFFSET_KEY } from "./clock";
 import { defaultUploadsRoot } from "./import/store";
@@ -61,7 +63,13 @@ async function emptyUploads() {
   const dir = defaultUploadsRoot();
   await mkdir(dir, { recursive: true });
   for (const entry of await readdir(dir)) {
-    await rm(join(dir, entry), { recursive: true, force: true });
+    // A few retries, as in `removeUpload`: on Windows a virus scanner can still hold a file it was just handed.
+    await rm(join(dir, entry), {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 50,
+    });
   }
 }
 
@@ -69,8 +77,17 @@ async function emptyUploads() {
  * Restores the demo to its seeded state: drops every table, re-runs the migrations, seeds with the
  * current time as the base, resets the demo clock and empties the uploads folder.
  * Callable from a server action and from `npm run db:reset`.
+ *
+ * It refuses, before touching anything, a database that isn't a local SQLite file (`file:…`): it drops
+ * every table, so a remote `libsql://` database is never its to reset. That holds with or without the
+ * demo flag; the action checks the flag, this checks the database.
  */
-export async function resetDemo(): Promise<{ counts: Record<string, number> }> {
+export async function resetDemo(): Promise<
+  ActionResult<{ counts: Record<string, number> }>
+> {
+  const refused = resetRefusal(DATABASE_URL);
+  if (refused) return refused;
+
   await dropAllTables();
   await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
 
@@ -88,5 +105,5 @@ export async function resetDemo(): Promise<{ counts: Record<string, number> }> {
   }
 
   await emptyUploads();
-  return { counts: await countRows() };
+  return { ok: true, counts: await countRows() };
 }

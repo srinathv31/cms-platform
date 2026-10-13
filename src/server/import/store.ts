@@ -23,13 +23,25 @@ export const COMPARE_FILE = "compare.html";
 export const REPORT_FILE = "report.json";
 
 /**
+ * The uploads folder: `configured` (`UPLOADS_DIR`, absolute or relative to `cwd`) when set, else ./data/uploads.
+ * Pure: `pathApi` is `path.posix` or `path.win32`, so a test can check the Windows result on any machine.
+ */
+export function resolveUploadsRoot(
+  cwd: string,
+  configured: string | undefined,
+  pathApi: Pick<typeof path, "resolve"> = path,
+): string {
+  return pathApi.resolve(cwd, configured || UPLOADS_SUBDIR);
+}
+
+/**
  * The uploads folder: `UPLOADS_DIR` when set (e2e points it at its own folder, beside its own database),
  * else ./data/uploads. Every read, write and reset of uploads takes it from here.
  */
 export function defaultUploadsRoot(): string {
-  return path.resolve(
+  return resolveUploadsRoot(
     /*turbopackIgnore: true*/ process.cwd(),
-    process.env.UPLOADS_DIR || UPLOADS_SUBDIR,
+    process.env.UPLOADS_DIR,
   );
 }
 
@@ -38,7 +50,11 @@ function folder(root: string, uploadId: string): string {
   return path.join(/*turbopackIgnore: true*/ root, uploadId);
 }
 
-/** `uploads.path` for an original: "<uploadId>/original.<ext>", relative to the root. */
+/**
+ * `uploads.path` for an original: "<uploadId>/original.<ext>", relative to the root. It is a key, not a
+ * file-system path: it always has `/`, on every operating system, so rows written on one machine read
+ * on another. `path.join(root, key)` turns it into the host's path.
+ */
 export function originalPath(uploadId: string, kind: ImportKind): string {
   if (!UPLOAD_ID.test(uploadId)) throw new Error("Invalid upload id");
   return `${uploadId}/${ORIGINAL_BASENAME}.${kind}`;
@@ -83,12 +99,20 @@ export async function writeUpload(
   return stored;
 }
 
-/** Removes an upload's folder (the transaction that would have recorded it failed). */
+/**
+ * Removes an upload's folder (the transaction that would have recorded it failed). A few retries,
+ * because on Windows a virus scanner or the search indexer can still hold a file it was just handed.
+ */
 export async function removeUpload(
   uploadId: string,
   root = defaultUploadsRoot(),
 ): Promise<void> {
-  await rm(folder(root, uploadId), { recursive: true, force: true });
+  await rm(folder(root, uploadId), {
+    recursive: true,
+    force: true,
+    maxRetries: 3,
+    retryDelay: 50,
+  });
 }
 
 /** The original's bytes, by its `uploads.path`; null when missing or not a path this store wrote. */

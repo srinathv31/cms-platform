@@ -1,0 +1,106 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "A value at the limit",
+  "versionNumber": 1,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "memo",
+      "label": "Memo",
+      "type": "text",
+      "required": true,
+      "sample": "x"
+    },
+    {
+      "key": "spacer",
+      "label": "Spacer",
+      "type": "text",
+      "required": false,
+      "sample": ""
+    }
+  ],
+  "values": {
+    "memo": "Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀 Note 😀",
+    "spacer": "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            "
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "A value at the limit"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Before."
+          }
+        ],
+        "attrs": {
+          "id": "b2"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "spacer"
+            }
+          }
+        ],
+        "attrs": {
+          "id": "b3"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Memo: "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "memo"
+            }
+          }
+        ],
+        "attrs": {
+          "id": "b4"
+        }
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "After."
+          }
+        ],
+        "attrs": {
+          "id": "b5"
+        }
+      }
+    ]
+  },
+  "channelFields": {},
+  "channels": [
+    "web",
+    "email"
+  ]
+}

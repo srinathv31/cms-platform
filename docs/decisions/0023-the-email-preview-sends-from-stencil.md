@@ -1,6 +1,7 @@
 # 0023. The email preview's fallback sender is Stencil's, and the other UCOMP names wait
 
 Status: Accepted
+Amended 2026-10-12: the `UC-` id prefix is now a product owner question, asked with the readable id, while there are no consumers to break; the id stays random and the primary key ([0060](0060-template-ids-are-random-and-retried-on-a-collision.md)).
 Date: 2026-10-09
 
 ## Context

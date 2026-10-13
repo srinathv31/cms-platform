@@ -153,21 +153,21 @@ describe("GET /api/v1/consumers/[consumerId]/notices: errors", () => {
     );
   });
 
-  it("404 consumer_not_found: the path names an unregistered consumer", async () => {
-    await expectError(
-      await get("acme"),
-      404,
-      "consumer_not_found",
-      "Consumer acme doesn't exist.",
-    );
-  });
-
   it("403 consumer_mismatch: X-Consumer-Id is another consumer", async () => {
     await expectError(
       await get("deposits-online"),
       403,
       "consumer_mismatch",
       "X-Consumer-Id doesn't match consumer deposits-online.",
+    );
+  });
+
+  it("403 consumer_mismatch for a path that names no registered consumer too: no way to learn which ids exist", async () => {
+    await expectError(
+      await get("acme"),
+      403,
+      "consumer_mismatch",
+      "X-Consumer-Id doesn't match consumer acme.",
     );
   });
 

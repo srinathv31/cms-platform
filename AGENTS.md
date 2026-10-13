@@ -15,7 +15,7 @@ is [docs/README.md](docs/README.md). Ignore `docs/archive/`: it records how the 
 
 | Command                                     | What it does                                                                                                                                                                                                                                                                                           |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run dev`                               | Dev server on port 3000.                                                                                                                                                                                                                                                                               |
+| `npm run dev`                               | Dev server on port 3000, with the demo tools on (`.env.development`).                                                                                                                                                                                                                                  |
 | `npm run db:reset`                          | Drops and reseeds `data/ucomp.db` and empties `data/uploads` (the folder `UPLOADS_DIR` names, if set). Needed once after cloning.                                                                                                                                                                      |
 | `npm run typecheck`                         | `next typegen && tsc --noEmit`. Run it after adding or renaming a route.                                                                                                                                                                                                                               |
 | `npm run lint`                              | ESLint, including the import boundaries below.                                                                                                                                                                                                                                                         |
@@ -94,6 +94,9 @@ Next.js API; Next's own note about it is at the end of this file.
   consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
   throw only for bugs. Inside a transaction, read and write through `tx`, never `db`. `serverAction` in
   [src/server/actions/kit.ts](src/server/actions/kit.ts) runs these steps; every action is written on it.
+- Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts (`src/instrumentation.ts`): `DEMO_MODE` today. The demo tools (reset, clock
+  advance, persona switcher, Demo pill) run only when it is on and are off when it is unset: a new demo path checks it
+  too ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).
 - A domain rule takes facts and `now`, writes nothing, and returns a refusal (a stable `code` and the sentence people
   read), or what to write plus `effects`.
 - Every refusal comes from a table in `src/domain` built with `refusal(code, sentence)`

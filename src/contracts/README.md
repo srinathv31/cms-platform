@@ -117,7 +117,7 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 | ------ | ----------------------------------------------------------------------------------- |
 | 400    | `bad_request`, `consumer_required`                                                  |
 | 403    | `unknown_consumer`, `preview_forbidden`, `consumer_mismatch`                        |
-| 404    | `template_not_found`, `version_not_found`, `consumer_not_found`                     |
+| 404    | `template_not_found`, `version_not_found`                                           |
 | 409    | `version_not_released`                                                              |
 | 410    | `version_sunset`, `version_revoked`                                                 |
 | 413    | `body_too_large`                                                                    |
@@ -127,7 +127,7 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 `preview_forbidden` is Stencil's own preview route's: `/api/v1` never returns it (it stays in `ApiErrorCode` so the
 two code lists match).
 
-`consumer_not_found` and `consumer_mismatch` belong to the notices route. The other 15 are the render codes
+`consumer_mismatch` belongs to the notices route, which answers it for a path naming any consumer but the caller, registered or not, so no answer says which consumer ids exist. The other 15 are the render codes
 (`RenderErrorCode` in `src/domain/render/types.ts`), which the GET routes reuse. That file's `RENDER_ERROR_STATUS`
 repeats their statuses and is read only by `src/domain/render/errors.test.ts`; take statuses from `API_ERROR_STATUS`.
 

@@ -15,6 +15,11 @@ export interface RenderFixture {
   templateName: string;
   /** null for a draft. */
   versionNumber: number | null;
+  /**
+   * The round a CMS preview of an unreleased version names ("v3 · Round 2"): `RenderDoc.round`, the PDF's
+   * footer and subject. Absent: none (a consumer's render, a released version, a first round).
+   */
+  round?: number;
   /** The render time (ISO): the PDF's creation and modification date. */
   at: string;
   variables: Variable[];
@@ -78,10 +83,16 @@ export function parseRenderFixture(text: string): RenderFixture {
   }
   if (raw.smsFooter !== undefined && typeof raw.smsFooter !== "string")
     throw new Error('Render fixture: "smsFooter" must be a string.');
+  if (
+    raw.round !== undefined &&
+    !(Number.isInteger(raw.round) && raw.round >= 1)
+  )
+    throw new Error('Render fixture: "round" must be a whole number from 1.');
   return {
     templateId: raw.templateId!,
     templateName: raw.templateName!,
     versionNumber: raw.versionNumber ?? null,
+    ...(raw.round === undefined ? {} : { round: raw.round }),
     at: raw.at!,
     variables: raw.variables,
     values: parsed.numbersAsText(raw.values),

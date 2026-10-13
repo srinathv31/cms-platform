@@ -571,11 +571,12 @@ test.describe("GET /api/v1/consumers/{consumerId}/notices", () => {
       "unknown_consumer",
       'Consumer "acme" isn\'t registered.',
     );
+    // A path naming an unregistered consumer answers as one naming someone else's: no oracle for ids.
     await expectError(
       await get(request, "/api/v1/consumers/acme/notices"),
-      404,
-      "consumer_not_found",
-      "Consumer acme doesn't exist.",
+      403,
+      "consumer_mismatch",
+      "X-Consumer-Id doesn't match consumer acme.",
     );
     await expectError(
       await get(request, "/api/v1/consumers/deposits-online/notices"),

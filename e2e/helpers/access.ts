@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { E2E_DATABASE_URL, E2E_UPLOADS_DIR } from "../storage";
@@ -145,7 +145,9 @@ export function resetDemoData() {
   // worktree), and has no busy timeout: if someone is writing at that moment, wait a moment and go again.
   for (let attempt = 1; ; attempt++) {
     try {
-      execFileSync("npm", ["run", "db:reset"], {
+      // `execSync`, not `execFileSync("npm", …)`: on Windows npm is `npm.cmd`, which Node won't start without a
+      // shell. The command is a fixed string, so running it through the shell (cmd.exe or sh) is safe.
+      execSync("npm run db:reset", {
         cwd: root,
         stdio: "pipe",
         env: {

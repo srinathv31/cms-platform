@@ -3,7 +3,6 @@ import { API_ERROR_STATUS } from "../golive-types";
 import {
   apiBadRequest,
   consumerMismatch,
-  consumerNotFound,
   NOTICE_LIMIT,
   parseLimit,
   parseVersionNumber,
@@ -13,10 +12,6 @@ import {
 
 describe("the GET routes' errors", () => {
   it("words them as the contract does, with the contract's statuses", () => {
-    expect(consumerNotFound("acme")).toEqual({
-      code: "consumer_not_found",
-      message: "Consumer acme doesn't exist.",
-    });
     expect(consumerMismatch("coral")).toEqual({
       code: "consumer_mismatch",
       message: "X-Consumer-Id doesn't match consumer coral.",
@@ -25,7 +20,6 @@ describe("the GET routes' errors", () => {
       code: "bad_request",
       message: "limit must be a number from 1 to 50.",
     });
-    expect(API_ERROR_STATUS.consumer_not_found).toBe(404);
     expect(API_ERROR_STATUS.consumer_mismatch).toBe(403);
   });
 });

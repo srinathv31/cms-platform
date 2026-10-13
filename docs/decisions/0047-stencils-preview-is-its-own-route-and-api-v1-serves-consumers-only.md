@@ -1,6 +1,7 @@
 # 0047. Stencil's preview is its own route, and `/api/v1` serves consumers only
 
 Status: Accepted
+Amended 2026-10-12: the render engine moves to Java ([0067](0067-java-renders-every-channel.md)), so after the port the preview route calls Java's render endpoint with the viewer's identity, as the first Consequences line foresaw, and its error body moves with `/api/v1`'s to the UCOMP API's format ([0056](0056-api-v1-errors-follow-the-ucomp-api-error-format.md)).
 Date: 2026-10-11
 
 ## Context

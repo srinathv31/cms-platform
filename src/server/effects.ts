@@ -23,7 +23,7 @@ import {
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
 
-// The write side every lifecycle action shares: the transaction (with the SQLITE_BUSY retry) and the
+// The write side every lifecycle action shares: the transaction (`inTransaction`, run once) and the
 // effects writer. A domain transition says WHAT happened as `effects` (audit rows, notifications,
 // consumer notices); this file decides WHO they reach and writes them in the caller's transaction,
 // so a transition and its side records land together or not at all.
@@ -367,28 +367,19 @@ async function recentConsumers(tx: Tx, ctx: EffectContext): Promise<string[]> {
 
 // ── Transactions ──────────────────────────────────────────────
 
-function isBusy(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const { code, cause } = error as { code?: unknown; cause?: unknown };
-  return code === "SQLITE_BUSY" || (cause !== undefined && isBusy(cause));
-}
-
 /**
- * One write transaction, retried when the local file is busy (as in `drafts/apply-patch.ts`). Two
- * writes at once make the second `BEGIN IMMEDIATE` fail with SQLITE_BUSY because the file has no busy
- * timeout; the failed attempt rolled back whole, so running it again is safe. The retry re-reads
- * everything, so its compare-and-set sees the first write. Against Turso this never triggers.
+ * One write transaction (`BEGIN IMMEDIATE`), run once. Every write transaction in the app runs here: the
+ * server actions (`actions/kit.ts`), autosave (`drafts/apply-patch.ts`), import (`import/create.ts`) and
+ * the sweeps. Two writes at once never collide: the database client makes the second wait its turn, at
+ * most 5 s (src/lib/serialized-writes.ts, the only place the app waits, which also says what a lock held
+ * by another process does: it freezes the event loop and fails queued writes one by one). Past the wait
+ * it fails with SQLITE_BUSY, and the failure is the answer: a retry here would wait again for every
+ * attempt. The transaction reads what it checks, so whichever
+ * write goes second sees the first one's, and its compare-and-set refuses if the row moved.
  */
-export async function inTransaction<T>(
+export function inTransaction<T>(
   db: Db,
   run: (tx: Tx) => Promise<T>,
 ): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await db.transaction(run);
-    } catch (error) {
-      if (attempt >= 5 || !isBusy(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 15 * 2 ** attempt));
-    }
-  }
+  return db.transaction(run);
 }

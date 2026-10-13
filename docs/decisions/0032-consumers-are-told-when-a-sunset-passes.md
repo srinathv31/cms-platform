@@ -1,6 +1,7 @@
 # 0032. Consumers are told when a sunset passes
 
 Status: Accepted
+Amended 2026-10-12: after the port, the sweep's "once" is a `versions.sunset_recorded_at` column, and the 90-day audience is read from the daily render rollup rather than the raw render log; who is told doesn't change ([0066](0066-the-audit-log-is-the-record-and-render-events-roll-up.md)).
 Date: 2026-10-09
 
 ## Context

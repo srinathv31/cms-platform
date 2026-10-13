@@ -14,10 +14,10 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 2    | 6      | 5   | 13    |
-| Partly fixed | 0        | 3    | 3      | 2   | 8     |
+| Open         | 0        | 1    | 4      | 5   | 10    |
+| Partly fixed | 1        | 4    | 5      | 2   | 12    |
 | Fixed        | 1        | 21   | 31     | 33  | 86    |
-| Deferred     | 1        | 2    | 1      | 0   | 4     |
+| Deferred     | 0        | 2    | 1      | 0   | 3     |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), PR #66 (N26 and N27), and PRs #67–#72 (A1, T3, T5, T7 and N20).
 
@@ -334,10 +334,10 @@ The sign-in work also touches findings filed elsewhere. [A1](#a1--high-the-publi
 
 They leave with the persona switcher.
 
-| Finding                                                                            | What removing them has to get right                                                                                                                                                                |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [S1 · Critical](#s1--critical-demo-reset-and-clock-actions-are-public-and-ungated) | Remove the reset and clock actions and the demo pill, or gate them behind one `DEMO_MODE` flag that production never sets. Either way, `resetDemo()` refuses any database that isn't a local file. |
-| [A7 · Medium](#a7--medium-the-http-date-header-carries-the-demo-clock)             | The HTTP `Date` header goes back to real time. If a demo mode survives, its clock travels in its own header.                                                                                       |
+| Finding                                                                            | What removing them has to get right                                                                                                                                          |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [S1 · Critical](#s1--critical-demo-reset-and-clock-actions-are-public-and-ungated) | Gated behind `DEMO_MODE` ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)); with real sign-in, remove the reset and clock actions and the demo pill. |
+| [A7 · Medium](#a7--medium-the-http-date-header-carries-the-demo-clock)             | The HTTP `Date` header goes back to real time. If a demo mode survives, its clock travels in its own header.                                                                 |
 
 ### The Java API
 
@@ -376,7 +376,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S1 · Critical: Demo reset and clock actions are public and ungated
 
-- **Status:** Deferred. The owner will remove or hide the demo tools before production.
+- **Status:** Partly fixed. The reset, the clock advance, the persona switcher and the Demo pill run only when `DEMO_MODE` is set (off unless it is; read when the server starts, parsed in `src/server/config.ts`), and `resetDemo()` refuses any database that isn't a local `file:` one, flag or no flag ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)). Left: the tools themselves, which leave with real sign-in, and the persona cookie ([S2](#s2--high-identity-fails-open-to-the-default-persona)), which still decides who acts.
 - **Where:** `src/server/actions/demo.ts` line 14; `src/server/reset.ts` line 23
 - **What happens:** `resetDemoAction` drops every table, re-seeds and empties the uploads folder. `advanceClockAction` moves the clock up to 3,650 days, runs the access sweep, and every later audit timestamp uses the moved clock. Both are `"use server"` endpoints with no permission or environment check, callable without a cookie. `resetDemo()` also runs against any `DATABASE_URL`, including a remote `libsql://` database.
 - **Fix:** One `DEMO_MODE` flag from a validated config module, checked inside each action and in the layout that mounts the demo pill. Make `resetDemo()` refuse non-`file:` URLs.
@@ -408,7 +408,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S5 · High: Consumer identity is a self-asserted header
 
-- **Status:** Open
+- **Status:** Partly fixed. A caller that isn't a registered consumer (`unknown_consumer`) writes no `render_log` row, so anonymous calls queue no writes, and the notices route answers 403 `consumer_mismatch` for any path but the caller's own, so no answer says which consumer ids exist. Credentials and rate limits wait for the gateway.
 - **Where:** `src/server/queries/consumer-api.ts` line 62; `src/app/api/v1/consumers/[consumerId]/notices/route.ts` line 27
 - **What happens:** `X-Consumer-Id` has no secret. The notices check (header must equal the path) looks like authorization, but the caller sets both. Every anonymous render of an existing template writes a `render_log` row through the process-wide write lock, so flooding the endpoint makes autosaves and approvals wait up to 15 seconds and then fail. None of this is documented as a prototype limit.
 - **Fix:** Client credentials (OAuth client-credentials or mTLS) at the gateway or BFF, rate limits, and no log rows for unauthenticated callers. State it in the contract.
@@ -850,7 +850,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B4 · Medium: SQLite workarounds are spread through the code
 
-- **Status:** Open
+- **Status:** Partly fixed. Waiting is contained in the database client: `createAppClient` (`src/lib/serialized-writes.ts`) is the one place a write waits, 5 s for its turn, and nothing retries above it; the copies in `effects.ts`, `drafts/apply-patch.ts` and the simulator's `withBusyRetry` are gone, and import runs on `inTransaction` too. `rowid` ordering, `strftime` day buckets and the in-memory filtering remain.
 - **Where:** `src/server/effects.ts` line 222; `src/server/queries/library.ts` line 59
 - **What happens:** A process-wide write lock, three busy-retry copies (and one transaction with none), `rowid` ordering for audit and notifications, `strftime` day buckets, and in-memory filtering: the library loads every version of every team, and the audit page loads the whole log.
 - **Fix:** Contain retries in the DB client, order by ULID or sequence, filter in SQL.
@@ -932,7 +932,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T8 · Medium: Runtime paths assume the dev machine
 
-- **Status:** Open
+- **Status:** Partly fixed. The uploads folder is configurable (`UPLOADS_DIR`, absolute or relative; `resolveUploadsRoot` in `src/server/import/store.ts`), and the three path sites (`store.ts`, `pdf-fonts.ts`, `e2e/storage.ts`) hold up on Windows, with tests that run the Windows path rules on any machine. Still open: the PDF fonts are read from `node_modules` under the working directory, and `db:migrate` needs `tsx`; both wait for the deployment work in [T4](#t4--high-no-ci-node-pin-or-environment-template) and the enterprise font.
 - **Where:** `src/server/render/channels/pdf-fonts.ts` line 47
 - **What happens:** PDF fonts are read from `process.cwd()/node_modules/...`, uploads go to `./data/uploads`, and `db:migrate` needs `tsx` from devDependencies. All three break in a standard container.
 - **Fix:** Copy fonts into the app, make the uploads location configurable, and compile the migration script.

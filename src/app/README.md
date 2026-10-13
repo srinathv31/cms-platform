@@ -118,11 +118,12 @@ decisions were in the product; they are recoverable from the `archive/design-moc
   "Transition was aborted" rejection.
 - [(product)/layout.tsx](<./(product)/layout.tsx>) wraps everything in `AppFrame`
   ([app-frame.tsx](../components/app-shell/app-frame.tsx)): sidebar, top bar and canvas, with the
-  viewer-dependent parts streamed as holes, and the Demo pill.
+  viewer-dependent parts streamed as holes, and the Demo pill (only in demo mode, decision 0051).
 - [[team]/layout.tsx](<./(product)/[team]/layout.tsx>) runs `TeamGuard` (`requireSpaceFromParams` in
-  [queries/spaces.ts](../server/queries/spaces.ts)): an unknown slug calls `notFound()`
-  ([not-found.tsx](<./(product)/not-found.tsx>)); a team the viewer can't see redirects to their default space or
-  `/request-access`. It renders `children` and the `modal` slot. Pages guard themselves too, through their
+  [queries/spaces.ts](../server/queries/spaces.ts)): an unknown slug and a team the viewer can't see both call
+  `notFound()` ([not-found.tsx](<./(product)/not-found.tsx>), whose Back to library goes to `/`, the viewer's own
+  space or `/request-access`; [decision 0052](../../docs/decisions/0052-a-page-you-may-not-read-is-not-found.md)).
+  It renders `children` and the `modal` slot. Pages guard themselves too, through their
   queries.
 - **The `@modal` slot.** A soft navigation to `/[team]/settings/[section]` is intercepted by
   [@modal/(.)settings](<./(product)/[team]/@modal/(.)settings/layout.tsx>), which opens `SettingsShell`
@@ -136,7 +137,7 @@ decisions were in the product; they are recoverable from the `archive/design-moc
   grid, the header, the tab bar and `WorkspaceSessionProvider`. Each tab is a page whose output fills cells of
   that grid.
 - [(simulator)/layout.tsx](<./(simulator)/layout.tsx>): a dashed Stencil-styled bar with the "Back to Stencil"
-  pill, then Coral's own nav and theme (`src/simulator/theme.css`), and the Demo pill. No `AppFrame`. `(dev)`
+  pill, then Coral's own nav and theme (`src/simulator/theme.css`), and the Demo pill (only in demo mode). No `AppFrame`. `(dev)`
   has no layout of its own.
 
 **Prefetching.** Default link prefetching is on and `partialPrefetching` is not enabled; the comment in
@@ -305,7 +306,7 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
   `E2E_WORKERS` sets the count (4 by default; `--workers` on the command line wins), and the tests inside one file
   still run in order. Worker `n` (Playwright's `TEST_PARALLEL_INDEX`) uses the server on `E2E_GATE_PORT + n` (3100
   by default), the database `data/e2e-n.db` and the uploads folder `data/e2e-uploads-n`. `playwright.config.ts`
-  starts each server after an `npm run db:reset` on its own `DATABASE_URL` and `UPLOADS_DIR`; the demo's
+  starts each server after an `npm run db:reset` on its own `DATABASE_URL`, `UPLOADS_DIR` and `DEMO_MODE=1` (the Demo pill, the clock and the persona switcher the specs use are off without it); the demo's
   `data/ucomp.db` and `data/uploads` are never touched. [e2e/storage.ts](../../e2e/storage.ts) derives the
   worker's port, database and folder from its index, and the config (which each worker loads too) takes the worker's
   `baseURL` from it, so a spec just uses `page.goto("/…")`. `openDb()` in `e2e/api/helpers.ts` and the cleanup
@@ -316,7 +317,7 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
   `E2E_PORT` (a server you started yourself), with `E2E_DATABASE_URL` or `E2E_UPLOADS_DIR` set, and in the opt-in
   `demo` and `stills-1280` projects. To check against a running dev server without a reset, start that server with
   the worker-0 values (`DATABASE_URL=file:./data/e2e-0.db UPLOADS_DIR=./data/e2e-uploads-0 npm run dev`, after an
-  `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts`. To point the
+  `npm run db:reset` with them), then `E2E_PORT=3000 npx playwright test e2e/principles-*.spec.ts` (`npm run dev` has the demo tools on; a `next start` you run yourself needs `DEMO_MODE=1`). To point the
   specs at the demo database instead, set `E2E_DATABASE_URL=file:./data/ucomp.db` and
   `E2E_UPLOADS_DIR=./data/uploads`.
 - **Pace and recording:** a functional spec clicks, types and drags at test speed. The helpers in `e2e/helpers/`

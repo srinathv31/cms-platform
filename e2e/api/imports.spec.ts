@@ -56,6 +56,8 @@ test.afterAll(async () => {
       await rm(path.join(E2E_UPLOADS_DIR, String(row.id)), {
         recursive: true,
         force: true,
+        maxRetries: 3,
+        retryDelay: 50,
       });
     for (const table of ["uploads", "audit_events", "versions"]) {
       await db.execute({

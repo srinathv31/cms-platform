@@ -1,0 +1,66 @@
+{
+  "templateId": "UC-GOLDEN",
+  "templateName": "Round two of a rate notice",
+  "versionNumber": 3,
+  "round": 2,
+  "at": "2027-03-04T12:00:00.000Z",
+  "variables": [
+    {
+      "key": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": true,
+      "sample": "Maya"
+    }
+  ],
+  "values": {
+    "first_name": "Maya"
+  },
+  "body": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "b1",
+          "level": 1,
+          "requiredKey": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Your rate is changing"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi "
+          },
+          {
+            "type": "variable",
+            "attrs": {
+              "key": "first_name"
+            }
+          },
+          {
+            "type": "text",
+            "text": ", the new rate starts on March 4."
+          }
+        ],
+        "attrs": {
+          "id": "b2"
+        }
+      }
+    ]
+  },
+  "channelFields": {},
+  "channels": [
+    "pdf",
+    "web",
+    "email"
+  ]
+}

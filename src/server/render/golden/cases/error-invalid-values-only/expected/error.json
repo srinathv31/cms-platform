@@ -1,0 +1,33 @@
+{
+  "code": "invalid_values",
+  "message": "purchase_apr must be a percentage, like 21.99. annual_fee must be an amount, like 1000 or 1000.50. opened_on must be a date, like 2027-03-04. home_state must be a US state, like NJ. points must be a number, like 20000. nickname must be text.",
+  "details": {
+    "missing": [],
+    "invalid": [
+      {
+        "key": "purchase_apr",
+        "expected": "percent"
+      },
+      {
+        "key": "annual_fee",
+        "expected": "currency"
+      },
+      {
+        "key": "opened_on",
+        "expected": "date"
+      },
+      {
+        "key": "home_state",
+        "expected": "us_state"
+      },
+      {
+        "key": "points",
+        "expected": "number"
+      },
+      {
+        "key": "nickname",
+        "expected": "text"
+      }
+    ]
+  }
+}

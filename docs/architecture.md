@@ -140,7 +140,8 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
    or a PDF. A message channel skips the body: `renderMessage` (`src/domain/render/message.ts`, the function the
    browser preview runs too) resolves its fields and renders a push for the requested `platform` or an SMS with the
    version's footer (frozen at submit; a draft's is the content type's), refused (422) past 4,096 bytes or 10 parts.
-5. One `render_log` row, success or error. It never stores the values.
+5. One `render_log` row, success or error, except for a caller that isn't a registered consumer. It never stores
+   the values.
 
 The golden files run the same engine on frozen inputs, so a golden file is exactly what the API returns.
 
@@ -154,8 +155,9 @@ cookie. Coral calls the consumer URL over HTTP from the server, as a real consum
 
 ## Data
 
-One SQLite file, `data/ucomp.db`, through libSQL and Drizzle. `DATABASE_URL` and `DATABASE_AUTH_TOKEN` can point
-at Turso instead. Two schema files:
+One SQLite file, `data/ucomp.db`, through libSQL and Drizzle. A remote libSQL database (Turso) isn't a supported
+deployment: the code's read-check-write rules assume one local file and one process, and the Java API replaces this
+layer. Two schema files:
 
 - [schema/ucomp.ts](../src/server/db/schema/ucomp.ts), the CMS:
   - **Settings:** `settings` (demo clock offset, seed version, business time zone).
@@ -182,8 +184,21 @@ at Turso instead. Two schema files:
 Conventions: JSON columns are typed with domain types; timestamps are millisecond integers read as `Date`, and become
 ISO strings at the read-model boundary. Unique indexes, partial where they need to be, allow one row per number
 and round, one released version per number, and one open draft and one Active version per template. Every write in the process takes turns on one lock (`createAppClient` in `src/lib/serialized-writes.ts`),
-and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migrations`; the
+the one place a write waits (5 s for its turn); a write that still can't go fails, and nothing retries it. Migrations are in `src/server/db/migrations`; the
 [server README](../src/server/README.md#database) says how to add one.
+
+What the Java API's MSSQL schema does instead: team and user ids
+([0053](decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md),
+[0054](decisions/0054-users-are-better-auth-users-linked-to-entra-by-oid.md)), template and log ids
+([0060](decisions/0060-template-ids-are-random-and-retried-on-a-collision.md)), JSON columns
+([0061](decisions/0061-documents-stay-json-and-references-become-rows.md)), invariants and the notice sequence
+([0062](decisions/0062-invariants-hold-in-the-database-not-in-one-writer.md)), timestamps
+([0063](decisions/0063-instants-are-utc-datetime2-ordered-by-at-and-seq.md)), payloads
+([0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md),
+[0064](decisions/0064-payloads-are-facts-with-one-shape-per-event.md)), documents
+([0065](decisions/0065-documents-are-validated-against-a-generated-json-schema.md)), logs
+([0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and test data
+([0069](decisions/0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)).
 
 ## Time, identity, and demo data
 
@@ -214,7 +229,14 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
 - [next.config.ts](../next.config.ts): `cacheComponents: true`, `typedRoutes: true`, dev indicators off, and libSQL
   kept out of the bundle (`serverExternalPackages`). Partial prefetching stays off: on 16.3.8 it re-requests every
   link's route tree in a loop in this app. The "router prefetch" tests in `e2e/phase-1.spec.ts` guard against it.
-- Environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`; `UCOMP_API_ORIGIN` (where Coral sends requests;
+  `headers()` sends static security headers on every response: `nosniff`, `Referrer-Policy: same-origin`, framing
+  by the same origin only (`X-Frame-Options: SAMEORIGIN`; Coral's customer view frames its stored deliveries) and a
+  `Permissions-Policy` that turns off camera, microphone, location, payment and USB. No `Content-Security-Policy`
+  there: a header set in `headers()` replaces a route's own, and the rendered HTML keeps its scriptless one.
+  `e2e/security-headers.spec.ts` checks them.
+- Environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`; `DEMO_MODE` (the demo tools: reset, clock advance,
+  persona switcher and the Demo pill; off unless set, read when the server starts, and a value that isn't valid stops the server at boot,
+  [decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md), parsed in [config.ts](../src/server/config.ts)); `UCOMP_API_ORIGIN` (where Coral sends requests;
   default this server over loopback) and `PORT`. E2E reads `E2E_PORT` and `E2E_GATE_PORT`.
 - Uploaded originals are stored under `data/uploads/`. PDF fonts are read from `node_modules` at render time.
 
@@ -223,8 +245,13 @@ and `inTransaction` retries `SQLITE_BUSY`. Migrations are in `src/server/db/migr
 Facts about the code today. Each line goes away in the PR that fixes it.
 
 - No real authentication: the persona cookie, failing open to Maya, identifies every request.
-- Demo controls are ungated: reset, advance clock, and persona switch work in any build, for anyone.
+- The demo controls (reset, advance clock, persona switch) run only with `DEMO_MODE` set, which a deployment never
+  sets ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)). They still go when real sign-in lands. Until then the persona cookie still decides who
+  acts, whether or not the switcher is there.
 - A consumer is identified by the `X-Consumer-Id` header alone, with no credential or rate limit.
+- No Content-Security-Policy for scripts: Next's inline scripts need a per-request nonce, which needs dynamic
+  rendering and fights the static shells Cache Components builds. A hash-based policy, `'strict-dynamic'`, or none
+  is a decision still to make. `Strict-Transport-Security` belongs to the TLS terminator in front of the app.
 - Access deadlines (recertification, inactivity) apply, and passed sunsets reach the audit log and consumers' notices, only when the sweeps
   run: on a clock advance, a persona switch, or an access action. There is no scheduled job. (A sunset still stops
   renders on time: the render rule reads the clock.)

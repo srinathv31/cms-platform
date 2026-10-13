@@ -1,6 +1,5 @@
 import "server-only";
 import { cache } from "react";
-import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import type {
   ApprovalChainsSection,
@@ -44,6 +43,7 @@ import {
 import { countPendingSunsets, getBusinessZone } from "@/server/business-zone";
 import { getViewer } from "@/server/viewer";
 import { demoNow } from "./dynamic";
+import { requireCan } from "./require-can";
 import { getPeople, iso, personOf } from "./review-shared";
 
 // The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules,
@@ -65,7 +65,7 @@ import { getPeople, iso, personOf } from "./review-shared";
 /** Platform Admin only; anyone else gets a 404 (the Platform group isn't shown to them). */
 async function requireManage() {
   const viewer = await getViewer();
-  if (!can(viewer, "platform.manage", { teamId: null }).ok) notFound();
+  requireCan(viewer, "platform.manage", { teamId: null });
   return viewer;
 }
 
