@@ -15,6 +15,7 @@ Branch `track/golive`. Report: `archive/tracks/a-report.md`.
 
 - **Simulator calls UCOMP server-side** from its own origin (via `headers()`; superseded at integration, see "Integration: adversarial review fixes"), so the browser never logs the intended 4xx/410 failures. Keeps "zero console errors" true during failure scenarios.
 - **Consumer GET endpoints require `X-Consumer-Id`.** Same header as render; a missing header → `consumer_required` (400), an unregistered one → `unknown_consumer` (403). `consumer_not_found` (404) is for a path that names an unregistered consumer.
+  Amended 2026-10-12: `consumer_not_found` was removed (M-21 of the [October 12 review](../quality-review-2026-10-12.md)). A notices path naming any consumer but the caller answers 403 `consumer_mismatch`, registered or not, so no answer says which consumer ids exist ([contract](../../src/contracts/README.md)).
 - **"Renders this month" is a rolling 30 days vs. the 30 before**, labelled "Renders · 30 days". Calendar months make the demo clock jumps look wrong.
 - **A link can be saved with unmapped required variables.** Send is then disabled and names the missing ones (explain only when blocked).
 - **A send renders every linked channel** for each chosen customer.
