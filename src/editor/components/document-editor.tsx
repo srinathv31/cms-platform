@@ -8,6 +8,8 @@
 // editor produces; the live TipTap editor mounts only after hydration and swaps in with no
 // visible change. Keeping useEditor out of the server render also keeps prerendering pure
 // (TipTap seeds instance ids with Math.random, which Cache Components rejects at prerender).
+// The live editor is rebuilt when a hidden route shows again (lib/use-editor-lifecycle.ts carries the
+// document and undo history over), and the block handle is loaded ahead of it (lib/load-block-handle.ts).
 //
 // Review comments (Phase 4): `threads` / `activeThreadId` are highlights (extensions/review-threads.ts,
 // in the static paint too); `onRequestComment` adds Comment to the toolbar (read-only too) and
@@ -29,10 +31,10 @@ import {
 import { useStore } from "zustand";
 import { modKey } from "../lib/platform";
 import {
-  captureHistory,
-  restoreHistory,
-  type HistoryCarry,
-} from "../lib/history-carry";
+  loadedBlockHandle,
+  useBlockHandleSettled,
+  type BlockHandleModule,
+} from "../lib/load-block-handle";
 import { focusFirstSection } from "../lib/sections";
 import {
   blockRequestAt,
@@ -48,6 +50,7 @@ import type {
   ThreadAnchor,
 } from "../types";
 import { cx } from "../lib/cx";
+import { useEditorLifecycle } from "../lib/use-editor-lifecycle";
 import { useHydrated } from "../lib/use-hydrated";
 import { editorExtensions } from "../schema";
 import { createChipPopoverStore } from "../state/chip-popover";
@@ -70,49 +73,11 @@ import {
 } from "./variable-picker";
 import "../styles.css";
 
-// The block handle is loaded on the client only. The official DragHandle pulls in Yjs, whose lib0
-// probes `localStorage` when its module evaluates, and on Node 26 that probe prints an
-// ExperimentalWarning during prerender. The handle only renders with the live editor (client-only),
-// so the server never needs it. The browser starts the load as this module evaluates, and the live
-// editor waits for it, so the handle mounts in the same commit as the editor: registering its
-// plugin later would reconfigure the view and close a slash menu that is already open.
-// The handle is optional chrome: if its chunk fails to load (a network blip, a redeploy under an
-// open tab), the editor mounts without it, still editable, and the next editor mounted tries again.
-type BlockHandleModule = typeof import("./block-handle");
-let blockHandleModule: BlockHandleModule | null = null;
-let blockHandleLoad: Promise<BlockHandleModule | null> | null = null;
-/** The block handle's module, or null when it failed to load. Never rejects. */
-function loadBlockHandle(): Promise<BlockHandleModule | null> {
-  blockHandleLoad ??= import("./block-handle").then(
-    (m) => (blockHandleModule = m),
-    () => {
-      blockHandleLoad = null;
-      return null;
-    },
-  );
-  return blockHandleLoad;
-}
-if (typeof window !== "undefined") void loadBlockHandle();
-
-/** True once the block handle's load has settled, loaded or failed (never on the server). */
-function useBlockHandleSettled(): boolean {
-  const [settled, setSettled] = useState(blockHandleModule !== null);
-  useEffect(() => {
-    if (settled) return;
-    let live = true;
-    void loadBlockHandle().then(() => live && setSettled(true));
-    return () => {
-      live = false;
-    };
-  }, [settled]);
-  return settled;
-}
-
 /** Renders the loaded BlockHandle (nothing when it failed to load); mounted once useBlockHandleSettled() is true. */
 function LoadedBlockHandle(
   props: Parameters<BlockHandleModule["BlockHandle"]>[0],
 ) {
-  const loaded = blockHandleModule;
+  const loaded = loadedBlockHandle();
   return loaded ? <loaded.BlockHandle {...props} /> : null;
 }
 
@@ -330,17 +295,21 @@ function LiveEditor({
   );
   const [initialFocus] = useState(autoFocus);
 
-  // Next keeps hidden routes alive in <Activity> but runs effect cleanups, and useEditor destroys
-  // the editor then; when the route shows again a new editor is created. `latestRef` hands it the
-  // current document (not the initial one), `snapshot` keeps the static fallback current, and
-  // `carry` hands it the undo history (lib/history-carry.ts), so undo still reaches back past the switch.
-  const [snapshot, setSnapshot] = useState<JSONContent>(initialContent);
-  const created = useRef(false);
-  const carry = useRef<HistoryCarry | null>(null);
-
-  const onChangeRef = useRef(onChange);
-  useLayoutEffect(() => {
-    onChangeRef.current = onChange;
+  // What a rebuilt editor inherits (after an <Activity> switch), and the host's onChange.
+  const lifecycle = useEditorLifecycle({
+    initialContent,
+    latestRef,
+    editorRef,
+    onChange,
+    onCreate: (ready, { first }) => {
+      if (first && initialFocus === "first-section" && ready.isEditable)
+        focusFirstSection(ready);
+      const pending = pendingFocusRef.current;
+      pendingFocusRef.current = null;
+      if (pending) applyFocus(ready, pending);
+      bridge.connect(ready);
+    },
+    onDestroy: () => bridge.connect(null),
   });
 
   // Stable per readOnly value: useEditor re-applies options whenever their identity changes.
@@ -367,43 +336,10 @@ function LiveEditor({
     autofocus:
       initialFocus === "start" || initialFocus === "end" ? initialFocus : false,
     editorProps,
-    onBeforeCreate: ({ editor: next }) => {
-      if (latestRef.current) next.setOptions({ content: latestRef.current });
-    },
-    onCreate: ({ editor: ready }) => {
-      editorRef.current = ready;
-      if (
-        !created.current &&
-        initialFocus === "first-section" &&
-        ready.isEditable
-      )
-        focusFirstSection(ready);
-      created.current = true;
-      const pending = pendingFocusRef.current;
-      pendingFocusRef.current = null;
-      if (pending) applyFocus(ready, pending);
-      bridge.connect(ready);
-      if (carry.current) restoreHistory(ready.view, carry.current);
-      carry.current = null;
-    },
+    ...lifecycle.callbacks,
     onTransaction: ({ transaction }) => {
       if (transaction.docChanged)
         bridge.docChanged(transaction.before, transaction.doc);
-    },
-    onUpdate: ({ editor: updated }) => {
-      // Skip normalization during mount (missing block ids, a trailing paragraph): it isn't an
-      // edit, and the host would otherwise autosave a document the author never touched.
-      if (!updated.isInitialized) return;
-      const doc = updated.getJSON();
-      latestRef.current = doc;
-      onChangeRef.current?.(doc);
-    },
-    onDestroy: () => {
-      const gone = editorRef.current;
-      if (gone) carry.current = captureHistory(gone.state);
-      editorRef.current = null;
-      bridge.connect(null);
-      if (latestRef.current) setSnapshot(latestRef.current);
     },
   });
 
@@ -457,7 +393,7 @@ function LiveEditor({
   if (!editor || editor.isDestroyed || (!readOnly && !blockHandleSettled)) {
     return (
       <StaticDocument
-        content={snapshot}
+        content={lifecycle.snapshot}
         variables={variables}
         threads={threads}
         activeThreadId={activeThreadId}
