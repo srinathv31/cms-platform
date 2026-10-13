@@ -15,7 +15,8 @@ import type { FakeState } from "./state";
 import type { FakeDeps } from "./index";
 
 // One template's versions in memory: what services/local/versions.ts reads with SQL, read from the fake's
-// arrays, with the same domain decisions.
+// arrays, with the same domain decisions. Compare and the base version aren't here: the fake serves a read only
+// where a contract case observes a command through it (decision 0072).
 
 export function fakeVersions({ store, clock }: FakeDeps): VersionService {
   return {

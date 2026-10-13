@@ -1,15 +1,14 @@
 // Review comments: threads anchored to a block (or a channel field, or the whole version), their replies,
 // and resolving and reopening them (`src/domain/comments.ts` decides who may).
 //
-// The four commands run behind the seam; `threads` still runs in src/server/queries/threads.ts until its package
-// moves it (plan.md).
+// The four commands and `threads` run behind the seam, local and fake; the threads' facts are in ./threads.ts.
 
+import type { TemplateThreads } from "./threads";
 import type {
   ActionResult,
   Changed,
   ReadResult,
   RequestContext,
-  Unsettled,
 } from "./types";
 
 export interface CommentService {
@@ -58,9 +57,14 @@ export interface CommentService {
     input: { threadId: string },
   ): Promise<ActionResult<Changed>>;
 
-  /** The template's threads, or one version's. */
+  /**
+   * The template's threads seen against one of its versions (`versionId`), or without one against what the
+   * workspace shows (the open draft, else the latest round). A submitted round is a record: it shows only the
+   * threads that began by it. Refuses 404 `template_unavailable` when the template doesn't exist or the viewer
+   * may not see its team, then 404 `version_unavailable` when `versionId` isn't one of its versions.
+   */
   threads(
     ctx: RequestContext,
     input: { templateId: string; versionId?: string },
-  ): Promise<ReadResult<Unsettled<"P4a: the threads' facts">>>;
+  ): Promise<ReadResult<TemplateThreads>>;
 }

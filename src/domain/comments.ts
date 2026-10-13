@@ -164,6 +164,30 @@ export function threadBeganBy(
 }
 
 /**
+ * A version's threads in the order its margin shows them, each marked orphaned when its anchor isn't in the
+ * version any more (deleted since): the document threads (a change request's reason) first, then by where their
+ * anchors appear (`anchors`, from `anchorIdsOf`), then the orphaned ones; oldest first within each, then by id.
+ */
+export function inReadingOrder<
+  T extends { id: string; blockId: string; createdAt: Date },
+>(
+  threads: readonly T[],
+  anchors: readonly string[],
+): (T & { orphaned: boolean })[] {
+  const position = new Map(anchors.map((id, index) => [id, index] as const));
+  const rank = (blockId: string) =>
+    blockId === DOCUMENT_THREAD ? -1 : (position.get(blockId) ?? Infinity);
+  return [...threads]
+    .sort(
+      (a, b) =>
+        rank(a.blockId) - rank(b.blockId) ||
+        a.createdAt.getTime() - b.createdAt.getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )
+    .map((t) => ({ ...t, orphaned: rank(t.blockId) === Infinity }));
+}
+
+/**
  * Where a thread on a version can anchor, in reading order: the fields of each channel that is on (a
  * message's whole content; a document's email subject and preheader, which show above its body), then
  * each block of the body (`blockIds`, top-level and nested). A thread on a field is about its whole text,

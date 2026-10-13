@@ -1,331 +1,99 @@
 import "server-only";
 import { cache } from "react";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
-import {
-  approvedThisRound,
-  currentStageOf,
-  ownStages,
-  stepperState,
-} from "@/domain/approval-chain";
-import { sunsetDay, todayIn } from "@/domain/business-zone";
-import { canComment } from "@/domain/comments";
-import { describeChanges, diffVariables } from "@/domain/contract";
-import { DAY_MS, utcDay } from "@/domain/dates";
-import { REFUSALS } from "@/domain/lifecycle/refusals";
-import {
-  contractBaseline,
-  renameBaseline,
-  reviewBaseline,
-} from "@/domain/lifecycle/baselines";
-import { sunsetPassed } from "@/domain/lifecycle/sunset";
-import { canSeeSpace } from "@/domain/permissions";
+import { notFound } from "next/navigation";
+import { stepperState } from "@/domain/approval-chain";
+import { describeChanges } from "@/domain/contract";
+import { utcDay } from "@/domain/dates";
+import { versionLabel } from "@/domain/rounds";
+import { requireRequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
 import type {
-  MessageTypeRules,
-  TeamSenders,
-} from "@/domain/platform-config/limits";
-import { refuse } from "@/domain/refusals";
-import type { ApprovalStage, VersionStage } from "@/domain/review-types";
-import { asNumbered, replacedBy, versionLabel } from "@/domain/rounds";
-import type {
-  ChannelFamily,
-  ContractChange,
-  PermissionResult,
-  Variable,
-  VersionState,
-} from "@/domain/types";
-import { getBusinessZone } from "@/server/services/local/business-zone";
-import { db } from "@/server/db/client";
-import {
-  approvals,
-  teams,
-  templates,
-  versions,
-} from "@/server/db/schema/ucomp";
-import { demoNow } from "./dynamic";
+  QueueRow,
+  ReviewQueueFacts,
+  ReviewScreenFacts,
+} from "@/server/services/review-reads";
+import { personOf, type People } from "./people";
 import type {
   ReviewQueue,
   ReviewQueueRow,
   ReviewScreenData,
 } from "./review-models";
-import { anchorIdsOf } from "@/domain/comments";
-import { chainFor, stageApproverIds } from "@/domain/approval-chain";
-import { decideCheck } from "@/domain/lifecycle/decide-check";
-import {
-  getChains,
-  loadChain,
-  loadDecisions,
-  loadFamily,
-  loadMessageRules,
-} from "@/server/services/local/chain";
-import { getPeople, personOf, type People } from "@/server/queries/people";
-import { iso } from "@/server/queries/iso";
-import { loadConsumerUsage } from "@/server/services/local/consumer-usage";
-import {
-  opensRound,
-  requireReviewVersion,
-} from "@/server/queries/template-access";
-import { requireSpace, type SpaceContext } from "./spaces";
-import { loadThreads } from "./threads";
+import { requireSpace } from "./spaces";
+import { threadViews } from "./threads";
 
-// The review queue and the review screen.
-
-/** "Recently decided" looks back this far. */
-export const DECIDED_WINDOW_DAYS = 30;
+// The review queue and the review screen. The review service decides (which rounds wait on the viewer, which
+// round a URL opens, the baselines, what the viewer may do: services/review-reads.ts); these read models word
+// and lay its facts out: people, version labels, contract lines, the stepper. They decide nothing.
 
 // ── Queue ─────────────────────────────────────────────────────
 
-// A row is a round, so it carries that round's name: an approver reviews the name it was submitted with.
-const queueColumns = {
-  versionId: versions.id,
-  versionNumber: versions.number,
-  round: versions.round,
-  state: versions.state,
-  submittedBy: versions.submittedBy,
-  submittedAt: versions.submittedAt,
-  writers: versions.writers,
-  createdBy: versions.createdBy,
-  createdAt: versions.createdAt,
-  stages: versions.stages,
-  currentStage: versions.currentStage,
-  contractChanges: versions.contractChanges,
-  templateId: templates.id,
-  templateName: versions.name,
-  contentTypeId: templates.contentTypeId,
-  teamId: teams.id,
-  teamSlug: teams.slug,
-  teamName: teams.name,
-};
-
-interface QueueVersion {
-  versionId: string;
-  versionNumber: number | null;
-  round: number | null;
-  state: VersionState;
-  submittedBy: string | null;
-  submittedAt: Date | null;
-  writers: string[];
-  createdBy: string;
-  createdAt: Date;
-  stages: VersionStage[] | null;
-  currentStage: number;
-  contractChanges: ContractChange[] | null;
-  templateId: string;
-  templateName: string;
-  contentTypeId: string;
-  teamId: string;
-  teamSlug: string;
-  teamName: string;
-}
-
-/** One team's space reads that team; "All teams" reads every team (requireSpace already let the viewer in). */
-function inScope(space: SpaceContext) {
-  return space.isAll || !space.teamId
-    ? undefined
-    : eq(templates.teamId, space.teamId);
-}
-
-function queueRow(
-  v: QueueVersion,
-  people: People,
-  stage: { position: number; name: string; count: number },
-): ReviewQueueRow {
-  return {
-    templateId: v.templateId,
-    templateName: v.templateName,
-    teamSlug: v.teamSlug,
-    teamName: v.teamName,
-    versionId: v.versionId,
-    versionNumber: v.versionNumber ?? 0,
-    round: v.round ?? 0,
-    state: v.state,
-    author: personOf(people, v.submittedBy ?? v.createdBy),
-    submittedAt: iso(v.submittedAt ?? v.createdAt),
-    stage,
-    breaking: (v.contractChanges ?? []).some((c) => c.breaking),
-  };
-}
-
-/** The queue's "Stage 2 of 3": a position in the version's own stages, with the name it recorded. */
-function queueStage(
-  v: { stages: VersionStage[] | null },
-  chain: readonly ApprovalStage[],
-  position: number,
-) {
-  const own = ownStages(v.stages, chain);
-  return { position, name: own[position]?.name ?? "", count: own.length };
-}
-
-const newestSubmitted = (a: ReviewQueueRow, b: ReviewQueueRow) =>
-  b.submittedAt.localeCompare(a.submittedAt) ||
-  a.templateName.localeCompare(b.templateName);
-
 /**
- * In-review versions in the space, and the ones the viewer may decide now. Cached: the badge and the
- * queue share it. A version on a team the viewer can't see joins `waiting` when its current stage
- * names them (Phase 6: a Legal reviewer covers every team), so they find it from their own space.
- */
-const loadInReview = cache(async (spaceSlug: string) => {
-  const space = await requireSpace(spaceSlug);
-  const [all, chains, people] = await Promise.all([
-    db
-      .select(queueColumns)
-      .from(versions)
-      .innerJoin(templates, eq(templates.id, versions.templateId))
-      .innerJoin(teams, eq(teams.id, templates.teamId))
-      .where(eq(versions.state, "in_review")),
-    getChains(),
-    getPeople(),
-  ]);
-  const viewer = space.viewer;
-  const inSpace = (v: QueueVersion) => space.isAll || v.teamId === space.teamId;
-  const namedElsewhere = (v: QueueVersion) =>
-    !canSeeSpace(viewer, v.teamId) &&
-    stageApproverIds(
-      currentStageOf(v, chainFor(chains, v.contentTypeId)),
-    ).includes(viewer.userId);
-  const rows = all.filter((v) => inSpace(v) || namedElsewhere(v));
-  const decisions = await loadDecisions(
-    db,
-    rows.map((v) => v.versionId),
-  );
-
-  const waiting: ReviewQueueRow[] = [];
-  const submitted: ReviewQueueRow[] = [];
-  for (const v of rows) {
-    const chain = chainFor(chains, v.contentTypeId);
-    const row = queueRow(v, people, queueStage(v, chain, v.currentStage));
-    if (v.submittedBy === viewer.userId) {
-      if (inSpace(v)) submitted.push(row);
-      continue;
-    }
-    const check = decideCheck(viewer, {
-      teamId: v.teamId,
-      submittedBy: v.submittedBy,
-      writers: v.writers,
-      stage: currentStageOf(v, chain),
-      approvedBy: approvedThisRound(decisions.get(v.versionId) ?? []),
-    });
-    if (check.ok) waiting.push(row);
-  }
-  return {
-    space,
-    waiting: waiting.sort(newestSubmitted),
-    submitted: submitted.sort(newestSubmitted),
-  };
-});
-
-/**
- * The three tabs of `/{team}/review`. Each row is a round: a number sent back and resubmitted has a
- * row per round.
- * - waiting: in review on the space's teams, at a stage the viewer may act on, not submitted by them;
- * - submitted: the viewer's own versions still in review;
- * - decided: the latest decision on each round decided in the last 30 days, newest first.
- * "All teams" spans every team (it's open only to cross-team viewers).
+ * The three tabs of `/{team}/review`. Each row is a round: a number sent back and resubmitted has a row per
+ * round. Waiting and submitted are newest submitted first; decided, newest decision first.
  */
 export const getReviewQueue = cache(
   async (spaceSlug: string): Promise<ReviewQueue> => {
-    const { space, waiting, submitted } = await loadInReview(spaceSlug);
-    const nowDate = await demoNow();
-    const since = new Date(nowDate.getTime() - DECIDED_WINDOW_DAYS * DAY_MS);
-
-    const [rows, chains, people] = await Promise.all([
-      db
-        .select({
-          ...queueColumns,
-          stagePosition: approvals.stagePosition,
-          stageName: approvals.stageName,
-          decision: approvals.decision,
-          decidedBy: approvals.actorId,
-          decidedAt: approvals.decidedAt,
-        })
-        .from(approvals)
-        .innerJoin(versions, eq(versions.id, approvals.versionId))
-        .innerJoin(templates, eq(templates.id, versions.templateId))
-        .innerJoin(teams, eq(teams.id, templates.teamId))
-        .where(and(gte(approvals.decidedAt, since), inScope(space)))
-        .orderBy(desc(approvals.decidedAt), desc(approvals.id)),
-      getChains(),
-      getPeople(),
-    ]);
-
-    const decided: ReviewQueueRow[] = [];
-    const seen = new Set<string>();
-    for (const r of rows) {
-      if (seen.has(r.versionId)) continue; // newest first: the first row is the version's latest decision
-      seen.add(r.versionId);
-      const count = ownStages(
-        r.stages,
-        chainFor(chains, r.contentTypeId),
-      ).length;
-      decided.push({
-        ...queueRow(r, people, {
-          position: r.stagePosition,
-          name: r.stageName,
-          count,
-        }),
-        decision: {
-          kind: r.decision,
-          by: personOf(people, r.decidedBy),
-          at: iso(r.decidedAt),
-        },
-      });
-    }
-
-    return { waiting, submitted, decided };
+    const ctx = await requireRequestContext();
+    const space = await requireSpace(spaceSlug);
+    const queue = await services().review.queue(ctx, { teamId: space.teamId });
+    if (!queue.ok) notFound();
+    return reviewQueueData(queue);
   },
 );
 
-/** The sidebar badge: how many versions wait on this viewer in the space. */
+/** The sidebar badge: how many rounds wait on the viewer in the space. */
 export const getReviewBadgeCount = cache(
   async (spaceSlug: string): Promise<number> => {
-    return (await loadInReview(spaceSlug)).waiting.length;
+    const ctx = await requireRequestContext();
+    const space = await requireSpace(spaceSlug);
+    const badge = await services().review.badgeCount(ctx, {
+      teamId: space.teamId,
+    });
+    return badge.ok ? badge.count : 0;
   },
 );
+
+/** The review queue from the service's facts: each row with its author, the lists in the order the tabs show. */
+export function reviewQueueData(queue: ReviewQueueFacts): ReviewQueue {
+  const people: People = new Map(queue.people.map((p) => [p.id, p]));
+  const row = (r: QueueRow): ReviewQueueRow => ({
+    templateId: r.templateId,
+    templateName: r.templateName,
+    teamSlug: r.teamSlug,
+    teamName: r.teamName,
+    versionId: r.versionId,
+    versionNumber: r.round.number,
+    round: r.round.round,
+    state: r.round.state,
+    author: personOf(people, r.authorId),
+    submittedAt: r.submittedAt,
+    stage: r.stage,
+    breaking: r.breaking,
+  });
+  const newestSubmitted = (a: ReviewQueueRow, b: ReviewQueueRow) =>
+    b.submittedAt.localeCompare(a.submittedAt) ||
+    a.templateName.localeCompare(b.templateName);
+  return {
+    waiting: queue.waiting.map(row).sort(newestSubmitted),
+    submitted: queue.submitted.map(row).sort(newestSubmitted),
+    decided: queue.decided.map((r) => ({
+      ...row(r),
+      decision: {
+        kind: r.decision.kind,
+        by: personOf(people, r.decision.by),
+        at: r.decision.at,
+      },
+    })),
+    now: queue.asOf,
+  };
+}
 
 // ── Review screen ─────────────────────────────────────────────
 
-/** Approve and Request changes share one answer: the decide check, then the version's state. */
-function decideOnScreen(
-  check: PermissionResult,
-  state: string,
-): PermissionResult {
-  if (!check.ok) return check;
-  return state === "in_review" ? check : refuse(REFUSALS.notInReview);
-}
-
-/** The baseline's content, for the redline: only the chosen version's body and channel fields are read. */
-async function loadBaseline(
-  base: { id: string; number: number | null; state: VersionState } | null,
-): Promise<ReviewScreenData["baseline"]> {
-  if (!base || base.number === null) return null;
-  const row = await db.query.versions.findFirst({
-    columns: {
-      body: true,
-      variables: true,
-      channels: true,
-      channelFields: true,
-      smsFooter: true,
-    },
-    where: eq(versions.id, base.id),
-  });
-  return row
-    ? { id: base.id, number: base.number, state: base.state, ...row }
-    : null;
-}
-
-/** The variable list of one stored version: what a version's contract changes are worked out against. */
-async function loadVariables(versionId: string): Promise<Variable[]> {
-  const row = await db.query.versions.findFirst({
-    columns: { variables: true },
-    where: eq(versions.id, versionId),
-  });
-  return row?.variables ?? [];
-}
-
 /**
- * Everything `/{team}/review/{templateId}/{n}?round=N` shows: that round, or without a round (null) the
- * number's head, its released row or else its latest round. 404 when the round doesn't exist or isn't
- * visible.
+ * Everything `/{team}/review/{templateId}/{n}?round=N` shows: that round, or without a round (null) the round
+ * the service opens for the viewer (the number's head, or for a stage reviewer from outside the team the newest
+ * round they may open). Not found when there is none.
  */
 export const getReviewScreen = cache(
   async (
@@ -334,207 +102,79 @@ export const getReviewScreen = cache(
     versionNumber: number,
     round: number | null,
   ): Promise<ReviewScreenData> => {
-    const access = await requireReviewVersion(
-      spaceSlug,
+    const ctx = await requireRequestContext();
+    const space = await requireSpace(spaceSlug);
+    const screen = await services().review.screen(ctx, {
+      teamId: space.teamId,
       templateId,
       versionNumber,
       round,
-    );
-    const { space, template, version } = access;
-    const shown = asNumbered(version);
-    const { number } = shown;
-
-    const nowDate = await demoNow();
-    const zone = await getBusinessZone();
-    const [
-      others,
-      chain,
-      people,
-      decisionRows,
-      threads,
-      consumerUsage,
-      messages,
-    ] = await Promise.all([
-      db
-        .select({
-          id: versions.id,
-          number: versions.number,
-          round: versions.round,
-          state: versions.state,
-          sunsetAt: versions.sunsetAt,
-          name: versions.name,
-          basedOnVersionId: versions.basedOnVersionId,
-        })
-        .from(versions)
-        .where(eq(versions.templateId, template.id)),
-      loadChain(db, template.contentTypeId),
-      getPeople(),
-      db
-        .select()
-        .from(approvals)
-        .where(eq(approvals.versionId, version.id))
-        .orderBy(asc(approvals.decidedAt), asc(approvals.id)),
-      // A submitted round is a record: the threads that began after it are not part of it.
-      loadThreads(template.id, anchorIdsOf(version), { through: shown }),
-      loadConsumerUsage(db, template.id, nowDate),
-      loadMessageSetup(template),
-    ]);
-
-    const submittedBy = version.submittedBy ?? version.createdBy;
-    // The version's own stages (recorded at submit), each stage's rule read from the chain now.
-    const own = ownStages(version.stages, chain);
-    const stage = currentStageOf(version, chain);
-    const decideInput = {
-      teamId: template.teamId,
-      submittedBy: version.submittedBy,
-      writers: version.writers,
-      stage,
-    };
-    const decide = decideOnScreen(
-      decideCheck(space.viewer, decideInput),
-      version.state,
-    );
-    const inReview = version.state === "in_review";
-    // Two stages need two people: someone who approved a stage of this version can't approve another.
-    const approvedBy = inReview ? approvedThisRound(decisionRows) : [];
-    const approve = decideOnScreen(
-      decideCheck(space.viewer, { ...decideInput, approvedBy }),
-      version.state,
-    );
-    const contractChanges = version.contractChanges ?? [];
-    // What a rename is shown against: the name customers get today, the Active version's or, with none
-    // Active, the newest that still renders (as submit's contract changes compare). Not this version's own:
-    // a round sent back before its number went live shows it against what it was drafted from.
-    const renamedFrom = renameBaseline(others, version.id, nowDate);
-    // What the redline compares with: the Active version or, after a revoke, the revoked text the draft
-    // corrects (decision 0031); never a round's own number. The Approve dialog's previous version stays
-    // the Active one, unless that is this version's own release.
-    const baseline = await loadBaseline(
-      reviewBaseline(others, version.id, nowDate),
-    );
-    const active = others.find((v) => v.state === "active");
-    // With nothing Active (after a revoke), the version consumers move from is the newest that still
-    // renders: the Approve dialog names its consumers and what they have to map (N3). The contract changes
-    // stored at submit were diffed against whatever was Active then, which may be a version revoked since
-    // (submitted while v2 was Active, v2 revoked during review), so they are worked out again here against
-    // the version that renders now, with the diff submit uses.
-    const renders = active ? null : contractBaseline(others, nowDate);
-    const rendersNow =
-      renders && renders.number !== null && renders.number !== number
-        ? { ...renders, number: renders.number }
-        : null;
-    const mapFrom = rendersNow
-      ? diffVariables(await loadVariables(rendersNow.id), version.variables)
-      : [];
-    // A sent-back round that was resubmitted is a record: where its work went is the number's head, linked
-    // when the viewer may open it (a stage reviewer from another team may not).
-    const head = replacedBy(others, shown);
-    const next =
-      head && (await opensRound(access, head.id)) ? asNumbered(head) : null;
-
-    return {
-      template: {
-        id: template.id,
-        teamId: template.teamId,
-        teamSlug: template.teamSlug,
-        teamName: template.teamName,
-        family: messages.family,
-      },
-      version: {
-        id: version.id,
-        number,
-        round: shown.round,
-        state: version.state,
-        name: version.name,
-        body: version.body,
-        variables: version.variables,
-        channels: version.channels,
-        sampleSets: version.sampleSets,
-        channelFields: version.channelFields,
-        smsFooter: version.smsFooter,
-        submittedBy: personOf(people, submittedBy),
-        submittedAt: iso(version.submittedAt ?? version.createdAt),
-        submitNote: version.submitNote,
-        sunsetDay: version.sunsetAt ? sunsetDay(version.sunsetAt, zone) : null,
-        sunsetPassed: sunsetPassed(version, nowDate),
-        contractChanges,
-        contractLines: describeChanges(contractChanges, number),
-      },
-      baseline,
-      previousNumber: active && active.number !== number ? active.number : null,
-      stillRenders: rendersNow
-        ? {
-            number: rendersNow.number,
-            sunsetDay: rendersNow.sunsetAt
-              ? sunsetDay(rendersNow.sunsetAt, zone)
-              : null,
-            contractChanges: mapFrom,
-          }
-        : null,
-      replacedBy: next
-        ? { ...next, label: versionLabel(next, { style: "sentence" }) }
-        : null,
-      liveName: renamedFrom?.name ?? null,
-      steps: stepperState(
-        own,
-        decisionRows.map((d) => ({
-          stageId: d.stageId,
-          decision: d.decision,
-          by: personOf(people, d.actorId),
-          at: iso(d.decidedAt),
-        })),
-        { state: version.state, currentStage: version.currentStage },
-      ),
-      threads,
-      can: {
-        approve,
-        requestChanges: decide,
-        // Authors and approvers on the team, and whoever the waiting stage names (any team), while it is in review.
-        comment: canComment(space.viewer, {
-          teamId: template.teamId,
-          version: {
-            state: version.state,
-            stageApproverIds: stageApproverIds(stage),
-          },
-        }),
-      },
-      consumerUsage,
-      today: utcDay(nowDate),
-      sunsetCalendar: { zone, today: todayIn(nowDate, zone) },
-      // A reviewed version is submitted: its SMS ends with the footer frozen into it, not the content type's now.
-      messageRules: { ...messages.rules, smsFooter: version.smsFooter },
-      senders: messages.senders,
-    };
+    });
+    if (!screen.ok) notFound();
+    return reviewScreenData(screen, ctx.viewer.userId);
   },
 );
 
 /**
- * The template's family (its content type's), and what the phone preview renders a message version with:
- * its content type's SMS footer and part budget, and who the team's messages come from (the push's app,
- * the SMS's short code).
+ * The review screen from the service's facts: its people, its contract lines, the stepper, the threads, and
+ * the labels. `viewerId` is who is looking (their own comments show under their name at once).
  */
-async function loadMessageSetup(template: {
-  teamId: string;
-  contentTypeId: string;
-}): Promise<{
-  family: ChannelFamily;
-  rules: MessageTypeRules;
-  senders: TeamSenders;
-}> {
-  const [family, rules, team] = await Promise.all([
-    loadFamily(db, template.contentTypeId),
-    loadMessageRules(db, template.contentTypeId),
-    db.query.teams.findFirst({
-      where: eq(teams.id, template.teamId),
-      columns: { appName: true, smsSender: true },
-    }),
-  ]);
+export function reviewScreenData(
+  screen: ReviewScreenFacts,
+  viewerId: string,
+): ReviewScreenData {
+  const people: People = new Map(screen.people.map((p) => [p.id, p]));
+  const { version } = screen;
   return {
-    family,
-    rules,
-    senders: {
-      appName: team?.appName ?? null,
-      smsSender: team?.smsSender ?? null,
+    template: screen.template,
+    version: {
+      id: version.id,
+      number: version.number,
+      round: version.round,
+      state: version.state,
+      name: version.name,
+      body: version.body,
+      variables: version.variables,
+      channels: version.channels,
+      sampleSets: version.sampleSets,
+      channelFields: version.channelFields,
+      smsFooter: version.smsFooter,
+      submittedBy: personOf(people, version.submittedBy),
+      submittedAt: version.submittedAt,
+      submitNote: version.submitNote,
+      sunsetDay: version.sunsetDay,
+      sunsetPassed: version.sunsetPassed,
+      contractChanges: version.contractChanges,
+      contractLines: describeChanges(version.contractChanges, version.number),
     },
+    baseline: screen.baseline,
+    previousNumber: screen.previousNumber,
+    stillRenders: screen.stillRenders,
+    replacedBy: screen.replacedBy
+      ? {
+          ...screen.replacedBy,
+          label: versionLabel(screen.replacedBy, { style: "sentence" }),
+        }
+      : null,
+    liveName: screen.liveName,
+    steps: stepperState(
+      version.stages,
+      version.decisions.map((d) => ({
+        stageId: d.stageId,
+        decision: d.kind,
+        by: personOf(people, d.by),
+        at: d.at,
+      })),
+      version,
+    ),
+    threads: threadViews(screen.threads, people),
+    can: screen.can,
+    consumerUsage: screen.consumerUsage,
+    now: screen.asOf,
+    today: utcDay(screen.asOf),
+    viewer: personOf(people, viewerId),
+    sunsetCalendar: screen.sunsetCalendar,
+    messageRules: screen.messageRules,
+    senders: screen.senders,
   };
 }

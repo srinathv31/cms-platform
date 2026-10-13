@@ -1,7 +1,9 @@
 import "server-only";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { sunsetDay, todayIn } from "@/domain/business-zone";
+import { channelFieldValues } from "@/domain/channel-fields";
 import { DAY_MS } from "@/domain/dates";
+import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { versionActions } from "@/domain/lifecycle/version-actions";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { can } from "@/domain/permissions";
@@ -19,14 +21,20 @@ import {
 } from "@/server/db/schema/ucomp";
 import { loadConsumerUsage } from "@/server/services/local/consumer-usage";
 import { currentName } from "@/server/services/local/template-name";
-import { notMoved } from "../not-moved";
 import { refusal } from "../results";
-import type { VersionFacts, VersionService } from "../versions";
+import type {
+  CompareVersionFacts,
+  VersionFacts,
+  VersionService,
+} from "../versions";
+import { loadFamily, loadMessageRules } from "./chain";
 import type { LocalDeps } from "./command";
+import { findTemplate } from "./visible-template";
 
 // One template's versions on this app's own database (src/server/services/versions.ts says what each read
 // promises): the rows, their decisions and renders, and what the viewer may do on each, decided by the domain
-// on the backend's clock, which the answer names (`asOf`).
+// on the backend's clock, which the answer names (`asOf`); and the content of the versions Compare and "Revert to
+// vN" read on demand.
 
 export function localVersions(deps: LocalDeps): VersionService {
   return {
@@ -175,7 +183,112 @@ export function localVersions(deps: LocalDeps): VersionService {
       };
     },
 
-    compare: notMoved("versions.compare"),
-    baseVersion: notMoved("versions.baseVersion"),
+    async compare(ctx, { templateId, from, to }) {
+      if (!isId(templateId) || !isId(from) || !isId(to))
+        return refusal(400, REQUEST_REFUSALS.templateUnavailable);
+      const template = await findTemplate(templateId);
+      if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
+      if (!can(ctx.viewer, "template.view", { teamId: template.teamId }).ok)
+        return refusal(403, REQUEST_REFUSALS.templateUnavailable);
+
+      const [rows, family, rules] = await Promise.all([
+        db
+          .select({
+            id: versions.id,
+            number: versions.number,
+            round: versions.round,
+            state: versions.state,
+            name: versions.name,
+            body: versions.body,
+            channels: versions.channels,
+            channelFields: versions.channelFields,
+            smsFooter: versions.smsFooter,
+            variables: versions.variables,
+          })
+          .from(versions)
+          .where(
+            and(
+              eq(versions.templateId, template.id),
+              inArray(versions.id, [from, to]),
+            ),
+          ),
+        loadFamily(db, template.contentTypeId),
+        loadMessageRules(db, template.contentTypeId),
+      ]);
+      const side = (id: string): CompareVersionFacts | undefined => {
+        const row = rows.find((r) => r.id === id);
+        if (!row) return undefined;
+        const draft = row.state === "draft";
+        return {
+          ...row,
+          number: draft ? null : row.number,
+          round: draft ? null : row.round,
+          smsFooter: smsFooterOf(row, rules.smsFooter),
+        };
+      };
+      const older = side(from);
+      const newer = side(to);
+      if (!older || !newer)
+        return refusal(404, REQUEST_REFUSALS.versionUnavailable);
+      return { ok: true, family, from: older, to: newer };
+    },
+
+    async baseVersion(ctx, { templateId, versionId }) {
+      if (!isId(templateId) || !isId(versionId))
+        return refusal(400, REQUEST_REFUSALS.templateUnavailable);
+      const template = await findTemplate(templateId);
+      if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
+      const allowed = can(ctx.viewer, "draft.edit", {
+        teamId: template.teamId,
+      });
+      if (!allowed.ok) return refusal(403, allowed);
+
+      const rows = await db
+        .select({
+          id: versions.id,
+          number: versions.number,
+          round: versions.round,
+          state: versions.state,
+          basedOnVersionId: versions.basedOnVersionId,
+          name: versions.name,
+          body: versions.body,
+          variables: versions.variables,
+          channels: versions.channels,
+          channelFields: versions.channelFields,
+          sampleSets: versions.sampleSets,
+        })
+        .from(versions)
+        .where(eq(versions.templateId, template.id));
+      // The draft on the client's screen, never another the template has by now (that one was submitted, and
+      // someone started a new one).
+      const draft = rows.find((v) => v.id === versionId);
+      if (!draft) return refusal(404, REQUEST_REFUSALS.noDraftToRevert);
+      if (draft.state !== "draft")
+        return refusal(409, REQUEST_REFUSALS.noDraftToRevert);
+      const base = draft.basedOnVersionId
+        ? rows.find((v) => v.id === draft.basedOnVersionId)
+        : undefined;
+      if (!base || base.number === null || base.round === null)
+        return refusal(409, REQUEST_REFUSALS.noBaseVersion);
+      return {
+        ok: true,
+        base: {
+          number: base.number,
+          round: base.round,
+          state: base.state,
+          name: base.name,
+          body: base.body,
+          variables: base.variables,
+          channels: base.channels,
+          sampleSets: base.sampleSets,
+          ...channelFieldValues(base.channelFields),
+        },
+      };
+    },
   };
+}
+
+/** An id as a request names it: present, and 1 to 64 characters. */
+function isId(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= 64;
 }

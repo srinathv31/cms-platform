@@ -13,7 +13,8 @@
 // A new template's id is the backend's: it draws a random one, inserts, and retries the whole write with another
 // when the insert finds it taken, three attempts at most (decision 0060).
 //
-// Typed for step 2b; the reads that are `Unsettled` still run in src/server/queries/ until their package moves
+// The commands run behind the seam (local and fake), and so do the workspace's two reads (local; their facts are
+// in ./workspace.ts). The reads that are `Unsettled` still run in src/server/queries/ until their package moves
 // them (plan.md).
 
 import type { DraftContent } from "@/domain/lifecycle/types";
@@ -27,6 +28,7 @@ import type {
   RequestContext,
   Unsettled,
 } from "./types";
+import type { WorkspaceDocumentFacts, WorkspaceHeaderFacts } from "./workspace";
 
 export type { DraftContent };
 
@@ -131,17 +133,24 @@ export interface TemplateService {
     },
   ): Promise<ReadResult<Unsettled<"P4c: the palette's results">>>;
 
-  /** The workspace header (name, state, what the viewer may do). */
+  /**
+   * The workspace header, on every tab: the version the workspace shows (its name, state and sunset), its
+   * labels' facts, and what the viewer may do there (`workspaceActions`). Refuses 404 `template_unavailable`
+   * when the template doesn't exist or the viewer may not see its team (the two read the same, decision 0052).
+   */
   workspaceHeader(
     ctx: RequestContext,
     input: { templateId: string },
-  ): Promise<ReadResult<Unsettled<"P4a: the workspace header's facts">>>;
+  ): Promise<ReadResult<WorkspaceHeaderFacts>>;
 
-  /** The draft (or latest version) the workspace edits or shows. */
+  /**
+   * The document the Content tab edits or shows (the open draft, else the latest round), with its margin's
+   * threads and what the viewer may do with it. Refuses as `workspaceHeader`.
+   */
   workspaceDocument(
     ctx: RequestContext,
     input: { templateId: string },
-  ): Promise<ReadResult<Unsettled<"P4a: the workspace document's facts">>>;
+  ): Promise<ReadResult<WorkspaceDocumentFacts>>;
 
   /** The SHARE panel's facts: what a consumer sends and gets (its worded examples are the BFF's). */
   integration(

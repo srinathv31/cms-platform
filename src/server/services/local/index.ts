@@ -1,13 +1,13 @@
 import "server-only";
-import type { AuditService } from "../audit";
 
-import { notMovedArea } from "../not-moved";
+import { notMoved, notMovedArea } from "../not-moved";
 import type { ImplementationOptions } from "../options";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
 import { now } from "@/server/clock";
 import { newTemplateId } from "@/server/ids";
 import { localAccess } from "./access";
+import { localActivity } from "./activity";
 import type { LocalDeps } from "./command";
 import { localComments } from "./comments";
 import { localDemo } from "./demo";
@@ -17,8 +17,11 @@ import { localNotifications } from "./notifications";
 import { localPlatform } from "./platform";
 import { localRender } from "./render";
 import { localReview } from "./review";
+import { localReviewReads } from "./review-reads";
 import { localTemplates } from "./templates";
+import { localThreads } from "./threads";
 import { localVersions } from "./versions";
+import { localWorkspace } from "./workspace";
 
 // The local implementation: the service interfaces on this app's own database (Drizzle over SQLite) and the
 // TypeScript domain. It is what the Java API replaces. Each area lives in its own file here; an area whose
@@ -41,15 +44,19 @@ export function localServices(options: LocalOptions = {}): Services {
   const identity = localIdentity();
   return {
     identity,
-    review: localReview(deps),
+    review: { ...localReview(deps), ...localReviewReads(deps) },
     versions: localVersions(deps),
-    templates: localTemplates(deps),
+    templates: { ...localTemplates(deps), ...localWorkspace(deps) },
     drafts: localDrafts(deps),
-    comments: localComments(deps),
+    comments: { ...localComments(deps), ...localThreads() },
     access: localAccess(deps),
     platform: localPlatform(deps),
     notifications: localNotifications(deps),
-    audit: notMovedArea<AuditService>("audit"),
+    audit: {
+      page: notMoved("audit.page"),
+      exportRows: notMoved("audit.exportRows"),
+      ...localActivity(deps),
+    },
     usage: notMovedArea<UsageService>("usage"),
     render: localRender(deps),
     demo: localDemo(deps, identity),

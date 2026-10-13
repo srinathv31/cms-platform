@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { contractBaseline, renameBaseline, reviewBaseline } from "./baselines";
+import {
+  contractBaseline,
+  renameBaseline,
+  reviewBaseline,
+  reviewScreenBaselines,
+} from "./baselines";
 import type { VersionState } from "../types";
 import { NOW } from "./fixtures";
 
@@ -270,5 +275,80 @@ describe("reviewBaseline", () => {
         NOW,
       ),
     ).toBeNull();
+  });
+});
+
+describe("reviewScreenBaselines", () => {
+  const DAY = 86_400_000;
+  const v = (
+    id: string,
+    state: VersionState,
+    number: number | null,
+    basedOnVersionId: string | null = null,
+    sunsetAt: Date | null = null,
+  ) => ({ id, state, number, sunsetAt, basedOnVersionId });
+  const ids = (b: ReturnType<typeof reviewScreenBaselines>) => ({
+    redline: b.redline?.id ?? null,
+    replaces: b.replaces?.id ?? null,
+    stillRenders: b.stillRenders?.id ?? null,
+    renamedFrom: b.renamedFrom?.id ?? null,
+  });
+
+  it("with a version Active: the redline, the rename and the replaced version are all the Active one", () => {
+    const list = [
+      v("v1", "superseded", 1),
+      v("v2", "active", 2, "v1"),
+      v("v3", "in_review", 3, "v2"),
+    ];
+    expect(
+      ids(reviewScreenBaselines(list, { id: "v3", number: 3 }, NOW)),
+    ).toEqual({
+      redline: "v2",
+      replaces: "v2",
+      stillRenders: null,
+      renamedFrom: "v2",
+    });
+    // On the Active version itself, nothing.
+    expect(
+      ids(reviewScreenBaselines(list, { id: "v2", number: 2 }, NOW)),
+    ).toEqual({
+      redline: null,
+      replaces: null,
+      stillRenders: null,
+      renamedFrom: null,
+    });
+  });
+
+  it("after a revoke: the redline is the revoked text, nothing is replaced, and consumers move from what still renders", () => {
+    const later = new Date(NOW.getTime() + 30 * DAY);
+    const list = [
+      v("v1", "superseded", 1, null, later),
+      v("v2", "revoked", 2, "v1"),
+      v("v3", "in_review", 3, "v2"),
+    ];
+    expect(
+      ids(reviewScreenBaselines(list, { id: "v3", number: 3 }, NOW)),
+    ).toEqual({
+      redline: "v2",
+      replaces: null,
+      stillRenders: "v1",
+      renamedFrom: "v1",
+    });
+  });
+
+  it("a round sent back before its number went live is compared with what it was drafted from, and replaces nothing", () => {
+    const list = [
+      v("v1", "superseded", 1),
+      v("v2r1", "changes_requested", 2, "v1"),
+      v("v2r2", "active", 2, "v2r1"),
+    ];
+    expect(
+      ids(reviewScreenBaselines(list, { id: "v2r1", number: 2 }, NOW)),
+    ).toEqual({
+      redline: "v1",
+      replaces: null,
+      stillRenders: null,
+      renamedFrom: "v1",
+    });
   });
 });

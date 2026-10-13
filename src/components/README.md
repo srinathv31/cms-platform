@@ -180,7 +180,7 @@ skeletons, and server-safe pieces such as `StatusBadge`. Names don't tell you th
 
 **Permissions.** The server decides. Read models carry `PermissionResult`s (`{ ok: true } | { ok: false; code; reason }`)
 or booleans: `m.can.remove` in `settings/team/members-table.tsx`, `data.can.approve` and `data.can.comment` in
-`review/review-workspace.tsx`, `canSubmit` in `workspace/workspace-tab-bar.tsx`. The settings rows render a
+`review/review-workspace.tsx`, `t.can.submit` in `workspace/workspace-tab-bar.tsx`. The settings rows render a
 refused action disabled, with its `reason` in a tooltip (`settings/team/rows.tsx`). What an action does comes the
 same way: the settings read models send each strip's line as `consequences` beside `can` (`m.consequences.remove`).
 A form checked as someone types calls the domain's own check with the read model's facts (`validateChain`,

@@ -10,9 +10,6 @@ const header = vi.hoisted(() => ({ data: null as WorkspaceHeaderData | null }));
 vi.mock("@/server/queries/workspace", () => ({
   getWorkspaceHeader: vi.fn(async () => header.data),
 }));
-vi.mock("@/server/clock", () => ({
-  now: vi.fn(async () => new Date("2026-10-04T12:00:00.000Z")),
-}));
 
 const { WorkspaceHeader } = await import("./workspace-header");
 const { NameField } = await import("./name-field");
@@ -36,11 +33,14 @@ const DRAFT: WorkspaceHeaderData = {
   versionNumber: 3,
   round: 1,
   inReview: null,
-  canEdit: true,
   editable: true,
   draft: { versionId: "v_draft3", rev: 7 },
-  canStartDraft: false,
-  canSubmit: true,
+  can: {
+    edit: { ok: true },
+    startDraft: { ok: true },
+    submit: { ok: true },
+  },
+  now: "2026-10-04T12:00:00.000Z",
 };
 
 /** Every element of a rendered tree of a given component, depth first. */
@@ -157,7 +157,10 @@ describe("WorkspaceHeader binding", () => {
       status: "in_review",
       editable: false,
       draft: null,
-      canSubmit: false,
+      can: {
+        ...DRAFT.can,
+        submit: { ok: false, code: "no_draft_to_submit", reason: "x" },
+      },
     });
     expect(
       find<{ draft: unknown }>(tree, BindDraft).map((el) => el.props),

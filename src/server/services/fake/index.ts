@@ -1,6 +1,4 @@
-import type { AuditService } from "../audit";
-
-import { notMovedArea } from "../not-moved";
+import { notMoved, notMovedArea } from "../not-moved";
 import type {
   Clock,
   IdSource,
@@ -12,6 +10,7 @@ import type { Services } from "../types";
 import type { UsageService } from "../usage";
 import { newTemplateId } from "@/server/ids";
 import { fakeAccess } from "./access";
+import { fakeActivity } from "./activity";
 import { fakeComments } from "./comments";
 import { fakeDemo } from "./demo";
 import { fakeDrafts } from "./drafts";
@@ -22,6 +21,7 @@ import { fakeReview } from "./review";
 import type { FakeState } from "./state";
 import { FakeStore } from "./store";
 import { fakeTemplates } from "./templates";
+import { fakeThreads } from "./threads";
 import { fakeVersions } from "./versions";
 
 // The in-memory fake of the service interfaces (decision 0068): the real domain rules over arrays instead of a
@@ -62,11 +62,15 @@ export function fakeServices(
     versions: fakeVersions(deps),
     templates: fakeTemplates(deps),
     drafts: fakeDrafts(deps),
-    comments: fakeComments(deps),
+    comments: { ...fakeComments(deps), ...fakeThreads(deps) },
     access: fakeAccess(deps),
     platform: fakePlatform(deps),
     notifications: fakeNotifications(deps),
-    audit: notMovedArea<AuditService>("audit"),
+    audit: {
+      page: notMoved("audit.page"),
+      exportRows: notMoved("audit.exportRows"),
+      ...fakeActivity(deps),
+    },
     usage: notMovedArea<UsageService>("usage"),
     // The preview is a read no contract case observes a command through, so the fake doesn't render: the preview
     // route's tests hand it facts (decision 0072's slim fake).

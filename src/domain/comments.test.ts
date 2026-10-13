@@ -8,6 +8,7 @@ import {
   canComment,
   commentAnchors,
   commentText,
+  inReadingOrder,
   reopenThread,
   reply,
   resolveThread,
@@ -333,6 +334,46 @@ describe("commentAnchors: where a thread can anchor", () => {
       "sms.text",
     ]);
     expect(commentAnchors(["b_one"], ["pdf", "web"])).toEqual(["b_one"]);
+  });
+});
+
+describe("inReadingOrder: a version's margin", () => {
+  const at = (seconds: number) => new Date(NOW.getTime() + seconds * 1000);
+  const thread = (id: string, blockId: string, seconds = 0) => ({
+    id,
+    blockId,
+    createdAt: at(seconds),
+  });
+
+  it("puts the document threads first, then by anchor, then the orphaned ones, oldest first within each", () => {
+    const ordered = inReadingOrder(
+      [
+        thread("t_gone", "b_gone"),
+        thread("t_two", "b_two"),
+        thread("t_doc_late", DOCUMENT_THREAD, 5),
+        thread("t_one_late", "b_one", 9),
+        thread("t_one", "b_one", 1),
+        thread("t_doc", DOCUMENT_THREAD, 2),
+      ],
+      ["b_one", "b_two"],
+    );
+    expect(ordered.map((t) => [t.id, t.orphaned])).toEqual([
+      ["t_doc", false],
+      ["t_doc_late", false],
+      ["t_one", false],
+      ["t_one_late", false],
+      ["t_two", false],
+      ["t_gone", true],
+    ]);
+  });
+
+  it("orders threads begun at the same moment by id", () => {
+    expect(
+      inReadingOrder(
+        [thread("t_b", "b_one"), thread("t_a", "b_one")],
+        ["b_one"],
+      ).map((t) => t.id),
+    ).toEqual(["t_a", "t_b"]);
   });
 });
 

@@ -7,7 +7,7 @@ import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { OutputKey } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD, type ActionResult } from "@/domain/review-types";
 import type { StoredNotification } from "../notifications";
-import type { ContractHarness, ProbeAuditEvent } from "./harness";
+import type { ContractHarness } from "./harness";
 
 // The review lifecycle's behaviour, as every implementation must show it (ReviewService in
 // src/server/services/review.ts). Cases act through the services, from the seed (all on Coral Offers, one
@@ -42,6 +42,16 @@ const added = <T>(before: readonly T[], after: readonly T[]) =>
   after.slice(before.length);
 
 /** A command's answer as its code, or "ok". */
+/** An audit row about a version, as the Activity tab's facts carry it. */
+interface AuditRow {
+  action: string;
+  /** ISO. */
+  at: string;
+  actorId: string | null;
+  versionId: string;
+  details: Record<string, unknown>;
+}
+
 const codeOf = async (answer: Promise<ActionResult<object>>) => {
   const result = await answer;
   return result.ok ? "ok" : result.code;
@@ -91,14 +101,38 @@ export function reviewContract(h: ContractHarness, base: Date) {
     rows.find((v) => v.state === "draft");
 
   /**
+   * The audit rows about each of the template's rows, oldest first, as its Activity tab reads them (to the
+   * Auditor, who sees every team).
+   */
+  async function auditByRow(templateId: string, rows: readonly Row[]) {
+    const activity = await h
+      .services()
+      .audit.activity(await h.as("taylor"), { templateId });
+    if (!activity.ok) throw new Error(activity.code);
+    const audit: Record<string, AuditRow[]> = Object.fromEntries(
+      rows.map((row) => [row.id, []]),
+    );
+    for (const { action, at, actorId, versionId, details } of [
+      ...activity.events,
+    ].reverse())
+      if (versionId)
+        (audit[versionId] ??= []).push({
+          action,
+          at,
+          actorId,
+          versionId,
+          details,
+        });
+    return audit;
+  }
+
+  /**
    * Everything a review command can write about a template, as the reads show it: its rows, the audit rows about
    * each of them, Coral's notices, and the bells of the people the cases watch.
    */
   async function world(templateId: string) {
     const { rows } = await rowsOf(templateId);
-    const audit: Record<string, ProbeAuditEvent[]> = {};
-    for (const row of rows)
-      audit[row.id] = await h.probe.auditEvents({ versionId: row.id });
+    const audit = await auditByRow(templateId, rows);
     const bells: Record<string, StoredNotification[]> = {};
     for (const userId of PEOPLE) {
       const list = await h
@@ -208,10 +242,29 @@ export function reviewContract(h: ContractHarness, base: Date) {
       .notifications.list(await h.as("priya"), { limit: 100 });
     if (!bell.ok) throw new Error(bell.code);
     return {
-      audit: await h.probe.auditEvents({ versionId: version.id }),
+      audit: await auditOf(templateId, version.id),
       notices: await h.consumerNotices(CORAL, templateId),
       priya: bell.items,
     };
+  }
+
+  /** The audit rows about one version, oldest first, as the template's Activity tab reads them. */
+  async function auditOf(templateId: string, versionId: string) {
+    const activity = await h
+      .services()
+      .audit.activity(await h.as("jordan"), { templateId });
+    if (!activity.ok) throw new Error(activity.code);
+    return activity.events
+      .filter((e) => e.versionId === versionId)
+      .reverse()
+      .map(({ action, at, actorId, details }) => ({
+        action,
+        at,
+        actorId,
+        templateId,
+        versionId,
+        details,
+      }));
   }
 
   /** The notifications in `after` that `before` didn't have (the bell lists newest first). */
@@ -248,7 +301,6 @@ export function reviewContract(h: ContractHarness, base: Date) {
           action: "version.sunset_set",
           at: minute(1).toISOString(),
           actorId: "alex",
-          teamId: history.template.teamId,
           templateId,
           versionId: version.id,
           details: expect.objectContaining({
@@ -625,10 +677,7 @@ export function reviewContract(h: ContractHarness, base: Date) {
       ]);
       expect(
         auditAdded(before, after).every(
-          (e) =>
-            e.at === minute(1).toISOString() &&
-            e.actorId === "maya" &&
-            e.teamId === CORAL_OFFERS,
+          (e) => e.at === minute(1).toISOString() && e.actorId === "maya",
         ),
       ).toBe(true);
       const review = {

@@ -1,10 +1,7 @@
 import { notFound } from "next/navigation";
 import { Stream } from "@/components/primitives/stream";
 import { parseRoundParam } from "@/domain/rounds";
-import { now } from "@/server/clock";
 import { getReviewScreen } from "@/server/queries/review";
-import { getPeople, personOf } from "@/server/queries/people";
-import { requireRequestContext } from "@/server/context/request";
 import { RV } from "./review-grid";
 import { ReviewSkeleton } from "./review-skeleton";
 import { ReviewWorkspace } from "./review-workspace";
@@ -25,18 +22,16 @@ async function ReviewData({
   if (round === "invalid") notFound();
   // 404 for a template, a version or a round that doesn't exist or that the viewer can't see.
   const data = await getReviewScreen(team, templateId, Number(version), round);
-  const nowDate = await now();
-  // Who is looking, for the comments they write (shown with their name at once, before the server confirms them).
-  const { viewer } = await requireRequestContext();
-  const me = personOf(await getPeople(), viewer.userId);
-  // A different version or round is a different screen: its own document, threads and dialogs.
+  // A different version or round is a different screen: its own document, threads and dialogs. Its relative
+  // times count from the instant the backend decided the screen at (`data.now`); `data.viewer` is who is
+  // looking, for the comments they write (shown with their name at once, before the server confirms them).
   return (
     <ReviewWorkspace
       key={data.version.id}
       data={data}
       team={team}
-      nowIso={nowDate.toISOString()}
-      viewer={me}
+      nowIso={data.now}
+      viewer={data.viewer}
     />
   );
 }

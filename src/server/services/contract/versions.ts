@@ -208,3 +208,200 @@ export function versionsContract(h: ContractHarness, base: Date) {
     });
   });
 }
+
+/**
+ * The two reads of a version's content the workspace makes on demand: Compare's pair and "Revert to vN"'s base.
+ * Morgan has no team; Sam views Coral Offers; Eli is on Deposits.
+ */
+export function versionContentContract(h: ContractHarness) {
+  /** A version row as the Versions read lists it: a number's head, or the open draft (number null). */
+  async function row(templateKey: string, number: number | null) {
+    const history = await h.services().versions.history(await h.as("jordan"), {
+      templateId: h.templates[templateKey]!,
+    });
+    if (!history.ok) throw new Error(history.code);
+    return history.versions.find((v) => v.number === number && v.head)!;
+  }
+
+  describe("versions.compare", () => {
+    it("reads two versions' content, older first, for anyone who may see the template", async () => {
+      const templateId = h.templates["cash-back"]!;
+      const [v1, v2] = [await row("cash-back", 1), await row("cash-back", 2)];
+      for (const userId of ["maya", "sam"]) {
+        const pair = await h.services().versions.compare(await h.as(userId), {
+          templateId,
+          from: v1.id,
+          to: v2.id,
+        });
+        expect(pair).toMatchObject({
+          ok: true,
+          family: "document",
+          from: { id: v1.id, number: 1, round: 1, state: "superseded" },
+          to: {
+            id: v2.id,
+            number: 2,
+            round: 1,
+            state: "active",
+            smsFooter: null,
+          },
+        });
+        if (!pair.ok) throw new Error(pair.code);
+        expect(pair.to).toEqual(
+          expect.objectContaining({
+            name: expect.any(String),
+            body: expect.objectContaining({ type: "doc" }),
+            channels: expect.any(Array),
+            channelFields: expect.any(Object),
+            variables: expect.any(Array),
+          }),
+        );
+      }
+    });
+
+    it("gives the open draft no number and no round", async () => {
+      const [v1, draft] = [
+        await row("annual-fee-waiver", 1),
+        await row("annual-fee-waiver", null),
+      ];
+      expect(
+        await h.services().versions.compare(await h.as("maya"), {
+          templateId: h.templates["annual-fee-waiver"]!,
+          from: v1.id,
+          to: draft.id,
+        }),
+      ).toMatchObject({
+        ok: true,
+        to: { id: draft.id, number: null, round: null, state: "draft" },
+      });
+    });
+
+    it("refuses, in order: 400 for an id missing or malformed, 404 and 403 for the template, 404 for a version that isn't its", async () => {
+      const templateId = h.templates["cash-back"]!;
+      const v1 = await row("cash-back", 1);
+      const maya = await h.as("maya");
+      for (const [from, to] of [
+        [null, null],
+        [v1.id, null],
+        [v1.id, ""],
+        [v1.id, "v".repeat(65)],
+      ])
+        expect(
+          await h.services().versions.compare(maya, { templateId, from, to }),
+        ).toMatchObject({
+          ok: false,
+          status: 400,
+          code: REQUEST_REFUSALS.templateUnavailable.code,
+        });
+      const other = await row("balance-transfer", 2);
+      expect(
+        await h.services().versions.compare(maya, {
+          templateId: "UC-ZZZZZZ",
+          from: v1.id,
+          to: other.id,
+        }),
+      ).toMatchObject({ ok: false, status: 404 });
+      expect(
+        await h.services().versions.compare(await h.as("morgan"), {
+          templateId,
+          from: v1.id,
+          to: other.id,
+        }),
+      ).toMatchObject({
+        ok: false,
+        status: 403,
+        code: REQUEST_REFUSALS.templateUnavailable.code,
+      });
+      expect(
+        await h.services().versions.compare(maya, {
+          templateId,
+          from: v1.id,
+          to: other.id,
+        }),
+      ).toMatchObject({
+        ok: false,
+        status: 404,
+        code: REQUEST_REFUSALS.versionUnavailable.code,
+      });
+    });
+  });
+
+  describe("versions.baseVersion", () => {
+    it("reads the content of the version the draft on screen was started from", async () => {
+      const [v1, draft] = [
+        await row("annual-fee-waiver", 1),
+        await row("annual-fee-waiver", null),
+      ];
+      const base = await h.services().versions.baseVersion(await h.as("maya"), {
+        templateId: h.templates["annual-fee-waiver"]!,
+        versionId: draft.id,
+      });
+      expect(base).toMatchObject({
+        ok: true,
+        base: { number: 1, round: 1, state: "changes_requested" },
+      });
+      if (!base.ok) throw new Error(base.code);
+      // Every field of every channel, by id: null when the version has none.
+      expect(base.base).toHaveProperty(["email.subject"]);
+      expect(v1.state).toBe("changes_requested");
+    });
+
+    it("refuses, in order: 400 for an id missing or malformed, 404 for the template, 403 to someone who may not edit, then 404 and 409 for a version that isn't an open draft of it", async () => {
+      const templateId = h.templates["annual-fee-waiver"]!;
+      const [v1, draft] = [
+        await row("annual-fee-waiver", 1),
+        await row("annual-fee-waiver", null),
+      ];
+      const maya = await h.as("maya");
+      for (const versionId of [null, "", "v".repeat(65)])
+        expect(
+          await h
+            .services()
+            .versions.baseVersion(maya, { templateId, versionId }),
+        ).toMatchObject({
+          ok: false,
+          status: 400,
+          code: REQUEST_REFUSALS.templateUnavailable.code,
+        });
+      expect(
+        await h.services().versions.baseVersion(maya, {
+          templateId: "UC-ZZZZZZ",
+          versionId: draft.id,
+        }),
+      ).toMatchObject({
+        ok: false,
+        status: 404,
+        code: REQUEST_REFUSALS.templateUnavailable.code,
+      });
+      for (const userId of ["sam", "eli", "morgan"])
+        expect(
+          await h.services().versions.baseVersion(await h.as(userId), {
+            templateId,
+            versionId: draft.id,
+          }),
+          userId,
+        ).toMatchObject({ ok: false, status: 403 });
+      expect(
+        await h.services().versions.baseVersion(maya, {
+          templateId: h.templates["cash-back"]!,
+          versionId: draft.id,
+        }),
+        "a draft of another template",
+      ).toMatchObject({
+        ok: false,
+        status: 404,
+        code: REQUEST_REFUSALS.noDraftToRevert.code,
+      });
+      expect(
+        await h.services().versions.baseVersion(maya, {
+          templateId,
+          versionId: v1.id,
+        }),
+        "not a draft any more",
+      ).toMatchObject({
+        ok: false,
+        status: 409,
+        code: REQUEST_REFUSALS.noDraftToRevert.code,
+      });
+    });
+  });
+}

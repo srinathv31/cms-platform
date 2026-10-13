@@ -52,9 +52,9 @@ async function TemplateActions({ params }: { params: Params }) {
   return (
     <>
       <PreviewToggle />
-      {t.canSubmit ? (
+      {t.can.submit.ok ? (
         <SubmitButton templateId={t.id} />
-      ) : t.canStartDraft ? (
+      ) : t.can.startDraft.ok ? (
         <EditButton templateId={t.id} />
       ) : null}
     </>

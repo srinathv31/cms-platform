@@ -189,10 +189,7 @@ const SEAM_NOT_YET = [
   "src/server/actions/kit.ts",
   "src/server/clock.ts",
   "src/server/queries/access.ts",
-  "src/server/queries/activity.ts",
   "src/server/queries/audit.ts",
-  "src/server/queries/base-version.ts",
-  "src/server/queries/compare.ts",
   "src/server/queries/consumer-api.ts",
   "src/server/queries/copilot.ts",
   "src/server/queries/integration.ts",
@@ -200,26 +197,17 @@ const SEAM_NOT_YET = [
   "src/server/queries/palette.ts",
   "src/server/queries/people.ts",
   "src/server/queries/platform.ts",
-  "src/server/queries/review.ts",
-  "src/server/queries/template-access.ts",
-  "src/server/queries/threads.ts",
   "src/server/queries/usage.ts",
-  "src/server/queries/workspace.ts",
 ];
 
 // The BFF files that still read the clock (N1), still decide with can() (N2), and still import the backend's own
 // machinery (H4): the packages that own them (plan.md) clear them, and delete their lines. Integration empties all
 // three, with SEAM_NOT_YET.
 const CLOCK_NOT_YET = [
-  "src/components/activity/activity-content.tsx",
   "src/components/library/library-view.tsx",
-  "src/components/review-queue/review-queue-view.tsx",
-  "src/components/review/review-screen.tsx",
   "src/components/settings/team/bodies.tsx",
   "src/components/usage/template-usage.tsx",
   "src/components/usage/usage-dashboard.tsx",
-  "src/components/workspace/content/workspace-content.tsx",
-  "src/components/workspace/workspace-header.tsx",
   "src/server/actions/kit.ts",
   "src/server/api/http.ts",
   "src/server/queries/access.ts",
@@ -228,26 +216,19 @@ const CLOCK_NOT_YET = [
   "src/server/queries/integration.ts",
   "src/server/queries/library.ts",
   "src/server/queries/platform.ts",
-  "src/server/queries/review.ts",
   "src/server/queries/usage.ts",
-  "src/server/queries/workspace.ts",
 ];
 const DECIDES_NOT_YET = [
   "src/components/library/library-view.tsx",
   "src/server/actions/kit.ts",
   "src/server/queries/access.ts",
   "src/server/queries/audit.ts",
-  "src/server/queries/base-version.ts",
-  "src/server/queries/compare.ts",
   "src/server/queries/copilot.ts",
   "src/server/queries/integration.ts",
   "src/server/queries/palette.ts",
   "src/server/queries/platform.ts",
   "src/server/queries/require-can.ts",
-  "src/server/queries/review.ts",
-  "src/server/queries/template-access.ts",
   "src/server/queries/usage.ts",
-  "src/server/queries/workspace.ts",
 ];
 const INTERNALS_NOT_YET = [];
 

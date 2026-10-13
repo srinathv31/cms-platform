@@ -12,7 +12,7 @@ type Reader = Pick<Db, "select">;
  * Revoked; there is at most one), else its latest round. The review screen, the review actions and the
  * render pipeline look a version up through it, so a bare `/review/{id}/{n}` and a consumer's pinned
  * number mean the same row. (The review screen's one exception, for a stage reviewer outside the team
- * the head is closed to, is in `requireReviewVersion`.)
+ * the head is closed to, is `roundToOpen` in src/domain/review-access.ts.)
  */
 export async function findRound(
   reader: Reader,

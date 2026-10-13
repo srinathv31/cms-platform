@@ -6,29 +6,14 @@ import type { NumberedRound } from "@/domain/rounds";
 
 const header = vi.hoisted(() => ({ inReview: null as NumberedRound | null }));
 
-vi.mock("@/server/clock", () => ({
-  now: vi.fn(async () => new Date("2026-10-09T15:00:00.000Z")),
-}));
-vi.mock("@/server/queries/people", () => ({
-  getPeople: vi.fn(async () => new Map()),
-  personOf: vi.fn((_people: unknown, id: string) => ({
-    id,
-    name: id,
-    initials: "MC",
-    hue: 0,
-  })),
-}));
-vi.mock("@/server/queries/template-access", () => ({
-  requireTemplate: vi.fn(async () => ({
-    space: { viewer: { userId: "maya" } },
-  })),
-}));
 vi.mock("@/server/queries/workspace", () => ({
   getWorkspaceDocument: vi.fn(async () => ({
     templateId: "UC-ABC123",
     versionId: "ver_3",
     editable: false,
     can: { comment: { ok: true } },
+    viewer: { id: "maya", name: "Maya Chen", initials: "MC", hue: 0 },
+    now: "2026-10-09T15:00:00.000Z",
   })),
   getWorkspaceHeader: vi.fn(async () => ({ inReview: header.inReview })),
 }));

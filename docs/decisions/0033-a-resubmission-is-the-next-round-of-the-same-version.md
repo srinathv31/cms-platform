@@ -2,6 +2,7 @@
 
 Status: Accepted
 Amended 2026-10-11: a preview names a `round` on Stencil's own `/api/templates/{id}/preview`; `/api/v1` has no `round` and ignores one (A1, [0047](0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
+Amended 2026-10-13: which round a review URL opens for whom is `roundToOpen` in [src/domain/review-access.ts](../../src/domain/review-access.ts), asked behind the service interfaces by the review service's `screen` ([0072](0072-the-bff-reaches-its-backend-through-service-interfaces.md)); `requireReviewVersion` is gone.
 Date: 2026-10-09
 
 ## Context

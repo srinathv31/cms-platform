@@ -95,22 +95,6 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
       return page.notices;
     },
     probe: {
-      async auditEvents({ versionId }) {
-        const rows = await db!
-          .select()
-          .from(auditEvents)
-          .where(eq(auditEvents.versionId, versionId))
-          .orderBy(sql`rowid`);
-        return rows.map((e) => ({
-          action: e.action,
-          at: e.at.toISOString(),
-          actorId: e.actorId,
-          teamId: e.teamId,
-          templateId: e.templateId,
-          versionId: e.versionId,
-          details: e.details,
-        }));
-      },
       async version({ versionId }) {
         const v = await db!.query.versions.findFirst({
           where: eq(versions.id, versionId),
