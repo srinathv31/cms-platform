@@ -257,6 +257,17 @@ export function withWriter(
   return writers.includes(userId) ? [...writers] : [...writers, userId];
 }
 
+/**
+ * The writers of a draft that a change request finds already open, with the returned round's writers among
+ * them (`withWriter` for each), so none of them can decide what the draft becomes.
+ */
+export function withWriters(
+  writers: readonly string[],
+  added: readonly string[],
+): string[] {
+  return added.reduce((all, userId) => withWriter(all, userId), [...writers]);
+}
+
 // ── Copying a version into a draft ─────────────────────────
 
 /**

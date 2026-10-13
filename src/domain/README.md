@@ -277,5 +277,5 @@ Read these before you assume a rule is missing. When you change one, move it her
   schemas with zod's `fromJSONSchema`. [schema-check.test.ts](../server/render/schema-check.test.ts) fails when
   the editor schema gains a node or mark that `render/resolve.ts` doesn't handle.
 - Tests of the write side (effects, transactions, actions) run against a temporary database next to the server
-  code: [effects.test.ts](../server/services/local/effects.test.ts), [actions/review.test.ts](../server/actions/review.test.ts),
+  code: [effects.test.ts](../server/services/local/effects.test.ts), [services/local/review.test.ts](../server/services/local/review.test.ts),
   helpers in [review-fixtures.ts](../server/testing/review-fixtures.ts).

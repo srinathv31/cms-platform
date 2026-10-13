@@ -311,7 +311,9 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
   database per test) and mock `@/server/clock`. The template
   reads are tested the same way, one `route.test.ts` beside each route (the helpers they share are in
   `src/server/testing/read-routes.ts`), with `getViewer` mocked to each persona, and so is the palette's search
-  ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
+  ([route.test.ts](./api/palette/[space]/route.test.ts)); a read that has moved behind the service interfaces runs
+  on the in-memory fake instead, with a 401 case ([submit-summary](./api/templates/[templateId]/submit-summary/route.test.ts)).
+  The drafts and imports tests mock `getViewer` and the
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](<./(product)/[team]/audit/export/route.test.ts>)) mocks the viewer and the
   query the same way; the delivery file route has none.
 - **Pages:** no unit tests; Playwright covers them. Spec files run in parallel against the production build, one

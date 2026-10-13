@@ -3,6 +3,9 @@
 Status: Accepted
 Amended 2026-10-11: the edit transition the Decision names `editActive` is `editLatest` now, and it also opens a draft
 from a Revoked version ([0009](0009-correct-a-revoked-version-from-its-content.md), handoff review D1, PR #16).
+Amended 2026-10-13: the test that checks the writers backfill is
+[version-backfills.test.ts](../../src/server/db/version-backfills.test.ts) now; the review commands run behind the
+service interfaces ([0072](0072-the-bff-reaches-its-backend-through-service-interfaces.md)).
 Date: 2026-10-08
 
 ## Context

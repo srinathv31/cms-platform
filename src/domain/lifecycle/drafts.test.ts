@@ -10,6 +10,7 @@ import {
   planDraftStart,
   newTemplateChannels,
   newTemplateContentType,
+  withWriters,
 } from "./drafts";
 import {
   LifecycleError,
@@ -519,4 +520,16 @@ describe("editLatest", () => {
       ).toThrow(LifecycleError);
     },
   );
+});
+
+describe("withWriters", () => {
+  it("adds each writer not already there, in order, after the draft's own", () => {
+    expect(withWriters(["maya"], ["maya", "priya"])).toEqual(["maya", "priya"]);
+    expect(withWriters(["priya", "eli"], ["maya", "priya"])).toEqual([
+      "priya",
+      "eli",
+      "maya",
+    ]);
+    expect(withWriters(["maya"], [])).toEqual(["maya"]);
+  });
 });

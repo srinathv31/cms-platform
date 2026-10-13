@@ -1,7 +1,7 @@
 import { OUTPUT_KEYS } from "../review-outputs";
 import { describe, expect, it } from "vitest";
 import { REFUSALS } from "./refusals";
-import { approve } from "./approve";
+import { approve, replacedActive } from "./approve";
 import type { ReviewVersion } from "./types";
 import { describeNotification } from "../notifications";
 import { REASONS } from "../permissions";
@@ -785,5 +785,18 @@ describe("approve", () => {
       code: "stage_missing",
       reason: "This version's approval stage no longer exists.",
     });
+  });
+});
+
+describe("replacedActive", () => {
+  it("is the template's Active version, unless it is the round being approved or has no number", () => {
+    const round = { id: "v_3" };
+    expect(replacedActive({ id: "v_2", number: 2 }, round)).toEqual({
+      id: "v_2",
+      number: 2,
+    });
+    expect(replacedActive({ id: "v_3", number: 3 }, round)).toBeNull();
+    expect(replacedActive({ id: "v_2", number: null }, round)).toBeNull();
+    expect(replacedActive(undefined, round)).toBeNull();
   });
 });
