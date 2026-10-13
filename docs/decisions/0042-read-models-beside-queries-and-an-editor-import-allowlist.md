@@ -1,6 +1,7 @@
 # 0042. Read models sit beside their queries, and the editor's public API is a lint allowlist
 
 Status: Accepted
+Amended 2026-10-13: the read models that were in `access-types.ts` are now in `src/server/queries/access-models.ts`; `access-types.ts` keeps the facts the domain rules take and return (lane F, step 2b-0a).
 Date: 2026-10-11
 
 ## Context

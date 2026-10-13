@@ -33,22 +33,24 @@ import {
   INACTIVITY_SUSPEND_DAYS,
   REQUESTABLE_ROLES,
   type AccessRequestFacts,
+  type MembershipFacts,
+  type Named,
+  type RecertFacts,
+} from "@/domain/access-types";
+import {
   type AccessRequestRow,
   type AccessRequestsSection,
   type InactivityRow,
   type InactivitySection,
   type MemberRow,
   type MembersSection,
-  type MembershipFacts,
   type MyAccessRequest,
-  type Named,
-  type RecertFacts,
   type RecertificationSection,
   type RecertItemRow,
   type RecertView,
   type RequestAccessData,
   type SidebarCardModel,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import { ALL_SPACE, can, spacesFor } from "@/domain/permissions";
 import type { Person } from "@/domain/review-types";
 import { refuse, type Refusal, type Refused } from "@/domain/refusals";

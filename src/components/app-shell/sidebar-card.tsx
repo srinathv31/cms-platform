@@ -8,7 +8,7 @@ import { Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fadeRise } from "@/components/motion/presets";
 import { ROLE_LABEL } from "@/domain/access/roles";
-import type { SidebarCardModel } from "@/domain/access-types";
+import type { SidebarCardModel } from "@/server/queries/access-models";
 import { formatShortDate } from "@/domain/dates";
 import { plural, pluralWord } from "@/domain/plural";
 

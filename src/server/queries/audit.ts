@@ -2,12 +2,14 @@ import "server-only";
 import { cache } from "react";
 import { desc, eq, sql } from "drizzle-orm";
 import {
-  AUDIT_PAGE_LIMIT,
   type AuditCategory,
   type AuditFilters,
-  type AuditPageData,
   type AuditRow,
 } from "@/domain/access-types";
+import {
+  AUDIT_PAGE_LIMIT,
+  type AuditPageData,
+} from "@/server/queries/access-models";
 import {
   SYSTEM_ACTOR,
   SYSTEM_INITIALS,

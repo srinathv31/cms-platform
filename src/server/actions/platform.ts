@@ -50,7 +50,7 @@ import { loadDecisions } from "@/server/services/local/chain";
 import { check, refuse, serverAction, type ActionContext } from "./kit";
 
 // Platform settings (Platform Admin, `platform.manage`): teams, content types, channel rules, approval
-// chains and the business time zone (contract: `PlatformActions` in domain/access-types.ts). Every action
+// chains and the business time zone (contract: `PlatformActions` in queries/access-models.ts). Every action
 // runs the server action kit (kit.ts): it checks the permission (`manage`), reads the facts and writes
 // the domain's answer (domain/platform-config/) in ONE transaction with its audit rows and
 // notifications, then refreshes every page (the switcher, the sidebar and the settings modal all read

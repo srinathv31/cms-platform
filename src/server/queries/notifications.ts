@@ -4,7 +4,7 @@ import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import type {
   NotificationView,
   NotificationsData,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import { notificationFallback } from "@/domain/audit";
 import { db } from "@/server/db/client";
 import { notifications, teams } from "@/server/db/schema/ucomp";

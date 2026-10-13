@@ -8,13 +8,12 @@ import { TeamIcon } from "@/components/primitives/team-icon";
 import { useActionRun } from "@/components/primitives/use-action-run";
 import { ROLE_LABEL, rolesLabel } from "@/domain/access/roles";
 import { validateAccessReason } from "@/domain/access/requests";
+import { ACCESS_REASON_MAX, type RequestableRole } from "@/domain/access-types";
 import {
-  ACCESS_REASON_MAX,
   type MyAccessRequest,
   type RequestAccessData,
   type RequestAccessTeam,
-  type RequestableRole,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import { requestAccess } from "@/server/actions/access";
 import { formatShortDate } from "@/domain/dates";
 import { pluralWord } from "@/domain/plural";

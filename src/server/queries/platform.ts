@@ -1,15 +1,15 @@
 import "server-only";
 import { cache } from "react";
 import { asc, eq } from "drizzle-orm";
+import type { ApproverFacts } from "@/domain/access-types";
 import type {
   ApprovalChainsSection,
   ApprovalChainView,
-  ApproverFacts,
   BusinessZoneSection,
   ChannelRulesSection,
   ContentTypesSection,
   TeamsSection,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import { versionsNeeding } from "@/domain/approval-chain";
 import { BUSINESS_ZONES, zoneLabel } from "@/domain/business-zone";
 import { can } from "@/domain/permissions";
@@ -51,7 +51,7 @@ import { getPeople, personOf } from "@/server/queries/people";
 import { iso } from "@/server/queries/iso";
 
 // The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules,
-// Approval chains and Time zone. Read models: domain/access-types.ts. The consequences the UI shows before a change
+// Approval chains and Time zone. Read models: queries/access-models.ts. The consequences the UI shows before a change
 // is committed come from the pure functions in domain/platform-config/, fed by these models:
 //   - a new team: `validateNewTeam({ name, description, icon, existing: section.teams })` as the
 //     admin types, and `newTeamConsequences(name, admin)`;

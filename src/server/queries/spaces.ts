@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import type { SidebarCardModel } from "@/domain/access-types";
+import type { SidebarCardModel } from "@/server/queries/access-models";
 import type { PermissionResult, Viewer } from "@/domain/types";
 import { requireRequestContext } from "@/server/context/request";
 import { services } from "@/server/services";

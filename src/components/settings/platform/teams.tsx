@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import { Plus } from "lucide-react";
-import type { TeamsSection } from "@/domain/access-types";
+import type { TeamsSection } from "@/server/queries/access-models";
 import {
   newTeamConsequences,
   validateNewTeam,

@@ -3,7 +3,7 @@ import type { Client } from "@libsql/client";
 import { and, asc, eq, gte } from "drizzle-orm";
 import { refresh, revalidatePath } from "next/cache";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PlatformActions } from "@/domain/access-types";
+import type { PlatformActions } from "@/server/queries/access-models";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { OUTPUT_KEYS } from "@/domain/review-outputs";
@@ -56,7 +56,7 @@ vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 
-// The contract (access-types.ts): the actions have exactly these signatures.
+// The contract (`PlatformActions` in queries/access-models.ts): the actions have exactly these signatures.
 const _contract: PlatformActions = {
   createTeam,
   updateContentType,

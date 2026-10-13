@@ -60,7 +60,6 @@ const noViewModels = {
     "@/server/starters/**",
     "@/server/api/**",
     "@/components/**",
-    "@/domain/access-types",
     "@/domain/golive-types",
     "@/domain/import-types",
   ],

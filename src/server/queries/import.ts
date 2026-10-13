@@ -10,7 +10,7 @@ import type {
 import { canSeeSpace } from "@/domain/permissions";
 import type { Viewer } from "@/domain/types";
 import { db } from "@/server/db/client";
-import { teams, templates, uploads, users } from "@/server/db/schema/ucomp";
+import { templates, uploads, users } from "@/server/db/schema/ucomp";
 import { decodeText } from "@/server/import/sniff";
 import {
   defaultUploadsRoot,

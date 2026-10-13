@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
-import type { ContentTypeView } from "@/domain/access-types";
+import type { ContentTypeView } from "@/server/queries/access-models";
 import { SECTION_TITLE_MAX } from "@/domain/platform-config/limits";
 import {
   describeSectionsChange,

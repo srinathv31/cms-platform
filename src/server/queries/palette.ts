@@ -126,8 +126,11 @@ async function spaceTemplates(
     if (list) list.push(v);
     else byTemplate.set(v.templateId, [v]);
   }
-  return visible.map(({ teamId: _teamId, ...r }) => ({
-    ...r,
+  return visible.map((r) => ({
+    id: r.id,
+    name: r.name,
+    teamSlug: r.teamSlug,
+    teamName: r.teamName,
     status:
       pickLatest(byTemplate.get(r.id) ?? [])?.state ??
       ("draft" as VersionState),

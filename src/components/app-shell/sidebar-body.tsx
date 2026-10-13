@@ -17,7 +17,7 @@ import {
 import { spring } from "@/components/motion/presets";
 import { LinkPending } from "@/components/primitives/link-pending";
 import { firstSettingsSection } from "@/components/settings/sections";
-import type { SidebarCardModel } from "@/domain/access-types";
+import type { SidebarCardModel } from "@/server/queries/access-models";
 import type { SpaceNav } from "@/server/queries/spaces";
 import { HelpPopover } from "./help-popover";
 import { NAV_ICON_STROKE, NAV_ITEMS, NAV_ROW, type NavKey } from "./nav";

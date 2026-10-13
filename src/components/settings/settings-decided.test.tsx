@@ -14,7 +14,7 @@ import type {
   MembersSection,
   RecertificationSection,
   RecertItemRow,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 
 // The settings screens render what the server decided: who may do what (`can`), what each action
 // does (`consequences`), how a settled row reads. They never work a rule out themselves. The read

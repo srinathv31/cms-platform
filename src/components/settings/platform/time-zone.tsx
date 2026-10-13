@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { BusinessZoneSection } from "@/domain/access-types";
+import type { BusinessZoneSection } from "@/server/queries/access-models";
 import { zoneLabel } from "@/domain/business-zone";
 import { describeZoneChange } from "@/domain/platform-config/time-zone";
 import { Button } from "@/components/ui/button";

@@ -16,7 +16,7 @@ import { planDraftStart } from "@/domain/lifecycle/drafts";
 import { smsFooterOf } from "@/domain/lifecycle/submit";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { canComment } from "@/domain/comments";
-import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import { can, canSeeSpace } from "@/domain/permissions";
 import type {
   MessageTypeRules,
   TeamSenders,

@@ -33,11 +33,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import type { AnyNotificationKind } from "@/domain/access-types";
 import type {
-  AnyNotificationKind,
   NotificationView,
   NotificationsData,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import {
   markAllNotificationsRead,
   markNotificationRead,
