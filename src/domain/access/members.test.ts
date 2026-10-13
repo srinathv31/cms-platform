@@ -3,6 +3,7 @@ import { ACCESS_REFUSALS } from "./refusals";
 import {
   changeRoles,
   keepInactive,
+  lastAdminRefusal,
   reinstate,
   removeMember,
   suspendInactive,
@@ -148,6 +149,52 @@ describe("changeRoles", () => {
       code: "last_admin",
       reason: "Coral Offers needs at least one Team Admin.",
     });
+  });
+});
+
+describe("lastAdminRefusal, checked again at the write", () => {
+  const twoAdmins = () => [
+    membership("alex", ["team_admin", "approver"]),
+    membership("jordan", ["team_admin", "approver"]),
+    membership("maya", ["author"]),
+  ];
+  const demoted = (ms: MembershipFacts[], userId: string) =>
+    ms.map((m) =>
+      m.userId === userId ? { ...m, roles: ["approver" as const] } : m,
+    );
+
+  it("lets a change through that leaves the team an active Team Admin", () => {
+    const before = twoAdmins();
+    expect(lastAdminRefusal(CORAL, before, demoted(before, "alex"))).toBeNull();
+  });
+
+  it("refuses the second of two admins demoting each other: each read the other as still there", () => {
+    const before = twoAdmins();
+    const both = demoted(demoted(before, "alex"), "jordan");
+    expect(lastAdminRefusal(CORAL, before, both)).toEqual(
+      ACCESS_REFUSALS.lastAdmin(CORAL.name),
+    );
+    // Suspended or removed counts the same as demoted.
+    const suspended = demoted(before, "jordan").map((m) =>
+      m.userId === "alex" ? { ...m, status: "suspended" as const } : m,
+    );
+    expect(lastAdminRefusal(CORAL, before, suspended)).toEqual(
+      ACCESS_REFUSALS.lastAdmin(CORAL.name),
+    );
+    expect(
+      lastAdminRefusal(
+        CORAL,
+        before,
+        demoted(before, "jordan").filter((m) => m.userId !== "alex"),
+      ),
+    ).toEqual(ACCESS_REFUSALS.lastAdmin(CORAL.name));
+  });
+
+  it("asks nothing of a team that had no active Team Admin to begin with, or of other teams", () => {
+    const before = [membership("maya", ["author"])];
+    expect(lastAdminRefusal(CORAL, before, before)).toBeNull();
+    const other = twoAdmins().map((m) => ({ ...m, teamId: "t_deposits" }));
+    expect(lastAdminRefusal(CORAL, other, [])).toBeNull();
   });
 });
 
