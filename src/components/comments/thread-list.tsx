@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useOptimistic,
   useRef,
   useState,
 } from "react";
@@ -33,33 +32,13 @@ import {
   groupThreads,
   isOptimistic,
   optimisticId,
-  reduceThreads,
   type ThreadMutation,
 } from "./thread-state";
+import { useFocusRequests } from "./use-focus-request";
 import type { ComposerState } from "./use-review-threads";
 
 const UNREACHABLE = "Couldn't reach the server. Try again.";
 const STAND_IN: Person = { id: "you", name: "You", initials: "Y", hue: 215 };
-
-/** How long a focus request waits for its place to be on screen (a new thread's id comes with the server's list). */
-const FOCUS_WAIT = 5000;
-
-/** Where focus should go next, asked for when a control that has it is about to go away. */
-interface FocusRequest {
-  /** The place, once it exists (null: not there yet, keep waiting). */
-  find: () => HTMLElement | null;
-  /** The element that had focus when it was asked: the request waits until that has gone. */
-  from: HTMLElement | null;
-  until: number;
-  /** Animation frames to wait after the control has gone, so a host that puts focus back itself goes first. */
-  frames: number;
-}
-
-/** Nothing has focus: the page fell back to <body> (or to an element that has since left it). */
-function focusIsLost(): boolean {
-  const active = document.activeElement;
-  return !active || active === document.body || !active.isConnected;
-}
 
 export type ComposerOutcome = "posted" | "cancelled";
 
@@ -98,11 +77,11 @@ export interface ThreadListProps {
   /** Where a block sits in the document, so a new thread slots into document order before the server confirms it. */
   blockPosition?: (blockId: string) => number | null;
   /**
-   * Hand over `useReviewThreads().mutate` and pass its `threads` here, and a change is applied once, in
-   * the hook, so everything that reads the hook's threads (the document's markers and highlights) changes with the list.
-   * Without it, the list keeps its own optimistic copy of `threads`.
+   * `useReviewThreads().mutate`, with that hook's `threads` passed here. The one optimistic layer lives in the
+   * hook, so a change is applied once and everything that reads the hook's threads (the document's markers and
+   * highlights) changes with the list.
    */
-  onMutate?: (mutation: ThreadMutation) => void;
+  onMutate: (mutation: ThreadMutation) => void;
 }
 
 /**
@@ -130,11 +109,6 @@ export function ThreadList({
   blockPosition,
   onMutate,
 }: ThreadListProps) {
-  // Two ways to be optimistic: through the hook that owns the list (`onMutate`), or on a copy of it here.
-  const [local, mutateLocal] = useOptimistic(threads, reduceThreads);
-  const shown = onMutate ? threads : local;
-  const apply = onMutate ?? mutateLocal;
-
   const me = viewer ?? STAND_IN;
   const nowMs = useNowMs(now);
   const [resolvedOpen, setResolvedOpen] = useState(false);
@@ -144,59 +118,9 @@ export function ThreadList({
   const counter = useRef(0);
   const root = useRef<HTMLDivElement>(null);
 
-  // ── Focus. A control that is clicked and then goes away (Resolve, Reopen, the composer's buttons) takes
-  // focus with it, and the page falls back to <body>. So each of those says where focus goes next, and the
-  // list moves it there once the control has gone and the place is on screen. Never over focus that was put
-  // somewhere on purpose in the meantime.
-  const pending = useRef<FocusRequest | null>(null);
-  // While the list itself moves focus into a card, the card's "focus arrived, so select me" (the keyboard path) stands down:
-  // moving focus after a resolve doesn't also move the document to another thread.
-  const movingFocus = useRef(false);
-  const moveFocusTo = (target: HTMLElement) => {
-    movingFocus.current = true;
-    try {
-      target.focus({ preventScroll: true });
-    } finally {
-      movingFocus.current = false;
-    }
-  };
-  const askFocus = (find: FocusRequest["find"], frames = 0) => {
-    const active = document.activeElement;
-    // <body> isn't a control that goes away: with nothing focused there is nothing to wait for.
-    const from =
-      active instanceof HTMLElement && active !== document.body ? active : null;
-    pending.current = { find, from, until: Date.now() + FOCUS_WAIT, frames };
-  };
-  useEffect(() => {
-    const request = pending.current;
-    if (!request) return;
-    if (Date.now() > request.until) {
-      pending.current = null;
-      return;
-    }
-    if (request.from?.isConnected) return; // the control that had focus is still on screen
-    if (!focusIsLost()) {
-      pending.current = null; // it went somewhere on purpose
-      return;
-    }
-    const arrive = () => {
-      if (!focusIsLost()) return;
-      const target = request.find();
-      if (target) moveFocusTo(target);
-    };
-    if (request.frames > 0) {
-      // Hosts put focus back too (the caret in an editable document, a frame later): look again after them.
-      pending.current = null;
-      let left = request.frames;
-      const wait = () => (--left > 0 ? requestAnimationFrame(wait) : arrive());
-      requestAnimationFrame(wait);
-      return;
-    }
-    const target = request.find();
-    if (!target) return; // not on screen yet (a new thread waits for its id): try again on the next render
-    pending.current = null;
-    moveFocusTo(target);
-  });
+  // Focus. A control that is clicked and then goes away (Resolve, Reopen, the composer's buttons) takes
+  // focus with it: each of those says where focus goes next, and the hook moves it there (use-focus-request.ts).
+  const focus = useFocusRequests();
 
   const byThread = (threadId: string) =>
     Array.from(
@@ -218,7 +142,7 @@ export function ThreadList({
     <T,>(mutation: ThreadMutation, call: () => Promise<ActionResult<T>>) =>
       new Promise<ActionResult<T>>((resolve) => {
         startTransition(async () => {
-          apply(mutation);
+          onMutate(mutation);
           try {
             resolve(await call());
           } catch {
@@ -226,7 +150,7 @@ export function ThreadList({
           }
         });
       }),
-    [apply],
+    [onMutate],
   );
 
   const stamp = () => new Date(nowMs ?? Date.now()).toISOString();
@@ -284,7 +208,7 @@ export function ThreadList({
           own &&
           own.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
       ) ?? open.at(-1);
-    askFocus(
+    focus.ask(
       () =>
         (next?.dataset.thread ? wayIn(next.dataset.thread) : null) ??
         resolvedToggle(),
@@ -304,7 +228,7 @@ export function ThreadList({
   const onReopen = async (threadId: string): Promise<Outcome> => {
     clearRefusal(threadId);
     // Reopen goes with the card (it moves back among the open ones): focus follows the card.
-    askFocus(() => byThread(threadId));
+    focus.ask(() => byThread(threadId));
     const result = await run({ type: "reopen", threadId }, () =>
       reopenThread({ threadId }),
     );
@@ -346,7 +270,7 @@ export function ThreadList({
     if (!result.ok) return result.reason;
     composer.onDraftChange?.("");
     // The box goes away and the thread shows under its own id, once the server's list has arrived: focus goes to its card.
-    askFocus(() => byThread(result.threadId));
+    focus.ask(() => byThread(result.threadId));
     onComposerClose("posted");
     onActivate(result.threadId);
     return null;
@@ -355,7 +279,7 @@ export function ThreadList({
   /** Esc or Cancel: the box closes (what was typed is kept by the host) and focus goes back to what opened it. */
   const onCancel = () => {
     const opener = composer?.opener ?? null;
-    askFocus(() => {
+    focus.ask(() => {
       if (opener?.isConnected && opener.getClientRects().length > 0)
         return opener.closest(".ProseMirror") ? null : opener;
       return root.current; // the opener is gone with the box: the list itself
@@ -384,7 +308,7 @@ export function ThreadList({
     );
   }, [composerKey]);
 
-  const groups = useMemo(() => groupThreads(shown), [shown]);
+  const groups = useMemo(() => groupThreads(threads), [threads]);
   const card = (thread: ThreadView, selectable: boolean) => (
     <ThreadCard
       key={thread.id}
@@ -400,7 +324,7 @@ export function ThreadList({
       onSelect={
         selectable
           ? () => {
-              if (!movingFocus.current) onActivate(thread.id);
+              if (!focus.moving()) onActivate(thread.id);
             }
           : undefined
       }

@@ -112,6 +112,7 @@ const base: Omit<ThreadListProps, "threads"> = {
   versionId: "v_draft",
   viewer: MAYA,
   now: NOW,
+  onMutate: () => {},
 };
 
 /** The thread cards in the order they are on screen. */
