@@ -3,7 +3,8 @@
 //   - a doc names a repo path in backticks (`src/…`, `@/…`, `docs/…`, `e2e/…`, `scripts/…`) that doesn't exist;
 //   - a code comment points at a docs/ file that doesn't exist;
 //   - a folder directly under src/ has no README.md.
-// docs/archive is history and isn't checked; links into it are. Run with `npm run docs:check`.
+// docs/archive and the dated quality review are history and aren't checked; links into them are. Run with
+// `npm run docs:check`.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -11,8 +12,16 @@ import { repoPath } from "../src/lib/repo-path";
 
 const ROOT = process.cwd();
 
-// Not ours to keep current: archived build-process docs, vendored agent skills, and agent worktrees.
-const SKIP = ["docs/archive/", ".agents/", ".claude/"];
+// Not ours to keep current: archived build-process docs, the October 12, 2026 quality review (a dated snapshot, like
+// the archive: it names files as they were that day, and its reports are never edited), vendored agent skills, and
+// agent worktrees.
+const SKIP = [
+  "docs/archive/",
+  "docs/quality-review-2026-10-12.md",
+  "docs/quality-review-2026-10-12/",
+  ".agents/",
+  ".claude/",
+];
 
 // Folders under src/ small enough to be covered by a neighbouring README (src/components/README.md).
 const NO_README = new Set(["hooks", "lib", "styles"]);

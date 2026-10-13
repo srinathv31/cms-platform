@@ -1,5 +1,6 @@
-// ID helpers. Runtime ids are random; the seed uses the seeded variants so ids stay stable
-// in structure from one reset to the next. Pure TypeScript: no server-only, no Node imports.
+// ID helpers. Runtime ids are random. The seed's row ids come from `seededId`, a function of the PRNG, so they
+// stay stable from one reset to the next; its template ids are literals (decision 0069).
+// Pure TypeScript: no server-only, no Node imports.
 
 /** A source of numbers in [0, 1). `Math.random` or a seeded PRNG both fit. */
 export type Random01 = () => number;
@@ -41,8 +42,4 @@ export function newTemplateId(): string {
 /** Same shapes as `newId`, but a pure function of the PRNG (used by the seed). */
 export function seededId(rng: Random01, prefix: string, length = 10): string {
   return `${prefix}_${fromRng(LOWER_CROCKFORD, length, rng)}`;
-}
-
-export function seededTemplateId(rng: Random01): string {
-  return `UC-${fromRng(CROCKFORD, 6, rng)}`;
 }

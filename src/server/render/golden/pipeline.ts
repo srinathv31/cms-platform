@@ -32,18 +32,20 @@ import {
   type RenderFixture,
 } from "@/server/render/testing/fixture";
 import {
-  VIEWS,
-  compareContent,
   contentFromHtml,
-  contentFromPdf,
-  contentFromRenderDoc,
   listMarkupProblems,
-  plainTextProblems,
   verbatimFromHtml,
-  verbatimFromRenderDoc,
   verbatimProblems,
+} from "./content-html";
+import { contentFromPdf } from "./content-pdf";
+import { plainTextProblems } from "./content-plaintext";
+import {
+  VIEWS,
+  contentFromRenderDoc,
+  verbatimFromRenderDoc,
   type Content,
-} from "./content";
+} from "./content-text";
+import { compareContent } from "./diff";
 import {
   extractPdf,
   pdfContentBlocks,

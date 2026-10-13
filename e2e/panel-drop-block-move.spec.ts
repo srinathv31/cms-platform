@@ -1,17 +1,9 @@
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { randomUUID } from "node:crypto";
-import { openDb } from "./api/helpers";
 import {
   SPRING_NAME,
   TEAM,
   click,
-  createSpringTravel,
-  json,
   reactReady,
-  removeTemplate,
-  rows,
-  run,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -27,6 +19,12 @@ import {
   tap,
   test,
 } from "./helpers/scenario";
+import {
+  Changes,
+  addCommentThread,
+  openDraftOf,
+  versionById,
+} from "./helpers/state";
 
 // A panel drop, then a block move (handoff review I4). Jordan left a comment on the "Open your account by"
 // paragraph of Spring Travel v2. Maya opens a draft, drags Home state from the Variables panel into the
@@ -41,55 +39,34 @@ const MOVED = "Open your account by";
 const QUOTE = "to qualify for this offer";
 const COMMENT = "Is this the right deadline?";
 
-type Body = {
-  content: { attrs?: { id?: string }; content?: { text?: string }[] }[];
-};
-
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 /** The commented paragraph's block id, as v2 stores it. */
 let blockId = "";
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
-  const [v2] = await rows(db, "SELECT body FROM versions WHERE id = ?", [
-    fixture.v2Id,
-  ]);
-  const moved = (json(v2.body) as Body).content.find((node) =>
+  fixture = await changes.createSpringTravel();
+  const v2 = await versionById(fixture.v2Id);
+  const moved = v2!.body.content?.find((node) =>
     node.content?.[0]?.text?.startsWith(MOVED),
   );
-  if (!moved?.attrs?.id)
+  const id = moved?.attrs?.id;
+  if (typeof id !== "string")
     throw new Error(`Spring Travel v2 has no "${MOVED}" paragraph with an id.`);
-  blockId = moved.attrs.id;
+  blockId = id;
 
-  const threadId = `th_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`;
-  const at = Date.now() - 86_400_000;
-  await run(
-    db,
-    "INSERT INTO comment_threads (id, template_id, origin_version_id, block_id, quote, status, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?)",
-    [threadId, fixture.templateId, fixture.v2Id, blockId, QUOTE, at],
-  );
-  await run(
-    db,
-    "INSERT INTO comments (id, thread_id, author_id, body, kind, created_at) VALUES (?, ?, 'jordan', ?, 'comment', ?)",
-    [
-      `cm_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`,
-      threadId,
-      COMMENT,
-      at,
-    ],
-  );
+  await addCommentThread({
+    templateId: fixture.templateId,
+    versionId: fixture.v2Id,
+    blockId,
+    quote: QUOTE,
+    authorId: "jordan",
+    comment: COMMENT,
+  });
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-  } finally {
-    db.close();
-  }
-});
+// Removes the template and every row this run wrote for it: the draft, Jordan's thread, the audit rows.
+test.afterAll(() => changes.undo());
 
 const statusBadge = (page: Page) =>
   page
@@ -239,12 +216,8 @@ test("a block moved by its grip after a panel drop keeps its id, and its comment
   });
 
   await test.step("The saved draft has the paragraph, with its id, right before the greeting", async () => {
-    const [draft] = await rows(
-      db,
-      "SELECT body FROM versions WHERE template_id = ? AND state = 'draft'",
-      [templateId],
-    );
-    const { content } = json(draft.body) as Body;
+    const draft = await openDraftOf(templateId);
+    const content = draft!.body.content!;
     const at = content.findIndex((node) => node.attrs?.id === blockId);
     expect(
       at,

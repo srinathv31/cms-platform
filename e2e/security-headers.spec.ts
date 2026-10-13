@@ -1,13 +1,6 @@
-import type { Client } from "@libsql/client";
 import { expect, test, type Page } from "@playwright/test";
-import {
-  allVersions,
-  isDocument,
-  openDb,
-  pick,
-  render,
-  validValues,
-} from "./api/helpers";
+import { isDocument, pick, render, validValues } from "./api/helpers";
+import { allVersions } from "./helpers/state";
 
 // The security headers next.config.ts sends on every response, and the framing they allow: the app's own
 // pages may frame its pages (Coral's customer view frames its stored deliveries), another origin may not.
@@ -25,21 +18,11 @@ const STATIC = {
 const values = (headers: { name: string; value: string }[], name: string) =>
   headers.filter((h) => h.name.toLowerCase() === name).map((h) => h.value);
 
-let db: Client;
-
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(() => {
-  db.close();
-});
-
 test("a page, a consumer API answer and a rendered web page carry the security headers", async ({
   request,
 }) => {
   const web = pick(
-    (await allVersions(db)).filter(isDocument),
+    (await allVersions()).filter(isDocument),
     "Active version with web on",
     (v) => v.state === "active" && v.channels.includes("web"),
   );

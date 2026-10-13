@@ -64,7 +64,7 @@ Mock: `/design/usage-dashboard?v=a|b|c&scope=team|template` (in the `archive/des
 ### Consumer API (S1)
 
 - **The JSON Schema describes only canonical forms**: decimals as strings matching `^(?!-0(?:\.0+)?$)-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$` (no leading zeros, no negative zero, no exponent; strings only, since a pattern can't constrain a JSON number), dates as `format: date` + a YYYY-MM-DD pattern that checks the calendar, states as an enum of 51 codes. The route still accepts the friendly forms and JSON numbers (read from their source text, same grammar). Tests check that whatever the schema accepts, render accepts too.
-  Amended 2026-10-12: the route will accept strings only, exactly what the schema accepts; a JSON number in `values` is refused as `invalid_values` ([0058](0058-render-values-are-strings.md)).
+  Amended 2026-10-12: the route accepts strings only, the JSON type the schema declares; a JSON number in `values` is refused as `invalid_values` ([0058](0058-render-values-are-strings.md)).
 - **Notices route check order**: header missing (400) → header unregistered (403) → path consumer unregistered (404) → mismatch (403). A notices `since` with no zone is read as UTC (superseded by [0006](0006-page-notices-by-commit-order.md): `since` was removed; notices page oldest first with an `after` cursor).
 - **Seeded revoke notices get `activeVersion` filled in** from the versions' dates.
 - **Sample snippets name the template's most recent real consumer**, falling back to the first registered one ("coral").
@@ -304,7 +304,7 @@ Branch `track/import`, which also carried the rough edges left from Phases 3–4
   Amended 2026-10-12: the route no longer logs it: a caller that isn't a registered consumer writes no `render_log` row (M-7 of the [October 12 review](../quality-review-2026-10-12.md)), and once consumers authenticate, no call writes one until it is authenticated and registered; the gateway's logs keep the trail of who tried ([0057](0057-consumers-authenticate-with-client-credentials.md)).
 - **Preview by "you decided it" needs current access** (review #6). The render preview's decided-it path now also requires an active team role somewhere, as the review screen's `requireSpace` does; a person removed from every team, lapsed or suspended reads nothing they once approved.
 - **The published JSON Schema only accepts what the render route accepts, with format as annotation** (review #7). A required text has `minLength: 1` and pattern `\S`; currency, percent and number are decimal strings only (≤ 308 whole digits; JSON numbers still render but aren't advertised, since 1e21 or 1e-7 stringify to exponent notation the route refuses); a date's pattern checks the real calendar (month lengths, leap years, years 0100–9999).
-  Amended 2026-10-12: JSON numbers will no longer render: `values` takes strings only ([0058](0058-render-values-are-strings.md)).
+  Amended 2026-10-12: JSON numbers no longer render: `values` takes strings only ([0058](0058-render-values-are-strings.md)).
 - **Every top-level route segment is a reserved team slug** (review #14). `sim` added; a test reads `src/app` (route groups looked through) and fails if a top-level segment isn't in RESERVED_SLUGS.
 
 ## Phase 7b: UX pass

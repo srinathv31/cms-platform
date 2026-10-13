@@ -1,14 +1,5 @@
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import {
-  SPRING_NAME,
-  TEAM,
-  createSpringTravel,
-  removeTemplate,
-  rows,
-  type SpringFixture,
-} from "./helpers/golive";
+import { SPRING_NAME, TEAM, type SpringFixture } from "./helpers/golive";
 import {
   asPersona,
   expect,
@@ -19,6 +10,7 @@ import {
   test,
   typeSlowly,
 } from "./helpers/scenario";
+import { Changes, commentThreads } from "./helpers/state";
 
 // An email's subject and preheader take review comments, as the body's blocks do (docs/handoff-review.md, N25).
 //
@@ -37,22 +29,14 @@ const PREHEADER_AS_TYPED = "Email preheader: What to know before you spend.";
 const MAYA_COMMENT = "Is “before you spend” too pushy for a preheader?";
 const JORDAN_COMMENT = "Say what changed in these terms.";
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const statusBadge = (page: Page) =>
   page
@@ -69,14 +53,13 @@ const gutterMarkers = (page: Page) =>
 /** A field of the version on the review screen, by its id ("email.subject"). */
 const fieldFrame = (page: Page, id: string) =>
   page.locator(`[data-fields-document] .ucomp-doc > [data-block-id="${id}"]`);
+/** The template's threads as "block:quote:status", ordered by block. */
 const threadRows = async () =>
-  (
-    await rows(
-      db,
-      "SELECT block_id, quote, status FROM comment_threads WHERE template_id = ? ORDER BY block_id",
-      [fixture!.templateId],
+  (await commentThreads(fixture!.templateId))
+    .sort((a, b) =>
+      a.blockId < b.blockId ? -1 : a.blockId > b.blockId ? 1 : 0,
     )
-  ).map((r) => `${r.block_id}:${r.quote}:${r.status}`);
+    .map((r) => `${r.blockId}:${r.quote}:${r.status}`);
 
 /** Posts the comment box that is open in `scope`: the text typed, then Comment. */
 async function post(page: Page, scope: Locator, text: string) {

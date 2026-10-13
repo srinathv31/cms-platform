@@ -2,14 +2,14 @@
 // canonical strings. Pure TypeScript.
 //
 // Walks the list in order. A value is absent when it's undefined, null or blank. Required and absent
-// is missing; optional and absent is left out (it renders empty). A present value must be a string
-// or a finite number, at most MAX_VALUE_LENGTH characters as sent, and fit its type (`validateValue`,
-// which also accepts friendly forms like "21.99%" or "New Jersey"). A longer value is invalid, never
-// cut. Keys that aren't in the list are ignored. Messages never echo a value.
+// is missing; optional and absent is left out (it renders empty). A present value must be a string,
+// at most MAX_VALUE_LENGTH characters as sent, and fit its type (`validateValue`, which also accepts
+// friendly forms like "21.99%" or "New Jersey"). A longer value is invalid, never cut. A JSON number
+// is invalid whatever its digits: a value is a JSON string (spec section 5, decision 0058), because a
+// number's text doesn't survive every parser and "21.90" must not become 21.9. Keys that aren't in
+// the list are ignored. Messages never echo a value.
 //
-// Canonical decimals are the digits as sent ("21.90" stays "21.90"). The render route hands JSON
-// numbers over as their exact source text (`parseJsonWithNumberText`), so they arrive here as strings;
-// a JS number from an internal caller is read as its JSON text (`String(n)`, see `validateValue`).
+// Canonical decimals are the digits as sent ("21.90" stays "21.90").
 
 import {
   MAX_VALUE_LENGTH,
@@ -50,6 +50,16 @@ export function validateValues(
       continue;
     }
 
+    // A JSON number is refused as such, so the sentence can say how to send it (as a string).
+    if (typeof value === "number") {
+      invalid.push({
+        key: variable.key,
+        expected: variable.type,
+        sent: "number",
+      });
+      continue;
+    }
+
     if (typeof value === "string" && longerThan(value, MAX_VALUE_LENGTH)) {
       invalid.push({
         key: variable.key,
@@ -59,10 +69,8 @@ export function validateValues(
       continue;
     }
 
-    const usable =
-      typeof value === "string" ||
-      (typeof value === "number" && Number.isFinite(value));
-    const checked = usable ? validateValue(variable.type, value) : null;
+    const checked =
+      typeof value === "string" ? validateValue(variable.type, value) : null;
     if (checked?.ok) canonical[variable.key] = checked.value;
     else invalid.push({ key: variable.key, expected: variable.type });
   }

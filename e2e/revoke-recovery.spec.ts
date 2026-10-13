@@ -1,20 +1,10 @@
-import { randomUUID } from "node:crypto";
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { expectError, longDate, openDb } from "./api/helpers";
+import { expectError, longDate } from "./api/helpers";
 import {
   SPRING_NAME,
   TEAM,
   click,
   coralRender,
-  createSpringTravel,
-  json,
-  restore,
-  rows,
-  run,
-  takeSnapshot,
-  type Row,
-  type Snapshot,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -32,6 +22,16 @@ import {
   untilUncovered,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import {
+  Changes,
+  addVersionLike,
+  auditEvents,
+  consumerNotices,
+  openDraftOf,
+  versionById,
+  versionNumbered,
+  versionsOf,
+} from "./helpers/state";
 
 // Approving views every output first, and the preview frames are sandboxed: Playwright's trace injects
 // scripts into them ("Blocked script execution").
@@ -59,8 +59,7 @@ const GREETING = "spend $1,000 on travel";
 const FIX = " The intro APR lasts 12 months.";
 const DAY = 86_400_000;
 
-let db: Client;
-let snapshot: Snapshot | undefined;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 let v1Id = "";
 
@@ -69,55 +68,37 @@ let v1Id = "";
  * and with no sunset, so it still renders.
  */
 async function insertV1(spring: SpringFixture): Promise<string> {
-  const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
-    spring.v2Id,
-  ]);
-  const live = Number(v2.activated_at);
-  const id = `v_e2e${randomUUID().replaceAll("-", "").slice(0, 9)}`;
-  const variables = spring.variables.map((v) =>
-    v.key === "offer_end_date" ? { ...v, required: true } : v,
-  );
-  const row: Row = {
-    ...v2,
-    id,
+  const v2 = (await versionById(spring.v2Id))!;
+  const live = v2.activatedAt!;
+  const v1 = await addVersionLike(v2, {
     number: 1,
     round: 1,
     state: "superseded",
-    variables: JSON.stringify(variables),
-    created_at: live - 20 * DAY,
-    updated_at: live - 19 * DAY,
-    submitted_at: live - 19 * DAY,
-    activated_at: live - 18 * DAY,
-    superseded_at: live,
-  };
-  const columns = Object.keys(row);
-  await run(
-    db,
-    `INSERT INTO versions (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
-    columns.map((c) => row[c]),
-  );
-  return id;
+    variables: v2.variables.map((v) =>
+      v.key === "offer_end_date" ? { ...v, required: true } : v,
+    ),
+    createdAt: live - 20 * DAY,
+    updatedAt: live - 19 * DAY,
+    submittedAt: live - 19 * DAY,
+    activatedAt: live - 18 * DAY,
+    supersededAt: live,
+  });
+  return v1.id;
+}
+
+/** The day a version's revoke was confirmed, as the API words it. */
+async function revokedOn(versionId: string): Promise<string> {
+  const version = await versionById(versionId);
+  return longDate(version!.revoke!.confirmedAt!);
 }
 
 test.beforeAll(async () => {
-  db = openDb();
-  snapshot = await takeSnapshot(db);
-  fixture = await createSpringTravel(db);
+  // The fixture template, with v1 and every row that points at it, is removed in afterAll. The clock is never moved.
+  fixture = await changes.createSpringTravel();
   v1Id = await insertV1(fixture);
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (snapshot)
-      await restore(db, snapshot, {
-        templates: fixture ? [fixture.templateId] : [],
-        clock: false,
-      });
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 // ── The screens ──────────────────────────────────────────────────────────────
 
@@ -215,10 +196,7 @@ test("after the Active version is revoked, an author corrects it from its conten
       "superseded",
     );
 
-    const [row] = await rows(db, "SELECT revoke FROM versions WHERE id = ?", [
-      spring.v2Id,
-    ]);
-    const day = longDate(json(row.revoke).confirmedAt);
+    const day = await revokedOn(spring.v2Id);
     const revoked = await coralRender(
       request,
       spring,
@@ -278,21 +256,13 @@ test("after the Active version is revoked, an author corrects it from its conten
       page.getByRole("button", { name: "Submit for review" }),
     ).toBeEnabled();
 
-    const [draft] = await rows(
-      db,
-      "SELECT * FROM versions WHERE template_id = ? AND state = 'draft'",
-      [templateId],
-    );
-    const [v2] = await rows(db, "SELECT * FROM versions WHERE id = ?", [
-      spring.v2Id,
-    ]);
-    expect(draft.based_on_version_id, "based on the revoked version").toBe(
+    const draft = await openDraftOf(templateId);
+    const v2 = await versionById(spring.v2Id);
+    expect(draft!.basedOnVersionId, "based on the revoked version").toBe(
       spring.v2Id,
     );
-    expect(json(draft.body), "v2's body, block ids and all").toEqual(
-      json(v2.body),
-    );
-    expect(json(draft.variables)).toEqual(json(v2.variables));
+    expect(draft!.body, "v2's body, block ids and all").toEqual(v2!.body);
+    expect(draft!.variables).toEqual(v2!.variables);
 
     // Against v1, offer_end_date is no longer required; against the revoked v2 nothing would be flagged.
     await expect(panelRow(page, "offer_end_date")).toContainText(
@@ -332,17 +302,13 @@ test("after the Active version is revoked, an author corrects it from its conten
       timeout: 20_000,
     });
 
-    const [v3] = await rows(
-      db,
-      "SELECT * FROM versions WHERE template_id = ? AND number = 3",
-      [templateId],
-    );
+    const v3 = await versionNumbered(templateId, 3);
     expect(v3).toMatchObject({
       state: "in_review",
-      submitted_by: "maya",
-      based_on_version_id: spring.v2Id,
+      submittedBy: "maya",
+      basedOnVersionId: spring.v2Id,
     });
-    expect(json(v3.contract_changes)).toEqual([
+    expect(v3!.contractChanges).toEqual([
       { kind: "made_optional", key: "offer_end_date", breaking: false },
     ]);
   });
@@ -427,48 +393,39 @@ test("after the Active version is revoked, an author corrects it from its conten
   });
 
   await test.step("4.3 The database: v3 Active, v2 still Revoked, v1 still Superseded; Coral is told about v3", async () => {
-    const list = await rows(
-      db,
-      "SELECT id, number, state, sunset_at FROM versions WHERE template_id = ? ORDER BY number",
-      [templateId],
+    const list = (await versionsOf(templateId)).map(
+      ({ id, number, state, sunsetAt }) => ({ id, number, state, sunsetAt }),
     );
     expect(list).toEqual([
-      { id: v1Id, number: 1, state: "superseded", sunset_at: null },
-      { id: spring.v2Id, number: 2, state: "revoked", sunset_at: null },
-      { id: expect.any(String), number: 3, state: "active", sunset_at: null },
+      { id: v1Id, number: 1, state: "superseded", sunsetAt: null },
+      { id: spring.v2Id, number: 2, state: "revoked", sunsetAt: null },
+      { id: expect.any(String), number: 3, state: "active", sunsetAt: null },
     ]);
-    const [activated] = await rows(
-      db,
-      "SELECT details FROM audit_events WHERE template_id = ? AND action = 'version.activated' ORDER BY at DESC LIMIT 1",
-      [templateId],
-    );
-    expect(json(activated.details)).toMatchObject({
+    const activated = (
+      await auditEvents({ templateId, action: "version.activated" })
+    ).at(-1);
+    expect(activated!.details).toMatchObject({
       number: 3,
       supersedes: null,
     });
     expect(
-      await rows(
-        db,
-        "SELECT id FROM audit_events WHERE template_id = ? AND action IN ('version.superseded', 'version.sunset_set')",
-        [templateId],
-      ),
+      await auditEvents({
+        templateId,
+        action: ["version.superseded", "version.sunset_set"],
+      }),
     ).toEqual([]);
 
-    const notices = await rows(
-      db,
-      "SELECT consumer_id, kind, payload FROM consumer_notices WHERE template_id = ? ORDER BY created_at, id",
-      [templateId],
-    );
-    expect(notices.map((n) => [n.consumer_id, n.kind])).toEqual([
+    const notices = await consumerNotices({ templateId });
+    expect(notices.map((n) => [n.consumerId, n.kind])).toEqual([
       ["coral", "revoked"],
       ["coral", "new_version"],
     ]);
-    expect(json(notices[0].payload)).toMatchObject({
+    expect(notices[0].payload).toMatchObject({
       versionNumber: 2,
       activeVersion: null,
       reason: REASON,
     });
-    expect(json(notices[1].payload)).toMatchObject({
+    expect(notices[1].payload).toMatchObject({
       versionNumber: 3,
       activeVersion: 3,
       contractLines: ["v3 makes `offer_end_date` optional."],
@@ -481,9 +438,7 @@ test("after the Active version is revoked, an author corrects it from its conten
     expect(v3.res.headers()["x-stencil-version"]).toBe("3");
     expect(await v3.res.text()).toContain(FIX.trim());
 
-    const [row] = await rows(db, "SELECT revoke FROM versions WHERE id = ?", [
-      spring.v2Id,
-    ]);
+    const day = await revokedOn(spring.v2Id);
     const v2 = await coralRender(
       request,
       spring,
@@ -494,7 +449,7 @@ test("after the Active version is revoked, an author corrects it from its conten
       v2.res,
       410,
       "version_revoked",
-      `Version 2 was revoked on ${longDate(json(row.revoke).confirmedAt)}. Version 3 is active.`,
+      `Version 2 was revoked on ${day}. Version 3 is active.`,
     );
   });
 });

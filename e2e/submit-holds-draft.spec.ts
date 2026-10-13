@@ -1,16 +1,9 @@
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   SPRING_NAME,
   TEAM,
   click,
-  createSpringTravel,
-  json,
   reactReady,
-  removeTemplate,
-  rows,
-  run,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -28,6 +21,12 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import {
+  Changes,
+  bumpDraftRev,
+  findVersion,
+  openDraftOf,
+} from "./helpers/state";
 
 // Submit holds the draft still (handoff review I8). Maya edits Spring Travel v2 and presses Submit while her
 // last saves are still on their way to the server:
@@ -50,22 +49,14 @@ const SECOND = "Typed after Cancel.";
 /** How long each autosave request is held on its way, so Submit is pressed while one is out. */
 const SLOW_SAVE_MS = 1_500;
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const statusBadge = (page: Page) =>
   page
@@ -212,15 +203,9 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
     await expect(held.formLabel(page)).toHaveValue("Half typed");
     await expect(dialog).toContainText("v3 adds required gift_card (Text).");
     await expect(saveIndicator(page)).toHaveText("Saved");
-    const [draft] = await rows(
-      db,
-      "SELECT body, variables FROM versions WHERE template_id = ? AND state = 'draft'",
-      [templateId],
-    );
-    expect(JSON.stringify(json(draft.body))).toContain(FIRST);
-    expect(
-      (json(draft.variables) as { key: string }[]).map((v) => v.key),
-    ).toContain("gift_card");
+    const draft = (await openDraftOf(templateId))!;
+    expect(JSON.stringify(draft.body)).toContain(FIRST);
+    expect(draft.variables.map((v) => v.key)).toContain("gift_card");
   });
 
   await page.unroute("**/api/drafts/**");
@@ -250,21 +235,14 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
     await expectEditable(page, false);
 
     // What a save from another tab leaves behind: the draft's rev moves on.
-    await run(
-      db,
-      "UPDATE versions SET rev = rev + 1 WHERE template_id = ? AND state = 'draft'",
-      [templateId],
-    );
+    await bumpDraftRev(templateId);
     await tap(dialog.getByRole("button", { name: "Submit v3", exact: true }));
     await expect(dialog.getByRole("alert")).toHaveText(
       "This draft changed after this summary was made.",
     );
-    const [still] = await rows(
-      db,
-      "SELECT state FROM versions WHERE template_id = ? AND number IS NULL",
-      [templateId],
+    expect((await openDraftOf(templateId))?.state, "nothing was frozen").toBe(
+      "draft",
     );
-    expect(still.state, "nothing was frozen").toBe("draft");
 
     await tap(dialog.getByRole("button", { name: "Refresh summary" }));
     await expect(dialog.getByRole("alert")).toHaveText("");
@@ -282,19 +260,13 @@ test("Submit holds the draft still while it reads the summary, Cancel lets go, a
   });
 
   await test.step("v3 holds everything she typed, and nothing failed to save after the submit", async () => {
-    const [v3] = await rows(
-      db,
-      "SELECT state, body, variables FROM versions WHERE template_id = ? AND number = 3",
-      [templateId],
-    );
+    const v3 = (await findVersion({ templateId, number: 3 }))!;
     expect(v3.state).toBe("in_review");
-    const body = JSON.stringify(json(v3.body));
+    const body = JSON.stringify(v3.body);
     expect(body).toContain(FIRST);
     expect(body).toContain(SECOND);
     expect(body).not.toContain("Nope");
-    expect(
-      (json(v3.variables) as { key: string }[]).map((v) => v.key),
-    ).toContain("gift_card");
+    expect(v3.variables.map((v) => v.key)).toContain("gift_card");
     await expect(page.getByText(/Not saved/)).toHaveCount(0);
   });
 });

@@ -327,13 +327,27 @@ function missingSentence(missing: readonly string[]): string {
 }
 
 /**
- * One invalid value's sentence: "{name} must be {noun}.", or for a value over the length limit
- * "{name} must be at most 1,000 characters." The route names the key; the CMS preview, the label.
+ * What a JSON number in `values` is refused with: values are JSON strings (decision 0058). The example
+ * is the same for every key and type: the sentence never echoes the value that was sent.
+ */
+export const NUMBER_VALUE_EXAMPLE = '"21.90"';
+
+/**
+ * One invalid value's sentence: "{name} must be {noun}.", for a value over the length limit
+ * "{name} must be at most 1,000 characters.", and for a JSON number
+ * `{name} must be a JSON string, like "21.90", not a number.` The route names the key; the CMS
+ * preview, the label.
  */
 export function invalidSentence(
   name: string,
-  { expected, maxLength }: Pick<InvalidValue, "expected" | "maxLength">,
+  {
+    expected,
+    maxLength,
+    sent,
+  }: Pick<InvalidValue, "expected" | "maxLength" | "sent">,
 ): string {
+  if (sent === "number")
+    return `${name} must be a JSON string, like ${NUMBER_VALUE_EXAMPLE}, not a number.`;
   if (maxLength !== undefined)
     return `${name} must be at most ${formatCount(maxLength)} characters.`;
   return `${name} must be ${VALUE_NOUNS[expected]}.`;

@@ -8,10 +8,6 @@ import {
   badRequest,
   bodyTooLarge,
 } from "@/domain/render";
-import {
-  parseJsonWithNumberText,
-  type JsonWithNumberText,
-} from "@/domain/render/json-number-text";
 import type {
   Base64ResponseBody,
   EmailRender,
@@ -69,9 +65,8 @@ export type ReadRender =
   { ok: true; body: RenderRequestBody } | { ok: false; error: RenderError };
 
 /**
- * The body, read within the limit and checked. A JSON number in `values` becomes its exact source
- * text ({"apr": 21.90} is "21.90", not 21.9), so it follows the same grammar as a string (rule:
- * digits are never rewritten).
+ * The body, read within the limit and checked. `values` is left as parsed: validation (`validateValues`)
+ * refuses a value that isn't a JSON string, a number included (decision 0058).
  */
 export async function readRenderRequest(request: Request): Promise<ReadRender> {
   // Too large: refused from the declared length when there is one, else as soon as the count passes it.
@@ -83,13 +78,12 @@ export async function readRenderRequest(request: Request): Promise<ReadRender> {
 }
 
 function parseRenderBody(text: string): ReadRender {
-  let read: JsonWithNumberText;
+  let json: unknown;
   try {
-    read = parseJsonWithNumberText(text);
+    json = JSON.parse(text);
   } catch {
     return { ok: false, error: badRequest(BAD_REQUEST_MESSAGES.body) };
   }
-  const { json, numbersAsText } = read;
   const required = ["version", "channel", "values"];
   if (
     !isPlainObject(json) ||
@@ -97,10 +91,7 @@ function parseRenderBody(text: string): ReadRender {
   ) {
     return { ok: false, error: badRequest(BAD_REQUEST_MESSAGES.body) };
   }
-  const values = isPlainObject(json.values)
-    ? numbersAsText(json.values)
-    : json.values;
-  const parsed = RequestBody.safeParse({ ...json, values });
+  const parsed = RequestBody.safeParse(json);
   if (!parsed.success) {
     const field = String(parsed.error.issues[0]?.path[0] ?? "");
     return {

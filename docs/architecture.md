@@ -134,8 +134,8 @@ prints exactly what the author typed and saw, with no rounding, dropping, renumb
    [version-rules.ts](../src/domain/render/version-rules.ts)): Active renders; Superseded renders until its sunset,
    then 410; Revoked is 410; unreleased states are 409.
 3. Channel allowed and enabled (422). The rest is the engine ([engine.ts](../src/server/render/engine.ts)), which
-   needs no database, clock, or request: values valid (422; each at most 1,000 characters, and a JSON number keeps
-   its exact source text), then the document check.
+   needs no database, clock, or request: values valid (422; each a string of at most 1,000 characters, a JSON
+   number refused), then the document check.
 4. Resolve the TipTap JSON to a `RenderDoc` (`src/domain/render`), then a channel adapter renders web HTML, an email,
    or a PDF. A message channel skips the body: `renderMessage` (`src/domain/render/message.ts`, the function the
    browser preview runs too) resolves its fields and renders a push for the requested `platform` or an SMS with the
@@ -199,6 +199,8 @@ What the Java API's MSSQL schema does instead: team and user ids
 ([0065](decisions/0065-documents-are-validated-against-a-generated-json-schema.md)), logs
 ([0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and test data
 ([0069](decisions/0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)).
+[Porting the data model](reference/data-model.md) puts them together table by table, with every audit action's and
+notice kind's payload.
 
 ## Time, identity, and demo data
 
@@ -272,6 +274,10 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   Functional specs click at test speed. The whole-demo script (`e2e/demo-script.spec.ts`) and the recording pacing
   are opt-in: `npx playwright test --project=demo` plays the script with a cursor, paced clicks and a video
   ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
+  Specs read and arrange Stencil's data only through `e2e/helpers/state` ([README](../e2e/helpers/state/README.md)):
+  named functions that return records, SQL today and a test endpoint or JDBC when Java owns the data
+  ([decision 0068](decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)). ESLint forbids the
+  database client anywhere else in `e2e/`. Where a screen or `/api/v1` can show a fact, the spec asserts it there.
 - **Golden files:** [src/server/render/golden](../src/server/render/golden/README.md) freezes every channel's
   output for a set of documents and checks that web, email, and PDF show the same content. Any change to render
   output fails `npm test` until it is regenerated with `npm run golden:update` and the diff is read. They are also

@@ -8,8 +8,6 @@ import type { SeedTemplate } from "./types";
 // waits for an approver; Rate Change Heads-up is a draft that pairs with the Rate Change Notice letter
 // (a separate template: a letter plus a text heads-up is two templates). Times are days before the reset.
 //
-// Built after every other team's templates, so the seeded ids that came before alerts stay the same.
-//
 // Every version passes submit's message rules with its own sample sets (seed.test.ts): the SMS text is
 // GSM-7, within the Alert's 3 parts with the long values and the footer, and links to no public
 // shortener; each push fits in 4,096 bytes on both platforms. No push title carries anything private
@@ -23,6 +21,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
   const templates: SeedTemplate[] = [
     // v1 Active, made from the Payment reminder starter: renders to Push and SMS every day.
     {
+      id: "UC-EFXFMS",
       key: "payment-due-reminder",
       teamId: "coral-offers",
       contentType: "alert",
@@ -33,6 +32,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_ze11vx5whw",
           ref: "v1",
           number: 1,
           state: "active",
@@ -81,6 +81,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
 
     // v1 In review: Priya submitted it yesterday, and Jordan or Alex approves it.
     {
+      id: "UC-397J2A",
       key: "card-used-abroad",
       teamId: "coral-offers",
       contentType: "alert",
@@ -91,6 +92,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_mzxmn7x706",
           ref: "v1",
           number: 1,
           state: "in_review",
@@ -130,6 +132,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
 
     // A draft from Blank, the text heads-up for the Rate Change Notice letter.
     {
+      id: "UC-FYN38M",
       key: "rate-change-heads-up",
       teamId: "coral-offers",
       contentType: "alert",
@@ -139,6 +142,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
       consumers: ["coral"],
       versions: [
         {
+          id: "v_c5f0bnjvbf",
           ref: "draft",
           number: null,
           state: "draft",

@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   BALANCE,
   CARD_ABROAD,
@@ -18,6 +17,7 @@ import {
   describeRoutes,
   installCls,
 } from "./helpers/principles";
+import { versionsOf } from "./helpers/state";
 
 // Phase 7 principle checks: the seed's template ids, the Library, the review queue and review screens, and Request access.
 // The five checks, the personas and the route matrix are in e2e/helpers/principles.ts.
@@ -44,24 +44,18 @@ const SEEDED: Record<string, string> = {
 };
 
 test("the template ids this spec names are the seed's", async () => {
-  const db = openDb();
-  try {
-    const found: Record<string, string> = {};
-    for (const id of Object.keys(SEEDED)) {
-      const { rows } = await db.execute({
-        // The newest numbered row, or the draft of a template that has nothing else.
-        sql: "SELECT name FROM versions WHERE template_id = ? ORDER BY number IS NULL, number DESC, round DESC LIMIT 1",
-        args: [id],
-      });
-      if (rows[0]) found[id] = String(rows[0].name);
-    }
-    expect(
-      found,
-      "each id is the seeded template of that name (npm run db:reset, or update the ids)",
-    ).toEqual(SEEDED);
-  } finally {
-    db.close();
+  const found: Record<string, string> = {};
+  for (const id of Object.keys(SEEDED)) {
+    // The newest numbered row, or the draft of a template that has nothing else.
+    const versions = await versionsOf(id);
+    const newest =
+      versions.filter((v) => v.number !== null).at(-1) ?? versions[0];
+    if (newest) found[id] = newest.name;
   }
+  expect(
+    found,
+    "each id is the seeded template of that name (npm run db:reset, or update the ids)",
+  ).toEqual(SEEDED);
 });
 
 describeRoutes(test, "Library", LIBRARY);

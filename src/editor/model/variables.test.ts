@@ -484,20 +484,6 @@ describe("values: the length limit", () => {
   });
 });
 
-describe("values: a JS number from an internal caller is read as its JSON text", () => {
-  it('95 is "95"; an exponent form is refused, never rewritten', () => {
-    expect(validateValue("currency", 95)).toEqual({ ok: true, value: "95" });
-    expect(formatValue("currency", 95)).toBe("$95");
-    expect(formatValue("percent", 21.9)).toBe("21.9%");
-    expect(validateValue("text", 7)).toEqual({ ok: true, value: "7" });
-    expect(validateValue("number", 1e21).ok).toBe(false);
-    expect(validateValue("number", 1e-7).ok).toBe(false);
-    expect(validateValue("number", -0)).toEqual({ ok: true, value: "0" });
-    expect(validateValue("number", Number.NaN).ok).toBe(false);
-    expect(validateValue("number", Number.POSITIVE_INFINITY).ok).toBe(false);
-  });
-});
-
 describe("TYPE_META and US_STATES", () => {
   it("covers every type, and every example is valid and formats", () => {
     for (const type of VARIABLE_TYPES) {

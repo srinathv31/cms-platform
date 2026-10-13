@@ -100,6 +100,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
 
   const templates: SeedTemplate[] = [
     {
+      id: "UC-8Y49K2",
       key: "statement-rate-change",
       teamId: "card-statements",
       name: "Statement Insert — Rate Change",
@@ -108,6 +109,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
       consumers: ["deposits-online"],
       versions: [
         {
+          id: "v_519d90gxpy",
           ref: "v1",
           number: 1,
           state: "active",
@@ -137,6 +139,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
       ],
     },
     {
+      id: "UC-7W726J",
       key: "statement-paperless",
       teamId: "card-statements",
       name: "Statement Insert — Paperless Enrollment",
@@ -145,6 +148,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
       consumers: ["deposits-online"],
       versions: [
         {
+          id: "v_djn39s1rh5",
           ref: "v1",
           number: 1,
           state: "active",
@@ -177,6 +181,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
       ],
     },
     {
+      id: "UC-SZZS5Y",
       key: "statement-privacy",
       teamId: "card-statements",
       name: "Statement Insert — Annual Privacy Notice",
@@ -185,6 +190,7 @@ export function seedCardStatementsTemplates(ctx: SeedCtx) {
       consumers: ["deposits-online"],
       versions: [
         {
+          id: "v_s8mrtnncsa",
           ref: "draft",
           number: null,
           state: "draft",

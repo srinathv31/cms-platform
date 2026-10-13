@@ -32,7 +32,9 @@ Tests sit beside each file. [fixtures.ts](fixtures.ts) holds the few inputs more
 ## Rules
 
 - **Teams.** A team's slug comes from its name; it must be new (slug and name, case-insensitive) and not a route the
-  app owns (`RESERVED_SLUGS`; [teams.test.ts](teams.test.ts) checks the folder). The team starts with one member,
+  app owns (`RESERVED_SLUGS`; [teams.test.ts](teams.test.ts) reads `src/app` and `public/`, so a new top-level route
+  fails it until its name is reserved, [decision 0071](../../../docs/decisions/0071-team-urls-stay-at-the-root-with-reserved-words.md)).
+  The team starts with one member,
   its first Team Admin, who is never an Auditor.
 - **Required sections shape only templates created afterwards.** A document carries its sections as headings with a
   `requiredKey`, and the editor protects those, so an existing template keeps the sections it was made with.

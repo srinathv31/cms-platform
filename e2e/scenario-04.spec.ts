@@ -1,6 +1,4 @@
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   CUSTOMERS,
   FIVE,
@@ -9,22 +7,16 @@ import {
   TEAM,
   backToUcomp,
   click,
-  createSpringTravel,
   dropDemoNoise,
   escapeRe,
-  json,
   openDemoDrawer,
   openOffer,
   reactReady,
-  restore,
   resultsHeadline,
   resultsRows,
-  rows,
   selectCustomers,
   send,
   sendButton,
-  takeSnapshot,
-  type Snapshot,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -38,6 +30,14 @@ import {
   test,
   typeSlowly,
 } from "./helpers/scenario";
+import {
+  Changes,
+  renderLog,
+  renderLogFields,
+  simDeliveries,
+  simLink,
+  storedTextAbout,
+} from "./helpers/state";
 
 // Phase 5 gate: demo scenario 4 ("Going live"), start to finish.
 //
@@ -65,29 +65,17 @@ import {
 // The preview frames are sandboxed; Playwright's trace injects scripts into them ("Blocked script execution").
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
-let snapshot: Snapshot;
 
 test.beforeAll(async () => {
-  db = openDb();
-  snapshot = await takeSnapshot(db);
-  fixture = await createSpringTravel(db);
+  await changes.watchClock();
+  fixture = await changes.createSpringTravel();
 });
 
 test.afterEach(({ problems }) => dropDemoNoise(problems));
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (snapshot)
-      await restore(db, snapshot, {
-        templates: fixture ? [fixture.templateId] : [],
-      });
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 /** The mapping row's combobox, named by the variable's label. */
 const mapping = (page: Page, label: string) =>
@@ -249,17 +237,14 @@ test.describe("scenario 4: going live", () => {
       ).toHaveAttribute("aria-selected", "true");
 
       // Coral's own table holds the link: UCOMP's tables never see it.
-      const [link] = await rows(
-        db,
-        "SELECT * FROM sim_links WHERE offer_id = 'offer_spring_travel'",
-      );
+      const link = await simLink("offer_spring_travel");
       expect(link).toMatchObject({
-        template_id: templateId,
-        template_name: SPRING_NAME,
-        pinned_version: 2,
+        templateId,
+        templateName: SPRING_NAME,
+        pinnedVersion: 2,
       });
-      expect(json(link.channels)).toEqual(["pdf", "web", "email"]);
-      expect(json(link.mapping)).toEqual({
+      expect(link?.channels).toEqual(["pdf", "web", "email"]);
+      expect(link?.mapping).toEqual({
         first_name: "customer.firstName",
         last_name: "customer.lastName",
         purchase_apr: "customer.purchaseApr",
@@ -535,20 +520,16 @@ test.describe("scenario 4: going live", () => {
     // ── 6. The render log holds no customer values ───────────────────────────
 
     await test.step("6. The render log: 15 live renders by Coral, and not one customer value in anything UCOMP wrote", async () => {
-      const log = await rows(
-        db,
-        "SELECT * FROM render_log WHERE template_id = ? ORDER BY at, id",
-        [templateId],
-      );
+      const log = await renderLog({ templateId });
       expect(log, "one row per customer and channel").toHaveLength(15);
       for (const entry of log) {
         expect(entry).toMatchObject({
-          consumer_id: "coral",
-          version_id: v2Id,
-          version_number: 2,
-          is_preview: 0,
+          consumerId: "coral",
+          versionId: v2Id,
+          versionNumber: 2,
+          isPreview: false,
           outcome: "ok",
-          error_code: null,
+          errorCode: null,
         });
       }
       const byChannel = (channel: string) =>
@@ -558,45 +539,30 @@ test.describe("scenario 4: going live", () => {
         "five of each channel",
       ).toEqual([5, 5, 5]);
       expect(
-        new Set(log.map((entry) => entry.correlation_id)).size,
+        new Set(log.map((entry) => entry.correlationId)).size,
         "each render has its own correlation id",
       ).toBe(15);
 
       // The log's columns are metadata only.
-      const columns = Object.keys(log[0]).sort();
-      expect(columns).toEqual([
+      expect((await renderLogFields()).sort()).toEqual([
         "at",
         "channel",
-        "consumer_id",
-        "correlation_id",
-        "duration_ms",
-        "error_code",
+        "consumerId",
+        "correlationId",
+        "durationMs",
+        "errorCode",
         "id",
-        "is_preview",
+        "isPreview",
         "outcome",
         "platform",
-        "template_id",
-        "version_id",
-        "version_number",
+        "templateId",
+        "versionId",
+        "versionNumber",
       ]);
 
       // None of the five customers' values is anywhere UCOMP wrote for this template: the log, the audit
       // events, the notifications, the consumer notices.
-      const written = [
-        ...log,
-        ...(await rows(db, "SELECT * FROM audit_events WHERE template_id = ?", [
-          templateId,
-        ])),
-        ...(await rows(db, "SELECT * FROM notifications WHERE href LIKE ?", [
-          `%/${templateId}%`,
-        ])),
-        ...(await rows(
-          db,
-          "SELECT * FROM consumer_notices WHERE template_id = ?",
-          [templateId],
-        )),
-      ];
-      const haystack = JSON.stringify(written);
+      const haystack = await storedTextAbout(templateId);
       for (const customer of FIVE) {
         for (const value of [customer.first, customer.last, customer.email])
           expect(haystack, `"${value}" is not in UCOMP's data`).not.toContain(
@@ -607,20 +573,16 @@ test.describe("scenario 4: going live", () => {
         expect(haystack, `"${apr}" is not in UCOMP's data`).not.toContain(apr);
 
       // Coral's own tables hold the deliveries (with the customers' values, rendered), all delivered.
-      const deliveries = await rows(
-        db,
-        "SELECT * FROM sim_deliveries WHERE template_id = ? ORDER BY id",
-        [templateId],
-      );
+      const deliveries = await simDeliveries({ templateId });
       expect(deliveries).toHaveLength(15);
       for (const delivery of deliveries)
         expect(delivery).toMatchObject({
           status: "delivered",
           error: null,
-          template_id: templateId,
-          version_number: 2,
+          templateId,
+          versionNumber: 2,
         });
-      expect(new Set(deliveries.map((d) => d.customer_id)).size).toBe(5);
+      expect(new Set(deliveries.map((d) => d.customerId)).size).toBe(5);
     });
   });
 });

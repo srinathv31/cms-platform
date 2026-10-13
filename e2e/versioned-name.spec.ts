@@ -1,14 +1,10 @@
-import type { Client } from "@libsql/client";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { openDb, render, validValues } from "./api/helpers";
+import { render, validValues } from "./api/helpers";
 import {
   SPRING_NAME,
   TEAM,
   click,
-  createSpringTravel,
   reactReady,
-  removeTemplate,
-  rows,
   type SpringFixture,
 } from "./helpers/golive";
 import {
@@ -22,6 +18,7 @@ import {
   test,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import { Changes, versionsOf } from "./helpers/state";
 
 // Approving views every output first, and the preview frames are sandboxed: Playwright's trace injects
 // scripts into them ("Blocked script execution").
@@ -42,22 +39,14 @@ test.use({ trace: "off" });
 
 const RENAMED = "Spring Travel Rewards — Card Terms";
 
-let db: Client;
+const changes = new Changes();
 let fixture: SpringFixture | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  fixture = await createSpringTravel(db);
+  fixture = await changes.createSpringTravel();
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (fixture) await removeTemplate(db, fixture.templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const statusBadge = (page: Page) =>
   page
@@ -86,14 +75,11 @@ async function apiName(request: APIRequestContext) {
   return ((await res.json()) as { name: string }).name;
 }
 
+/** Each stored version's number, state and name, numbered ones first and an open draft last. */
 const savedNames = async () =>
-  (
-    await rows(
-      db,
-      "SELECT number, state, name FROM versions WHERE template_id = ? ORDER BY number IS NULL, number",
-      [fixture!.templateId],
-    )
-  ).map((v) => [v.number, v.state, v.name]);
+  (await versionsOf(fixture!.templateId))
+    .sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity))
+    .map((v) => [v.number, v.state, v.name]);
 
 test("a draft rename reaches customers only when its version is approved, and the review shows it", async ({
   page,

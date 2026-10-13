@@ -1,8 +1,5 @@
-import { execSync } from "node:child_process";
-import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
-import { E2E_DATABASE_URL, E2E_UPLOADS_DIR } from "../storage";
-import { beat, expect, tap, test, untilUncovered } from "./scenario";
+import { beat, expect, tap, untilUncovered } from "./scenario";
 
 // Shared by the Phase 6 gate specs (scenarios 7 and 8, the two-stage approval): the persona switcher as a
 // presenter uses it, the settings modal, the bell, the demo drawer's clock, and putting the demo data back.
@@ -130,49 +127,5 @@ export async function advanceClock(page: Page, days: number) {
 
 // ── Putting the data back ────────────────────────────────────────────────────
 
-/**
- * Re-seeds the database the server runs on (e2e's own, see e2e/storage.ts; the reset reads `DATABASE_URL` and
- * `UPLOADS_DIR`, which only the server was given), and so puts the clock back. For the specs that advance the
- * clock, change the approval chain or create what they cannot remove by hand: whatever runs after them expects
- * the starting data. Called from afterAll.
- */
-export function resetDemoData() {
-  const root = path.dirname(
-    test.info().config.configFile ??
-      path.join(process.cwd(), "playwright.config.ts"),
-  );
-  // The database file is shared with whatever else has it open (the server, a dev server on the same
-  // worktree), and has no busy timeout: if someone is writing at that moment, wait a moment and go again.
-  for (let attempt = 1; ; attempt++) {
-    try {
-      // `execSync`, not `execFileSync("npm", …)`: on Windows npm is `npm.cmd`, which Node won't start without a
-      // shell. The command is a fixed string, so running it through the shell (cmd.exe or sh) is safe.
-      execSync("npm run db:reset", {
-        cwd: root,
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          DATABASE_URL: E2E_DATABASE_URL,
-          UPLOADS_DIR: E2E_UPLOADS_DIR,
-        },
-      });
-      return;
-    } catch (error) {
-      if (
-        attempt >= 5 ||
-        !/SQLITE_BUSY|database is locked/i.test(
-          String(
-            (error as { stderr?: unknown; message?: unknown }).stderr ?? "",
-          ) + String((error as Error).message),
-        )
-      )
-        throw error;
-      Atomics.wait(
-        new Int32Array(new SharedArrayBuffer(4)),
-        0,
-        0,
-        1500 * attempt,
-      );
-    }
-  }
-}
+// Re-seeding the database is e2e state, so it lives in ./state; the Phase 6 specs keep importing it from here.
+export { resetDemoData } from "./state";

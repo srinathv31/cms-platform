@@ -1,6 +1,9 @@
 # 0071. Team URLs stay at the root, and the app's own segments are reserved words
 
 Status: Accepted
+Amended 2026-10-12: the test reads every folder under `src/app` (route groups looked through; dynamic, private, slot and
+intercepting folders are not segments) and every top-level folder or extensionless file in `public/`, and a test of the
+walker itself keeps it from finding nothing (wave 2.1).
 Date: 2026-10-12
 
 ## Context

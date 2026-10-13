@@ -39,7 +39,8 @@ async function reviewHref(inReview: NumberedRound | null) {
   const element = await WorkspaceContent({
     params: Promise.resolve({ team: "coral-offers", templateId: "UC-ABC123" }),
   });
-  return (element.props as { reviewHref: string | null }).reviewHref;
+  return (element.props as { rail: { reviewHref: string | null } }).rail
+    .reviewHref;
 }
 
 describe("WorkspaceContent: the Open review link", () => {

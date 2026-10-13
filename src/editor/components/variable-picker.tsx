@@ -7,7 +7,8 @@
 //
 // "Create" is pinned at the bottom, carrying the query. Choosing it turns the picker into the
 // compact variable form (focus moves into it); saving creates the variable and puts its chip where
-// `{{query` was, in one step. Esc goes back to the list.
+// `{{query` was, in one step, and focus is back in the document by the time the save returns. Esc goes back
+// to the list.
 
 import type { Editor } from "@tiptap/react";
 import type { SuggestionMount, SuggestionProps } from "@tiptap/suggestion";
@@ -365,8 +366,13 @@ function PickerCreate({ controller, editor, root }: PickerProps) {
 
   const create = (variable: Variable) => {
     const result = root.createVariable(variable);
-    if (result.ok)
+    if (result.ok) {
       store.getState().props?.command({ kind: "variable", variable });
+      // The form held focus and goes with the picker, which leaves focus on <body> until the command's own
+      // focus lands a frame later (TipTap defers it): a key typed in that gap would be lost. ProseMirror's
+      // `focus` takes it back now, without scrolling; the deferred focus then scrolls the caret into view.
+      if (!editor.isDestroyed) editor.view.focus();
+    }
     return result;
   };
 

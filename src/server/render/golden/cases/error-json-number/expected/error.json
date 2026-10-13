@@ -1,0 +1,24 @@
+{
+  "code": "invalid_values",
+  "message": "purchase_apr must be a JSON string, like \"21.90\", not a number. annual_fee must be a JSON string, like \"21.90\", not a number. nickname must be a JSON string, like \"21.90\", not a number.",
+  "details": {
+    "missing": [],
+    "invalid": [
+      {
+        "key": "purchase_apr",
+        "expected": "percent",
+        "sent": "number"
+      },
+      {
+        "key": "annual_fee",
+        "expected": "currency",
+        "sent": "number"
+      },
+      {
+        "key": "nickname",
+        "expected": "text",
+        "sent": "number"
+      }
+    ]
+  }
+}

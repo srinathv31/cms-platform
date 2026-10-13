@@ -1,8 +1,5 @@
 import path from "node:path";
-import type { Client } from "@libsql/client";
 import type { Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import {
   asPersona,
   beat,
@@ -17,6 +14,7 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import { Changes, uploadsOf, versionsOf } from "./helpers/state";
 
 // Phase 7a gate: demo scenario 9 ("Import").
 //
@@ -48,22 +46,11 @@ const FILE = path.join(
 const FILE_NAME = "spring-offer.docx";
 const TEMPLATE_NAME = "Spring Balance Transfer Offer";
 
-let db: Client;
-/** Set once the template exists, so afterAll removes it even when the test fails half way. */
+const changes = new Changes();
+/** Set once the template exists, so the steps after it can name it. */
 let templateId: string | null = null;
 
-test.beforeAll(() => {
-  db = openDb();
-});
-
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (templateId) await removeTemplate(db, templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const rail = (page: Page) =>
   page.locator('[data-slot="rail"]').filter({ visible: true });
@@ -114,6 +101,8 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
       timeout: 30_000,
     });
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1];
+    // Registered as soon as the id is known: the template, its upload row and its upload folder go with it.
+    changes.ownTemplate(templateId);
   });
 
   await test.step("3. The draft: the title is the name (selected), the chip, the table, the required sections", async () => {
@@ -222,22 +211,11 @@ test("scenario 9: Maya imports a .docx; the draft has the chip and the table; th
   });
 
   await test.step("6. The database and Activity know where the draft came from", async () => {
-    const [version] = await rowsOf(
-      db,
-      "SELECT import_upload_id, state FROM versions WHERE template_id = ?",
-      [templateId!],
-    );
+    const [version] = await versionsOf(templateId!);
     expect(version.state).toBe("draft");
-    const [upload] = await rowsOf(
-      db,
-      "SELECT id, filename, template_id FROM uploads WHERE template_id = ?",
-      [templateId!],
-    );
-    expect(upload).toMatchObject({
-      filename: FILE_NAME,
-      template_id: templateId,
-    });
-    expect(version.import_upload_id).toBe(upload.id);
+    const [upload] = await uploadsOf(templateId!);
+    expect(upload).toMatchObject({ filename: FILE_NAME, templateId });
+    expect(version.importUploadId).toBe(upload.id);
 
     await tap(
       page

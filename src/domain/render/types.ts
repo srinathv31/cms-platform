@@ -365,6 +365,7 @@ export interface Base64ResponseBody {
  * | 422    | missing_variables     | "Missing required variables: first_name, purchase_apr."                   |
  * | 422    | invalid_values        | "purchase_apr must be a percentage, like 21.99."                          |
  * |        |                       | "first_name must be at most 1,000 characters." (longer than MAX_VALUE_LENGTH) |
+ * |        |                       | "purchase_apr must be a JSON string, like \"21.90\", not a number." (a JSON number) |
  * | 422    | push_payload_too_large | "The push is 4,321 bytes on iPhone. It can be at most 4,096 bytes."      |
  * | 422    | sms_too_long          | "The SMS is 11 parts in UCS-2. It can be at most 10 parts."               |
  * | 500    | render_failed         | "The PDF couldn't be rendered. Try again."                                |
@@ -418,6 +419,11 @@ export interface InvalidValue {
   expected: VariableType;
   /** Set when the value is longer than this many characters (MAX_VALUE_LENGTH), whatever its type. */
   maxLength?: number;
+  /**
+   * Set when the value was a JSON number: a value is a JSON string, whatever its type (decision 0058),
+   * so the number is refused without a look at its digits.
+   */
+  sent?: "number";
 }
 
 export interface ValueErrorDetails {

@@ -1,7 +1,4 @@
-import type { Client } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
-import { removeTemplate, rowsOf } from "./helpers/cleanup";
 import {
   asPersona,
   caret,
@@ -18,6 +15,13 @@ import {
   untilUncovered,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import {
+  Changes,
+  decisionsOnTemplate,
+  membershipOf,
+  openDraftOf,
+  versionNumbered,
+} from "./helpers/state";
 
 // Maker-checker reaches everyone who wrote a version, not only whoever pressed Submit
 // (docs/handoff-review.md, S3). Holding Author and Approver on one team is normal: approving an access
@@ -40,51 +44,19 @@ const INTEREST_STARTS = "Interest on purchases starts on the transaction date";
 const SENTENCE = " Priya wrote this sentence.";
 const WROTE = "You wrote part of this version.";
 
-let db: Client;
+const changes = new Changes();
 let templateId: string | null = null;
-/** Priya's Coral Offers membership, once this spec has given it the Approver role. */
-let approverAddedTo: string | null = null;
 
 test.beforeAll(async () => {
-  db = openDb();
-  const [membership] = await rowsOf(
-    db,
-    "SELECT id FROM memberships WHERE user_id = 'priya' AND team_id = ?",
-    [TEAM],
-  );
-  const id = String(membership!.id);
-  const roles = await rowsOf(
-    db,
-    "SELECT role FROM membership_roles WHERE membership_id = ?",
-    [id],
-  );
   expect(
-    roles.map((r) => r.role),
+    (await membershipOf("priya", TEAM))?.roles,
     "the seed makes Priya an author on Coral Offers",
   ).toEqual(["author"]);
-  await rowsOf(
-    db,
-    "INSERT INTO membership_roles (membership_id, role) VALUES (?, 'approver')",
-    [id],
-  );
-  approverAddedTo = id;
+  // Priya's Approver role, and the template Maya makes below, are taken away again in afterAll.
+  await changes.grantRole("priya", TEAM, "approver");
 });
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    if (approverAddedTo) {
-      await rowsOf(
-        db,
-        "DELETE FROM membership_roles WHERE membership_id = ? AND role = 'approver'",
-        [approverAddedTo],
-      );
-    }
-    if (templateId) await removeTemplate(db, templateId);
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 const decision = (page: Page) =>
   page.locator('aside[aria-label="Decision"]').filter({ visible: true });
@@ -133,6 +105,7 @@ test("someone who edited a draft another author submitted can't approve it or se
     await tap(gallery.getByRole("button", { name: /Card offer terms/ }));
     await expect(page).toHaveURL(/\/coral-offers\/templates\/UC-[0-9A-Z]{6}/);
     templateId = /\/templates\/(UC-[0-9A-Z]{6})/.exec(page.url())![1]!;
+    changes.ownTemplate(templateId);
 
     await expect(nameField(page)).toBeFocused();
     // The page is live (the document's editor has taken over from the server's markup) before the first keystroke.
@@ -163,13 +136,9 @@ test("someone who edited a draft another author submitted can't approve it or se
     await expect(paragraph).toContainText(SENTENCE.trim());
     await expectAutosaved(page);
 
-    const [draft] = await rowsOf(
-      db,
-      "SELECT created_by, writers FROM versions WHERE template_id = ? AND state = 'draft'",
-      [id],
-    );
-    expect(draft).toMatchObject({ created_by: "maya" });
-    expect(JSON.parse(String(draft!.writers))).toEqual(["maya", "priya"]);
+    const draft = await openDraftOf(id);
+    expect(draft).toMatchObject({ createdBy: "maya" });
+    expect(draft!.writers).toEqual(["maya", "priya"]);
   });
 
   await test.step("3. Maya submits it as v1", async () => {
@@ -184,13 +153,9 @@ test("someone who edited a draft another author submitted can't approve it or se
       timeout: 20_000,
     });
 
-    const [v1] = await rowsOf(
-      db,
-      "SELECT state, submitted_by, writers FROM versions WHERE template_id = ? AND number = 1",
-      [id],
-    );
-    expect(v1).toMatchObject({ state: "in_review", submitted_by: "maya" });
-    expect(JSON.parse(String(v1!.writers))).toEqual(["maya", "priya"]);
+    const v1 = await versionNumbered(id, 1);
+    expect(v1).toMatchObject({ state: "in_review", submittedBy: "maya" });
+    expect(v1!.writers).toEqual(["maya", "priya"]);
   });
 
   await test.step("4. Priya opens v1: Approve and Request changes are disabled, and the reason says why", async () => {
@@ -246,13 +211,7 @@ test("someone who edited a draft another author submitted can't approve it or se
       panel.locator(`a[href="/${TEAM}/review/${id}/1"]`),
       "v1 doesn't wait on Priya",
     ).toHaveCount(0);
-    expect(
-      await rowsOf(
-        db,
-        "SELECT id FROM approvals WHERE version_id IN (SELECT id FROM versions WHERE template_id = ?)",
-        [id],
-      ),
-    ).toEqual([]);
+    expect(await decisionsOnTemplate(id)).toEqual([]);
   });
 
   await test.step("5. Jordan wrote none of it: Approve and Request changes are his to press", async () => {

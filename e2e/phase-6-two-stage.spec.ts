@@ -1,6 +1,4 @@
-import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
-import { openDb } from "./api/helpers";
 import {
   click,
   closeSettings,
@@ -24,6 +22,15 @@ import {
   test,
 } from "./helpers/scenario";
 import { viewEveryOutput } from "./helpers/review";
+import {
+  addApprovalStage,
+  approvalChain,
+  approvalsOf,
+  auditEvents,
+  findVersion,
+  moveApprovalStage,
+  versionById,
+} from "./helpers/state";
 
 // Approving views every output first, and the preview frames are sandboxed: Playwright's trace injects
 // scripts into them ("Blocked script execution").
@@ -61,47 +68,19 @@ const STAGE = "Legal reviewer";
 const EVERY_TEAM =
   "Dana Park will review Disclosure submissions from every team, including teams they aren't a member of.";
 
-type Row = Record<string, InValue>;
-
-let db: Client;
-
 // The first test counts what waits on Jordan in the seed, so it starts from the seed: the specs that run before
 // this one (those that also turn the trace off) may leave versions of their own in review.
 test.beforeAll(() => {
   test.setTimeout(90_000);
   resetDemoData();
-  db = openDb();
 });
 
-// Each test changes the chain and the version in review: put the seed back after each, and the last one closes the database.
+// Each test changes the chain and the version in review: put the seed back after each (so this file needs no
+// `Changes`).
 test.afterEach(() => {
   test.setTimeout(90_000);
   resetDemoData();
 });
-
-test.afterAll(() => {
-  db?.close();
-});
-
-async function rows(sql: string, args: InValue[] = []): Promise<Row[]> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const result = await db.execute({ sql, args });
-      return result.rows.map((row) =>
-        Object.fromEntries(
-          result.columns.map((column) => [column, row[column] as InValue]),
-        ),
-      );
-    } catch (error) {
-      const text =
-        String((error as { code?: unknown }).code ?? "") +
-        String((error as Error).message ?? "");
-      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text))
-        throw error;
-      await new Promise((resolve) => setTimeout(resolve, 40 * 2 ** attempt));
-    }
-  }
-}
 
 // ── The screens ──────────────────────────────────────────────────────────────
 
@@ -161,28 +140,22 @@ const inReviewLabel = (number: number, round: number) =>
 
 /** The seed's in-review version of Cash Back: v3, round 2 (round 1 was sent back). */
 async function seededInReview() {
-  const [seeded] = await rows(
-    `SELECT v.id, v.template_id, v.number, v.round, v.state, v.current_stage, v.stages FROM versions v JOIN templates t ON t.id = v.template_id
-     WHERE v.name = ? AND v.state = 'in_review'`,
-    [NAME],
-  );
-  if (!seeded)
+  const seeded = await findVersion({ name: NAME, state: "in_review" });
+  if (!seeded || seeded.number === null || seeded.round === null)
     throw new Error(
       `This spec needs the fresh seed (npm run db:reset): ${NAME} in review.`,
     );
-  const number = Number(seeded.number);
-  const round = Number(seeded.round);
+  const { number, round } = seeded;
   expect(
     [number, round],
     "the seed has Cash Back v3 in review on round 2",
   ).toEqual([3, 2]);
   return {
-    versionId: String(seeded.id),
-    templateId: String(seeded.template_id),
+    versionId: seeded.id,
+    templateId: seeded.templateId,
     number,
     round,
     label: inReviewLabel(number, round),
-    row: seeded,
   };
 }
 
@@ -263,15 +236,15 @@ async function goLiveThenResubmit(
   );
   await expect(dialog).toBeHidden({ timeout: 20_000 });
   await expect(statusBadge(page)).toHaveText("In review", { timeout: 20_000 });
-  const [row] = await rows(
-    "SELECT id, state, stages FROM versions WHERE template_id = ? AND number = ?",
-    [seeded.templateId, number],
-  );
-  expect(row?.state).toBe("in_review");
-  return {
-    versionId: String(row!.id),
+  const submitted = await findVersion({
+    templateId: seeded.templateId,
     number,
-    stages: JSON.parse(String(row!.stages)) as { id: string; name: string }[],
+  });
+  expect(submitted?.state).toBe("in_review");
+  return {
+    versionId: submitted!.id,
+    number,
+    stages: submitted!.stages ?? [],
   };
 }
 
@@ -369,31 +342,23 @@ test.describe("phase 6: two-stage approval", () => {
     });
 
     await test.step("1.3 The chain has both stages; v3, submitted before, keeps the one stage it was submitted with", async () => {
-      const stages = await rows(
-        "SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position",
-      );
-      expect(stages.map((s) => [s.position, s.name])).toEqual([
+      const savedChain = await approvalChain("ct_disclosure");
+      expect(savedChain.map((s) => [s.position, s.name])).toEqual([
         [0, "Team approver"],
         [1, STAGE],
       ]);
-      expect(stages[0].id, "the first stage kept its id").toBe(
+      expect(savedChain[0].id, "the first stage kept its id").toBe(
         "stage_disclosure_0",
       );
-      expect(JSON.parse(String(stages[1].approver_rule))).toEqual({
+      expect(savedChain[1].approverRule).toEqual({
         kind: "user",
         userId: "dana",
       });
-      const [version] = await rows(
-        "SELECT state, current_stage, stages FROM versions WHERE id = ?",
-        [seeded.versionId],
-      );
-      expect(version.state).toBe("in_review");
+      const version = await versionById(seeded.versionId);
+      expect(version?.state).toBe("in_review");
+      expect(version?.currentStage, "still waiting on the first stage").toBe(0);
       expect(
-        Number(version.current_stage),
-        "still waiting on the first stage",
-      ).toBe(0);
-      expect(
-        JSON.parse(String(version.stages)),
+        version?.stages,
         "a chain edit doesn't change a version in review",
       ).toEqual([{ id: "stage_disclosure_0", name: "Team approver" }]);
     });
@@ -477,12 +442,9 @@ test.describe("phase 6: two-stage approval", () => {
         queueRow(page),
         "it moved on, so it isn't in his Waiting on me",
       ).toHaveCount(0);
-      const [version] = await rows(
-        "SELECT state, current_stage FROM versions WHERE id = ?",
-        [versionId],
-      );
-      expect(version.state).toBe("in_review");
-      expect(Number(version.current_stage)).toBe(1);
+      const version = await versionById(versionId);
+      expect(version?.state).toBe("in_review");
+      expect(version?.currentStage).toBe(1);
     });
 
     // ── 3. Alex can only watch ───────────────────────────────────────────────
@@ -588,44 +550,32 @@ test.describe("phase 6: two-stage approval", () => {
     // ── 5. The trail ─────────────────────────────────────────────────────────
 
     await test.step("5. The database: both approvals in order, v4 Active, v3 Superseded", async () => {
-      const [legal] = await rows(
-        "SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' AND name = ?",
-        [STAGE],
+      const legal = (await approvalChain("ct_disclosure")).find(
+        (s) => s.name === STAGE,
       );
-      const approvals = await rows(
-        "SELECT * FROM approvals WHERE version_id = ? ORDER BY decided_at, stage_position",
-        [versionId],
-      );
+      const approvals = await approvalsOf(versionId);
       expect(
         approvals.map((a) => [
-          a.actor_id,
+          a.actorId,
           a.decision,
-          a.stage_id,
-          Number(a.stage_position),
-          a.stage_name,
+          a.stageId,
+          a.stagePosition,
+          a.stageName,
         ]),
       ).toEqual([
         ["jordan", "approved", "stage_disclosure_0", 0, "Team approver"],
         ["dana", "approved", legal!.id, 1, STAGE],
       ]);
-      const [version] = await rows(
-        "SELECT state, activated_at FROM versions WHERE id = ?",
-        [versionId],
-      );
-      expect(version.state).toBe("active");
-      expect(version.activated_at).not.toBeNull();
-      const [before] = await rows("SELECT state FROM versions WHERE id = ?", [
-        seeded.versionId,
-      ]);
-      expect(before.state, "the version it replaced").toBe("superseded");
-      const audit = await rows(
-        "SELECT actor_id, action FROM audit_events WHERE version_id = ? ORDER BY at, id",
-        [versionId],
-      );
+      const version = await versionById(versionId);
+      expect(version?.state).toBe("active");
+      expect(version?.activatedAt).toEqual(expect.any(Number));
+      const before = await versionById(seeded.versionId);
+      expect(before?.state, "the version it replaced").toBe("superseded");
+      const audit = await auditEvents({ versionId });
       expect(
         audit
-          .filter((a) => /approved|activated/.test(String(a.action)))
-          .map((a) => a.actor_id),
+          .filter((a) => /approved|activated/.test(a.action))
+          .map((a) => a.actorId),
       ).toContain("dana");
     });
   });
@@ -737,16 +687,9 @@ test.describe("phase 6: two-stage approval", () => {
       await beat(page, 900);
       await shoot(page, "alex-second-stage-active");
 
-      const approvals = await rows(
-        "SELECT actor_id, stage_position, stage_name FROM approvals WHERE version_id = ? ORDER BY stage_position",
-        [versionId],
-      );
+      const approvals = await approvalsOf(versionId);
       expect(
-        approvals.map((a) => [
-          a.actor_id,
-          Number(a.stage_position),
-          a.stage_name,
-        ]),
+        approvals.map((a) => [a.actorId, a.stagePosition, a.stageName]),
       ).toEqual([
         ["jordan", 0, "Team approver"],
         ["alex", 1, SECOND],
@@ -765,13 +708,14 @@ test.describe("phase 6: two-stage approval", () => {
 
     // The chain starts as [Legal reviewer (Dana), Team approver], set up in the database: the tests above
     // cover adding a stage in the chain editor. afterEach re-seeds.
-    await rows(
-      "UPDATE approval_stages SET position = 1 WHERE id = 'stage_disclosure_0'",
-    );
-    await rows(
-      "INSERT INTO approval_stages (id, content_type_id, position, name, approver_rule) VALUES (?, 'ct_disclosure', 0, ?, ?)",
-      [LEGAL_ID, STAGE, JSON.stringify({ kind: "user", userId: "dana" })],
-    );
+    await moveApprovalStage("stage_disclosure_0", 1);
+    await addApprovalStage({
+      id: LEGAL_ID,
+      contentTypeId: "ct_disclosure",
+      position: 0,
+      name: STAGE,
+      approverRule: { kind: "user", userId: "dana" },
+    });
 
     await test.step("1. v3 goes Active on its one stage; Maya submits v4, which records Legal reviewer, then Team approver", async () => {
       const submitted = await goLiveThenResubmit(page, seeded);
@@ -834,22 +778,13 @@ test.describe("phase 6: two-stage approval", () => {
       await expect(consequence).toBeHidden({ timeout: 20_000 });
       await closeSettings(page);
 
-      const saved = await rows(
-        "SELECT id FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position",
-      );
+      const saved = await approvalChain("ct_disclosure");
       expect(saved.map((s) => s.id)).toEqual(["stage_disclosure_0", LEGAL_ID]);
-      const [version] = await rows(
-        "SELECT state, current_stage, stages FROM versions WHERE id = ?",
-        [v4.versionId],
-      );
-      expect(version.state).toBe("in_review");
-      expect(Number(version.current_stage), "still at its second stage").toBe(
-        1,
-      );
+      const version = await versionById(v4.versionId);
+      expect(version?.state).toBe("in_review");
+      expect(version?.currentStage, "still at its second stage").toBe(1);
       expect(
-        (JSON.parse(String(version.stages)) as { id: string }[]).map(
-          (s) => s.id,
-        ),
+        version?.stages?.map((s) => s.id),
         "its own order",
       ).toEqual([LEGAL_ID, "stage_disclosure_0"]);
     });
@@ -873,25 +808,19 @@ test.describe("phase 6: two-stage approval", () => {
     });
 
     await test.step("5. The database: each approval under the stage it was made at", async () => {
-      const approvals = await rows(
-        "SELECT actor_id, stage_id, stage_position, stage_name FROM approvals WHERE version_id = ? ORDER BY decided_at",
-        [v4.versionId],
-      );
+      const approvals = await approvalsOf(v4.versionId);
       expect(
         approvals.map((a) => [
-          a.actor_id,
-          a.stage_id,
-          Number(a.stage_position),
-          a.stage_name,
+          a.actorId,
+          a.stageId,
+          a.stagePosition,
+          a.stageName,
         ]),
       ).toEqual([
         ["dana", LEGAL_ID, 0, STAGE],
         ["jordan", "stage_disclosure_0", 1, "Team approver"],
       ]);
-      const [version] = await rows("SELECT state FROM versions WHERE id = ?", [
-        v4.versionId,
-      ]);
-      expect(version.state).toBe("active");
+      expect((await versionById(v4.versionId))?.state).toBe("active");
     });
   });
 
@@ -900,10 +829,7 @@ test.describe("phase 6: two-stage approval", () => {
   }) => {
     test.setTimeout(demoTimeout(120_000));
     const REASON = "Dana Park already reviews stage 2.";
-    const chainRows = () =>
-      rows(
-        "SELECT id, position, name, approver_rule FROM approval_stages WHERE content_type_id = 'ct_disclosure' ORDER BY position",
-      );
+    const chainRows = () => approvalChain("ct_disclosure");
     const before = await chainRows();
 
     await asPersona(page, "riley");

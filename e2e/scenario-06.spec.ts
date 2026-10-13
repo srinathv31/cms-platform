@@ -1,13 +1,8 @@
-import type { Client, InValue } from "@libsql/client";
 import type { Locator, Page } from "@playwright/test";
 import {
-  allVersions,
   correlation,
-  demoNow,
   expectError,
-  logFor,
   longDate,
-  openDb,
   pick,
   render,
   validValues,
@@ -21,12 +16,9 @@ import {
   openOffer,
   openOfferTab,
   openSimulator,
-  restore as restoreCoral,
   resultsHeadline,
   selectCustomers,
   send,
-  takeSnapshot as takeCoralSnapshot,
-  type Snapshot as CoralSnapshot,
 } from "./helpers/golive";
 import {
   asPersona,
@@ -41,6 +33,18 @@ import {
   typeSlowly,
   untilUncovered,
 } from "./helpers/scenario";
+import {
+  Changes,
+  allVersions,
+  approversOf,
+  auditEvents,
+  consumerNotices,
+  demoNow,
+  notificationsAbout,
+  renderLogFor,
+  simDeliveries,
+  versionById,
+} from "./helpers/state";
 
 // Phase 4 gate: demo scenario 6 ("Revoke"), all of it that exists in this phase.
 //
@@ -63,11 +67,11 @@ import {
 // Audit page; until then this spec proves the revoke through the Activity tab, the render API and the simulator
 // (docs/archive/implementation-plan.md, Phase 4).
 //
-// Runs from a fresh reset. It REVOKES the seeded v1, so the rows it changes are snapshotted before and put
-// back in afterAll (the version, the audit events, notifications and consumer notices it wrote for this
-// template, its own render_log rows, and what Coral's send wrote: the deliveries, the render_log rows they
-// made and the reads of notices): the gate-media run plays the spec twice against one database,
-// and the dev database is shared. Console and page errors fail it.
+// Runs from a fresh reset. It REVOKES the seeded v1, so `Changes` remembers what it changes and puts it back in
+// afterAll (the versions, the audit events, notifications and consumer notices it wrote for this template, its own
+// render_log rows, and what Coral's send wrote: the deliveries, the render_log rows they made and the reads of
+// notices): the gate-media run plays the spec twice against one database, and the dev database is shared.
+// Console and page errors fail it.
 
 // The preview frames and the customer views are sandboxed; Playwright's trace injects scripts into them.
 test.use({ trace: "off" });
@@ -81,86 +85,26 @@ const OWN_REVOKE = "You started this revoke. Another approver must confirm it.";
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// ── The database ─────────────────────────────────────────────────────────────
+// ── What the run changes ─────────────────────────────────────────────────────
 
-type Row = Record<string, InValue>;
+const changes = new Changes();
 
-/** The file has no busy timeout, and the app writes to it: a read or write waits its turn. */
-async function busy<T>(run: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await run();
-    } catch (error) {
-      const text =
-        String((error as { code?: unknown; message?: unknown })?.code ?? "") +
-        String((error as Error)?.message ?? "");
-      if (attempt >= 8 || !/SQLITE_BUSY|database is locked/i.test(text))
-        throw error;
-      await new Promise((resolve) => setTimeout(resolve, 40 * 2 ** attempt));
-    }
-  }
-}
-
-async function rows(
-  db: Client,
-  sql: string,
-  args: InValue[] = [],
-): Promise<Row[]> {
-  const result = await busy(() => db.execute({ sql, args }));
-  return result.rows.map((row) =>
-    Object.fromEntries(
-      result.columns.map((column) => [column, row[column] as InValue]),
-    ),
-  );
-}
-
-const json = (value: InValue) =>
-  value === null || value === undefined ? null : JSON.parse(String(value));
-
-// What this scenario leaves in the shared database, so it can be put back.
-interface Snapshot {
-  v1Row: Row;
+/** What the template had before the run: the steps read only what the revoke wrote since. */
+interface Before {
   v2Rev: number;
   audit: Set<string>;
   notifications: Set<string>;
   notices: Set<string>;
-  correlationIds: string[];
+  deliveries: Set<string>;
 }
 
-let db: Client;
 let v1: SeedVersion;
 let v2: SeedVersion;
-let snapshot: Snapshot;
-let coral: CoralSnapshot;
+let before: Before;
 let approvers: string[];
 
-const hrefLike = (templateId: string) => `%/templates/${templateId}%`;
-
-async function ids(sql: string, args: InValue[]): Promise<Set<string>> {
-  return new Set((await rows(db, sql, args)).map((row) => String(row.id)));
-}
-
-async function deleteNew(
-  table: string,
-  where: string,
-  args: InValue[],
-  before: Set<string>,
-) {
-  const fresh = [
-    ...(await ids(`SELECT id FROM ${table} WHERE ${where}`, args)),
-  ].filter((id) => !before.has(id));
-  if (fresh.length === 0) return;
-  await busy(() =>
-    db.execute({
-      sql: `DELETE FROM ${table} WHERE id IN (${fresh.map(() => "?").join(",")})`,
-      args: fresh,
-    }),
-  );
-}
-
 test.beforeAll(async () => {
-  db = openDb();
-  const all = await allVersions(db);
+  const all = await allVersions();
   const find = (number: number) =>
     pick(
       all,
@@ -170,103 +114,48 @@ test.beforeAll(async () => {
   v1 = find(1);
   v2 = find(2);
 
-  const [row] = await rows(db, "SELECT * FROM versions WHERE id = ?", [v1.id]);
+  const v1Row = await versionById(v1.id);
+  const v2Row = await versionById(v2.id);
   const ready = `from a fresh seed (npm run db:reset): ${NAME} v1 Superseded with no revoke, v2 Active`;
   if (
     v1.state !== "superseded" ||
-    row.revoke !== null ||
+    v1Row?.revoke !== null ||
     v2.state !== "active"
   ) {
     throw new Error(
-      `This scenario needs ${ready}. v1 is ${v1.state}${row.revoke !== null ? " with a revoke on it" : ""}, v2 is ${v2.state}.`,
+      `This scenario needs ${ready}. v1 is ${v1.state}${v1Row?.revoke !== null ? " with a revoke on it" : ""}, v2 is ${v2.state}.`,
     );
   }
-  const [v2Row] = await rows(db, "SELECT rev FROM versions WHERE id = ?", [
-    v2.id,
-  ]);
-  coral = await takeCoralSnapshot(db);
 
-  snapshot = {
-    v1Row: row,
-    v2Rev: Number(v2Row.rev),
-    audit: await ids("SELECT id FROM audit_events WHERE template_id = ?", [
-      v1.templateId,
-    ]),
-    notifications: await ids("SELECT id FROM notifications WHERE href LIKE ?", [
-      hrefLike(v1.templateId),
-    ]),
-    notices: await ids(
-      "SELECT id FROM consumer_notices WHERE template_id = ?",
-      [v1.templateId],
+  // Registered before Coral's, so it is put back after it: Coral's reads of notices point at the notices the
+  // template's undo removes. The test doesn't move the demo clock, so there is no `watchClock`.
+  await changes.watchTemplate(v1.templateId);
+  await changes.watchSimulator({
+    offers: [OFFER],
+    noticeTemplates: [v1.templateId],
+  });
+
+  before = {
+    v2Rev: v2Row!.rev,
+    audit: new Set(
+      (await auditEvents({ templateId: v1.templateId })).map((e) => e.id),
     ),
-    correlationIds: [],
+    notifications: new Set(
+      (await notificationsAbout(v1.templateId)).map((n) => n.id),
+    ),
+    notices: new Set(
+      (await consumerNotices({ templateId: v1.templateId })).map((n) => n.id),
+    ),
+    deliveries: new Set(
+      (await simDeliveries({ offerId: OFFER })).map((d) => d.id),
+    ),
   };
-  approvers = (
-    await rows(
-      db,
-      `SELECT DISTINCT m.user_id AS id FROM memberships m JOIN membership_roles r ON r.membership_id = m.id
-       WHERE m.team_id = ? AND m.status = 'active' AND r.role = 'approver'`,
-      [v1.teamId],
-    )
-  )
-    .map((r) => String(r.id))
-    .sort();
+  approvers = await approversOf(v1.teamId);
 });
 
 test.afterEach(({ problems }) => dropDemoNoise(problems));
 
-test.afterAll(async () => {
-  if (!db) return;
-  try {
-    // Coral's side first: its reads of notices point at the notices removed below.
-    if (coral)
-      await restoreCoral(db, coral, {
-        offers: [OFFER],
-        noticeTemplates: [v1.templateId],
-        clock: false,
-      });
-    if (snapshot) {
-      const columns = Object.keys(snapshot.v1Row).filter(
-        (column) => column !== "id",
-      );
-      await busy(() =>
-        db.execute({
-          sql: `UPDATE versions SET ${columns.map((column) => `${column} = ?`).join(", ")} WHERE id = ?`,
-          args: [...columns.map((column) => snapshot.v1Row[column]), v1.id],
-        }),
-      );
-      await deleteNew(
-        "audit_events",
-        "template_id = ?",
-        [v1.templateId],
-        snapshot.audit,
-      );
-      await deleteNew(
-        "notifications",
-        "href LIKE ?",
-        [hrefLike(v1.templateId)],
-        snapshot.notifications,
-      );
-      await deleteNew(
-        "consumer_notices",
-        "template_id = ?",
-        [v1.templateId],
-        snapshot.notices,
-      );
-      if (snapshot.correlationIds.length > 0) {
-        const marks = snapshot.correlationIds.map(() => "?").join(",");
-        await busy(() =>
-          db.execute({
-            sql: `DELETE FROM render_log WHERE correlation_id IN (${marks})`,
-            args: snapshot.correlationIds,
-          }),
-        );
-      }
-    }
-  } finally {
-    db.close();
-  }
-});
+test.afterAll(() => changes.undo());
 
 // ── The render API ───────────────────────────────────────────────────────────
 
@@ -279,12 +168,10 @@ function renderAs(
   const channel = version.channels.includes("web")
     ? "web"
     : version.channels[0];
-  const cid = correlation(label);
-  snapshot.correlationIds.push(cid);
   return render(request, {
     templateId: version.templateId,
     consumer: "coral",
-    correlationId: cid,
+    correlationId: correlation(label),
     body: {
       version: version.number,
       channel,
@@ -360,13 +247,13 @@ test.describe("scenario 6: revoke", () => {
         res.headers()["x-stencil-newer-version"],
         "the header names the Active version",
       ).toBe("2");
-      const [logged] = await logFor(db, correlationId!);
+      const [logged] = await renderLogFor(correlationId!);
       expect(logged).toMatchObject({
-        consumer_id: "coral",
-        version_number: 1,
-        is_preview: 0,
+        consumerId: "coral",
+        versionNumber: 1,
+        isPreview: false,
         outcome: "ok",
-        error_code: null,
+        errorCode: null,
       });
     });
 
@@ -490,71 +377,55 @@ test.describe("scenario 6: revoke", () => {
     });
 
     await test.step("2.4 Nothing has changed for Coral yet: the version row, the audit event, the confirm request", async () => {
-      const [row] = await rows(
-        db,
-        "SELECT state, revoke FROM versions WHERE id = ?",
-        [v1.id],
-      );
-      expect(row.state).toBe("superseded");
-      expect(json(row.revoke)).toMatchObject({
+      const row = await versionById(v1.id);
+      expect(row!.state).toBe("superseded");
+      expect(row!.revoke).toMatchObject({
         reason: REASON,
         startedBy: "jordan",
       });
-      expect(json(row.revoke).confirmedAt, "not confirmed").toBeUndefined();
+      expect(row!.revoke!.confirmedAt, "not confirmed").toBeUndefined();
 
-      const audit = (
-        await rows(
-          db,
-          "SELECT * FROM audit_events WHERE template_id = ? ORDER BY at, id",
-          [v1.templateId],
-        )
-      ).filter((r) => !snapshot.audit.has(String(r.id)));
-      expect(audit.map((r) => r.action)).toEqual(["version.revoke_started"]);
+      const audit = (await auditEvents({ templateId: v1.templateId })).filter(
+        (e) => !before.audit.has(e.id),
+      );
+      expect(audit.map((e) => e.action)).toEqual(["version.revoke_started"]);
       expect(audit[0]).toMatchObject({
-        actor_id: "jordan",
-        team_id: TEAM,
-        template_id: v1.templateId,
-        version_id: v1.id,
+        actorId: "jordan",
+        teamId: TEAM,
+        templateId: v1.templateId,
+        versionId: v1.id,
       });
-      expect(json(audit[0].details)).toMatchObject({
+      expect(audit[0].details).toMatchObject({
         number: 1,
         reason: REASON,
       });
 
-      const fresh = (
-        await rows(
-          db,
-          "SELECT * FROM notifications WHERE href LIKE ? ORDER BY created_at, id",
-          [hrefLike(v1.templateId)],
-        )
-      ).filter((r) => !snapshot.notifications.has(String(r.id)));
+      const fresh = (await notificationsAbout(v1.templateId)).filter(
+        (n) => !before.notifications.has(n.id),
+      );
       expect(
-        fresh.map((r) => r.kind),
+        fresh.map((n) => n.kind),
         "one confirm request each",
       ).toEqual(
         approvers.filter((id) => id !== "jordan").map(() => "revoke_started"),
       );
       expect(
-        fresh.map((r) => String(r.user_id)).sort(),
+        fresh.map((n) => n.userId).sort(),
         "to the approvers other than Jordan",
       ).toEqual(approvers.filter((id) => id !== "jordan"));
       for (const note of fresh) {
         expect(note).toMatchObject({
-          team_id: TEAM,
+          teamId: TEAM,
           title: `Jordan Ellis started revoking ${NAME} v1. Confirm or cancel.`,
           body: REASON,
           href: `/${TEAM}/templates/${v1.templateId}/versions`,
-          read_at: null,
+          readAt: null,
         });
       }
 
       const notices = (
-        await rows(
-          db,
-          "SELECT id FROM consumer_notices WHERE template_id = ?",
-          [v1.templateId],
-        )
-      ).filter((r) => !snapshot.notices.has(String(r.id)));
+        await consumerNotices({ templateId: v1.templateId })
+      ).filter((n) => !before.notices.has(n.id));
       expect(
         notices,
         "consumers are told when it is confirmed, not before",
@@ -614,12 +485,12 @@ test.describe("scenario 6: revoke", () => {
       ).toBeFocused();
       await beat(page, 900);
 
-      dayBefore.push(longDate(await demoNow(db)));
+      dayBefore.push(longDate(await demoNow()));
       await press(
         dialog.getByRole("button", { name: "Confirm revoke", exact: true }),
       );
       await expect(dialog).toBeHidden({ timeout: 20_000 });
-      dayBefore.push(longDate(await demoNow(db)));
+      dayBefore.push(longDate(await demoNow()));
 
       await expect(first).toHaveAttribute("data-state", "revoked", {
         timeout: 20_000,
@@ -652,13 +523,9 @@ test.describe("scenario 6: revoke", () => {
     // ── 4. After: the render API ─────────────────────────────────────────────
 
     await test.step("4. After: Coral's render of v1 is 410 version_revoked with the date; v2 still renders", async () => {
-      const [row] = await rows(
-        db,
-        "SELECT state, revoke FROM versions WHERE id = ?",
-        [v1.id],
-      );
-      expect(row.state).toBe("revoked");
-      const revoke = json(row.revoke);
+      const row = await versionById(v1.id);
+      expect(row!.state).toBe("revoked");
+      const revoke = row!.revoke!;
       expect(revoke).toMatchObject({
         reason: REASON,
         startedBy: "jordan",
@@ -668,7 +535,7 @@ test.describe("scenario 6: revoke", () => {
         revoke.confirmedAt,
         "a confirmed revoke has its time",
       ).toBeTruthy();
-      confirmedDay = longDate(revoke.confirmedAt);
+      confirmedDay = longDate(revoke.confirmedAt!);
       expect(dayBefore, "the date is the demo clock's day").toContain(
         confirmedDay,
       );
@@ -687,14 +554,14 @@ test.describe("scenario 6: revoke", () => {
       expect(error.details).toEqual({
         version: 1,
         activeVersion: 2,
-        at: new Date(revoke.confirmedAt).toISOString(),
+        at: new Date(revoke.confirmedAt!).toISOString(),
       });
-      const [logged] = await logFor(db, correlationId!);
+      const [logged] = await renderLogFor(correlationId!);
       expect(logged).toMatchObject({
-        consumer_id: "coral",
-        version_number: 1,
-        is_preview: 0,
-        error_code: "version_revoked",
+        consumerId: "coral",
+        versionNumber: 1,
+        isPreview: false,
+        errorCode: "version_revoked",
       });
       expect(logged.outcome).not.toBe("ok");
 
@@ -751,30 +618,28 @@ test.describe("scenario 6: revoke", () => {
       await shoot(page, "simulator-send-revoked");
 
       // Coral stored the API's words as received, and UCOMP logged the refusals under Coral's id.
-      const deliveries = (
-        await rows(db, "SELECT * FROM sim_deliveries WHERE offer_id = ?", [
-          OFFER,
-        ])
-      ).filter((r) => !coral.simDeliveries.has(String(r.id)));
+      const deliveries = (await simDeliveries({ offerId: OFFER })).filter(
+        (d) => !before.deliveries.has(d.id),
+      );
       expect(deliveries).toHaveLength(4);
       for (const delivery of deliveries) {
         expect(delivery).toMatchObject({
           status: "failed",
-          template_id: v1.templateId,
-          version_number: 1,
+          templateId: v1.templateId,
+          versionNumber: 1,
           output: null,
         });
-        expect(json(delivery.error)).toEqual({
+        expect(delivery.error).toEqual({
           status: 410,
           code: "version_revoked",
           message,
         });
-        const [logged] = await logFor(db, String(delivery.correlation_id));
+        const [logged] = await renderLogFor(delivery.correlationId);
         expect(logged).toMatchObject({
-          consumer_id: "coral",
-          version_number: 1,
-          is_preview: 0,
-          error_code: "version_revoked",
+          consumerId: "coral",
+          versionNumber: 1,
+          isPreview: false,
+          errorCode: "version_revoked",
         });
       }
 
@@ -848,48 +713,42 @@ test.describe("scenario 6: revoke", () => {
 
     await test.step("6. consumer_notices, notifications and audit_events hold the whole revoke", async () => {
       // audit_events: both steps, in order, by who did them.
-      const audit = (
-        await rows(
-          db,
-          "SELECT * FROM audit_events WHERE template_id = ? ORDER BY at, id",
-          [v1.templateId],
-        )
-      ).filter((r) => !snapshot.audit.has(String(r.id)));
-      expect(audit.map((r) => r.action)).toEqual([
+      const audit = (await auditEvents({ templateId: v1.templateId })).filter(
+        (e) => !before.audit.has(e.id),
+      );
+      expect(audit.map((e) => e.action)).toEqual([
         "version.revoke_started",
         "version.revoked",
       ]);
-      expect(audit.map((r) => r.actor_id)).toEqual(["jordan", "alex"]);
+      expect(audit.map((e) => e.actorId)).toEqual(["jordan", "alex"]);
       for (const event of audit)
         expect(event).toMatchObject({
-          team_id: TEAM,
-          template_id: v1.templateId,
-          version_id: v1.id,
+          teamId: TEAM,
+          templateId: v1.templateId,
+          versionId: v1.id,
         });
-      expect(json(audit[0].details)).toMatchObject({
+      expect(audit[0].details).toMatchObject({
         number: 1,
         reason: REASON,
       });
-      expect(json(audit[1].details)).toMatchObject({
+      expect(audit[1].details).toMatchObject({
         number: 1,
         reason: REASON,
         startedBy: "jordan",
         wasActive: false,
       });
-      expect(Number(audit[1].at)).toBeGreaterThanOrEqual(Number(audit[0].at));
+      expect(audit[1].at).toBeGreaterThanOrEqual(audit[0].at);
 
       // consumer_notices: Coral is told v1 was revoked, and that v2 is the one to use.
       const notices = (
-        await rows(db, "SELECT * FROM consumer_notices WHERE template_id = ?", [
-          v1.templateId,
-        ])
-      ).filter((r) => !snapshot.notices.has(String(r.id)));
+        await consumerNotices({ templateId: v1.templateId })
+      ).filter((n) => !before.notices.has(n.id));
       expect(notices.length, "at least Coral").toBeGreaterThanOrEqual(1);
       for (const notice of notices)
-        expect(notice).toMatchObject({ kind: "revoked", version_id: v1.id });
-      const coral = notices.filter((r) => r.consumer_id === "coral");
-      expect(coral, "one revoked notice for Coral on v1").toHaveLength(1);
-      expect(json(coral[0].payload)).toEqual({
+        expect(notice).toMatchObject({ kind: "revoked", versionId: v1.id });
+      const forCoral = notices.filter((n) => n.consumerId === "coral");
+      expect(forCoral, "one revoked notice for Coral on v1").toHaveLength(1);
+      expect(forCoral[0].payload).toEqual({
         templateName: NAME,
         versionNumber: 1,
         activeVersion: 2,
@@ -898,51 +757,40 @@ test.describe("scenario 6: revoke", () => {
 
       // notifications: the confirm request went to the approvers other than Jordan (checked at step 2.4);
       // the revoked notice goes to the other approvers (Jordan) and whoever submitted v1, never to Alex.
-      const [submitter] = await rows(
-        db,
-        "SELECT submitted_by FROM versions WHERE id = ?",
-        [v1.id],
-      );
+      const submitter = (await versionById(v1.id))!.submittedBy;
       const told = new Set(approvers.filter((id) => id !== "alex"));
-      if (submitter.submitted_by && submitter.submitted_by !== "alex")
-        told.add(String(submitter.submitted_by));
-      const fresh = (
-        await rows(
-          db,
-          "SELECT * FROM notifications WHERE href LIKE ? ORDER BY created_at, id",
-          [hrefLike(v1.templateId)],
-        )
-      ).filter((r) => !snapshot.notifications.has(String(r.id)));
-      const started = fresh.filter((r) => r.kind === "revoke_started");
-      const revoked = fresh.filter((r) => r.kind === "version_revoked");
+      if (submitter && submitter !== "alex") told.add(submitter);
+      const fresh = (await notificationsAbout(v1.templateId)).filter(
+        (n) => !before.notifications.has(n.id),
+      );
+      const started = fresh.filter((n) => n.kind === "revoke_started");
+      const revoked = fresh.filter((n) => n.kind === "version_revoked");
       expect(fresh.length, "nothing else was sent").toBe(
         started.length + revoked.length,
       );
       expect(
-        started.map((r) => String(r.user_id)).sort(),
+        started.map((n) => n.userId).sort(),
         "the confirm request: not to Jordan",
       ).toEqual(approvers.filter((id) => id !== "jordan"));
       expect(
-        revoked.map((r) => String(r.user_id)).sort(),
+        revoked.map((n) => n.userId).sort(),
         "the revoked notice: not to Alex",
       ).toEqual([...told].sort());
       for (const note of revoked) {
         expect(note).toMatchObject({
-          team_id: TEAM,
+          teamId: TEAM,
           title: `Alex Kim confirmed the revoke of ${NAME} v1.`,
           body: REASON,
           href: `/${TEAM}/templates/${v1.templateId}/versions`,
-          read_at: null,
+          readAt: null,
         });
       }
 
       // The other version is as it was.
-      const [other] = await rows(
-        db,
-        "SELECT state, rev FROM versions WHERE id = ?",
-        [v2.id],
-      );
-      expect(other).toMatchObject({ state: "active", rev: snapshot.v2Rev });
+      expect(await versionById(v2.id)).toMatchObject({
+        state: "active",
+        rev: before.v2Rev,
+      });
     });
   });
 });

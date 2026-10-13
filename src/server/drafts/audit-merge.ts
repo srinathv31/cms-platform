@@ -31,7 +31,7 @@ export interface DraftEditedDetails {
    * as the save, so it says who wrote the current rev; see `sessionOwnsRev`.
    */
   rev: number;
-  /** Anything else already on the row (the seed adds `basedOn`) is kept. */
+  /** Anything else already on the row is kept. */
   [key: string]: unknown;
 }
 
@@ -60,8 +60,8 @@ function validIso(value: unknown): value is string {
  * else's. That happens when a save lands but its response is lost.
  *
  * Every save, by anyone, bumps the rev, so if the session's last save produced the current rev
- * then no one has written since. Rows without a recorded rev (the seed's, or a row that never
- * saw one) never match, so those requests get a normal conflict.
+ * then no one has written since. Rows without a recorded rev (one that never saw one) never match,
+ * so those requests get a normal conflict.
  */
 export function sessionOwnsRev(
   previous: { details: unknown } | null,
@@ -78,8 +78,8 @@ export function sessionOwnsRev(
  * - No row yet: a new one with `saves: 1`, the changed fields and `since: now`.
  * - A row exists: `saves + 1`, the union of the fields, and `since` kept. The row's `at` moves to now.
  *
- * Rows written before this existed (the seed has `{ saves: 15 }`) have no `fields`, `since` or `rev`:
- * their fields start empty and `since` falls back to the row's old `at`.
+ * Rows written before this existed have no `fields`, `since` or `rev`: their fields start empty and
+ * `since` falls back to the row's old `at`.
  */
 export function mergeDraftEdit(
   previous: { at: Date; details: unknown } | null,

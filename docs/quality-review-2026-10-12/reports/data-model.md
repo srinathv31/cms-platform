@@ -247,8 +247,8 @@ Fix: a `platform_settings` table with typed columns (or one row), a SEQUENCE, an
 Where: `audit_events.{team_id,template_id,version_id}`, `render_log.{template_id,version_id,consumer_id}`,
 `consumer_notices.{template_id,version_id}`, `notifications.team_id`, `versions.based_on_version_id`,
 `versions.import_upload_id`, `approvals.stage_id` (`ucomp.ts`, the columns without `.references`). Only `stage_id`
-says why (line 219-220). `e2e/helpers/cleanup.ts:27-45` deletes a template with nine hand-ordered statements,
-including `DELETE FROM notifications WHERE href LIKE '%/<id>%'`.
+says why (line 219-220). The e2e cleanup helper (now `e2e/helpers/state/templates.ts`) deletes a template with nine hand-ordered
+statements, including `DELETE FROM notifications WHERE href LIKE '%/<id>%'`.
 Why it matters: some of these are deliberate (a log should outlive what it logs), but the schema does not say so,
 and a Java team adding `@ManyToOne` everywhere will change the product's delete semantics without noticing. The
 product has no delete today, so the question has been avoidable.
