@@ -12,7 +12,7 @@ import type {
   ReviewQueueFacts,
   ReviewScreenFacts,
 } from "@/server/services/review-reads";
-import { personOf, type People } from "./people";
+import { peopleById, personOf } from "@/domain/people";
 import type {
   ReviewQueue,
   ReviewQueueRow,
@@ -55,7 +55,7 @@ export const getReviewBadgeCount = cache(
 
 /** The review queue from the service's facts: each row with its author, the lists in the order the tabs show. */
 export function reviewQueueData(queue: ReviewQueueFacts): ReviewQueue {
-  const people: People = new Map(queue.people.map((p) => [p.id, p]));
+  const people = peopleById(queue.people);
   const row = (r: QueueRow): ReviewQueueRow => ({
     templateId: r.templateId,
     templateName: r.templateName,
@@ -123,7 +123,7 @@ export function reviewScreenData(
   screen: ReviewScreenFacts,
   viewerId: string,
 ): ReviewScreenData {
-  const people: People = new Map(screen.people.map((p) => [p.id, p]));
+  const people = peopleById(screen.people);
   const { version } = screen;
   return {
     template: screen.template,

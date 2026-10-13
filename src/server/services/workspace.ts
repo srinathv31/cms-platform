@@ -31,7 +31,6 @@ export interface WorkspaceHeaderFacts {
     teamId: string;
     teamSlug: string;
     teamName: string;
-    contentTypeId: string;
   };
   /** The version the workspace shows: the open draft, else the latest round. Null for a template with none. */
   shown: {

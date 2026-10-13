@@ -26,7 +26,7 @@ import type {
   WorkspaceDocumentFacts,
   WorkspaceHeaderFacts,
 } from "@/server/services/workspace";
-import { personOf, type People } from "./people";
+import { peopleById, personOf } from "@/domain/people";
 import { requireSpace } from "./spaces";
 import { threadViews, type ThreadView } from "./threads";
 
@@ -240,7 +240,7 @@ export function workspaceDocumentData(
   document: WorkspaceDocumentFacts,
   viewerId: string,
 ): WorkspaceDocumentData {
-  const people: People = new Map(document.people.map((p) => [p.id, p]));
+  const people = peopleById(document.people);
   const { template, version, importOriginal } = document;
   return {
     templateId: template.id,

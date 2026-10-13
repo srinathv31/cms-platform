@@ -78,7 +78,6 @@ export function localWorkspace(deps: LocalDeps): WorkspaceReads {
           teamId: template.teamId,
           teamSlug: template.teamSlug,
           teamName: template.teamName,
-          contentTypeId: template.contentTypeId,
         },
         shown: shown
           ? {

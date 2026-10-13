@@ -2,7 +2,7 @@ import "server-only";
 
 import type { ImplementationOptions } from "../options";
 import type { Services } from "../types";
-import { now } from "@/server/clock";
+import { now } from "./clock";
 import { newTemplateId } from "@/server/ids";
 import { localAccess } from "./access";
 import { localActivity } from "./activity";
@@ -28,8 +28,8 @@ import { localVersions } from "./versions";
 import { localWorkspace } from "./workspace";
 
 // The local implementation: the service interfaces on this app's own database (Drizzle over SQLite) and the
-// TypeScript domain. It is what the Java API replaces. Each area lives in its own file here; an area whose
-// code still sits in src/server/actions/ or src/server/queries/ answers `notMovedArea` until it moves.
+// TypeScript domain. It is what the Java API replaces. Each area lives in its own files here: its commands in
+// one (`localReview`), its reads beside them where they are many (`localReviewReads`), joined below.
 
 /** What the local implementation is built with, beside the options every implementation takes. */
 export interface LocalOptions extends ImplementationOptions {

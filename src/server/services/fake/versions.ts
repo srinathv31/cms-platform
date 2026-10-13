@@ -6,7 +6,7 @@ import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ConsumerUsage, Person } from "@/domain/review-types";
 import { compareRounds, headOf } from "@/domain/rounds";
-import { notMoved } from "../not-moved";
+import { notInFake } from "./not-in-fake";
 import { refusal } from "../results";
 import type { VersionFacts, VersionService } from "../versions";
 import { businessZone } from "./settings";
@@ -98,8 +98,8 @@ export function fakeVersions({ store, clock }: FakeDeps): VersionService {
       };
     },
 
-    compare: notMoved("versions.compare"),
-    baseVersion: notMoved("versions.baseVersion"),
+    compare: notInFake("versions.compare"),
+    baseVersion: notInFake("versions.baseVersion"),
   };
 }
 

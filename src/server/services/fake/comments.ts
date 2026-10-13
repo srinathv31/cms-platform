@@ -19,7 +19,6 @@ import { compareRounds, nextRound } from "@/domain/rounds";
 import type { Viewer } from "@/domain/types";
 import { newId } from "@/server/ids";
 import type { CommentService } from "../comments";
-import { notMoved } from "../not-moved";
 import { answerFor, permit, refuse } from "../refuse";
 import type { Changed, RequestContext } from "../types";
 import { chainOf } from "./chain";
@@ -154,7 +153,7 @@ export function fakeComments({
   store,
   clock,
   hooks,
-}: FakeDeps): CommentService {
+}: FakeDeps): Omit<CommentService, "threads"> {
   /** Runs one command against the store at the clock's instant; a refusal is its answer. */
   async function run<T extends object>(
     command: (
@@ -281,7 +280,5 @@ export function fakeComments({
 
     resolve: (ctx, input) => setStatus(ctx, input, resolveTransition),
     reopen: (ctx, input) => setStatus(ctx, input, reopenTransition),
-
-    threads: notMoved("comments.threads"),
   };
 }

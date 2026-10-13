@@ -82,7 +82,8 @@ async function bothWrite(write: {
         limit: 100,
       });
       if (!list.ok) throw new Error(list.code);
-      out[userId] = list.items.map(({ id: _id, ...n }) => n);
+      // Ids differ by implementation: compare the rest.
+      out[userId] = list.items.map((n) => ({ ...n, id: undefined }));
     }
     return out;
   };

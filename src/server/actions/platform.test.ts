@@ -48,7 +48,9 @@ vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-platform-actions-");
 });
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
+vi.mock("@/server/services/local/clock", () => ({
+  now: vi.fn(async () => env.now),
+}));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 

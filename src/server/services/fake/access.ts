@@ -28,7 +28,7 @@ import type { ActionResult } from "@/domain/review-types";
 import type { PlatformRole, Viewer } from "@/domain/types";
 import { newId } from "@/server/ids";
 import type { AccessService } from "../access";
-import { notMoved } from "../not-moved";
+import { notInFake } from "./not-in-fake";
 import type { TestHooks } from "../options";
 import { answerFor, check, permit, refuse } from "../refuse";
 import type { Changed, RequestContext } from "../types";
@@ -519,12 +519,12 @@ export function fakeAccess(deps: FakeDeps): AccessService {
         return { ok: true, recertId };
       }),
 
-    requestAccessData: notMoved("access.requestAccessData"),
-    members: notMoved("access.members"),
-    requests: notMoved("access.requests"),
-    recertification: notMoved("access.recertification"),
-    inactivity: notMoved("access.inactivity"),
-    sidebarCards: notMoved("access.sidebarCards"),
-    homeCard: notMoved("access.homeCard"),
+    requestAccessData: notInFake("access.requestAccessData"),
+    members: notInFake("access.members"),
+    requests: notInFake("access.requests"),
+    recertification: notInFake("access.recertification"),
+    inactivity: notInFake("access.inactivity"),
+    sidebarCards: notInFake("access.sidebarCards"),
+    homeCard: notInFake("access.homeCard"),
   };
 }

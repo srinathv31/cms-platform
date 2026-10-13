@@ -28,7 +28,6 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
-import { notMoved } from "../not-moved";
 import type { PlatformService } from "../platform";
 import type { Changed } from "../types";
 import { applyMembershipChange, writeAccessEffects } from "./access-effects";
@@ -111,7 +110,12 @@ const sameRule = (a: ApproverRule, b: ApproverRule) =>
     ? b.kind === "user" && a.userId === b.userId
     : b.kind === "team_role" && a.role === b.role;
 
-export function localPlatform(deps: LocalDeps): PlatformService {
+export function localPlatform(
+  deps: LocalDeps,
+): Omit<
+  PlatformService,
+  "teams" | "contentTypes" | "channelRules" | "approvalChains" | "businessZone"
+> {
   return {
     createTeam: (ctx, input) =>
       runCommand(deps, ctx, input, {
@@ -376,11 +380,5 @@ export function localPlatform(deps: LocalDeps): PlatformService {
           return changed;
         },
       }),
-
-    teams: notMoved("platform.teams"),
-    contentTypes: notMoved("platform.contentTypes"),
-    channelRules: notMoved("platform.channelRules"),
-    approvalChains: notMoved("platform.approvalChains"),
-    businessZone: notMoved("platform.businessZone"),
   };
 }

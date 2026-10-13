@@ -42,7 +42,7 @@ export function freshDatabasePerTest(
 }
 
 /**
- * For a test that hands `db` to the code under test (`writeEffects`, `runRender`, `applyDraftPatch`) instead
+ * For a test that hands `db` to the code under test (`writeEffects`, `runRender`) instead
  * of mocking `@/server/db/client`: the real seed built on `base`, one copy per test. Returns the live `db`
  * and `libsql` (they follow the test's copy) and the seed's template ids by key.
  */

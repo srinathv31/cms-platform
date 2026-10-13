@@ -19,11 +19,11 @@ import {
 } from "@/server/render/schema-check";
 
 // The pipeline end to end against a temporary database filled by the real seed (every lifecycle
-// state is in it). runRender takes the database and the time, the way applyDraftPatch does.
+// state is in it). runRender takes the database and the time.
 
 // The app database and the demo clock are never touched: runRender gets both as arguments.
 vi.mock("@/server/db/client", () => ({ db: null }));
-vi.mock("@/server/clock", () => ({ now: vi.fn() }));
+vi.mock("@/server/services/local/clock", () => ({ now: vi.fn() }));
 // Spy on the web adapter so one test can make it throw.
 vi.mock("@/server/render/channels/web", async (importOriginal) => {
   const actual =

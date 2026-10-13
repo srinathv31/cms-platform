@@ -30,7 +30,7 @@ vi.mock(
   "@/server/context/request",
   () => import("@/server/services/fake/testing"),
 );
-vi.mock("@/server/clock", () => ({
+vi.mock("@/server/services/local/clock", () => ({
   now: () => {
     throw new Error("The BFF read the clock.");
   },

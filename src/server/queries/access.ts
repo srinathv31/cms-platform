@@ -17,7 +17,6 @@ import {
   INACTIVITY_SUSPEND_DAYS,
   REQUESTABLE_ROLES,
 } from "@/domain/access-types";
-import type { Person } from "@/domain/review-types";
 import { TEAM_ROLES } from "@/domain/types";
 import { requireRequestContext } from "@/server/context/request";
 import { services } from "@/server/services";
@@ -47,7 +46,7 @@ import type {
   SidebarCardModel,
 } from "@/server/queries/access-models";
 import { isoOrUndefined } from "./iso";
-import { personOf, type People } from "./people";
+import { peopleById, personOf, type People } from "@/domain/people";
 import { requireSpace } from "./spaces";
 
 // Read models for team access: the Request access page (anyone), the four Team sections of the settings modal
@@ -56,9 +55,6 @@ import { requireSpace } from "./spaces";
 // and what time decides at the instant the read names (`asOf`). These read models word and lay them out: each
 // strip's `consequences`, how a settled row reads, a review's footnote, "4 of 6 confirmed", the cards' ids.
 // They decide nothing and read no clock: every date is counted from the read's `asOf`.
-
-const peopleMap = (list: readonly Person[]): People =>
-  new Map(list.map((p) => [p.id, p]));
 
 const named = (people: People, id: string) => {
   const { name } = personOf(people, id);
@@ -88,7 +84,7 @@ export const getRequestAccessData = cache(
 export function requestAccessData(
   facts: RequestAccessFacts,
 ): RequestAccessData {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   const teamName = new Map(facts.teams.map((t) => [t.id, t.name]));
   return {
     teams: facts.teams.map((t) => ({
@@ -158,7 +154,7 @@ export function membersSection(
   facts: MembersFacts,
   viewerId: string,
 ): MembersSection {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   const now = new Date(facts.asOf);
   return {
     team: facts.team,
@@ -216,7 +212,7 @@ export const getAccessRequestsSection = cache(
 export function accessRequestsSection(
   facts: RequestsFacts,
 ): AccessRequestsSection {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   const row = (r: RequestFacts): AccessRequestRow => ({
     id: r.id,
     person: personOf(people, r.userId),
@@ -258,7 +254,7 @@ export const getRecertificationSection = cache(
 export function recertificationSection(
   facts: RecertificationFacts,
 ): RecertificationSection {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   const now = new Date(facts.asOf);
   const r = facts.current;
 
@@ -334,7 +330,7 @@ export const getInactivitySection = cache(
 
 /** The Inactivity section from the service's facts: each row with its strips' lines. */
 export function inactivitySection(facts: InactivityFacts): InactivitySection {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   const now = new Date(facts.asOf);
   const row = (m: InactiveMemberFacts): InactivityRow => {
     const said = memberConsequences({
@@ -397,7 +393,7 @@ export const getSidebarCards = cache(
 export function sidebarCards(
   facts: SidebarCardsFacts,
 ): Record<string, SidebarCardModel> {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   return Object.fromEntries(
     facts.cards.map((card): [string, SidebarCardModel] => [
       card.teamId,
@@ -438,7 +434,7 @@ export const getHomeCard = cache(async (): Promise<SidebarCardModel | null> => {
 export function homeCard(facts: HomeCardFacts): SidebarCardModel | null {
   const { request } = facts;
   if (!request) return null;
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   return {
     kind: "my_request",
     id: `my-request:${request.id}`,

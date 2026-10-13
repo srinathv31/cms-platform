@@ -46,7 +46,9 @@ vi.mock("@/server/db/client", async () => {
   return tempDatabase("ucomp-local-templates-");
 });
 vi.mock("@/server/services", () => ({ services: () => env.services }));
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
+vi.mock("@/server/services/local/clock", () => ({
+  now: vi.fn(async () => env.now),
+}));
 
 const { auditEvents, contentTypes, templates, uploads, versions } = schema;
 

@@ -24,7 +24,9 @@ vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-render-route-");
 });
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
+vi.mock("@/server/services/local/clock", () => ({
+  now: vi.fn(async () => env.now),
+}));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 
 let db: Db;

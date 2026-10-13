@@ -28,7 +28,6 @@ import {
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
 import type { CommentService } from "../comments";
-import { notMoved } from "../not-moved";
 import type { Changed } from "../types";
 import { loadChain } from "./chain";
 import { permit, refuse, runCommand, type LocalDeps } from "./command";
@@ -238,7 +237,9 @@ async function authorizeThread({
   permit(canActOnThread(ctx.viewer, found));
 }
 
-export function localComments(deps: LocalDeps): CommentService {
+export function localComments(
+  deps: LocalDeps,
+): Omit<CommentService, "threads"> {
   /** Resolve and reopen: the same steps, with the transition that differs. */
   const setStatus = (
     ctx: Parameters<CommentService["resolve"]>[0],
@@ -384,7 +385,5 @@ export function localComments(deps: LocalDeps): CommentService {
 
     resolve: (ctx, input) => setStatus(ctx, input, resolveTransition),
     reopen: (ctx, input) => setStatus(ctx, input, reopenTransition),
-
-    threads: notMoved("comments.threads"),
   };
 }

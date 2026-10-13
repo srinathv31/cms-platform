@@ -35,7 +35,6 @@ import {
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
 import type { AccessService } from "../access";
-import { notMoved } from "../not-moved";
 import type { TestHooks } from "../options";
 import type { Changed, RequestContext } from "../types";
 import {
@@ -155,7 +154,18 @@ type MemberOutcome =
   | { ok: true; membership: MembershipChange | null; effects: AccessEffect[] }
   | Refused;
 
-export function localAccess(deps: LocalDeps): AccessService {
+export function localAccess(
+  deps: LocalDeps,
+): Omit<
+  AccessService,
+  | "requestAccessData"
+  | "members"
+  | "requests"
+  | "recertification"
+  | "inactivity"
+  | "sidebarCards"
+  | "homeCard"
+> {
   // The access commands' clock: the backend's, and reading it runs the scheduled jobs at that instant first.
   const commandDeps: LocalDeps = {
     ...deps,
@@ -490,13 +500,5 @@ export function localAccess(deps: LocalDeps): AccessService {
           return { ok: true, recertId };
         },
       }),
-
-    requestAccessData: notMoved("access.requestAccessData"),
-    members: notMoved("access.members"),
-    requests: notMoved("access.requests"),
-    recertification: notMoved("access.recertification"),
-    inactivity: notMoved("access.inactivity"),
-    sidebarCards: notMoved("access.sidebarCards"),
-    homeCard: notMoved("access.homeCard"),
   };
 }

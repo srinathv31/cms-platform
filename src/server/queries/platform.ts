@@ -23,7 +23,7 @@ import type {
   ContentTypesSection,
   TeamsSection,
 } from "@/server/queries/access-models";
-import { personOf, type People } from "./people";
+import { peopleById, personOf } from "@/domain/people";
 
 // The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules,
 // Approval chains and Time zone. The facts and the decisions come from the platform service
@@ -51,9 +51,6 @@ function orNotFound<T>(facts: ({ ok: true } & T) | { ok: false }): T {
   return facts;
 }
 
-const peopleMap = (list: TeamsFacts["people"]): People =>
-  new Map(list.map((p) => [p.id, p]));
-
 // ── Teams ─────────────────────────────────────────────────────
 
 export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
@@ -63,7 +60,7 @@ export const getTeamsSection = cache(async (): Promise<TeamsSection> => {
 
 /** The Teams section from the service's facts. */
 export function teamsSection(facts: TeamsFacts): TeamsSection {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   return {
     teams: facts.teams.map(({ adminIds, ...team }) => ({
       ...team,
@@ -135,7 +132,7 @@ export function approvalChainsSection(
   facts: ApprovalChainsFacts,
   viewerId: string,
 ): ApprovalChainsSection {
-  const people = peopleMap(facts.people);
+  const people = peopleById(facts.people);
   const platformRoleOf = new Map<string, PlatformRole | null>(
     facts.approvers.map((a) => [a.id, a.platformRole]),
   );

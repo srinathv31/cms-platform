@@ -14,7 +14,9 @@ vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-detail-route-");
 });
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
+vi.mock("@/server/services/local/clock", () => ({
+  now: vi.fn(async () => env.now),
+}));
 
 const ids = seededDatabasePerTest({ base: env.now });
 

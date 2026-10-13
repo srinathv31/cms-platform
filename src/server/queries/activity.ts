@@ -6,7 +6,7 @@ import type { AuditAction, Person } from "@/domain/review-types";
 import { requireRequestContext } from "@/server/context/request";
 import { services } from "@/server/services";
 import type { TemplateActivity } from "@/server/services/activity";
-import { personOf, type People } from "./people";
+import { peopleById, personOf } from "@/domain/people";
 import { requireSpace } from "./spaces";
 
 // The template's Activity tab: its audit events, newest first, each as one plain sentence. The events come from
@@ -52,7 +52,7 @@ export const getActivity = cache(
 
 /** The Activity tab from the service's facts: one sentence per event, its version's label, its actor. */
 export function activityData(activity: TemplateActivity): ActivityData {
-  const people: People = new Map(activity.people.map((p) => [p.id, p]));
+  const people = peopleById(activity.people);
   return {
     now: activity.asOf,
     items: activity.events.map((e) => {

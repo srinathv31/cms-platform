@@ -21,7 +21,7 @@ import type { RenderError, RenderTarget } from "@/domain/render/types";
 import { asNumbered, isReleased, showsRound } from "@/domain/rounds";
 import type { Channel, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/services/local/business-zone";
-import { now } from "@/server/clock";
+import { now } from "../clock";
 import { db as appDb, type Db } from "@/server/db/client";
 import {
   approvalStages,

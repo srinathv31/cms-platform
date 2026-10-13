@@ -38,7 +38,6 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
-import { notMoved } from "../not-moved";
 import { refusal } from "../results";
 import type { ReviewService, VersionRef } from "../review";
 import type { Changed } from "../types";
@@ -66,7 +65,9 @@ import {
 // state, rev and stage (`updateVersion`, ./version-rows.ts), and writes the transition's effects through
 // ./effects.ts, all dated by the backend's clock.
 
-export function localReview(deps: LocalDeps): ReviewService {
+export function localReview(
+  deps: LocalDeps,
+): Omit<ReviewService, "queue" | "badgeCount" | "screen"> {
   /** The three revoke steps: the head, its permission, then read, transition, compare-and-set, effects. */
   const revokeCommand = <I extends VersionRef>(
     ctx: Parameters<ReviewService["startRevoke"]>[0],
@@ -532,10 +533,6 @@ export function localReview(deps: LocalDeps): ReviewService {
         ...summary,
       };
     },
-
-    queue: notMoved("review.queue"),
-    badgeCount: notMoved("review.badgeCount"),
-    screen: notMoved("review.screen"),
   };
 }
 

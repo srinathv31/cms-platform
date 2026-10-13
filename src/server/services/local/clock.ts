@@ -2,11 +2,13 @@ import "server-only";
 import { connection } from "next/server";
 import { eq } from "drizzle-orm";
 import { DAY_MS } from "@/domain/dates";
-import { db } from "./db/client";
-import { settings } from "./db/schema/ucomp";
+import { db } from "@/server/db/client";
+import { settings } from "@/server/db/schema/ucomp";
 
-// Demo clock: real current time + an "advance N days" offset (Sri, Oct 4).
-// This is the ONLY place that reads the system clock. Domain functions take `now` as an argument.
+// The local implementation's clock, the demo clock: the real time plus the "advance N days" offset the demo's
+// Advance clock moves. The backend owns time (decision 0072): this is the one place the system clock is read, and
+// only the backend reads it (`localServices` by default, /api/v1, the seed and the reset). The BFF reads no clock:
+// a read that decides by time answers `asOf`. Domain functions take `now` as an argument.
 
 export const CLOCK_OFFSET_KEY = "clock_offset_days";
 

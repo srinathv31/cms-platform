@@ -19,7 +19,7 @@ import type {
   VersionHistory,
 } from "@/server/services/versions";
 import type { SunsetCalendar } from "./review-models";
-import { personOf, type People } from "@/server/queries/people";
+import { peopleById, personOf } from "@/domain/people";
 import { requireSpace } from "./spaces";
 
 // The Versions tab: the template's versions as a timeline, with what the viewer may do on each. A number
@@ -159,7 +159,7 @@ export const getVersions = cache(
 
 /** The Versions tab from the service's facts: each number once, as its head, with labels, lines and people. */
 export function versionsData(history: VersionHistory): VersionsData {
-  const people: People = new Map(history.people.map((p) => [p.id, p]));
+  const people = peopleById(history.people);
   // Every row, the open draft first, then newest first (the service's order).
   const rows = history.versions;
 

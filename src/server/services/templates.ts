@@ -17,7 +17,6 @@
 // workspace's two reads (their facts in ./workspace.ts), the SHARE panel's and the Copilot prompt's run in the
 // local implementation.
 
-import type { ChannelFields } from "@/domain/channel-fields";
 import type { ImportKind, ImportReport } from "@/domain/import-report";
 import type { LibraryFacts } from "@/domain/library";
 import type { DraftContent } from "@/domain/lifecycle/types";
@@ -28,7 +27,6 @@ import type {
   ChannelFamily,
   JSONContent,
   RequiredSection,
-  SampleSet,
   VersionState,
   Variable,
 } from "@/domain/types";

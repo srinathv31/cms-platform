@@ -30,7 +30,7 @@ import {
 } from "@/domain/review-types";
 import type { Action, RevokeRecord, Viewer } from "@/domain/types";
 import { newId } from "@/server/ids";
-import { notMoved } from "../not-moved";
+import { notInFake } from "./not-in-fake";
 import { answerFor, check, refuse } from "../refuse";
 import { refusal } from "../results";
 import type { ReviewService, VersionRef } from "../review";
@@ -457,9 +457,9 @@ export function fakeReview(deps: FakeDeps): ReviewService {
       };
     },
 
-    queue: notMoved("review.queue"),
-    badgeCount: notMoved("review.badgeCount"),
-    screen: notMoved("review.screen"),
+    queue: notInFake("review.queue"),
+    badgeCount: notInFake("review.badgeCount"),
+    screen: notInFake("review.screen"),
   };
 }
 

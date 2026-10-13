@@ -39,7 +39,7 @@ import type {
   AuditTeamFacts,
 } from "@/server/services/audit";
 import type { ReadRefusal } from "@/server/services/results";
-import { personOf, type People } from "./people";
+import { peopleById, personOf, type People } from "@/domain/people";
 import { getShellFacts, requireSpace } from "./spaces";
 
 // The Audit page (/{team}/audit) and its CSV export (/{team}/audit/export). The facts and the decisions come
@@ -189,7 +189,7 @@ export function auditPageData(
   facts: AuditPageFacts,
   space: AuditPageData["space"],
 ): AuditPageData {
-  const people: People = new Map(facts.people.map((p) => [p.id, p]));
+  const people = peopleById(facts.people);
   const teamsById = new Map(facts.teams.map((t) => [t.id, t]));
   const slugOf = new Map(facts.teams.map((t) => [t.id, t.slug]));
   const applied = auditFilters(facts.applied, slugOf);
@@ -255,7 +255,7 @@ function auditRows(
     people: readonly Person[];
   },
 ): AuditRow[] {
-  const people: People = new Map(facts.people.map((p) => [p.id, p]));
+  const people = peopleById(facts.people);
   const teamsById = new Map(facts.teams.map((t) => [t.id, t]));
   return events.map((e) => toRow(e, people, teamsById, facts.asOf));
 }

@@ -11,7 +11,7 @@ import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";
 import { newId } from "@/server/ids";
-import { notMoved } from "../not-moved";
+import { notInFake } from "./not-in-fake";
 import { answerFor, check, refuse } from "../refuse";
 import { refusal } from "../results";
 import { TemplateIdTaken, withNewTemplateId } from "../template-id";
@@ -35,7 +35,9 @@ interface StoredUpload {
   compareHtml: string | null;
 }
 
-export function fakeTemplates(deps: FakeDeps): TemplateService {
+export function fakeTemplates(
+  deps: FakeDeps,
+): Omit<TemplateService, "library" | "palette"> {
   const { store, clock, hooks, ids } = deps;
   const files = new Map<string, StoredUpload>();
 
@@ -364,11 +366,9 @@ export function fakeTemplates(deps: FakeDeps): TemplateService {
       };
     },
 
-    library: notMoved("templates.library"),
-    palette: notMoved("templates.palette"),
-    workspaceHeader: notMoved("templates.workspaceHeader"),
-    workspaceDocument: notMoved("templates.workspaceDocument"),
-    integration: notMoved("templates.integration"),
-    copilotPrompt: notMoved("templates.copilotPrompt"),
+    workspaceHeader: notInFake("templates.workspaceHeader"),
+    workspaceDocument: notInFake("templates.workspaceDocument"),
+    integration: notInFake("templates.integration"),
+    copilotPrompt: notInFake("templates.copilotPrompt"),
   };
 }

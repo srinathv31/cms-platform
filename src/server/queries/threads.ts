@@ -2,7 +2,7 @@ import "server-only";
 import type { Person } from "@/domain/review-types";
 import { versionLabel } from "@/domain/rounds";
 import type { ThreadFacts } from "@/server/services/threads";
-import { personOf, type People } from "./people";
+import { personOf, type People } from "@/domain/people";
 
 // Review threads as the screens show them. A thread belongs to the template and anchors to a stable block id (or
 // a channel field's id, "push.title": an alert's threads are on its fields), so a draft made from a version (same

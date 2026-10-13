@@ -66,7 +66,6 @@ function header(
       teamId: "t_coral",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
-      contentTypeId: "ct_doc",
     },
     shown: {
       id: "v_draft",

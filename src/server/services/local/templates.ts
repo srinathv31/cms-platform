@@ -27,7 +27,6 @@ import {
 } from "@/server/db/schema/ucomp";
 import { db } from "@/server/db/client";
 import { newId } from "@/server/ids";
-import { notMoved } from "../not-moved";
 import { answerFor } from "../refuse";
 import { refusal } from "../results";
 import { TemplateIdTaken, withNewTemplateId } from "../template-id";
@@ -183,7 +182,17 @@ async function visibleUpload(viewer: Viewer, uploadId: string) {
     : undefined;
 }
 
-export function localTemplates(deps: LocalDeps): TemplateService {
+export function localTemplates(
+  deps: LocalDeps,
+): Omit<
+  TemplateService,
+  | "library"
+  | "palette"
+  | "workspaceHeader"
+  | "workspaceDocument"
+  | "integration"
+  | "copilotPrompt"
+> {
   const uploadsRoot = () => deps.uploadsRoot ?? defaultUploadsRoot();
 
   /** New template and Import: the permission, then (in the transaction) the content type and the channels. */
@@ -498,12 +507,5 @@ export function localTemplates(deps: LocalDeps): TemplateService {
         .then((rows) => rows[0]);
       return { ok: true, original: row ? importedOriginal(row) : null };
     },
-
-    library: notMoved("templates.library"),
-    palette: notMoved("templates.palette"),
-    workspaceHeader: notMoved("templates.workspaceHeader"),
-    workspaceDocument: notMoved("templates.workspaceDocument"),
-    integration: notMoved("templates.integration"),
-    copilotPrompt: notMoved("templates.copilotPrompt"),
   };
 }

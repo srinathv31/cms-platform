@@ -12,7 +12,7 @@ import {
   errorResponse,
   jsonResponse,
 } from "@/server/api/http";
-import { now } from "@/server/clock";
+import { now } from "@/server/services/local/clock";
 import {
   listNotices,
   noticeEpoch,

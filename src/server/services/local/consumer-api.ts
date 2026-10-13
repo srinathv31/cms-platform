@@ -33,7 +33,7 @@ import {
 } from "@/domain/render";
 import { headOf, isReleased } from "@/domain/rounds";
 import { CHANNELS, type Channel } from "@/domain/types";
-import { now } from "@/server/clock";
+import { now } from "./clock";
 import { readBusinessZone } from "./business-zone";
 import { db } from "@/server/db/client";
 import {

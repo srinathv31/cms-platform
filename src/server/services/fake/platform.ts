@@ -17,7 +17,7 @@ import type { ActionResult } from "@/domain/review-types";
 import { asNumbered, reviewLink } from "@/domain/rounds";
 import type { ApproverRule, Viewer } from "@/domain/types";
 import { newId } from "@/server/ids";
-import { notMoved } from "../not-moved";
+import { notInFake } from "./not-in-fake";
 import type { PlatformService } from "../platform";
 import { check, refuse } from "../refuse";
 import type { Changed } from "../types";
@@ -322,10 +322,10 @@ export function fakePlatform(deps: FakeDeps): PlatformService {
         return changed;
       }),
 
-    teams: notMoved("platform.teams"),
-    contentTypes: notMoved("platform.contentTypes"),
-    channelRules: notMoved("platform.channelRules"),
-    approvalChains: notMoved("platform.approvalChains"),
-    businessZone: notMoved("platform.businessZone"),
+    teams: notInFake("platform.teams"),
+    contentTypes: notInFake("platform.contentTypes"),
+    channelRules: notInFake("platform.channelRules"),
+    approvalChains: notInFake("platform.approvalChains"),
+    businessZone: notInFake("platform.businessZone"),
   };
 }

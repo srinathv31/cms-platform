@@ -8,7 +8,7 @@ import {
 } from "@/domain/demo";
 import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
 import type { TeamRole } from "@/domain/types";
-import { advanceClock, getClockOffsetDays } from "@/server/clock";
+import { advanceClock, getClockOffsetDays } from "./clock";
 import { DEMO_MODE } from "@/server/config";
 import { db } from "@/server/db/client";
 import {

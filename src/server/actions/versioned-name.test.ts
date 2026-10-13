@@ -5,7 +5,7 @@ import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { applyDraftPatch } from "@/server/drafts/apply-patch";
+import { prepareDraftPatch } from "@/server/drafts/prepare-patch";
 import {
   getTemplateDetail,
   listNotices,
@@ -19,7 +19,7 @@ import { getLibrary } from "@/server/queries/library";
 import { searchPalette } from "@/server/queries/palette";
 import { services } from "@/server/services";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
-import { runRender } from "@/server/render/render-template";
+import { runRender } from "@/server/services/local/render/render-template";
 import { asShown } from "@/server/testing/notifications";
 import {
   loadPersona,
@@ -41,7 +41,9 @@ vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-versioned-name-");
 });
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
+vi.mock("@/server/services/local/clock", () => ({
+  now: vi.fn(async () => env.now),
+}));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -141,14 +143,19 @@ const found = async (q: string) =>
     .filter((r) => r.id === templateId)
     .map((r) => r.name);
 
+/** Maya renames the open draft, as autosave does: the route prepares the patch, the backend saves it. */
 async function rename(name: string) {
   const open = await draft();
-  const at = as("maya");
-  const result = await applyDraftPatch(db, {
-    viewer: people.maya!,
+  as("maya");
+  const prepared = prepareDraftPatch({
+    rev: open.rev,
+    sessionKey: "sess_rename",
+    name,
+  });
+  if (!prepared.ok) throw new Error(prepared.reason);
+  const result = await services().drafts.save(mayaContext(), {
     versionId: open.id,
-    at,
-    patch: { rev: open.rev, sessionKey: "sess_rename", name },
+    patch: prepared.patch,
   });
   expect(result).toMatchObject({ ok: true });
 }

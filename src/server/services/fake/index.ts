@@ -1,13 +1,10 @@
-import { notMoved, notMovedArea } from "../not-moved";
 import type {
   Clock,
   IdSource,
   ImplementationOptions,
   TestHooks,
 } from "../options";
-import type { RenderService } from "../render";
 import type { Services } from "../types";
-import type { UsageService } from "../usage";
 import { newTemplateId } from "@/server/ids";
 import { fakeAccess } from "./access";
 import { fakeActivity } from "./activity";
@@ -16,6 +13,7 @@ import { fakeDemo } from "./demo";
 import { fakeDrafts } from "./drafts";
 import { fakeIdentity } from "./identity";
 import { fakeLibrary } from "./library";
+import { notInFake } from "./not-in-fake";
 import { fakeNotifications } from "./notifications";
 import { fakePlatform } from "./platform";
 import { fakeReview } from "./review";
@@ -31,11 +29,11 @@ import { fakeVersions } from "./versions";
 // behaviour one has and the other lacks fails there.
 //
 // It is kept slim (decision 0072): every command is implemented in full, and a read only where a contract case
-// needs it to observe a command. The BFF's read models are tested on facts handed straight to their pure
-// shaping functions, not through the fake.
+// needs it to observe a command (the version history, the bell, a template's activity and threads, the Library
+// and the palette). The other reads answer `notInFake`: the BFF's read models are tested on facts handed
+// straight to their pure shaping functions, and the reads' contract cases run against the local implementation.
 //
-// Not for production: no persistence, no concurrency beyond JavaScript's own turn-taking, and only the areas
-// that have moved behind the seam (the others answer `notMovedArea`, as in the local implementation).
+// Not for production: no persistence and no concurrency beyond JavaScript's own turn-taking.
 
 /** What every fake area is built with. */
 export interface FakeDeps {
@@ -70,20 +68,16 @@ export function fakeServices(
     platform: fakePlatform(deps),
     notifications: fakeNotifications(deps),
     audit: {
-      page: notMoved("audit.page"),
-      exportRows: notMoved("audit.exportRows"),
+      page: notInFake("audit.page"),
+      exportRows: notInFake("audit.exportRows"),
       ...fakeActivity(deps),
     },
-    usage: notMovedArea<UsageService>("usage"),
-    // The preview is a read no contract case observes a command through, so the fake doesn't render: the preview
-    // route's tests hand it facts (decision 0072's slim fake).
-    render: {
-      preview: async () => {
-        throw new Error(
-          "The fake doesn't render: test the preview on facts (src/server/services/README.md, The fake).",
-        );
-      },
-    } satisfies RenderService,
+    usage: {
+      dashboard: notInFake("usage.dashboard"),
+      template: notInFake("usage.template"),
+    },
+    // The fake doesn't render: the preview route's tests hand it facts.
+    render: { preview: notInFake("render.preview") },
     demo: fakeDemo(deps, identity),
   };
 }
