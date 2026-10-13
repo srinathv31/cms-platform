@@ -455,6 +455,9 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
 
   if (version.sunset) {
     const successor = spec.versions.find((v) => v.supersedes === version.ref);
+    // The version Active when the sunset was set, as the runtime words it (`setSunset`'s `activeNumber`): the
+    // successor, unless a later version had replaced it by then.
+    const active = activeAt(spec, version.sunset.setAt);
     const sunset = seededSunset(ctx, version.sunset.inDays);
     const sunsetAt = sunset.at.toISOString();
     build.audit({
@@ -483,7 +486,7 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
           sunsetAt,
           sunsetDay: sunset.day,
           zone: DEFAULT_BUSINESS_ZONE,
-          activeVersion: successor?.number ?? null,
+          activeVersion: active?.number ?? null,
           contractChanges: successor?.contractChanges ?? [],
         },
         createdAt: ctx.at(version.sunset.setAt),
