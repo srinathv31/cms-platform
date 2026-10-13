@@ -86,6 +86,12 @@ add a template or a version, write any id of the right shape (`UC-` and six Croc
 ten lowercase ones). The build refuses a malformed one (`checkIds`) and one used twice (`ctx.claimId`). To change a
 pinned template id, edit its literal, the list in [seed.test.ts](seed.test.ts), and whatever names it.
 
+A team's id is a literal too, and never its slug ([decision 0053](../../../docs/decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)):
+`t_coral`, `t_deposits` and `t_cards` (`TEAM_IDS` in [teams.ts](teams.ts)), with the slugs `coral-offers`,
+`deposits` and `card-statements` the URLs use (`TEAM_SLUGS`). A spec and a row name a team by its id; a link the
+seed stores (a notification's `href`) names it by its slug. Because the two differ, code that swaps one for the
+other fails a test.
+
 Every other row's id is drawn, not written. `ctx.id(scope, prefix)` draws from a sequence named for the scope and
 the prefix: `template:<key>` for a template's audit events, approvals, threads, comments and notices; `team:<id>`
 for a team's memberships and events; `platform`, `activity` and `sim` for those modules. A sequence is a pure

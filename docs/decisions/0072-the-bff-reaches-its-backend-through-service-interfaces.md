@@ -1,6 +1,13 @@
 # 0072. The BFF reaches its backend through service interfaces, with a fail-closed request context
 
 Status: Accepted
+Amended 2026-10-13: the Java API's contract run is serial: its cases share one test clock and one database loaded
+from the seed's fixture at the run's base instant, so each runs alone, from the fixture as loaded, and none depends
+on isolation the fake and SQLite happen to give. The fake is loaded from that fixture too. Four lint rules hold the
+seam, each with a per-file ratchet the 2b packages empty: the database and the implementations (`SEAM_NOT_YET`), the
+clock (`CLOCK_NOT_YET`), the permission check (`DECIDES_NOT_YET`), and the backend's own machinery (the reset, the
+seed and test support, `INTERNALS_NOT_YET`). Identity is behind the seam: `identity.space` resolves a URL's slug to
+the team's opaque id once ([0053](0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)).
 Date: 2026-10-13
 
 ## Context

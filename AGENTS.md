@@ -74,9 +74,14 @@ Not enforced yet; follow them anyway:
 - New business rules go in `src/domain`. Never add one to an action, a query, or a component.
 - Only `src/server` imports the database client: in the end only the local implementation (`src/server/services/local`),
   `src/server/db` and the seed. Lint errs on any other file, except those still listed in `SEAM_NOT_YET`
-  ([eslint.config.mjs](eslint.config.mjs)), where it warns until their package clears them.
+  ([eslint.config.mjs](eslint.config.mjs)), where it warns until their package clears them. Three more seam rules
+  work the same way: only the backend reads the clock (`CLOCK_NOT_YET`), only the domain and the implementations call
+  `can()` (`DECIDES_NOT_YET`), and nothing else imports the reset, the seed or the test support
+  (`INTERNALS_NOT_YET`).
 - Read models return permissions decided (`can: { action: PermissionResult }`). Components render them; they don't
   call `can()` or compare refusal sentences.
+- A team's id is opaque and never its slug (decision 0053). A URL names a team by its slug, `requireSpace` resolves
+  it to the id once, and everything below compares teams by id.
 
 ## Next.js 16 rules for this repo
 

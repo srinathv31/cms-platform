@@ -223,13 +223,16 @@ notice kind's payload.
   ([decision 0028](decisions/0028-today-and-yesterday-are-utc-calendar-days.md)). Dates, counts and plurals have
   one module each in `src/domain`: `dates.ts`, `numbers.ts`, `plural.ts`.
 - **Identity.** There is no login. The request context ([context/request.ts](../src/server/context/request.ts))
-  reads the `ucomp_persona` cookie through `getViewer()`. A missing or unknown cookie is signed out, and a page goes
-  to `/sign-in`; with the demo tools on (`DEMO_MODE`), it acts as Maya.
+  reads the `ucomp_persona` cookie through `getViewer()`, which asks the identity service whom it names. A missing or
+  unknown cookie is signed out, and a page goes to `/sign-in`; with the demo tools on (`DEMO_MODE`), it acts as Maya.
+  A URL names a team by its slug; `requireSpace` resolves it to the team's id once (`identity.space`), and everything
+  below compares teams by id, which is never the slug
+  ([decision 0053](decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)).
 - **Seed** ([src/server/seed](../src/server/seed/index.ts)), deterministic, rebuilt by `npm run db:reset`:
 
   |                     |                                                                                                                                                                                                                             |
   | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | Teams               | `coral-offers`, `deposits`, `card-statements` (ids equal slugs); `all` is the cross-team space                                                                                                                              |
+  | Teams               | Slugs `coral-offers`, `deposits`, `card-statements` (ids `t_coral`, `t_deposits`, `t_cards`: never the slug); `all` is the cross-team space                                                                                 |
   | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer)                                                                                         |
   | Content types       | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a 3-part budget                         |
   | Templates           | Coral Offers: five disclosures, one in each lifecycle state, and three alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: three disclosures each |
