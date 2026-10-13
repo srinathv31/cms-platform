@@ -211,7 +211,7 @@ describe("applyDraftPatch: a good save", () => {
       channels: ["pdf", "web"],
       "email.subject": subject,
       "email.preheader": doc(para("Pre", "h1")),
-      sampleSets: [{ id: "s1", name: "Maya", values: { a: "1", b: 2 } }],
+      sampleSets: [{ id: "s1", name: "Maya", values: { a: "1", b: "2" } }],
       name: "New name",
     });
     expect(res.ok).toBe(true);
@@ -222,7 +222,7 @@ describe("applyDraftPatch: a good save", () => {
       email: { subject, preheader: doc(para("Pre", "h1")) },
     });
     expect(after.sampleSets).toEqual([
-      { id: "s1", name: "Maya", values: { a: "1", b: 2 } },
+      { id: "s1", name: "Maya", values: { a: "1", b: "2" } },
     ]);
     expect((await draft()).name).toBe("New name");
   });

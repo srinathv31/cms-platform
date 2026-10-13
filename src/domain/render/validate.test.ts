@@ -26,7 +26,7 @@ const GOOD = {
   annual_fee: "95",
   purchase_apr: "21.99",
   offer_end_date: "2027-03-04",
-  bonus_points: 20000,
+  bonus_points: "20000",
   home_state: "NJ",
 };
 
@@ -68,19 +68,6 @@ describe("validateValues: success", () => {
         bonus_points: "20000",
         home_state: "NJ",
       },
-    });
-  });
-
-  it("accepts finite numbers for numeric types and for text", () => {
-    const result = validateValues(VARIABLES, {
-      ...GOOD,
-      first_name: 7,
-      annual_fee: 95.5,
-      purchase_apr: 0,
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      values: { first_name: "7", annual_fee: "95.5", purchase_apr: "0" },
     });
   });
 
@@ -137,7 +124,7 @@ describe("validateValues: missing", () => {
       validateValues(VARIABLES, {
         annual_fee: "95",
         offer_end_date: "2027-03-04",
-        bonus_points: 1,
+        bonus_points: "1",
         home_state: "NJ",
       }),
     );
@@ -210,23 +197,82 @@ describe("validateValues: invalid", () => {
     });
   });
 
-  it("rejects values that are neither strings nor finite numbers", () => {
-    for (const bad of [
-      true,
-      false,
-      {},
-      [],
-      ["Maya"],
-      Number.NaN,
-      Number.POSITIVE_INFINITY,
-      () => "Maya",
-    ]) {
+  it("rejects values that aren't strings", () => {
+    for (const bad of [true, false, {}, [], ["Maya"], () => "Maya"]) {
       const error = failure(
         validateValues(VARIABLES, { ...GOOD, first_name: bad }),
       );
       expect(error.code).toBe("invalid_values");
       expect(error.message).toBe("first_name must be text.");
     }
+  });
+
+  describe("a JSON number (decision 0058)", () => {
+    const SENTENCE = (key: string) =>
+      `${key} must be a JSON string, like "21.90", not a number.`;
+
+    it("is refused for every type, whatever its digits, with the string form in the sentence", () => {
+      const error = failure(
+        validateValues(VARIABLES, {
+          first_name: 7,
+          annual_fee: 95.5,
+          purchase_apr: 0,
+          offer_end_date: 20270304,
+          bonus_points: 1e21,
+          home_state: -1,
+          promo_code: 1,
+        }),
+      );
+      expect(error.code).toBe("invalid_values");
+      expect(error.message).toBe(
+        [
+          "first_name",
+          "annual_fee",
+          "purchase_apr",
+          "offer_end_date",
+          "bonus_points",
+          "home_state",
+          "promo_code",
+        ]
+          .map(SENTENCE)
+          .join(" "),
+      );
+      expect(error.details).toEqual({
+        missing: [],
+        invalid: VARIABLES.map((variable) => ({
+          key: variable.key,
+          expected: variable.type,
+          sent: "number",
+        })),
+      } satisfies ValueErrorDetails);
+    });
+
+    it("is present, never missing, even as 0 or a number JSON can't hold (1e999 is Infinity)", () => {
+      for (const number of [0, -0, Number.POSITIVE_INFINITY, Number.NaN]) {
+        const error = failure(
+          validateValues(VARIABLES, { ...GOOD, first_name: number }),
+        );
+        expect(error.code).toBe("invalid_values");
+        expect(error.message).toBe(SENTENCE("first_name"));
+      }
+    });
+
+    it("never echoes its digits", () => {
+      const error = failure(
+        validateValues(VARIABLES, { ...GOOD, annual_fee: 95.5 }),
+      );
+      expect(JSON.stringify(error)).not.toContain("95");
+    });
+
+    it("sits beside a missing key, after the missing sentence", () => {
+      const error = failure(
+        validateValues(VARIABLES, { ...GOOD, first_name: "", annual_fee: 5 }),
+      );
+      expect(error.code).toBe("missing_variables");
+      expect(error.message).toBe(
+        `Missing required variables: first_name. ${SENTENCE("annual_fee")}`,
+      );
+    });
   });
 
   it("checks optional values when they're present", () => {

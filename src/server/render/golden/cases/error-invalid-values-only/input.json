@@ -57,7 +57,7 @@
   "values": {
     "first_name": "Maya",
     "purchase_apr": "1,00",
-    "annual_fee": 1e3,
+    "annual_fee": "1e3",
     "opened_on": "2027-02-29",
     "home_state": "N.J.",
     "points": "007",

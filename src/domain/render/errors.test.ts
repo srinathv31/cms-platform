@@ -393,6 +393,26 @@ describe("value messages", () => {
     });
   });
 
+  it("a JSON number names the string form instead of the type, and never its digits", () => {
+    const sentNumbers = {
+      missing: [],
+      invalid: [
+        {
+          key: "purchase_apr",
+          expected: "percent" as const,
+          sent: "number" as const,
+        },
+        ...details.invalid,
+      ],
+    };
+    expect(invalidValues(sentNumbers)).toEqual({
+      code: "invalid_values",
+      message:
+        'purchase_apr must be a JSON string, like "21.90", not a number. home_state must be a US state, like NJ.',
+      details: sentNumbers,
+    });
+  });
+
   it("valuesError picks the code", () => {
     expect(valuesError(details).code).toBe("missing_variables");
     expect(valuesError({ missing: [], invalid: details.invalid }).code).toBe(

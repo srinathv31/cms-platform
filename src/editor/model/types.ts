@@ -42,7 +42,8 @@ export interface Variable {
   sample: string;
 }
 
-export type VariableValue = string | number;
+/** A value is a string, whatever the variable's type (decision 0058): the digits of "21.90" are never a number's. */
+export type VariableValue = string;
 export type VariableValues = Record<string, VariableValue>;
 
 export interface SampleSet {

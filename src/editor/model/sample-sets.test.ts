@@ -310,11 +310,11 @@ describe("sampleSetValues", () => {
     const set: SampleSet = {
       id: "typical",
       name: "Typical customer",
-      values: { first_name: "Jordan", annual_fee: 120 },
+      values: { first_name: "Jordan", annual_fee: "120" },
     };
     expect(sampleSetValues(set, VARIABLES, TODAY)).toMatchObject({
       first_name: "Jordan",
-      annual_fee: 120,
+      annual_fee: "120",
     });
   });
 
