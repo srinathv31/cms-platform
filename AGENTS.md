@@ -156,20 +156,20 @@ Next.js API; Next's own note about it is at the end of this file.
 
 ## Copy these
 
-| To…                                            | Copy                                                                                                                                                                        |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Write a server action                          | `serverAction` in [src/server/actions/kit.ts](src/server/actions/kit.ts), as `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) uses it            |
-| Write a domain transition                      | `setSunset` in [src/domain/lifecycle/sunset.ts](src/domain/lifecycle/sunset.ts), `startRevoke` in [src/domain/lifecycle/revoke.ts](src/domain/lifecycle/revoke.ts)          |
-| Build a read model with permissions            | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts)                                                                                           |
-| Stream a page                                  | [versions/page.tsx](<src/app/(product)/[team]/templates/[templateId]/versions/page.tsx>) with [versions-content.tsx](src/components/versions/versions-content.tsx)          |
-| Run an action from a dialog, with validation   | [src/components/review/request-dialog.tsx](src/components/review/request-dialog.tsx) on [action-dialog.tsx](src/components/versions/action-dialog.tsx)                      |
-| Render server-decided actions                  | [src/components/settings/team/members-table.tsx](src/components/settings/team/members-table.tsx)                                                                            |
-| Update optimistically                          | [use-review-threads.ts](src/components/comments/use-review-threads.ts) with [thread-list.tsx](src/components/comments/thread-list.tsx)                                      |
-| Load heavy code on demand                      | [compare-dialog.tsx](src/components/versions/compare-dialog.tsx), [load-pdfjs.ts](src/components/preview/pdf/load-pdfjs.ts)                                                 |
-| Add an `/api/v1` route                         | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts)                                                                                                      |
-| Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts)                                                                                                                                  |
-| Format a count or a plural                     | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts)                                                                                |
-| Test an action against a database              | [src/server/actions/review.test.ts](src/server/actions/review.test.ts): a database of its own for every test (`seededDatabasePerTest`); each test builds the state it needs |
+| To…                                            | Copy                                                                                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Write a server action                          | `serverAction` in [src/server/actions/kit.ts](src/server/actions/kit.ts), as `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) uses it       |
+| Write a domain transition                      | `setSunset` in [src/domain/lifecycle/sunset.ts](src/domain/lifecycle/sunset.ts), `startRevoke` in [src/domain/lifecycle/revoke.ts](src/domain/lifecycle/revoke.ts)     |
+| Build a read model with permissions            | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts)                                                                                      |
+| Stream a page                                  | [versions/page.tsx](<src/app/(product)/[team]/templates/[templateId]/versions/page.tsx>) with [versions-content.tsx](src/components/versions/versions-content.tsx)     |
+| Run an action from a dialog, with validation   | [src/components/review/request-dialog.tsx](src/components/review/request-dialog.tsx) on [action-dialog.tsx](src/components/versions/action-dialog.tsx)                 |
+| Render server-decided actions                  | [src/components/settings/team/members-table.tsx](src/components/settings/team/members-table.tsx)                                                                       |
+| Update optimistically                          | [use-review-threads.ts](src/components/comments/use-review-threads.ts) with [thread-list.tsx](src/components/comments/thread-list.tsx)                                 |
+| Load heavy code on demand                      | [compare-dialog.tsx](src/components/versions/compare-dialog.tsx), [load-pdfjs.ts](src/components/preview/pdf/load-pdfjs.ts)                                            |
+| Add an `/api/v1` route                         | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts)                                                                                                 |
+| Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts)                                                                                                                             |
+| Format a count or a plural                     | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts)                                                                           |
+| Test an action                                 | [review.test.ts](src/server/actions/review.test.ts) on the fake; what its command does: [contract/review.ts](src/server/services/contract/review.ts), on every backend |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
 bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are the editor and PDF labs on fixture data.
