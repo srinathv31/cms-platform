@@ -424,7 +424,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S7 · Medium: Comments are accepted on any version state
 
-- **Status:** Fixed. The comment policy is `src/domain/comments.ts`; the actions ask it again inside their transaction, so a comment, reply, resolve or reopen where no draft or version in review shows the thread is refused and writes nothing, and the review and workspace read models return `can.comment` decided.
+- **Status:** Fixed. The comment policy is `src/domain/comments.ts`; the comment commands (`src/server/services/local/comments.ts` and the fake) ask it again inside their transaction, so a comment, reply, resolve or reopen where no draft or version in review shows the thread is refused and writes nothing, and the review and workspace read models return `can.comment` decided.
 - **Where:** `src/server/actions/comments.ts` line 75; `src/components/comments/thread-state.ts` line 109
 - **What happens:** Only drafts and versions in review take comments, but that rule lives in `versionTakesComments` on the client. `addComment`, `reply` and `resolveThread` check permission only, so a direct call comments on an Active or Superseded version. The whole comment policy (length, block must exist, recipients) sits in the action with no `domain/comments.ts`.
 - **Fix:** A domain comment policy enforced in the actions, with the read model returning `can.comment`.
@@ -932,7 +932,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T8 · Medium: Runtime paths assume the dev machine
 
-- **Status:** Partly fixed. The uploads folder is configurable (`UPLOADS_DIR`, absolute or relative; `resolveUploadsRoot` in `src/server/import/store.ts`), and the three path sites (`store.ts`, `pdf-fonts.ts`, `e2e/storage.ts`) hold up on Windows, with tests that run the Windows path rules on any machine. Still open: the PDF fonts are read from `node_modules` under the working directory, and `db:migrate` needs `tsx`; both wait for the deployment work in [T4](#t4--high-no-ci-node-pin-or-environment-template) and the enterprise font.
+- **Status:** Partly fixed. The uploads folder is configurable (`UPLOADS_DIR`, absolute or relative; `resolveUploadsRoot` in `src/server/services/local/uploads.ts`), and the three path sites (`uploads.ts`, `pdf-fonts.ts`, `e2e/storage.ts`) hold up on Windows, with tests that run the Windows path rules on any machine. Still open: the PDF fonts are read from `node_modules` under the working directory, and `db:migrate` needs `tsx`; both wait for the deployment work in [T4](#t4--high-no-ci-node-pin-or-environment-template) and the enterprise font.
 - **Where:** `src/server/render/channels/pdf-fonts.ts` line 47
 - **What happens:** PDF fonts are read from `process.cwd()/node_modules/...`, uploads go to `./data/uploads`, and `db:migrate` needs `tsx` from devDependencies. All three break in a standard container.
 - **Fix:** Copy fonts into the app, make the uploads location configurable, and compile the migration script.

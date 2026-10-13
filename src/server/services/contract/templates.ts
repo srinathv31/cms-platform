@@ -209,12 +209,10 @@ export function templatesContract(h: ContractHarness, base: Date) {
         );
 
       expect(
-        await h
-          .services()
-          .templates.newTemplateType(maya, {
-            teamId: CORAL,
-            family: "message",
-          }),
+        await h.services().templates.newTemplateType(maya, {
+          teamId: CORAL,
+          family: "message",
+        }),
       ).toMatchObject({
         ok: true,
         contentTypeId: "ct_alert",
@@ -546,11 +544,9 @@ export function templatesContract(h: ContractHarness, base: Date) {
         h
           .services()
           .templates.importOriginal(naomi, { uploadId: "up_0000000000" }),
-        h
-          .services()
-          .templates.importOriginal(await h.as("maya"), {
-            uploadId: "../../etc",
-          }),
+        h.services().templates.importOriginal(await h.as("maya"), {
+          uploadId: "../../etc",
+        }),
       ])
         expect(await read).toMatchObject({
           ok: false,
@@ -606,11 +602,9 @@ export function templatesContract(h: ContractHarness, base: Date) {
       if (!result.ok) throw new Error(`import refused: ${result.code}`);
       expect(result.templateId).toBe("UC-IMPRT2");
       expect(
-        await h
-          .services()
-          .templates.importOriginal(await h.as("maya"), {
-            uploadId: result.uploadId,
-          }),
+        await h.services().templates.importOriginal(await h.as("maya"), {
+          uploadId: result.uploadId,
+        }),
       ).toMatchObject({ ok: true, filename: "Rates.docx" });
     });
   });

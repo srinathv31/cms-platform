@@ -68,7 +68,7 @@ const LONG = "Long name and maximum values";
 const TYPICAL_NAME = "Maya";
 const LONG_NAME = "Alexandria-Marguerite";
 const EDITED_NAME = "Jordan";
-/** The purchase APR in each set (the seed's sample values, src/server/seed/variables.ts). */
+/** The purchase APR in each set (the starter's sample values, src/server/documents/variables.ts). */
 const TYPICAL_APR = "21.99%";
 const LONG_APR = "29.99%";
 

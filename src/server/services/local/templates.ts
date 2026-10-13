@@ -1,19 +1,18 @@
 import "server-only";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import type { ImportedOriginal } from "../templates";
 import {
   createTemplateFrom,
+  editLatest,
   newTemplateContentType,
   newTemplateRefusal,
   planDraftStart,
-  editLatest,
+  type NewTemplateChanges,
 } from "@/domain/lifecycle/drafts";
 import type {
   DraftContent,
   LifecycleResult,
   VersionSnapshot,
 } from "@/domain/lifecycle/types";
-import type { NewTemplateChanges } from "@/domain/lifecycle/drafts";
 import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
@@ -28,11 +27,11 @@ import {
 } from "@/server/db/schema/ucomp";
 import { db } from "@/server/db/client";
 import { newId } from "@/server/ids";
+import { notMoved } from "../not-moved";
 import { answerFor } from "../refuse";
 import { refusal } from "../results";
-import { notMoved } from "../not-moved";
-import type { TemplateService } from "../templates";
 import { TemplateIdTaken, withNewTemplateId } from "../template-id";
+import type { ImportedOriginal, TemplateService } from "../templates";
 import type { Changed } from "../types";
 import { check, refuse, runCommand, type LocalDeps } from "./command";
 import { draftRow } from "./draft-row";

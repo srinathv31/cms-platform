@@ -263,11 +263,9 @@ export function commentsContract(h: ContractHarness, base: Date) {
 
     it("refuses a comment on a version that is decided: Active, Superseded, Revoked or sent back", async () => {
       const history = async (key: string) => {
-        const read = await h
-          .services()
-          .versions.history(await h.as("maya"), {
-            templateId: h.templates[key]!,
-          });
+        const read = await h.services().versions.history(await h.as("maya"), {
+          templateId: h.templates[key]!,
+        });
         if (!read.ok) throw new Error(read.code);
         return read.versions;
       };
@@ -382,12 +380,10 @@ export function commentsContract(h: ContractHarness, base: Date) {
         const before = thread.comments.length;
         h.setClock(minute(n + 1));
         expect(
-          await h
-            .services()
-            .comments.reply(await h.as("maya"), {
-              threadId: thread.id,
-              body: "Done.",
-            }),
+          await h.services().comments.reply(await h.as("maya"), {
+            threadId: thread.id,
+            body: "Done.",
+          }),
           thread.status,
         ).toEqual({ ok: true });
         const after = (await threadsOf("annual-fee-waiver")).find(
