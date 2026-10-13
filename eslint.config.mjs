@@ -186,13 +186,11 @@ const ratchet = (files, rules) => (files.length > 0 ? [{ files, rules }] : []);
 
 // The files the seam rules still warn on, until their package moves them (plan.md). Delete a line as you clear it.
 const SEAM_NOT_YET = [
-  "src/server/access-effects.ts",
   "src/server/access-sweep.ts",
   "src/server/actions/access.ts",
   "src/server/actions/comments.ts",
   "src/server/actions/create-template.ts",
   "src/server/actions/kit.ts",
-  "src/server/actions/notifications.ts",
   "src/server/actions/persona.ts",
   "src/server/actions/platform.ts",
   "src/server/actions/review.ts",
@@ -200,7 +198,6 @@ const SEAM_NOT_YET = [
   "src/server/clock.ts",
   "src/server/drafts/apply-patch.ts",
   "src/server/drafts/save-draft.ts",
-  "src/server/effects.ts",
   "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/activity.ts",
@@ -212,7 +209,6 @@ const SEAM_NOT_YET = [
   "src/server/queries/import.ts",
   "src/server/queries/integration.ts",
   "src/server/queries/library.ts",
-  "src/server/queries/notifications.ts",
   "src/server/queries/palette.ts",
   "src/server/queries/people.ts",
   "src/server/queries/personas.ts",
@@ -256,7 +252,6 @@ const CLOCK_NOT_YET = [
   "src/server/queries/dynamic.ts",
   "src/server/queries/integration.ts",
   "src/server/queries/library.ts",
-  "src/server/queries/notifications.ts",
   "src/server/queries/platform.ts",
   "src/server/queries/review.ts",
   "src/server/queries/submit-summary.ts",

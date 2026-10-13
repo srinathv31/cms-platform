@@ -83,11 +83,6 @@ export function fakeContractHarness(opts: { base: Date }): ContractHarness {
             details: e.details,
           }));
       },
-      async notifications({ userId }) {
-        return state!.notifications
-          .filter((n) => n.userId === userId)
-          .map((n) => ({ userId: n.userId, kind: n.kind }));
-      },
     },
   };
 }

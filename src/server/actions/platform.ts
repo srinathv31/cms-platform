@@ -10,7 +10,7 @@ import {
   stageRecipients,
 } from "@/domain/approval-chain";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
-import { asNumbered, reviewLink, versionLabel } from "@/domain/rounds";
+import { asNumbered, reviewLink } from "@/domain/rounds";
 import { PLATFORM_REFUSALS } from "@/domain/platform-config/refusals";
 import { createTeam as createTeamRule } from "@/domain/platform-config/teams";
 import { saveApprovalChain as saveApprovalChainRule } from "@/domain/platform-config/approval-chains";
@@ -27,7 +27,7 @@ import {
 import {
   applyMembershipChange,
   writeAccessEffects,
-} from "@/server/access-effects";
+} from "@/server/services/local/access-effects";
 import {
   BUSINESS_ZONE_KEY,
   countPendingSunsets,
@@ -44,7 +44,8 @@ import {
   users,
   versions,
 } from "@/server/db/schema/ucomp";
-import { writeEffects, type Tx } from "@/server/effects";
+import { writeEffects } from "@/server/services/local/effects";
+import type { Tx } from "@/server/services/local/transaction";
 import { newId } from "@/server/ids";
 import { loadDecisions } from "@/server/services/local/chain";
 import { check, refuse, serverAction, type ActionContext } from "./kit";
@@ -429,7 +430,13 @@ export async function saveApprovalChain(input: {
               kind: "notification",
               notification: "review_requested",
               to: asked,
-              title: `${v.templateName} ${versionLabel(round, { style: "sentence" })} is waiting on ${before.name}.`,
+              facts: {
+                actorName: viewer.name,
+                templateName: v.templateName,
+                number: round.number,
+                round: round.round,
+                stage: before.name,
+              },
               link: reviewLink(v.templateId, round),
             },
           ],

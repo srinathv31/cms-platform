@@ -6,6 +6,7 @@ import { REASONS } from "@/domain/permissions";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { asShown } from "@/server/testing/notifications";
 import {
   loadPersona,
   seededDatabasePerTest,
@@ -94,12 +95,15 @@ const auditAt = (at: Date) =>
     .from(auditEvents)
     .where(eq(auditEvents.at, at))
     .orderBy(auditEvents.action);
-const notificationsAt = (at: Date) =>
-  db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.createdAt, at))
-    .orderBy(notifications.userId);
+// The rows as the bell shows them (decision 0055): the stored facts and link, worded and linked on read.
+const notificationsAt = async (at: Date) =>
+  (
+    await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.createdAt, at))
+      .orderBy(notifications.userId)
+  ).map((n) => asShown(n));
 const requestCount = async () =>
   (await db.select().from(accessRequests)).length;
 const coralRecert = async () =>
@@ -215,6 +219,16 @@ describe("requesting and deciding access", () => {
         "access_requested",
         "Morgan Lee asked for Author access to Coral Offers.",
         "/coral-offers/settings/access-requests",
+      ],
+    ]);
+    // Stored as facts and a link by team id, not as a sentence and a URL.
+    expect(
+      (await notificationsAt(at)).map((n) => [n.facts, n.link, n.body]),
+    ).toEqual([
+      [
+        { actorName: "Morgan Lee", teamName: "Coral Offers", role: "author" },
+        { to: "settings", teamId: "t_coral", section: "access-requests" },
+        "Drafting the spring offers.",
       ],
     ]);
   });

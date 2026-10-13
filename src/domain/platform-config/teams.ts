@@ -148,17 +148,12 @@ export function createTeam(input: {
       },
     },
     effects: [
-      configChanged(
-        "teams",
-        team.id,
-        `Created team ${name} with ${admin.name} as Team Admin`,
-        {
-          teamName: name,
-          slug,
-          userId: admin.id,
-          userName: admin.name,
-        },
-      ),
+      configChanged("teams", team.id, {
+        teamName: name,
+        slug,
+        userId: admin.id,
+        userName: admin.name,
+      }),
       {
         kind: "audit",
         action: "access.granted",
@@ -176,7 +171,7 @@ export function createTeam(input: {
         notification: "team_admin_appointed",
         to: { kind: "user", userId: admin.id },
         teamId: team.id,
-        title: `${actor.name} made you Team Admin of ${name}.`,
+        facts: { actorName: actor.name, teamName: name },
         link: { to: "settings", teamId: team.id, section: "members" },
       },
     ],

@@ -29,6 +29,20 @@ export function ruleLabel(
   return people.find((p) => p.id === rule.userId)?.name ?? rule.userId;
 }
 
+/**
+ * A stage as the `platform.config_changed` row records it: its name and rule, and for a rule that names a
+ * person, their name as it was (`userName`), so the Audit page words the chain without looking them up again.
+ */
+export function chainStageFacts(
+  stage: { name: string; rule: ApproverRule },
+  people: readonly Named[],
+): { name: string; rule: ApproverRule; userName?: string } {
+  const { name, rule } = stage;
+  if (rule.kind !== "user") return { name, rule };
+  const person = people.find((p) => p.id === rule.userId);
+  return person ? { name, rule, userName: person.name } : { name, rule };
+}
+
 export interface ChainCardStage {
   /** The stage's id; null for a stage being added. */
   id: string | null;
@@ -346,24 +360,17 @@ export function saveApprovalChain(input: {
   });
   if (!change.changed) return { ok: true, stages, effects: [] };
 
-  const chainText = (list: { name: string; rule: ApproverRule }[]) =>
-    list.map((s) => `${s.name} (${ruleLabel(s.rule, people)})`).join(" → ");
   return {
     ok: true,
     stages,
     effects: [
-      configChanged(
-        "approval_chains",
-        null,
-        `Set ${contentType.name} approval chain: ${chainText(stages)}`,
-        {
-          contentTypeId: contentType.id,
-          contentTypeName: contentType.name,
-          before: current.map((s) => s.name),
-          after: stages.map((s) => s.name),
-          stages: stages.map((s) => ({ name: s.name, rule: s.rule })),
-        },
-      ),
+      configChanged("approval_chains", null, {
+        contentTypeId: contentType.id,
+        contentTypeName: contentType.name,
+        before: current.map((s) => s.name),
+        after: stages.map((s) => s.name),
+        stages: stages.map((s) => chainStageFacts(s, people)),
+      }),
     ],
   };
 }

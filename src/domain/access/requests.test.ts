@@ -8,7 +8,12 @@ import {
   validateDecisionNote,
 } from "./requests";
 import { REASONS } from "../permissions";
-import type { AccessRequestFacts, MembershipFacts } from "../access-types";
+import type {
+  AccessNotificationEffect,
+  AccessRequestFacts,
+  MembershipFacts,
+} from "../access-types";
+import { describeNotification } from "../notifications";
 import type { TeamRole } from "../types";
 import {
   at,
@@ -36,6 +41,15 @@ function request(opts: Partial<AccessRequestFacts> = {}): AccessRequestFacts {
     ...opts,
   };
 }
+
+/** A notification effect as the person reading it sees it (`describeNotification`). */
+const words = (
+  effect: AccessNotificationEffect | undefined,
+  readerId: string,
+) =>
+  effect
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 
 describe("requestAccess", () => {
   const base = {
@@ -75,10 +89,17 @@ describe("requestAccess", () => {
     expect(note).toMatchObject({
       notification: "access_requested",
       to: { kind: "team_admins", teamId: CORAL.id, exceptUserIds: ["morgan"] },
-      title: "Morgan Lee asked for Author access to Coral Offers.",
+      facts: {
+        actorName: "Morgan Lee",
+        teamName: "Coral Offers",
+        role: "author",
+      },
       body: "Drafting the spring promotions.",
       link: { to: "settings", teamId: CORAL.id, section: "access-requests" },
     });
+    expect(words(note, "alex")?.title).toBe(
+      "Morgan Lee asked for Author access to Coral Offers.",
+    );
   });
 
   it("offers Viewer, Author and Approver only", () => {
@@ -242,9 +263,16 @@ describe("decideAccessRequest", () => {
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_granted",
       to: { kind: "user", userId: "morgan" },
-      title: "Alex Kim approved your Author access to Coral Offers.",
+      facts: {
+        actorName: "Alex Kim",
+        teamName: "Coral Offers",
+        role: "author",
+      },
       link: { to: "library", teamId: CORAL.id },
     });
+    expect(words(notes(result.effects)[0], "morgan")?.title).toBe(
+      "Alex Kim approved your Author access to Coral Offers.",
+    );
   });
 
   it("approving for an active member adds the role to the ones they have", () => {
@@ -303,11 +331,17 @@ describe("decideAccessRequest", () => {
     });
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_denied",
-      title:
-        "Alex Kim declined your request for Author access to Coral Offers.",
+      facts: {
+        actorName: "Alex Kim",
+        teamName: "Coral Offers",
+        role: "author",
+      },
       body: "Ask Jordan first.",
       link: { to: "request-access" },
     });
+    expect(words(notes(result.effects)[0], "morgan")?.title).toBe(
+      "Alex Kim declined your request for Author access to Coral Offers.",
+    );
   });
 
   it("keeps the note short", () => {

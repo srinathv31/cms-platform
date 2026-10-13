@@ -1,7 +1,7 @@
 import "server-only";
 import type { ActionResult } from "@/domain/review-types";
 import { db } from "@/server/db/client";
-import { inTransaction, type Tx } from "@/server/effects";
+import { inTransaction, type Tx } from "./transaction";
 import type { Clock, TestHooks } from "../options";
 import { answerFor, refuse } from "../refuse";
 import type { RequestContext } from "../types";

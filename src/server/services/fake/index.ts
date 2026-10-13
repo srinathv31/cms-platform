@@ -5,7 +5,6 @@ import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
 
 import { notMovedArea } from "../not-moved";
-import type { NotificationService } from "../notifications";
 import type { Clock, ImplementationOptions, TestHooks } from "../options";
 import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
@@ -13,6 +12,7 @@ import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
 import { fakeIdentity } from "./identity";
+import { fakeNotifications } from "./notifications";
 import { fakeReview } from "./review";
 import type { FakeState } from "./state";
 import { FakeStore } from "./store";
@@ -56,7 +56,7 @@ export function fakeServices(
     comments: notMovedArea<CommentService>("comments"),
     access: notMovedArea<AccessService>("access"),
     platform: notMovedArea<PlatformService>("platform"),
-    notifications: notMovedArea<NotificationService>("notifications"),
+    notifications: fakeNotifications(deps),
     audit: notMovedArea<AuditService>("audit"),
     usage: notMovedArea<UsageService>("usage"),
     render: notMovedArea<RenderService>("render"),

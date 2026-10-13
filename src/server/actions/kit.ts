@@ -9,7 +9,7 @@ import {
 } from "@/server/context/request";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
-import { inTransaction, type Tx } from "@/server/effects";
+import { inTransaction, type Tx } from "@/server/services/local/transaction";
 import { answerFor, refuse } from "@/server/services/refuse";
 
 // The server action kit: the one shape every mutation in this folder has (AGENTS.md, "Server code"), written

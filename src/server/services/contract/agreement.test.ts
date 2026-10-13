@@ -3,8 +3,9 @@ import { fakeContractHarness } from "../fake/contract-harness";
 import { localContractHarness } from "../local/contract-harness";
 
 // The fake and the local implementation read the whole seeded world alike: every template's history, for a
-// person on each team and a platform role, field for field. Where the contract cases pick examples, this
-// compares everything the seed holds, so a difference in a read the cases don't name still fails.
+// person on each team and a platform role, and everyone's notifications, field for field. Where the contract
+// cases pick examples, this compares everything the seed holds, so a difference in a read the cases don't name
+// still fails.
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
@@ -68,3 +69,15 @@ it.each(["maya", "jordan", "eli", "riley"])(
       }
   },
 );
+
+it("lists everyone's notifications alike: the same facts, links and read times", async () => {
+  for (const userId of ["maya", "priya", "jordan", "alex", "riley", "morgan"]) {
+    const [fromFake, fromLocal] = await Promise.all([
+      fake.services().notifications.list(await fake.as(userId), { limit: 100 }),
+      local
+        .services()
+        .notifications.list(await local.as(userId), { limit: 100 }),
+    ]);
+    expect(fromFake, userId).toEqual(fromLocal);
+  }
+});

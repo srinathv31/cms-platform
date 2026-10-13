@@ -35,7 +35,7 @@ import { TEAM_ROLES, type TeamRole, type Viewer } from "@/domain/types";
 import {
   applyMembershipChange,
   writeAccessEffects,
-} from "@/server/access-effects";
+} from "@/server/services/local/access-effects";
 import {
   loadMembershipFacts,
   loadRecertFacts,
@@ -51,7 +51,7 @@ import {
   teams,
   users,
 } from "@/server/db/schema/ucomp";
-import type { Tx } from "@/server/effects";
+import type { Tx } from "@/server/services/local/transaction";
 import { newId } from "@/server/ids";
 import { runSunsetSweep } from "@/server/sunset-sweep";
 import { check, refuse, serverAction, type ActionSteps } from "./kit";

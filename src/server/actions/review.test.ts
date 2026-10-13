@@ -34,6 +34,7 @@ import {
 } from "@/server/queries/workspace";
 import { applyDraftPatch } from "@/server/drafts/apply-patch";
 import { findRound } from "@/server/services/local/find-round";
+import { asShown } from "@/server/testing/notifications";
 import {
   createTemplateWithDraft,
   draftRev,
@@ -126,12 +127,15 @@ const draftOf = (templateId: string) =>
   });
 const auditAt = (at: Date) =>
   db.select().from(auditEvents).where(eq(auditEvents.at, at));
-const notificationsAt = (at: Date) =>
-  db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.createdAt, at))
-    .orderBy(notifications.userId);
+// The rows as the bell shows them (decision 0055): the stored facts and link, worded and linked on read.
+const notificationsAt = async (at: Date) =>
+  (
+    await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.createdAt, at))
+      .orderBy(notifications.userId)
+  ).map((n) => asShown(n));
 const noticesAt = (at: Date) =>
   db.select().from(consumerNotices).where(eq(consumerNotices.createdAt, at));
 
@@ -257,6 +261,22 @@ describe("the review loop (scenario 3)", () => {
       body: "Ready for a look.",
       href: `/coral-offers/review/${templateId}/1`,
     });
+    // Stored as facts and a link by team id; the sentence and the URL are made when the bell reads it.
+    expect(sent[0]).toMatchObject({
+      facts: {
+        actorName: "Maya Chen",
+        templateName: "Spring Travel Rewards — Terms",
+        number: 1,
+        round: 1,
+      },
+      link: {
+        to: "review",
+        teamId: "t_coral",
+        templateId,
+        versionNumber: 1,
+      },
+    });
+    expect(sent[0]!.link).not.toHaveProperty("round");
   });
 
   it("a second submit is refused and writes nothing", async () => {
@@ -426,6 +446,13 @@ describe("the review loop (scenario 3)", () => {
       title:
         "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review.",
       href: `/coral-offers/review/${templateId}/1?round=2`,
+      link: {
+        to: "review",
+        teamId: "t_coral",
+        templateId,
+        versionNumber: 1,
+        round: 2,
+      },
     });
   });
 
@@ -848,8 +875,28 @@ describe("approveVersion over an Active version", () => {
     expect(newVersion.payload).toMatchObject({
       templateName: "Cash Back Welcome Bonus — Terms",
       versionNumber: 3,
-      contractLines: ["v3 adds required `annual_fee` (Currency)."],
+      contractChanges: [
+        {
+          kind: "added",
+          key: "annual_fee",
+          type: "currency",
+          required: true,
+          breaking: true,
+        },
+      ],
     });
+    // The notice stores the changes, not their sentences; the API words them when it serves the notice.
+    expect(newVersion.payload).not.toHaveProperty("contractLines");
+    expect(noticeView(newVersion).changes.map((c) => c.text)).toEqual([
+      "v3 adds required `annual_fee` (Currency).",
+    ]);
+    // The sunset notice carries the same changes (always present, empty when the new version changes nothing).
+    const sunsetNotice = notices.find((n) => n.kind === "sunset_scheduled")!;
+    expect(sunsetNotice.payload).toMatchObject({
+      contractChanges: (newVersion.payload as { contractChanges: unknown })
+        .contractChanges,
+    });
+    expect(sunsetNotice.payload).not.toHaveProperty("contractLines");
   });
 
   it("refuses a sunset date that isn't after today, and one that isn't a date", async () => {
@@ -1777,17 +1824,19 @@ describe("after the Active version is revoked (handoff review D1)", () => {
       templateName: NAME,
       versionNumber: 3,
       activeVersion: 3,
-      contractLines: describeChanges(
-        (await version(templateId, 3))!.contractChanges!,
-        3,
-      ),
+      contractChanges: (await version(templateId, 3))!.contractChanges!,
     });
-    expect(notices[0]!.payload).toMatchObject({
-      contractLines: [
-        "v3 adds optional `promo_code` (Text).",
-        "v3 adds required `annual_fee` (Currency).",
-      ],
-    });
+    expect(notices[0]!.payload).not.toHaveProperty("contractLines");
+    // The sentences are the API's to word from the stored changes.
+    const lines = describeChanges(
+      (await version(templateId, 3))!.contractChanges!,
+      3,
+    );
+    expect(lines).toEqual([
+      "v3 adds optional `promo_code` (Text).",
+      "v3 adds required `annual_fee` (Currency).",
+    ]);
+    expect(noticeView(notices[0]!).changes.map((c) => c.text)).toEqual(lines);
 
     as("maya");
     expect(await getWorkspaceHeader("coral-offers", templateId)).toMatchObject({
@@ -2008,8 +2057,8 @@ describe("a variable renamed in a draft", () => {
           to: "name_on_card",
         },
       ],
-      contractLines: ["v2 renames `first_name` to `name_on_card`."],
     });
+    expect(notice!.payload).not.toHaveProperty("contractLines");
     const served = noticeView(notice!);
     expect(served.changes).toEqual([
       {

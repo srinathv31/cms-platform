@@ -6,6 +6,7 @@ import {
   sweepSunsets,
   type SunsetFacts,
 } from "./sunset";
+import { describeNotification } from "../notifications";
 import { VERSION_STATES } from "../types";
 import {
   NOW,
@@ -60,17 +61,39 @@ describe("setSunset", () => {
             sunsetAt: "2027-03-01T05:00:00.000Z",
             sunsetDay: "2027-03-01",
             zone: ZONE,
+            contractChanges: [],
           },
         },
         {
           kind: "notification",
           notification: "sunset_scheduled",
           to: { kind: "user", userId: "priya" },
-          title:
-            "Balance Transfer Intro v1 will stop rendering on March 1, 2027.",
+          facts: {
+            templateName: "Balance Transfer Intro",
+            number: 1,
+            sunsetAt: "2027-03-01T05:00:00.000Z",
+            sunsetDay: "2027-03-01",
+            zone: ZONE,
+          },
           link: { to: "versions", templateId: TEMPLATE.id },
         },
       ],
+    });
+  });
+
+  it("words the author's notification when it is read: the day, in the zone it was set in", () => {
+    const result = run();
+    const notification = result.ok ? result.effects[2] : undefined;
+    expect(
+      notification?.kind === "notification" &&
+        describeNotification(
+          notification.notification,
+          notification.facts,
+          "priya",
+        ),
+    ).toEqual({
+      title: "Balance Transfer Intro v1 will stop rendering on March 1, 2027.",
+      body: null,
     });
   });
 
@@ -145,8 +168,18 @@ describe("setSunset", () => {
         sunsetDay: "2027-03-01",
         zone: ZONE,
         contractChanges: [ANNUAL_FEE_ADDED],
-        contractLines: ["v2 adds required `annual_fee` (Currency)."],
       },
+    });
+  });
+
+  it("sends no contract changes when nothing is Active, whatever it is given: the notice has one shape", () => {
+    const result = run({
+      activeNumber: null,
+      contractChanges: [ANNUAL_FEE_ADDED],
+    });
+    expect(result.ok && result.effects[1]).toMatchObject({
+      notice: "sunset_scheduled",
+      payload: { activeVersion: null, contractChanges: [] },
     });
   });
 

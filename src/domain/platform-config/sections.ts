@@ -171,23 +171,17 @@ export function updateRequiredSections(input: {
     planSections(current, input.next);
   if (!changed) return { ok: true, requiredSections: current, effects: [] };
 
-  const parts = [
-    added.length ? `added ${joinWithAnd(added)}` : null,
-    removed.length ? `removed ${joinWithAnd(removed)}` : null,
-    ...renamed.map((r) => `renamed ${r.from} to ${r.to}`),
-    reordered ? "reordered the sections" : null,
-  ].filter((p): p is string => p !== null);
-  const summary = `Changed ${contentType.name} required sections: ${parts.join("; ")}`;
   return {
     ok: true,
     requiredSections,
     effects: [
-      configChanged("content_types", null, summary, {
+      configChanged("content_types", null, {
         contentTypeId: contentType.id,
         contentTypeName: contentType.name,
         added,
         removed,
         renamed,
+        reordered,
         sections: requiredSections.map((s) => s.title),
       }),
     ],

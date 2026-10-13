@@ -2,38 +2,32 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 import type {
   AccessEffect,
-  AccessLink,
+  AccessEffectContext,
+  AccessEffectsWritten,
   AccessRecipients,
   MembershipChange,
 } from "@/domain/access-types";
-import { ALL_SPACE } from "@/domain/permissions";
 import {
   auditEvents,
   membershipRoles,
   memberships,
   notifications,
-  teams,
   users,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
-import type { Tx } from "./effects";
+import type { Tx } from "./transaction";
 
-// The write side of Phase 6 (access and platform settings), the twin of ./effects.ts for lifecycle
-// transitions. A domain function (domain/access/, domain/platform-config/) says WHAT changed and
-// what to record; these helpers write it inside the caller's transaction (`inTransaction` from
-// ./effects), so a decision, its membership row, its audit row and its notifications land together.
+// The local backend's write side for access and platform settings, the twin of ./effects.ts for lifecycle
+// transitions. A domain function (domain/access/, domain/platform-config/) says WHAT changed and what to
+// record; these helpers write it inside the caller's transaction (./transaction.ts), so a decision, its
+// membership row, its audit row and its notifications land together. A notification stores its kind, its
+// facts and its link (by team id); the BFF words it and builds the href when it reads it (decision 0055). The
+// fake's twin is services/fake/access-effects.ts.
 
-export interface AccessEffectContext {
-  /** The demo clock, read once by the action. Effects with their own `at` (the sweep) keep it. */
-  now: Date;
-  /** Who acted. null for the system (the clock-driven sweep). Effects may override with `actorId`. */
-  actorId: string | null;
-}
-
-export interface AccessEffectsWritten {
-  audit: number;
-  notifications: number;
-}
+export type {
+  AccessEffectContext,
+  AccessEffectsWritten,
+} from "@/domain/access-types";
 
 /**
  * Writes audit rows and notifications. Recipients: `user` is that user; `team_admins` is every
@@ -67,16 +61,15 @@ export async function writeAccessEffects(
       (id) => id !== ctx.actorId,
     );
     if (recipients.length === 0) continue;
-    const href = accessHref(effect.link, await linkSlug(tx, effect.link));
     await tx.insert(notifications).values(
       recipients.map((userId) => ({
         id: newId("nt"),
         userId,
         teamId: effect.teamId,
         kind: effect.notification,
-        title: effect.title,
+        facts: effect.facts,
+        link: effect.link,
         body: effect.body ?? null,
-        href,
         createdAt: at,
         readAt: null,
       })),
@@ -117,38 +110,6 @@ export async function resolveAccessRecipients(
   return [...new Set(rows.map((r) => r.userId))]
     .filter((id) => !except.has(id))
     .sort();
-}
-
-/**
- * The slug of the team a link opens in, read inside the transaction: a link names its team by id, and the URL
- * by slug (decision 0053). null for a link outside any team.
- */
-async function linkSlug(tx: Tx, link: AccessLink): Promise<string | null> {
-  if (link.to !== "settings" && link.to !== "library") return null;
-  const [team] = await tx
-    .select({ slug: teams.slug })
-    .from(teams)
-    .where(eq(teams.id, link.teamId))
-    .limit(1);
-  if (!team)
-    throw new Error(
-      `A notification links to team ${link.teamId}, which isn't there.`,
-    );
-  return team.slug;
-}
-
-/** Where a link opens, as an app URL: under `teamSlug`, the slug of the team it names, for a team's link. */
-export function accessHref(link: AccessLink, teamSlug: string | null): string {
-  switch (link.to) {
-    case "settings":
-      return `/${teamSlug}/settings/${link.section}`;
-    case "library":
-      return `/${teamSlug}/library`;
-    case "request-access":
-      return "/request-access";
-    case "platform":
-      return `/${ALL_SPACE}/settings/${link.section}`;
-  }
 }
 
 /**

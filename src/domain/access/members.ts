@@ -14,7 +14,7 @@ import type {
 import { TEAM_ROLES, type TeamRole } from "../types";
 import { inactivity } from "./inactivity";
 import { ACCESS_REFUSALS } from "./refusals";
-import { sortRoles, rolesLabel } from "./roles";
+import { sortRoles } from "./roles";
 
 /** Why a member can't be given this set of roles, or null: they keep at least one. */
 export function validateRoles(roles: readonly TeamRole[]): Refusal | null {
@@ -96,7 +96,7 @@ export function changeRoles(
         notification: "roles_changed",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} changed your roles on ${team.name} to ${rolesLabel(roles)}.`,
+        facts: { actorName: actor.name, teamName: team.name, roles },
         link: { to: "library", teamId: team.id },
       },
     ],
@@ -130,7 +130,7 @@ export function removeMember(
         notification: "access_removed",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} removed your access to ${team.name}.`,
+        facts: { actorName: actor.name, teamName: team.name },
         link: { to: "request-access" },
       },
     ],
@@ -176,7 +176,13 @@ export function suspendInactive(
         notification: "access_suspended",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} suspended your access to ${team.name} after ${state.daysInactive} days without a sign-in.`,
+        facts: {
+          userId: member.id,
+          userName: member.name,
+          teamName: team.name,
+          daysInactive: state.daysInactive,
+          actorName: actor.name,
+        },
         link: { to: "request-access" },
       },
     ],
@@ -259,7 +265,7 @@ export function reinstate(
         notification: "access_granted",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} restored your access to ${team.name}.`,
+        facts: { actorName: actor.name, teamName: team.name },
         link: { to: "library", teamId: team.id },
       },
     ],

@@ -5,17 +5,20 @@ import {
   type RecipientFacts,
   type RecipientMembership,
 } from "@/domain/recipients";
-import type { LifecycleEffect } from "@/domain/review-types";
-import type { EffectContext, EffectsWritten } from "@/server/effects";
+import type {
+  EffectContext,
+  EffectsWritten,
+  LifecycleEffect,
+} from "@/domain/review-types";
 import { newId } from "@/server/ids";
-import { notificationHref } from "@/server/notification-href";
 import type { FakeState } from "./state";
 import type { FakeTx } from "./store";
 
 // The fake's effects writer: what a transition asks for (audit rows, notifications, consumer notices),
 // written into the command's `FakeTx`. Who a notification reaches and where its link opens are the domain's
-// rules (domain/recipients.ts), the same ones `writeEffects` (src/server/effects.ts) follows; the consumer
-// audience is the domain's window (domain/golive/audience.ts).
+// rules (domain/recipients.ts), the same ones `writeEffects` (services/local/effects.ts) follows; a notification
+// stores its kind, its facts and its link placed by team id. The consumer audience is the domain's window
+// (domain/golive/audience.ts). The access twin is ./access-effects.ts.
 
 const NOTICE_SEQ_KEY = "consumer_notice_seq";
 
@@ -63,21 +66,19 @@ export function writeFakeEffects(
           ctx.actorId,
         );
         if (userIds.length === 0) break;
-        const slug = teamSlugOf(state, ctx);
         for (const userId of userIds) {
-          const opens = recipientLink(
-            recipientFacts(state, userId),
-            slug,
-            effect.link,
-          );
           tx.insert("notifications", {
             id: newId("nt"),
             userId,
             teamId: ctx.teamId,
             kind: effect.notification,
-            title: effect.title,
+            facts: effect.facts,
+            link: recipientLink(
+              recipientFacts(state, userId),
+              ctx.teamId,
+              effect.link,
+            ),
             body: effect.body ?? null,
-            href: notificationHref(opens.teamSlug, opens.link),
             createdAt,
             readAt: null,
           });
@@ -113,14 +114,6 @@ export function writeFakeEffects(
   return written;
 }
 
-/** The template's team's slug: notifications link under it. */
-function teamSlugOf(state: FakeState, ctx: EffectContext): string {
-  const team = state.teams.find((t) => t.id === ctx.teamId);
-  if (!team)
-    throw new Error(`Effects for team ${ctx.teamId}, which isn't there.`);
-  return team.slug;
-}
-
 /** Every membership, with its team and roles, as the recipient rules read them (domain/recipients.ts). */
 function membershipsOf(state: FakeState): RecipientMembership[] {
   return state.memberships.flatMap((m) => {
@@ -130,7 +123,6 @@ function membershipsOf(state: FakeState): RecipientMembership[] {
       {
         userId: m.userId,
         teamId: team.id,
-        teamSlug: team.slug,
         teamName: team.name,
         status: m.status,
         roles: state.membershipRoles

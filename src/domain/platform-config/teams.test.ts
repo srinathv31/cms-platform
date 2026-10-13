@@ -9,6 +9,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { describeNotification } from "../notifications";
+import { describeConfigChange } from "./effects";
 import { PLATFORM_REFUSALS } from "./refusals";
 import { RESERVED_SLUGS } from "./limits";
 import {
@@ -84,7 +86,6 @@ describe("createTeam", () => {
           teamId: "t_home",
           details: {
             area: "teams",
-            summary: "Created team Home Loans with Alex Kim as Team Admin",
             teamName: "Home Loans",
             slug: "home-loans",
             userId: "alex",
@@ -108,10 +109,22 @@ describe("createTeam", () => {
           notification: "team_admin_appointed",
           to: { kind: "user", userId: "alex" },
           teamId: "t_home",
-          title: "Riley Brooks made you Team Admin of Home Loans.",
+          facts: { actorName: "Riley Brooks", teamName: "Home Loans" },
           link: { to: "settings", teamId: "t_home", section: "members" },
         },
       ],
+    });
+    // Both are worded when they are read: the audit row on the Audit page, the notification in the bell.
+    const [created, , appointed] = result.ok ? result.effects : [];
+    expect(
+      created?.kind === "audit" && describeConfigChange(created.details),
+    ).toBe("created team Home Loans with Alex Kim as Team Admin");
+    expect(
+      appointed?.kind === "notification" &&
+        describeNotification(appointed.notification, appointed.facts, "alex"),
+    ).toEqual({
+      title: "Riley Brooks made you Team Admin of Home Loans.",
+      body: null,
     });
   });
 

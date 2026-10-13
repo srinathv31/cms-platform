@@ -8,6 +8,7 @@ import {
   updateRequiredSections,
   validateRequiredSections,
 } from "./sections";
+import { describeConfigChange } from "./effects";
 import type { JSONContent, RequiredSection } from "../types";
 import { NOW, riley, SECTIONS, disclosure } from "./fixtures";
 
@@ -49,13 +50,12 @@ describe("updateRequiredSections", () => {
         teamId: null,
         details: {
           area: "content_types",
-          summary:
-            "Changed Disclosure required sections: added Privacy; renamed Offer details to Offer summary",
           contentTypeId: "ct_disclosure",
           contentTypeName: "Disclosure",
           added: ["Privacy"],
           removed: [],
           renamed: [{ from: "Offer details", to: "Offer summary" }],
+          reordered: false,
           sections: [
             "Offer summary",
             "Rates and fees",
@@ -65,6 +65,11 @@ describe("updateRequiredSections", () => {
         },
       },
     ]);
+    // The Audit page words the row when it reads it.
+    const audit = result.ok ? result.effects[0] : undefined;
+    expect(audit?.kind === "audit" && describeConfigChange(audit.details)).toBe(
+      "changed Disclosure required sections: added Privacy; renamed Offer details to Offer summary",
+    );
   });
 
   it("removes a section (existing templates keep theirs; nothing at submit checks sections)", () => {
@@ -73,11 +78,16 @@ describe("updateRequiredSections", () => {
       SECTIONS[0],
       SECTIONS[2],
     ]);
-    expect(
-      result.ok &&
-        result.effects[0]?.kind === "audit" &&
-        result.effects[0].details.summary,
-    ).toBe("Changed Disclosure required sections: removed Rates and fees");
+    const audit = result.ok ? result.effects[0] : undefined;
+    expect(audit?.kind === "audit" && audit.details).toMatchObject({
+      added: [],
+      removed: ["Rates and fees"],
+      renamed: [],
+      reordered: false,
+    });
+    expect(audit?.kind === "audit" && describeConfigChange(audit.details)).toBe(
+      "changed Disclosure required sections: removed Rates and fees",
+    );
   });
 
   it("never reuses a key the type has: a new section titled like an old key gets a suffix", () => {
@@ -90,11 +100,16 @@ describe("updateRequiredSections", () => {
 
   it("records a reorder, and nothing when nothing changed", () => {
     const reordered = run([SECTIONS[1]!, SECTIONS[0]!, SECTIONS[2]!]);
-    expect(
-      reordered.ok &&
-        reordered.effects[0]?.kind === "audit" &&
-        reordered.effects[0].details.summary,
-    ).toBe("Changed Disclosure required sections: reordered the sections");
+    const audit = reordered.ok ? reordered.effects[0] : undefined;
+    expect(audit?.kind === "audit" && audit.details).toMatchObject({
+      added: [],
+      removed: [],
+      renamed: [],
+      reordered: true,
+    });
+    expect(audit?.kind === "audit" && describeConfigChange(audit.details)).toBe(
+      "changed Disclosure required sections: reordered the sections",
+    );
     expect(run(SECTIONS.map((s) => ({ ...s, title: ` ${s.title} ` })))).toEqual(
       { ok: true, requiredSections: SECTIONS, effects: [] },
     );

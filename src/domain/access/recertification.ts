@@ -2,7 +2,7 @@
 // ends access at once. Anyone still unconfirmed when the deadline arrives lapses AT the deadline
 // (now >= dueAt), and the review closes (`sweepAccess` applies that).
 
-import { DAY_MS, formatLongDate } from "../dates";
+import { DAY_MS } from "../dates";
 import { REASONS } from "../permissions";
 import { refuse } from "../refusals";
 import {
@@ -153,8 +153,11 @@ export function startRecert(input: {
         notification: "recert_due",
         to: { kind: "team_admins", teamId: team.id, exceptUserIds: [actor.id] },
         teamId: team.id,
-        title: `${label} access review for ${team.name} is due ${formatLongDate(dueAt)}.`,
-        body: `Confirm ${subjects.length} members.`,
+        facts: {
+          teamName: team.name,
+          dueAt: dueAt.toISOString(),
+          members: subjects.length,
+        },
         link: { to: "settings", teamId: team.id, section: "recertification" },
       },
     ],
@@ -230,7 +233,11 @@ export function decideRecertItem(input: {
       notification: "access_removed",
       to: { kind: "user", userId },
       teamId: team.id,
-      title: `Your access to ${team.name} was removed in the ${recert.label} access review.`,
+      facts: {
+        actorName: actor.name,
+        teamName: team.name,
+        recertDueAt: recert.dueAt.toISOString(),
+      },
       link: { to: "request-access" },
     });
   }

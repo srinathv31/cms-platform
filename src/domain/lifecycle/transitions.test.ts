@@ -8,6 +8,7 @@ import { createDraft, editLatest, withWriter } from "./drafts";
 import { isAfterToday, setSunset, sunsetPassed } from "./sunset";
 import { requestChanges } from "./request-changes";
 import { submit, type SubmitDraft } from "./submit";
+import { describeNotification } from "../notifications";
 import { REASONS } from "../permissions";
 import type { Refusal } from "../refusals";
 import type { RoundRow } from "../rounds";
@@ -292,12 +293,23 @@ describe("scenario 3: the review loop", () => {
       changes: { state: "active" },
     });
     // Released, it is the v1 consumers know; the audit row keeps the round it was approved on.
-    expect(approved.ok && approved.effects).toContainEqual(
-      expect.objectContaining({
-        kind: "notification",
-        title: "Spring Travel Rewards — Terms v1 is now Active.",
-      }),
-    );
+    const live = approved.ok
+      ? approved.effects.find(
+          (e) => e.kind === "notification" && e.notification === "version_live",
+        )
+      : undefined;
+    expect(live).toMatchObject({
+      kind: "notification",
+      facts: {
+        actorName: "Jordan Ellis",
+        templateName: TEMPLATE.name,
+        number: 1,
+      },
+    });
+    expect(
+      live?.kind === "notification" &&
+        describeNotification(live.notification, live.facts, "maya").title,
+    ).toBe("Spring Travel Rewards — Terms v1 is now Active.");
     expect(approved.ok && approved.effects[0]).toMatchObject({
       action: "version.activated",
       details: { number: 1, round: 2 },

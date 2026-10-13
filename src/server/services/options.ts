@@ -12,10 +12,11 @@ export interface TestHooks {
   /**
    * Runs between a command's re-read of a row and its compare-and-set write. Answering `competing_write` changes
    * the row first, as another writer committing in between would on a database that doesn't serialize writes:
-   * the write then finds the row moved, and the command is refused `version_changed` and writes nothing.
+   * the write then finds the row moved. On a version the command is refused `version_changed` and writes
+   * nothing; on a notification the competing write marks it read first, so `markRead` finds nothing to change.
    */
   beforeCompareAndSet?(target: {
-    table: "versions";
+    table: "versions" | "notifications";
     id: string;
   }): "competing_write" | undefined;
 }

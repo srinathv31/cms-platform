@@ -9,13 +9,12 @@ import {
   stageRecipients,
   type RecordedDecision,
 } from "../approval-chain";
-import { describeChanges } from "../contract";
 import { makerCheckerRefusal } from "../permissions";
 import { refuse, type Refusal } from "../refusals";
 import { outputsRefusal, viewedOutputs } from "../review-outputs";
 import { reviewLink } from "../rounds";
 import type { ApprovalStage, LifecycleEffect } from "../review-types";
-import { unique, roundOf, sentence, notify } from "./helpers";
+import { unique, roundOf, notify } from "./helpers";
 import { REFUSALS } from "./refusals";
 import { sunsetOn, isAfterToday } from "./sunset";
 import type { Ok, Outcome, ReviewVersion, ApprovalRecord } from "./types";
@@ -148,7 +147,7 @@ export function approve(input: {
     decidedAt: now,
   };
   const review = reviewLink(version.templateId, reviewed);
-  const label = `${templateName} ${sentence(reviewed)}`;
+  const named = { templateName, number, round };
 
   // ── An earlier stage: on to the next one ──
   if (next) {
@@ -176,7 +175,7 @@ export function approve(input: {
         notify({
           notification: "review_requested",
           to: asked,
-          title: `${label} is waiting on ${next.name}.`,
+          facts: { actorName, ...named, stage: next.name },
           link: review,
         }),
       );
@@ -186,8 +185,7 @@ export function approve(input: {
         notify({
           notification: "stage_approved",
           to: { kind: "user", userId: version.submittedBy },
-          title: `${actorName} approved ${label} for ${stage.name}.`,
-          body: `Next: ${next.name}.`,
+          facts: { actorName, ...named, stage: stage.name, next: next.name },
           link: review,
         }),
       );
@@ -211,7 +209,6 @@ export function approve(input: {
   const sunset =
     active && sunsetPrevious !== null ? sunsetOn(sunsetPrevious, zone) : null;
   const contractChanges = [...(version.contractChanges ?? [])];
-  const contractLines = describeChanges(contractChanges, number);
 
   const effects: LifecycleEffect[] = [
     {
@@ -252,8 +249,7 @@ export function approve(input: {
         notification: "version_live",
         to: { kind: "user", userId: version.submittedBy },
         // Released: the number consumers know, "v2", whichever round it was approved on.
-        title: `${templateName} ${sentence({ number, round, state: "active" })} is now Active.`,
-        body: `${actorName} approved it.`,
+        facts: { actorName, templateName, number },
         link: { to: "template", templateId: version.templateId },
       }),
     );
@@ -266,7 +262,6 @@ export function approve(input: {
       versionNumber: number,
       activeVersion: number,
       contractChanges,
-      contractLines,
     },
   });
   if (active && sunset) {
@@ -281,7 +276,6 @@ export function approve(input: {
         sunsetDay: sunset.details.sunsetDay,
         zone: sunset.details.zone,
         contractChanges,
-        contractLines,
       },
     });
   }

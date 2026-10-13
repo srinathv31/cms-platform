@@ -43,13 +43,7 @@ import type {
   VersionState,
 } from "../types";
 import { withWriter } from "./drafts";
-import {
-  unique,
-  sentence,
-  trimmed,
-  teamApproversExcept,
-  notify,
-} from "./helpers";
+import { unique, trimmed, teamApproversExcept, notify } from "./helpers";
 import { REFUSALS } from "./refusals";
 import type { LifecycleResult } from "./types";
 
@@ -129,7 +123,7 @@ export interface SubmitInput {
   baseline: readonly Variable[] | null;
   now: Date;
   submittedBy: string;
-  /** For the notification: "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review." */
+  /** The submitter's name, as the notification keeps it ("Maya Chen submitted … for review."). */
   submitterName: string;
   templateId: string;
   templateName: string;
@@ -242,7 +236,12 @@ export function submit(input: SubmitInput): SubmitResult {
         to:
           (firstStage && stageRecipients(firstStage, writers)) ||
           teamApproversExcept(...writers),
-        title: `${input.submitterName} submitted ${input.templateName} ${sentence(submitted)} for review.`,
+        facts: {
+          actorName: input.submitterName,
+          templateName: input.templateName,
+          number,
+          round,
+        },
         body: submitNote,
         link: reviewLink(input.templateId, submitted),
       }),

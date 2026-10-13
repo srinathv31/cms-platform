@@ -5,7 +5,7 @@ import type { SidebarCardModel } from "@/server/queries/access-models";
 import type { PermissionResult, Viewer } from "@/domain/types";
 import { requireRequestContext } from "@/server/context/request";
 import { services } from "@/server/services";
-import type { SpaceFacts } from "@/server/services/identity";
+import type { ShellFacts, SpaceFacts } from "@/server/services/identity";
 import { getHomeCard, getSidebarCards } from "./access";
 
 // The spaces read models: the `[team]` segment resolved to its team, once, at the edge (`requireSpace`), and
@@ -52,12 +52,22 @@ export interface ShellData {
   canRequestAccess: PermissionResult;
 }
 
-/** Everything the sidebar needs, for every space at once, so a team switch never refetches. */
-export const getShell = cache(async (): Promise<ShellData> => {
+/**
+ * The identity service's shell for the viewer (every space they may switch to, by id and slug), asked once per
+ * render: the sidebar lays it out, and the bell builds its links with its slugs.
+ */
+export const getShellFacts = cache(async (): Promise<ShellFacts> => {
   const ctx = await requireRequestContext();
   const shell = await services().identity.shell(ctx);
   if (!shell.ok)
     throw new Error(`The shell refused a signed-in viewer: ${shell.code}`);
+  return shell;
+});
+
+/** Everything the sidebar needs, for every space at once, so a team switch never refetches. */
+export const getShell = cache(async (): Promise<ShellData> => {
+  const ctx = await requireRequestContext();
+  const shell = await getShellFacts();
   const base = {
     viewer: { userId: ctx.viewer.userId, name: ctx.viewer.name },
     canRequestAccess: shell.can.requestAccess,

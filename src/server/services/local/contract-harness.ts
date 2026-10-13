@@ -1,7 +1,7 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { beforeAll, beforeEach } from "vitest";
 import type { Db } from "@/server/db/client";
-import { auditEvents, notifications } from "@/server/db/schema/ucomp";
+import { auditEvents } from "@/server/db/schema/ucomp";
 import { listNotices } from "@/server/queries/consumer-api";
 import { runSunsetSweep } from "@/server/sunset-sweep";
 import {
@@ -82,14 +82,6 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
           versionId: e.versionId,
           details: e.details,
         }));
-      },
-      async notifications({ userId }) {
-        const rows = await db!
-          .select({ userId: notifications.userId, kind: notifications.kind })
-          .from(notifications)
-          .where(eq(notifications.userId, userId))
-          .orderBy(asc(sql`rowid`));
-        return rows;
       },
     },
   };

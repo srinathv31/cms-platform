@@ -28,16 +28,11 @@ import {
   DOCUMENT_THREAD,
   type LifecycleEffect,
   type NotificationEffect,
+  type NotificationFacts,
   type NotificationLink,
 } from "./review-types";
 import { fieldsOfChannels } from "./channel-fields";
-import {
-  asNumbered,
-  compareRounds,
-  reviewLink,
-  versionLabel,
-  type RoundRef,
-} from "./rounds";
+import { asNumbered, compareRounds, reviewLink, type RoundRef } from "./rounds";
 import type {
   Channel,
   JSONContent,
@@ -319,7 +314,7 @@ export function addComment(input: {
       },
     },
     ...notifyEach([authorOf(version)], viewer.userId, {
-      title: `${viewer.name} commented on ${versionPhrase(template.name, version)}.`,
+      facts: commentFacts(viewer, template.name, version, false),
       body: text.body,
       link: commentLink(template.id, version),
     }),
@@ -393,7 +388,7 @@ export function reply(input: {
       [authorOf(thread.origin), ...input.participants],
       viewer.userId,
       {
-        title: `${viewer.name} replied on ${versionPhrase(template.name, thread.origin)}.`,
+        facts: commentFacts(viewer, template.name, thread.origin, true),
         body: text.body,
         link: commentLink(template.id, thread.origin),
       },
@@ -488,7 +483,11 @@ function authorOf(
 function notifyEach(
   userIds: readonly string[],
   actorId: string,
-  n: { title: string; body: string; link: NotificationLink },
+  n: {
+    facts: NotificationFacts["comment_added"];
+    body: string;
+    link: NotificationLink;
+  },
 ): NotificationEffect[] {
   return [...new Set(userIds)]
     .filter((userId) => userId !== actorId)
@@ -522,13 +521,25 @@ function commentLink(
   };
 }
 
-/** "the draft of Spring Travel", "Spring Travel v2", or "Spring Travel v1, round 2" once v1 was sent back. */
-function versionPhrase(
+/**
+ * What a `comment_added` notification stores: who wrote, and the version the thread is on as it is now (a draft
+ * has no number or round), so it reads "…commented on the draft of Spring Travel", "…on Spring Travel v2", or
+ * "…on Spring Travel v1, round 2" once v1 was sent back.
+ */
+function commentFacts(
+  viewer: Viewer,
   templateName: string,
   version: { number: number | null; round: number | null; state: VersionState },
-): string {
-  if (version.number === null) return `the draft of ${templateName}`;
-  return `${templateName} ${versionLabel(asNumbered(version), { style: "sentence" })}`;
+  reply: boolean,
+): NotificationFacts["comment_added"] {
+  return {
+    actorName: viewer.name,
+    templateName,
+    number: version.number,
+    round: version.number === null ? null : version.round,
+    state: version.state,
+    reply,
+  };
 }
 
 /** The round a thread began on; null when it began in the open draft. */

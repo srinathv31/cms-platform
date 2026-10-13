@@ -1,9 +1,18 @@
 import type { AnyNotificationKind } from "@/domain/access-types";
 import { quarterLabel } from "@/domain/access/recertification";
-import { formatLongDate } from "@/domain/dates";
-import { reviewPath, versionLabel, type NumberedRound } from "@/domain/rounds";
+import {
+  DEFAULT_BUSINESS_ZONE,
+  sunsetDay as sunsetDayIn,
+} from "@/domain/business-zone";
+import type {
+  NotificationFactsOf,
+  StoredNotificationLink,
+} from "@/domain/notifications";
+import { recipientLink } from "@/domain/recipients";
+import type { NotificationLink } from "@/domain/review-types";
+import { asNumbered, reviewLink } from "@/domain/rounds";
 import type { SeedCtx, VersionRef } from "./context";
-import { TEAM_SLUGS, flaggedMembers, recertSubjectIds } from "./teams";
+import { flaggedMembers, recertSubjectIds, teamName } from "./teams";
 import { userName } from "./people";
 
 // Access requests, recertification and notifications. Lifecycle audit events and consumer notices
@@ -12,9 +21,6 @@ import { userName } from "./people";
 export function seedActivity(ctx: SeedCtx) {
   const { sink } = ctx;
   const coral = "t_coral";
-  // A stored link names the team by its slug, as the app builds one (until notifications store link
-  // descriptors, decision 0055).
-  const space = TEAM_SLUGS[coral];
 
   // ── Chris Morales asks to join Coral Offers as an Author ───────
   const requestReason =
@@ -95,33 +101,53 @@ export function seedActivity(ctx: SeedCtx) {
   }
 
   // ── Notifications ──────────────────────────────────────────────
-  // Kinds are domain/access-types.ts `AnyNotificationKind`.
+  // As the runtime writes them (decision 0055): the kind, its facts with names as they were (read from the
+  // rows the template builder wrote, so they agree), a link placed in the team by id (`recipientLink`), and a
+  // person's own words as the body. The bell words them when it reads them, so a seeded notification reads
+  // like a live one, at whatever moment the seed is loaded.
   const cashBack = ctx.template("cash-back");
   const waiver = ctx.template("annual-fee-waiver");
   const balanceTransfer = ctx.template("balance-transfer");
   const holiday = ctx.template("holiday-points");
   const abroad = ctx.template("card-used-abroad");
   const reminder = ctx.template("payment-due-reminder");
-  const reasonFor = (version: VersionRef) =>
-    sink.approvals.find(
-      (a) => a.versionId === version.id && a.decision === "changes_requested",
-    )?.reason;
-  const waiverReason = reasonFor(waiver.versions.v1);
-  // A round as the app's notifications name it (rounds.ts): "v3, round 2".
-  const round = (version: VersionRef): NumberedRound => ({
+  const coralName = teamName(coral);
+
+  const rowOf = (version: VersionRef) => {
+    const row = sink.versions.find((v) => v.id === version.id);
+    if (!row) throw new Error(`Seed: no version ${version.id}`);
+    return row;
+  };
+  /** Who decided the version that way (its approvals row). */
+  const decision = (
+    version: VersionRef,
+    kind: "approved" | "changes_requested",
+  ) => {
+    const row = sink.approvals.find(
+      (a) => a.versionId === version.id && a.decision === kind,
+    );
+    if (!row) throw new Error(`Seed: ${version.id} has no ${kind} decision`);
+    return row;
+  };
+  /** A round, as a notification about it stores it: its name then, its number and its round. */
+  const roundOf = (version: VersionRef) => ({
+    templateName: rowOf(version).name,
     number: version.number!,
     round: version.round!,
-    state: version.state,
   });
-  const sentence = (version: VersionRef) =>
-    versionLabel(round(version), { style: "sentence" });
+  /** A released version: its name then and its number. */
+  const releasedOf = (version: VersionRef) => ({
+    templateName: rowOf(version).name,
+    number: version.number!,
+  });
+  const inCoral = (link: NotificationLink) => recipientLink(null, coral, link);
 
-  const note = (n: {
+  const note = <K extends AnyNotificationKind>(n: {
     user: string;
-    kind: AnyNotificationKind;
-    title: string;
-    body?: string;
-    href?: string;
+    kind: K;
+    facts: NotificationFactsOf<K>;
+    body?: string | null;
+    link: StoredNotificationLink;
     at: number;
     read?: boolean;
   }) =>
@@ -130,114 +156,135 @@ export function seedActivity(ctx: SeedCtx) {
       userId: n.user,
       teamId: coral,
       kind: n.kind,
-      title: n.title,
+      facts: n.facts,
+      link: n.link,
       body: n.body ?? null,
-      href: n.href ?? null,
       createdAt: ctx.at(n.at),
       readAt: n.read ? ctx.at(n.at - 0.05) : null,
     });
 
-  // Waiting on someone
-  note({
-    user: "jordan",
-    kind: "review_requested",
-    title: `${userName("maya")} submitted ${cashBack.name} ${sentence(cashBack.versions.v3)} for review.`,
-    body: "It adds the required variable annual_fee, a breaking change for consumers.",
-    href: reviewPath(space, cashBack.id, round(cashBack.versions.v3)),
-    at: 0.9,
-  });
-  note({
-    user: "jordan",
-    kind: "review_requested",
-    title: `${userName("priya")} submitted ${abroad.name} ${sentence(abroad.versions.v1)} for review.`,
-    body: "Fraud Operations asked for a push and a text when a card is used outside the US.",
-    href: reviewPath(space, abroad.id, round(abroad.versions.v1)),
-    at: 1.2,
-  });
+  // Waiting on someone: a submit asks the first stage's approvers, with the submitter's note.
+  for (const [template, version, at] of [
+    [cashBack, cashBack.versions.v3, 0.9],
+    [abroad, abroad.versions.v1, 1.2],
+  ] as const) {
+    const row = rowOf(version);
+    note({
+      user: "jordan",
+      kind: "review_requested",
+      facts: { actorName: userName(row.submittedBy!), ...roundOf(version) },
+      body: row.submitNote,
+      link: inCoral(reviewLink(template.id, asNumbered(version))),
+      at,
+    });
+  }
+  // A send-back tells the submitter, with the reason.
+  const sentBack = decision(waiver.versions.v1, "changes_requested");
   note({
     user: "maya",
     kind: "changes_requested",
-    title: `${userName("jordan")} requested changes on ${waiver.name} ${sentence(waiver.versions.v1)}.`,
-    body: waiverReason ?? undefined,
-    href: `/${space}/templates/${waiver.id}`,
+    facts: {
+      actorName: userName(sentBack.actorId),
+      ...roundOf(waiver.versions.v1),
+    },
+    body: sentBack.reason,
+    link: inCoral({ to: "template", templateId: waiver.id }),
     at: 3.9,
   });
   note({
     user: "alex",
     kind: "access_requested",
-    title: `${userName("chris")} asked for Author access to Coral Offers.`,
+    facts: {
+      actorName: userName("chris"),
+      teamName: coralName,
+      role: "author",
+    },
     body: requestReason,
-    href: `/${space}/settings/access-requests`,
+    link: { to: "settings", teamId: coral, section: "access-requests" },
     at: 1.5,
   });
   note({
     user: "alex",
     kind: "recert_due",
-    title: "Recertification is due in 30 days.",
-    body: `${label} access review for Coral Offers: confirm ${members.length} members.`,
-    href: `/${space}/settings/recertification`,
+    facts: {
+      teamName: coralName,
+      dueAt: dueAt.toISOString(),
+      members: members.length,
+    },
+    link: { to: "settings", teamId: coral, section: "recertification" },
     at: 4,
   });
   for (const m of flaggedMembers(coral)) {
     note({
       user: "alex",
       kind: "inactivity_flagged",
-      title: `${userName(m.user)} hasn't signed in for 90 days.`,
-      body: `Access to Coral Offers is suspended automatically on ${formatLongDate(ctx.at(m.flaggedDaysAgo! - 30))}.`,
-      href: `/${space}/settings/inactivity`,
+      facts: {
+        userId: m.user,
+        userName: userName(m.user),
+        teamName: coralName,
+        suspendsAt: ctx.at(m.flaggedDaysAgo! - 30).toISOString(),
+      },
+      link: { to: "settings", teamId: coral, section: "inactivity" },
       at: m.flaggedDaysAgo!,
       read: true,
     });
   }
+  // The sunset Jordan set on Balance Transfer v1 tells Priya, who submitted it.
+  const sunsetAt = rowOf(balanceTransfer.versions.v1).sunsetAt!;
   note({
     user: "priya",
     kind: "sunset_scheduled",
-    title: `Sunset set for ${balanceTransfer.name} v1.`,
-    body: "Coral still renders v1. It keeps working until the sunset date.",
-    href: `/${space}/templates/${balanceTransfer.id}`,
+    facts: {
+      ...releasedOf(balanceTransfer.versions.v1),
+      sunsetAt: sunsetAt.toISOString(),
+      sunsetDay: sunsetDayIn(sunsetAt, DEFAULT_BUSINESS_ZONE),
+      zone: DEFAULT_BUSINESS_ZONE,
+    },
+    link: inCoral({ to: "versions", templateId: balanceTransfer.id }),
     at: 2.2,
   });
 
   // Already read: a little history in the bell
+  const firstSendBack = decision(cashBack.versions.v3r1, "changes_requested");
   note({
     user: "maya",
     kind: "changes_requested",
-    title: `${userName("jordan")} requested changes on ${cashBack.name} ${sentence(cashBack.versions.v3r1)}.`,
-    body: reasonFor(cashBack.versions.v3r1) ?? undefined,
-    href: `/${space}/templates/${cashBack.id}`,
+    facts: {
+      actorName: userName(firstSendBack.actorId),
+      ...roundOf(cashBack.versions.v3r1),
+    },
+    body: firstSendBack.reason,
+    link: inCoral({ to: "template", templateId: cashBack.id }),
     at: 2.6,
     read: true,
   });
-  note({
-    user: "maya",
-    kind: "version_live",
-    title: `${cashBack.name} v2 is now Active.`,
-    href: `/${space}/templates/${cashBack.id}`,
-    at: 86.5,
-    read: true,
-  });
-  note({
-    user: "maya",
-    kind: "version_live",
-    title: `${reminder.name} v1 is now Active.`,
-    href: `/${space}/templates/${reminder.id}`,
-    at: 51.5,
-    read: true,
-  });
-  note({
-    user: "priya",
-    kind: "version_live",
-    title: `${balanceTransfer.name} v2 is now Active.`,
-    href: `/${space}/templates/${balanceTransfer.id}`,
-    at: 47.5,
-    read: true,
-  });
+  for (const [user, template, version, at] of [
+    ["maya", cashBack, cashBack.versions.v2, 86.5],
+    ["maya", reminder, reminder.versions.v1, 51.5],
+    ["priya", balanceTransfer, balanceTransfer.versions.v2, 47.5],
+  ] as const) {
+    note({
+      user,
+      kind: "version_live",
+      facts: {
+        actorName: userName(decision(version, "approved").actorId),
+        ...releasedOf(version),
+      },
+      link: inCoral({ to: "template", templateId: template.id }),
+      at,
+      read: true,
+    });
+  }
+  const revoked = rowOf(holiday.versions.v1).revoke!;
   note({
     user: "priya",
     kind: "version_revoked",
-    title: `${holiday.name} v1 was revoked.`,
-    body: "Reason: Wrong bonus amount.",
-    href: `/${space}/templates/${holiday.id}`,
+    facts: {
+      actorName: userName(revoked.confirmedBy!),
+      ...releasedOf(holiday.versions.v1),
+    },
+    body: revoked.reason,
+    link: inCoral({ to: "versions", templateId: holiday.id }),
     at: 34.3,
     read: true,
   });

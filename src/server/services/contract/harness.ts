@@ -54,19 +54,12 @@ export interface ProbeAuditEvent {
   details: Record<string, unknown> | null;
 }
 
-/** A notification, as facts: who and what (its words and its link are the BFF's, decision 0055). */
-export interface ProbeNotification {
-  userId: string;
-  kind: string;
-}
-
 /**
  * Reads what a command wrote that no service read serves yet: SQL for the local implementation, the arrays for
- * the fake, test endpoints for Java. Replaced by `audit.activity` and `notifications.list` when they move.
+ * the fake, test endpoints for Java. Replaced by `audit.activity` when it moves (plan P4a). Notifications are read
+ * through `notifications.list`.
  */
 export interface ContractProbe {
   /** The audit rows about a version, in the order they were written. */
   auditEvents(filter: { versionId: string }): Promise<ProbeAuditEvent[]>;
-  /** A person's notifications, in the order they were written. */
-  notifications(filter: { userId: string }): Promise<ProbeNotification[]>;
 }

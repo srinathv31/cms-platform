@@ -7,7 +7,8 @@ import {
   recertSubjects,
   startRecert,
 } from "./recertification";
-import type { RecertFacts } from "../access-types";
+import type { AccessNotificationEffect, RecertFacts } from "../access-types";
+import { describeNotification } from "../notifications";
 import {
   at,
   CORAL,
@@ -19,6 +20,15 @@ import {
   audits,
   notes,
 } from "./fixtures";
+
+/** A notification effect as the person reading it sees it (`describeNotification`). */
+const words = (
+  effect: AccessNotificationEffect | undefined,
+  readerId: string,
+) =>
+  effect
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 
 describe("recertification phase", () => {
   const r = recert({ startsAt: at(0), dueAt: at(30) });
@@ -121,9 +131,19 @@ describe("startRecert", () => {
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "recert_due",
       to: { kind: "team_admins", teamId: CORAL.id, exceptUserIds: ["alex"] },
-      title: "Q1 2027 access review for Coral Offers is due March 3, 2027.",
+      facts: {
+        teamName: "Coral Offers",
+        dueAt: at(30).toISOString(),
+        members: 4,
+      },
       link: { to: "settings", teamId: CORAL.id, section: "recertification" },
     });
+    // The quarter and the second line are worded when it is read, from the deadline and the count.
+    expect(words(notes(result.effects)[0], "alex")).toEqual({
+      title: "Q1 2027 access review for Coral Offers is due March 3, 2027.",
+      body: "Confirm 4 members.",
+    });
+    expect(notes(result.effects)[0]).not.toHaveProperty("body");
   });
 
   it("refuses while a review is open or upcoming, and allows it once closed", () => {
@@ -197,9 +217,15 @@ describe("decideRecertItem", () => {
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_removed",
       to: { kind: "user", userId: "maya" },
-      title:
-        "Your access to Coral Offers was removed in the Q1 2027 access review.",
+      facts: {
+        actorName: "Alex Kim",
+        teamName: "Coral Offers",
+        recertDueAt: at(30).toISOString(),
+      },
     });
+    expect(words(notes(result.effects)[0], "maya")?.title).toBe(
+      "Your access to Coral Offers was removed in the Q1 2027 access review.",
+    );
   });
 
   it("is open until one millisecond before the deadline, and closed at it", () => {

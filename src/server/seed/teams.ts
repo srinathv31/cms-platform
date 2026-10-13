@@ -58,6 +58,13 @@ const TEAMS: {
   },
 ];
 
+/** A seeded team's name. */
+export function teamName(id: TeamId): string {
+  const team = TEAMS.find((t) => t.id === id);
+  if (!team) throw new Error(`Seed: no team ${id}`);
+  return team.name;
+}
+
 interface Member {
   user: string;
   team: TeamId;
@@ -184,16 +191,12 @@ export function seedTeams(ctx: SeedCtx) {
       actorId: "riley",
       teamId: t.id,
       action: "platform.config_changed",
-      details: platformConfigDetails(
-        "teams",
-        `Created team ${t.name} with ${userName(admin.user)} as Team Admin`,
-        {
-          teamName: t.name,
-          slug: TEAM_SLUGS[t.id],
-          userId: admin.user,
-          userName: userName(admin.user),
-        },
-      ),
+      details: platformConfigDetails("teams", {
+        teamName: t.name,
+        slug: TEAM_SLUGS[t.id],
+        userId: admin.user,
+        userName: userName(admin.user),
+      }),
     });
   }
 

@@ -135,7 +135,7 @@ export type MembershipChange =
   | { kind: "update"; membershipId: string; set: MembershipSet }
   | { kind: "delete"; membershipId: string };
 
-// ── Effects (audit rows and notifications; server/access-effects.ts writes them) ─
+// ── Effects (audit rows and notifications; services/local/access-effects.ts writes them) ─
 
 export type AccessAuditAction =
   | "access.requested"
@@ -158,7 +158,7 @@ export type AccessAuditAction =
   | "recert.kept" // one member confirmed
   | "recert.removed" // one member removed during the review (their access ends at once)
   | "recert.closed" // the deadline passed, or every member was decided
-  | "platform.config_changed"; // details.area: "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone"; details.summary
+  | "platform.config_changed"; // details.area: "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone", and that area's facts
 
 export type PlatformArea =
   | "teams"
@@ -194,6 +194,75 @@ export type AccessNotificationKind =
 /** Every notification kind the bell shows: lifecycle (Phase 4) and access (Phase 6). */
 export type AnyNotificationKind = NotificationKind | AccessNotificationKind;
 
+/**
+ * What each access notification stores (decision 0055): facts, never a sentence or a URL, with names as they
+ * were. `describeNotification` (notifications.ts) words them when read, for the person reading: a notification
+ * about a member (`userId`) reads "Your access…" to that member and "Devon Lin's access…" to a Team Admin. An
+ * instant is ISO; a recertification's quarter label (`Q1 2027`) is worded from its deadline, never stored here.
+ */
+export interface AccessNotificationFacts {
+  /** A request, to the team's Team Admins (the requester's reason is the body). */
+  access_requested: { actorName: string; teamName: string; role: TeamRole };
+  /**
+   * Access given: a request approved (`role`; the admin's note, if any, is the body), or a suspended or lapsed
+   * member restored with their roles (no `role`).
+   */
+  access_granted: { actorName: string; teamName: string; role?: TeamRole };
+  /** A request declined, to the requester (the admin's note is the body). */
+  access_denied: { actorName: string; teamName: string; role: TeamRole };
+  /** A member's roles replaced, to the member: every role after. */
+  roles_changed: { actorName: string; teamName: string; roles: TeamRole[] };
+  /** A member removed, to the member; `recertDueAt` (the review's deadline) when removed in an access review. */
+  access_removed: { actorName: string; teamName: string; recertDueAt?: string };
+  /** Unconfirmed at a review's deadline (`dueAt`): to the member, and to the team's Team Admins. */
+  access_lapsed: {
+    userId: string;
+    userName: string;
+    teamName: string;
+    dueAt: string;
+  };
+  /**
+   * Suspended after `daysInactive` days without a sign-in: by a Team Admin (`actorName`), to the member; or by the
+   * sweep (`actorName` null), to the member and the team's Team Admins.
+   */
+  access_suspended: {
+    userId: string;
+    userName: string;
+    teamName: string;
+    daysInactive: number;
+    actorName: string | null;
+  };
+  /**
+   * To the team's Team Admins: a member flagged at 90 days, suspended automatically at `suspendsAt`. Or
+   * (`keptLastAdmin`) to the Platform Admins: the sweep kept the team's last Team Admin past the automatic
+   * suspension, after `daysInactive` days.
+   */
+  inactivity_flagged:
+    | { userId: string; userName: string; teamName: string; suspendsAt: string }
+    | {
+        userId: string;
+        userName: string;
+        teamName: string;
+        daysInactive: number;
+        keptLastAdmin: true;
+      };
+  /**
+   * To the team's Team Admins: a review started, due at `dueAt`, with `members` to confirm. Or (`keptLastAdmin`)
+   * to the Platform Admins: the team's last Team Admin, unconfirmed at the deadline, kept their access.
+   */
+  recert_due:
+    | { teamName: string; dueAt: string; members: number }
+    | {
+        userId: string;
+        userName: string;
+        teamName: string;
+        dueAt: string;
+        keptLastAdmin: true;
+      };
+  /** A new team's first Team Admin, to them. */
+  team_admin_appointed: { actorName: string; teamName: string };
+}
+
 export type AccessRecipients =
   | { kind: "user"; userId: string }
   /** Every active Team Admin of the team, minus `exceptUserIds`. The actor is never notified. */
@@ -201,12 +270,15 @@ export type AccessRecipients =
   /** Every Platform Admin (additive, R1: the last Team Admin kept past a deadline). */
   | { kind: "platform_admins" };
 
-/** Where a notification opens. A team's link names the team by id; the writer builds the href from its slug. */
 export type TeamSettingsSection =
   "members" | "access-requests" | "recertification" | "inactivity";
 export type PlatformSettingsSection =
   "teams" | "content-types" | "channel-rules" | "approval-chains" | "time-zone";
 
+/**
+ * Where an access notification opens. A team's link names the team by id; the BFF builds the href from its slug
+ * when it reads the notification (decision 0055).
+ */
 export type AccessLink =
   | { to: "settings"; teamId: string; section: TeamSettingsSection }
   | { to: "library"; teamId: string }
@@ -214,20 +286,37 @@ export type AccessLink =
   /** A Platform settings section, from the "All teams" space (additive, R1). */
   | { to: "platform"; section: PlatformSettingsSection };
 
-export interface AccessNotificationEffect {
-  kind: "notification";
-  notification: AccessNotificationKind;
-  to: AccessRecipients;
-  teamId: string | null;
-  /** One plain sentence: "Morgan Lee asked for Author access to Coral Offers." */
-  title: string;
-  body?: string;
-  link: AccessLink;
-  /** Default: the action's `now` (the sweep backdates, like audit). */
-  at?: Date;
-}
+/** An access notification to write: its kind, its facts, whom it reaches and where it opens. */
+export type AccessNotificationEffect = {
+  [K in AccessNotificationKind]: {
+    kind: "notification";
+    notification: K;
+    to: AccessRecipients;
+    teamId: string | null;
+    facts: AccessNotificationFacts[K];
+    /** Only a person's own words: the requester's reason, the admin's note. */
+    body?: string;
+    link: AccessLink;
+    /** Default: the action's `now` (the sweep backdates, like audit). */
+    at?: Date;
+  };
+}[AccessNotificationKind];
 
 export type AccessEffect = AccessAuditEffect | AccessNotificationEffect;
+
+/** When access effects happen and who acted: what both implementations' access effects writers take. */
+export interface AccessEffectContext {
+  /** The backend's clock, read once by the command. Effects with their own `at` (the sweep) keep it. */
+  now: Date;
+  /** Who acted. null for the system (the clock-driven sweep). Effects may override with `actorId`. */
+  actorId: string | null;
+}
+
+/** How many rows of each kind an access effects writer wrote. */
+export interface AccessEffectsWritten {
+  audit: number;
+  notifications: number;
+}
 
 export type Ok<T> = { ok: true } & T;
 export type { Refused };

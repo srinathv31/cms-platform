@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AccessNotificationEffect,
   MembershipFacts,
   RecertFacts,
   SweepResult,
 } from "../access-types";
+import { describeNotification } from "../notifications";
 import {
   at,
   ago,
@@ -17,6 +19,15 @@ import {
   sweepAt,
   statusOf,
 } from "./fixtures";
+
+/** A notification effect as the person reading it sees it (`describeNotification`). */
+const words = (
+  effect: AccessNotificationEffect | undefined,
+  readerId: string,
+) =>
+  effect
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 
 /** What the server does with a sweep: write the changes back. */
 function apply(
@@ -91,15 +102,33 @@ describe("sweepAccess: recertification deadline", () => {
       removed: 0,
       lapsed: 1,
     });
-    expect(notes(result.effects).map((n) => [n.to, n.title])).toEqual([
-      [
-        { kind: "user", userId: "sam" },
-        "Your access to Coral Offers lapsed: it wasn't recertified by March 3, 2027.",
-      ],
+    // One set of facts for both: the member's own sentence and the admins' are worded when each reads it.
+    const lapsed = {
+      userId: "sam",
+      userName: "Sam Ortiz",
+      teamName: "Coral Offers",
+      dueAt: at(30).toISOString(),
+    };
+    expect(notes(result.effects).map((n) => [n.to, n.facts])).toEqual([
+      [{ kind: "user", userId: "sam" }, lapsed],
       [
         { kind: "team_admins", teamId: CORAL.id, exceptUserIds: ["sam"] },
-        "Sam Ortiz's access to Coral Offers lapsed: not recertified by March 3, 2027.",
+        lapsed,
       ],
+    ]);
+    expect(
+      notes(result.effects).map((n, i) => words(n, i === 0 ? "sam" : "alex")),
+    ).toEqual([
+      {
+        title:
+          "Your access to Coral Offers lapsed: it wasn't recertified by March 3, 2027.",
+        body: null,
+      },
+      {
+        title:
+          "Sam Ortiz's access to Coral Offers lapsed: not recertified by March 3, 2027.",
+        body: null,
+      },
     ]);
   });
 
@@ -193,9 +222,18 @@ describe("sweepAccess: inactivity", () => {
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "inactivity_flagged",
       to: { kind: "team_admins", teamId: CORAL.id, exceptUserIds: ["devon"] },
+      facts: {
+        userId: "devon",
+        userName: "Devon Lin",
+        teamName: "Coral Offers",
+        suspendsAt: at(120).toISOString(),
+      },
+      at: at(90),
+    });
+    expect(notes(result.effects)[0]).not.toHaveProperty("body");
+    expect(words(notes(result.effects)[0], "alex")).toEqual({
       title: "Devon Lin hasn't signed in for 90 days.",
       body: "Access to Coral Offers is suspended automatically on June 1, 2027.",
-      at: at(90),
     });
   });
 
@@ -230,7 +268,23 @@ describe("sweepAccess: inactivity", () => {
         }),
       }),
     ]);
-    expect(notes(result.effects).map((n) => n.title)).toEqual([
+    const suspended = {
+      userId: "devon",
+      userName: "Devon Lin",
+      teamName: "Coral Offers",
+      daysInactive: 120,
+      actorName: null,
+    };
+    expect(notes(result.effects).map((n) => n.facts)).toEqual([
+      suspended,
+      suspended,
+    ]);
+    // The same facts read "Your access…" to the member and "Devon Lin's access…" to the admins.
+    expect(
+      notes(result.effects).map(
+        (n, i) => words(n, i === 0 ? "devon" : "alex")?.title,
+      ),
+    ).toEqual([
       "Your access to Coral Offers was suspended after 120 days without a sign-in.",
       "Devon Lin's access to Coral Offers was suspended after 120 days without a sign-in.",
     ]);
@@ -466,10 +520,18 @@ describe("sweepAccess: the last Team Admin", () => {
     expect(held).toMatchObject({
       notification: "inactivity_flagged",
       link: { to: "platform", section: "teams" },
-      title:
-        "Alex Kim hasn't signed in for 120 days, but as the last Team Admin of Coral Offers their access stays on.",
+      facts: {
+        userId: "alex",
+        userName: "Alex Kim",
+        teamName: "Coral Offers",
+        keptLastAdmin: true,
+        daysInactive: 120,
+      },
       at: at(120),
     });
+    expect(words(held, "taylor")?.title).toBe(
+      "Alex Kim hasn't signed in for 120 days, but as the last Team Admin of Coral Offers their access stays on.",
+    );
 
     const next = apply(result, [alex], []);
     expect(sweepAt(at(125), next.memberships)).toEqual({

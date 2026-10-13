@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { describeNotification } from "../notifications";
 import { REFUSALS } from "./refusals";
 import { smsFooterOf, submit, type SubmitDraft } from "./submit";
 import type { MessageTypeRules } from "../platform-config/limits";
@@ -75,7 +76,12 @@ describe("submit", () => {
       role: "approver",
       exceptUserIds: ["maya"],
     },
-    title: `Maya Chen submitted Spring Travel Rewards — Terms v${number}${(extra.round ?? 1) > 1 ? `, round ${extra.round}` : ""} for review.`,
+    facts: {
+      actorName: "Maya Chen",
+      templateName: TEMPLATE.name,
+      number,
+      round: extra.round ?? 1,
+    },
     ...(extra.body ? { body: extra.body } : {}),
     link: {
       to: "review",
@@ -162,6 +168,29 @@ describe("submit", () => {
       submitted(1, { round: 2 }),
       reviewRequested(1, { round: 2 }),
     ]);
+    // The notification keeps the round as a fact; read, it is worded with the round named.
+    const notification = result.ok && result.effects[1];
+    expect(
+      notification &&
+        notification.kind === "notification" &&
+        describeNotification(
+          notification.notification,
+          notification.facts,
+          "priya",
+        ),
+    ).toEqual({
+      title:
+        "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review.",
+      body: null,
+    });
+    expect(
+      notification && notification.kind === "notification" && notification.link,
+    ).toEqual({
+      to: "review",
+      templateId: TEMPLATE.id,
+      versionNumber: 1,
+      round: 2,
+    });
   });
 
   it("keeps the note to reviewers, trimmed, and passes it on to them", () => {

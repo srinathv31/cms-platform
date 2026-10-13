@@ -23,7 +23,7 @@ import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import { teams, uploads } from "@/server/db/schema/ucomp";
 import { prepareBody } from "@/server/documents/prepare";
-import { inTransaction } from "@/server/effects";
+import { inTransaction } from "@/server/services/local/transaction";
 import { newId } from "@/server/ids";
 import {
   conformToContentType,

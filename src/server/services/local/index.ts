@@ -7,7 +7,6 @@ import type { DraftService } from "../drafts";
 
 import { notMovedArea } from "../not-moved";
 import type { ImplementationOptions } from "../options";
-import type { NotificationService } from "../notifications";
 import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
 import type { TemplateService } from "../templates";
@@ -16,6 +15,7 @@ import type { UsageService } from "../usage";
 import { now } from "@/server/clock";
 import type { LocalDeps } from "./command";
 import { localIdentity } from "./identity";
+import { localNotifications } from "./notifications";
 import { localReview } from "./review";
 import { localVersions } from "./versions";
 
@@ -38,7 +38,7 @@ export function localServices(options: ImplementationOptions = {}): Services {
     comments: notMovedArea<CommentService>("comments"),
     access: notMovedArea<AccessService>("access"),
     platform: notMovedArea<PlatformService>("platform"),
-    notifications: notMovedArea<NotificationService>("notifications"),
+    notifications: localNotifications(deps),
     audit: notMovedArea<AuditService>("audit"),
     usage: notMovedArea<UsageService>("usage"),
     render: notMovedArea<RenderService>("render"),

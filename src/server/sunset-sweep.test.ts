@@ -9,7 +9,7 @@ import * as schema from "@/server/db/schema/ucomp";
 import { freshDatabasePerTest } from "@/server/testing/review-fixtures";
 import { seedDatabase } from "@/server/seed";
 import { advanceClockAction } from "./actions/demo";
-import { NOTICE_SEQ_KEY } from "./effects";
+import { NOTICE_SEQ_KEY } from "@/server/services/local/effects";
 import { runSunsetSweep } from "./sunset-sweep";
 
 // The sunset sweep against a temporary database filled by the real seed, with the demo clock moved by

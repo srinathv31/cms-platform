@@ -44,7 +44,11 @@ const OWNED: readonly Owned[] = [
     arg: (id) => id,
   },
   { table: "audit_events", where: "template_id = ?", arg: (id) => id },
-  { table: "notifications", where: "href LIKE ?", arg: (id) => `%/${id}%` },
+  {
+    table: "notifications",
+    where: "json_extract(link, '$.templateId') = ?",
+    arg: (id) => id,
+  },
   { table: "consumer_notices", where: "template_id = ?", arg: (id) => id },
   { table: "render_log", where: "template_id = ?", arg: (id) => id },
   { table: "versions", where: "template_id = ?", arg: (id) => id },

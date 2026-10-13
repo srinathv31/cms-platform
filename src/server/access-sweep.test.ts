@@ -2,6 +2,7 @@ import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
+import { asShown } from "@/server/testing/notifications";
 import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { runAccessSweep } from "./access-sweep";
 
@@ -159,11 +160,13 @@ describe("runAccessSweep across the seed's deadlines", () => {
     expect(await count(auditEvents)).toBe(auditBefore + 3);
 
     // Notifications: the member and the team's Team Admins, backdated too.
-    const sent = await db
-      .select()
-      .from(notifications)
-      .where(gt(notifications.createdAt, day(15)))
-      .orderBy(asc(notifications.createdAt), asc(notifications.userId));
+    const sent = (
+      await db
+        .select()
+        .from(notifications)
+        .where(gt(notifications.createdAt, day(15)))
+        .orderBy(asc(notifications.createdAt), asc(notifications.userId))
+    ).map((n) => asShown(n));
     expect(sent.map((n) => [n.kind, n.userId, n.createdAt, n.href])).toEqual([
       [
         "access_suspended",
@@ -179,6 +182,21 @@ describe("runAccessSweep across the seed's deadlines", () => {
         "/coral-offers/settings/recertification",
       ],
       ["access_lapsed", "sam", dueAt, "/request-access"],
+    ]);
+    // Stored by team id, not by slug: the BFF builds the href when it reads the row.
+    expect(sent.map((n) => [n.kind, n.userId, n.link])).toEqual([
+      [
+        "access_suspended",
+        "alex",
+        { to: "settings", teamId: "t_coral", section: "inactivity" },
+      ],
+      ["access_suspended", "devon", { to: "request-access" }],
+      [
+        "access_lapsed",
+        "alex",
+        { to: "settings", teamId: "t_coral", section: "recertification" },
+      ],
+      ["access_lapsed", "sam", { to: "request-access" }],
     ]);
   });
 
@@ -289,16 +307,18 @@ describe("runAccessSweep never leaves a team without a Team Admin", () => {
     expect(kept.map((r) => r.teamId).sort()).toEqual(
       ["t_cards", "t_coral", "t_deposits"].sort(),
     );
-    const told = await db
-      .select({ userId: notifications.userId, href: notifications.href })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.userId, "riley"),
-          eq(notifications.href, "/all/settings/teams"),
-        ),
-      );
+    const told = (
+      await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.userId, "riley"))
+    )
+      .map((n) => asShown(n))
+      .filter((n) => n.href === "/all/settings/teams");
     expect(told).toHaveLength(3);
+    expect(told.map((n) => n.link)).toEqual(
+      told.map(() => ({ to: "platform", section: "teams" })),
+    );
     expect(await runAccessSweep()).toEqual({
       membershipChanges: [],
       recertsClosed: [],

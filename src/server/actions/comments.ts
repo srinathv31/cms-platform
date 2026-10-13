@@ -28,7 +28,7 @@ import {
   templates,
   versions,
 } from "@/server/db/schema/ucomp";
-import { writeEffects } from "@/server/effects";
+import { writeEffects } from "@/server/services/local/effects";
 import { newId } from "@/server/ids";
 import { anchorIdsOf } from "@/domain/comments";
 import { loadChain } from "@/server/services/local/chain";

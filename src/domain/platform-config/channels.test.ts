@@ -5,6 +5,7 @@ import {
   channelRuleRefusal,
   setChannelRule,
 } from "./channels";
+import { describeConfigChange } from "./effects";
 import type { Channel } from "../types";
 import { NOW, riley } from "./fixtures";
 
@@ -141,7 +142,8 @@ describe("setChannelRule", () => {
     });
 
   it("turning a channel off names the Active versions it stops", () => {
-    expect(run()).toEqual({
+    const result = run();
+    expect(result).toEqual({
       ok: true,
       allowedChannels: ["pdf", "web"],
       consequences: [
@@ -155,8 +157,6 @@ describe("setChannelRule", () => {
           teamId: null,
           details: {
             area: "channel_rules",
-            summary:
-              "Turned off Email for Disclosure: 2 Active versions stopped rendering to Email",
             contentTypeId: "ct_disclosure",
             contentTypeName: "Disclosure",
             channel: "email",
@@ -166,12 +166,34 @@ describe("setChannelRule", () => {
         },
       ],
     });
+    // The Audit page words the row when it reads it.
+    const audit = result.ok ? result.effects[0] : undefined;
+    expect(audit?.kind === "audit" && describeConfigChange(audit.details)).toBe(
+      "turned off Email for Disclosure: 2 Active versions stopped rendering to Email",
+    );
     expect(channelOffConsequences("Disclosure", "pdf", 1)[0]).toBe(
       "1 Active Disclosure version stops rendering to PDF.",
     );
     expect(channelOffConsequences("Disclosure", "web", 0)[0]).toBe(
       "No Active Disclosure version renders to Web.",
     );
+  });
+
+  it("words turning a channel on, and turning off one no Active version uses", () => {
+    const on = run({
+      contentType: { ...ct, allowedChannels: ["web"] },
+      channel: "pdf",
+      allowed: true,
+    });
+    const turnedOn = on.ok ? on.effects[0] : undefined;
+    expect(
+      turnedOn?.kind === "audit" && describeConfigChange(turnedOn.details),
+    ).toBe("turned on PDF for Disclosure");
+    const idle = run({ activeUsing: 0 });
+    const turnedOff = idle.ok ? idle.effects[0] : undefined;
+    expect(
+      turnedOff?.kind === "audit" && describeConfigChange(turnedOff.details),
+    ).toBe("turned off Email for Disclosure");
   });
 
   it("turning one back on keeps the channel order; a no-op writes nothing", () => {

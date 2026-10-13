@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { requestChanges } from "./request-changes";
+import { describeNotification } from "../notifications";
 import { REASONS } from "../permissions";
-import type { ApprovalStage } from "../review-types";
+import type { ApprovalStage, LifecycleEffect } from "../review-types";
 import {
   NOW,
   TEMPLATE,
@@ -15,6 +16,12 @@ import {
   EMAIL_SUBJECT,
   reviewVersion,
 } from "./fixtures";
+
+/** A notification effect as its reader sees it (`describeNotification`): null for any other effect. */
+const worded = (effect: LifecycleEffect | undefined, readerId = "maya") =>
+  effect?.kind === "notification"
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 
 describe("requestChanges", () => {
   const run = (over: Partial<Parameters<typeof requestChanges>[0]> = {}) =>
@@ -79,13 +86,26 @@ describe("requestChanges", () => {
           kind: "notification",
           notification: "changes_requested",
           to: { kind: "user", userId: "maya" },
-          // Sent back, the round shows: "v1, round 1".
-          title:
-            "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 1.",
+          // Sent back, the round shows: it is a fact, worded "v1, round 1" when read.
+          facts: {
+            actorName: "Jordan Ellis",
+            templateName: TEMPLATE.name,
+            number: 1,
+            round: 1,
+          },
           body: REASON,
           link: { to: "template", templateId: TEMPLATE.id },
         },
       ],
+    });
+  });
+
+  it("words the author's notification when it is read: who sent which round back", () => {
+    const result = run();
+    expect(result.ok && worded(result.effects[1])).toEqual({
+      title:
+        "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 1.",
+      body: null,
     });
   });
 
@@ -193,10 +213,13 @@ describe("requestChanges", () => {
     expect(result.ok && result.effects).toMatchObject([
       { action: "version.changes_requested", details: { number: 1, round: 2 } },
       {
-        title:
-          "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 2.",
+        notification: "changes_requested",
+        facts: { number: 1, round: 2 },
       },
     ]);
+    expect(result.ok && worded(result.effects[1])?.title).toBe(
+      "Jordan Ellis requested changes on Spring Travel Rewards — Terms v1, round 2.",
+    );
     // The new draft is the next round's: no number and no round until it is submitted.
     expect(
       result.ok && [result.newDraft.number, result.newDraft.round],

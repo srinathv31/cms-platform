@@ -18,6 +18,7 @@ import { getLibraryRows } from "@/server/queries/library";
 import { searchPalette } from "@/server/queries/palette";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
 import { runRender } from "@/server/render/render-template";
+import { asShown } from "@/server/testing/notifications";
 import {
   loadPersona,
   seededDatabasePerTest,
@@ -297,10 +298,12 @@ describe("a rename in a draft goes live only with its version", () => {
   it("submitted, it is reviewed under its new name; customers still see the old one", async () => {
     const at = await submittedV3();
     expect((await version(3)).name).toBe(RENAMED);
-    const sent = await db
-      .select()
-      .from(notifications)
-      .where(eq(notifications.createdAt, at));
+    const sent = (
+      await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.createdAt, at))
+    ).map((n) => asShown(n));
     expect(sent.map((n) => n.title)).toContain(
       `Maya Chen submitted ${RENAMED} v3 for review.`,
     );
@@ -319,10 +322,12 @@ describe("a rename in a draft goes live only with its version", () => {
       body: "Is the new name approved by Legal?",
     });
     expect(result).toMatchObject({ ok: true });
-    const sent = await db
-      .select()
-      .from(notifications)
-      .where(eq(notifications.createdAt, at));
+    const sent = (
+      await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.createdAt, at))
+    ).map((n) => asShown(n));
     expect(sent.map((n) => n.title)).toEqual([
       `Jordan Ellis commented on ${RENAMED} v3.`,
     ]);

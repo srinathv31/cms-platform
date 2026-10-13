@@ -1,14 +1,10 @@
 import { and, eq } from "drizzle-orm";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { LifecycleEffect } from "@/domain/review-types";
-import { WRITE_TURN_WAIT_MS } from "@/lib/serialized-writes";
-import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { standaloneDatabasePerTest } from "@/server/testing/review-fixtures";
 import {
-  inTransaction,
   NOTICE_SEQ_KEY,
-  notificationHref,
   takeNoticeSeqs,
   writeEffects,
   type EffectContext,
@@ -29,7 +25,7 @@ const {
 const DAY = 86_400_000;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
-const { db, libsql, ids } = standaloneDatabasePerTest({ base: BASE });
+const { db, ids } = standaloneDatabasePerTest({ base: BASE });
 
 // Every test writes at its own instant, so its rows are easy to pick out.
 let tick = 0;
@@ -135,23 +131,50 @@ describe("writeEffects: notifications", () => {
     kind: "notification",
     notification: "review_requested",
     to: { kind: "team_role", role: "approver", exceptUserIds: except },
-    title: "Maya Chen submitted Cash Back Welcome Bonus — Terms v4 for review.",
+    facts: {
+      actorName: "Maya Chen",
+      templateName: "Cash Back Welcome Bonus — Terms",
+      number: 4,
+      round: 1,
+    },
     link: { to: "review", templateId: ids["cash-back"]!, versionNumber: 4 },
   });
 
-  it("sends a team_role notification to every active member with the role, linked under the team slug", async () => {
+  /** A comment's facts: what the writer stores, never a sentence. */
+  const commented = {
+    actorName: "Jordan Ellis",
+    templateName: "Balance Transfer Intro — Terms",
+    number: 2,
+    round: 1,
+    state: "superseded" as const,
+    reply: true,
+  };
+
+  it("sends a team_role notification to every active member with the role: its facts, and its link placed in the team by id", async () => {
     const ctx = context("cash-back", { actorId: "maya" });
     const written = await write([reviewRequested()], ctx);
     expect(written.notifications).toBe(2);
     const rows = await notificationsAt(ctx.at);
     expect(rows.map((r) => r.userId)).toEqual(["alex", "jordan"]);
-    expect(rows[0]).toMatchObject({
+    expect(rows[0]).toEqual({
+      id: expect.any(String),
+      userId: "alex",
       teamId: "t_coral",
       kind: "review_requested",
-      title:
-        "Maya Chen submitted Cash Back Welcome Bonus — Terms v4 for review.",
+      facts: {
+        actorName: "Maya Chen",
+        templateName: "Cash Back Welcome Bonus — Terms",
+        number: 4,
+        round: 1,
+      },
+      link: {
+        to: "review",
+        teamId: "t_coral",
+        templateId: ids["cash-back"],
+        versionNumber: 4,
+      },
       body: null,
-      href: `/coral-offers/review/${ids["cash-back"]}/4`,
+      createdAt: ctx.at,
       readAt: null,
     });
   });
@@ -199,17 +222,21 @@ describe("writeEffects: notifications", () => {
       [
         {
           kind: "notification",
-          notification: "version_live",
+          notification: "revoke_started",
           to: { kind: "user", userId: "maya" },
-          title: "Balance Transfer Intro — Terms v3 is Active.",
-          body: "Approved by Jordan Ellis.",
+          facts: {
+            actorName: "Jordan Ellis",
+            templateName: "Balance Transfer Intro — Terms",
+            number: 2,
+          },
+          body: "Wrong intro APR.",
           link: { to: "versions", templateId: ids["balance-transfer"]! },
         },
         {
           kind: "notification",
           notification: "comment_added",
           to: { kind: "user", userId: "jordan" }, // the actor: dropped
-          title: "x",
+          facts: commented,
           link: { to: "template", templateId: ids["balance-transfer"]! },
         },
       ],
@@ -218,9 +245,13 @@ describe("writeEffects: notifications", () => {
     expect(await notificationsAt(ctx.at)).toEqual([
       expect.objectContaining({
         userId: "maya",
-        kind: "version_live",
-        body: "Approved by Jordan Ellis.",
-        href: `/coral-offers/templates/${ids["balance-transfer"]}/versions`,
+        kind: "revoke_started",
+        body: "Wrong intro APR.",
+        link: {
+          to: "versions",
+          teamId: "t_coral",
+          templateId: ids["balance-transfer"],
+        },
       }),
     ]);
   });
@@ -238,17 +269,28 @@ describe("writeEffects: notifications", () => {
         kind: "notification" as const,
         notification: "review_requested" as const,
         to: { kind: "user" as const, userId },
-        title: "Waiting on you.",
+        facts: {
+          actorName: "Jordan Ellis",
+          templateName: "Balance Transfer Intro — Terms",
+          number: 3,
+          round: 1,
+          stage: "Legal",
+        },
         link,
       })),
       ctx,
     );
+    const review = {
+      to: "review",
+      templateId: link.templateId,
+      versionNumber: 3,
+    };
     expect(
-      (await notificationsAt(ctx.at)).map((n) => [n.userId, n.href]),
+      (await notificationsAt(ctx.at)).map((n) => [n.userId, n.link]),
     ).toEqual([
-      ["maya", `/coral-offers/review/${ids["balance-transfer"]}/3`],
-      ["naomi", `/deposits/review/${ids["balance-transfer"]}/3`],
-      ["riley", `/coral-offers/review/${ids["balance-transfer"]}/3`],
+      ["maya", { ...review, teamId: "t_coral" }],
+      ["naomi", { ...review, teamId: "t_deposits" }],
+      ["riley", { ...review, teamId: "t_coral" }],
     ]);
   });
 
@@ -264,17 +306,21 @@ describe("writeEffects: notifications", () => {
         kind: "notification" as const,
         notification: "comment_added" as const,
         to: { kind: "user" as const, userId },
-        title: "Jordan replied.",
+        facts: commented,
         link,
       })),
       ctx,
     );
+    const templateId = ids["balance-transfer"];
     expect(
-      (await notificationsAt(ctx.at)).map((n) => [n.userId, n.href]),
+      (await notificationsAt(ctx.at)).map((n) => [n.userId, n.link]),
     ).toEqual([
-      ["maya", `/coral-offers/templates/${ids["balance-transfer"]}`],
-      ["naomi", `/deposits/review/${ids["balance-transfer"]}/2`],
-      ["riley", `/coral-offers/templates/${ids["balance-transfer"]}`],
+      ["maya", { to: "template", teamId: "t_coral", templateId }],
+      [
+        "naomi",
+        { to: "review", teamId: "t_deposits", templateId, versionNumber: 2 },
+      ],
+      ["riley", { to: "template", teamId: "t_coral", templateId }],
     ]);
   });
 
@@ -290,41 +336,32 @@ describe("writeEffects: notifications", () => {
         kind: "notification" as const,
         notification: "comment_added" as const,
         to: { kind: "user" as const, userId },
-        title: "Jordan replied.",
+        facts: {
+          ...commented,
+          number: 3,
+          round: 1,
+          state: "changes_requested",
+        },
         link,
       })),
       ctx,
     );
+    const templateId = ids["balance-transfer"];
     expect(
-      (await notificationsAt(ctx.at)).map((n) => [n.userId, n.href]),
+      (await notificationsAt(ctx.at)).map((n) => [n.userId, n.link]),
     ).toEqual([
-      ["maya", `/coral-offers/templates/${ids["balance-transfer"]}`],
-      ["naomi", `/deposits/review/${ids["balance-transfer"]}/3?round=1`],
+      ["maya", { to: "template", teamId: "t_coral", templateId }],
+      [
+        "naomi",
+        {
+          to: "review",
+          teamId: "t_deposits",
+          templateId,
+          versionNumber: 3,
+          round: 1,
+        },
+      ],
     ]);
-  });
-
-  it("builds the three kinds of href, a review link with its round when it names one", () => {
-    expect(
-      notificationHref("deposits", {
-        to: "review",
-        templateId: "UC-AAAAAA",
-        versionNumber: 2,
-      }),
-    ).toBe("/deposits/review/UC-AAAAAA/2");
-    expect(
-      notificationHref("deposits", {
-        to: "review",
-        templateId: "UC-AAAAAA",
-        versionNumber: 2,
-        round: 3,
-      }),
-    ).toBe("/deposits/review/UC-AAAAAA/2?round=3");
-    expect(
-      notificationHref("deposits", { to: "template", templateId: "UC-AAAAAA" }),
-    ).toBe("/deposits/templates/UC-AAAAAA");
-    expect(
-      notificationHref("deposits", { to: "versions", templateId: "UC-AAAAAA" }),
-    ).toBe("/deposits/templates/UC-AAAAAA/versions");
   });
 });
 
@@ -337,7 +374,7 @@ describe("writeEffects: consumer notices", () => {
       versionNumber: 1,
       activeVersion: 2,
       sunsetAt: "2026-11-01T00:00:00.000Z",
-      contractLines: [],
+      contractChanges: [],
     },
   });
 
@@ -361,11 +398,11 @@ describe("writeEffects: consumer notices", () => {
           versionNumber: 1,
           activeVersion: 2,
           sunsetAt: "2026-11-01T00:00:00.000Z",
-          contractLines: [],
+          contractChanges: [],
         },
       }),
     ]);
-    // The payload is the effect's: numbers, dates and contract lines. No variable values.
+    // The payload is the effect's: numbers, dates and contract changes. No variable values.
     expect(JSON.stringify(rows[0]!.payload)).not.toContain("first_name");
   });
 
@@ -561,7 +598,7 @@ describe("writeEffects: consumer notices", () => {
               kind: "notification",
               notification: "version_revoked",
               to: { kind: "team_role", role: "approver" },
-              title: "x",
+              facts: { actorName: "Maya Chen", templateName: "x", number: 1 },
               link: { to: "versions", templateId: ctx.templateId },
             },
             sunsetNotice("v_x"),
@@ -581,60 +618,5 @@ describe("writeEffects: consumer notices", () => {
         .from(consumerNotices)
         .where(eq(consumerNotices.createdAt, ctx.at)),
     ).toEqual([]);
-  });
-});
-
-describe("inTransaction", () => {
-  const busy = Object.assign(new Error("database is locked"), {
-    code: "SQLITE_BUSY",
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
-
-  it("runs the transaction once: a busy failure is the answer, not a reason to try again", async () => {
-    const transaction = vi.fn().mockRejectedValue(busy);
-    await expect(
-      inTransaction({ transaction } as unknown as Db, async () => 0),
-    ).rejects.toBe(busy);
-    expect(transaction).toHaveBeenCalledTimes(1);
-  });
-
-  it("passes any other error straight through", async () => {
-    const transaction = vi
-      .fn()
-      .mockRejectedValue(new Error("constraint failed"));
-    await expect(
-      inTransaction({ transaction } as unknown as Db, async () => 0),
-    ).rejects.toThrow("constraint failed");
-    expect(transaction).toHaveBeenCalledTimes(1);
-  });
-
-  // The worst case a server action, an autosave or a sweep can wait (src/lib/serialized-writes.ts): stuck
-  // behind a write that never ends, it fails once the client's turn wait is over, and tries nothing more.
-  it("behind a write that never ends, fails after the client's 5 s wait and never tries again", async () => {
-    const attempts = vi.spyOn(db, "transaction");
-    const run = vi.fn(async () => "written");
-    const held = await libsql.transaction("write");
-    try {
-      vi.useFakeTimers();
-      const outcome = vi.fn();
-      inTransaction(db, run).then(
-        () => outcome("written"),
-        (error: { code?: string }) => outcome(error.code),
-      );
-      await vi.advanceTimersByTimeAsync(WRITE_TURN_WAIT_MS - 1);
-      expect(outcome, "a moment before the limit").not.toHaveBeenCalled();
-      await vi.advanceTimersByTimeAsync(1);
-      expect(outcome).toHaveBeenCalledWith("SQLITE_BUSY");
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(attempts).toHaveBeenCalledTimes(1);
-      expect(run, "the transaction never opened").not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-      await held.rollback();
-    }
   });
 });

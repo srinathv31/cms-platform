@@ -7,7 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
 import { teams, templates, versions } from "@/server/db/schema/ucomp";
-import { writeEffects } from "@/server/effects";
+import { writeEffects } from "@/server/services/local/effects";
 import { submitVersion } from "@/server/actions/review";
 import { newId } from "@/server/ids";
 import { draftRow } from "@/server/templates/create";

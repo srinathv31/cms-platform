@@ -12,9 +12,7 @@ import {
   sunsetInstant,
   todayIn,
 } from "../business-zone";
-import { describeChanges } from "../contract";
 import { refuse } from "../refusals";
-import { formatLongDate } from "../dates";
 import type { LifecycleEffect } from "../review-types";
 import type { ContractChange, VersionState } from "../types";
 import { numberOf, notify } from "./helpers";
@@ -43,8 +41,8 @@ export function sunsetPassed(
 /**
  * Set, or move, the date a Superseded version stops rendering: `sunsetDay`, which ends at 00:00 in the
  * business time zone (`zone`, decision 0017), and must come after today there. Consumers still rendering
- * it are notified with the instant and, when given, the contract changes the Active version brought
- * (`contractChanges`, worded against `activeNumber`).
+ * it are notified with the instant and the contract changes the Active version brought (`contractChanges`;
+ * empty when it brought none or nothing is Active: the notice has one shape, decision 0064).
  *
  * Once the sunset has passed it is final: the version has stopped rendering and its consumers have
  * moved on, so a new date would bring withdrawn content back. There is no clearing a sunset either,
@@ -95,12 +93,7 @@ export function setSunset(input: {
         sunsetAt: sunset.details.sunsetAt,
         sunsetDay,
         zone,
-        ...(changes.length > 0 && activeNumber !== null
-          ? {
-              contractChanges: changes,
-              contractLines: describeChanges(changes, activeNumber),
-            }
-          : {}),
+        contractChanges: activeNumber === null ? [] : changes,
       },
     },
   ];
@@ -110,7 +103,7 @@ export function setSunset(input: {
       notify({
         notification: "sunset_scheduled",
         to: { kind: "user", userId: version.submittedBy },
-        title: `${templateName} v${number} will stop rendering on ${formatLongDate(sunsetDay)}.`,
+        facts: { templateName, number, ...sunset.details },
         link: { to: "versions", templateId: version.templateId },
       }),
     );

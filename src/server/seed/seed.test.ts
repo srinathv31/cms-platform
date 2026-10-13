@@ -31,6 +31,7 @@ import {
   newTemplateId,
   seededId,
 } from "@/server/ids";
+import { asShown } from "@/server/testing/notifications";
 import { trySubmit } from "@/server/testing/submit-check";
 import { createContext } from "./context";
 import { seedDatabase, type SeedResult } from "./index";
@@ -1166,9 +1167,9 @@ describe("notifications, access and audit", () => {
       expect(approvals.filter((a) => a.versionId === v.id)).toHaveLength(0);
     }
 
-    const notes = (await db.select().from(ucomp.notifications)).filter(
-      (n) => n.userId === "jordan",
-    );
+    const notes = (await db.select().from(ucomp.notifications))
+      .filter((n) => n.userId === "jordan")
+      .map((n) => asShown(n));
     expect(notes).toHaveLength(2);
     for (const n of notes)
       expect(n).toMatchObject({
@@ -1182,6 +1183,28 @@ describe("notifications, access and audit", () => {
         `/coral-offers/review/${tpl("card-used-abroad")}/1`,
         `/coral-offers/review/${tpl("cash-back")}/3?round=2`,
       ].sort(),
+    );
+    // Stored by team id, never by slug or route (decision 0055).
+    expect(
+      notes
+        .map((n) => n.link)
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    ).toEqual(
+      [
+        {
+          to: "review",
+          teamId: "t_coral",
+          templateId: tpl("card-used-abroad"),
+          versionNumber: 1,
+        },
+        {
+          to: "review",
+          teamId: "t_coral",
+          templateId: tpl("cash-back"),
+          versionNumber: 3,
+          round: 2,
+        },
+      ].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
     );
 
     const waiting = versions.filter(
@@ -1482,7 +1505,6 @@ describe("one spelling per event", () => {
     expect(keysOf(byArea("teams"))).toEqual([
       "area",
       "slug",
-      "summary",
       "teamName",
       "userId",
       "userName",
@@ -1512,7 +1534,10 @@ describe("one spelling per event", () => {
       contentTypeName: "Disclosure",
       added: ["Offer details", "Rates and fees", "Legal notices"],
       sections: ["Offer details", "Rates and fees", "Legal notices"],
+      reordered: false,
     });
+    // The sentence is worded on read (`describeConfigChange`), never stored in the details.
+    for (const e of config) expect(e.details).not.toHaveProperty("summary");
   });
 
   it("writes every consumer notice with the fields a live one has, under no other spelling", async () => {

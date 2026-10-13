@@ -8,8 +8,11 @@ import {
   type RecipientFacts,
   type RecipientMembership,
 } from "@/domain/recipients";
-import type { LifecycleEffect } from "@/domain/review-types";
-import type { Db } from "@/server/db/client";
+import type {
+  EffectContext,
+  EffectsWritten,
+  LifecycleEffect,
+} from "@/domain/review-types";
 import {
   auditEvents,
   consumerNotices,
@@ -24,44 +27,15 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
-import { notificationHref } from "@/server/notification-href";
+import type { Tx } from "./transaction";
 
-// The write side every lifecycle action shares: the transaction (`inTransaction`, run once) and the
-// effects writer. A domain transition says WHAT happened as `effects` (audit rows, notifications,
-// consumer notices); this file decides WHO they reach and writes them in the caller's transaction,
-// so a transition and its side records land together or not at all.
+// The local backend's effects writer for lifecycle transitions. A domain transition says WHAT happened as
+// `effects` (audit rows, notifications, consumer notices); this file decides WHO they reach, by the domain's
+// rules (domain/recipients.ts, domain/golive/audience.ts), and writes them in the caller's transaction
+// (./transaction.ts), so a transition and its side records land together or not at all. The fake's twin is
+// services/fake/effects.ts.
 
-/** The transaction handle drizzle passes to `db.transaction`. */
-export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-
-export { CONSUMER_NOTICE_WINDOW_DAYS } from "@/domain/golive/audience";
-export { notificationHref } from "@/server/notification-href";
-
-export interface EffectContext {
-  /**
-   * When it happened: the demo clock, read once by the action. The sunset sweep passes the instant the
-   * sunset passed. Audit rows are dated then, and consumer notices go to the consumers that rendered the
-   * template from 90 days before it on.
-   */
-  at: Date;
-  /**
-   * When the effects are written, if later than `at`: the sunset sweep runs after the sunset. Notifications
-   * and consumer notices are created then, the moment they can first be read. Defaults to `at`.
-   */
-  writtenAt?: Date;
-  /** Who acted; null for the system (the sunset sweep). */
-  actorId: string | null;
-  teamId: string;
-  templateId: string;
-  /** The version the transition is about. An effect may name another one (`versionId`). */
-  versionId: string;
-}
-
-export interface EffectsWritten {
-  audit: number;
-  notifications: number;
-  consumerNotices: number;
-}
+export type { EffectContext, EffectsWritten } from "@/domain/review-types";
 
 /**
  * Writes what a lifecycle transition asked for, inside the caller's transaction.
@@ -69,7 +43,9 @@ export interface EffectsWritten {
  * - **audit**: one row with the team, the template and the version (`template.created` has none).
  * - **notification**: one row per recipient. `user` is that user; `team_role` is every active member
  *   holding the role on the template's team, minus `exceptUserIds`. Nobody is notified of their own
- *   action. The link becomes an href under the team's slug.
+ *   action. The row stores the kind, its facts and the link placed for that recipient (`recipientLink`: in
+ *   the template's team, or a stage reviewer's own), by team id; the BFF words it and builds the href when
+ *   it reads it (decision 0055).
  * - **consumer_notice**: one row per consumer that rendered the template, not as a preview, from 90
  *   days before `at` on (from the render log). The payload carries the name of the version the notice
  *   is about (`templateName`), version numbers, dates and contract changes, never variable values. Each
@@ -87,9 +63,7 @@ export async function writeEffects(
     consumerNotices: 0,
   };
   const createdAt = ctx.writtenAt ?? ctx.at;
-  // Read once, and only when a notification or a notice needs it.
-  let team: Promise<string> | undefined;
-  const teamSlugOf = () => (team ??= teamSlug(tx, ctx));
+  // Read once, and only when a notice needs it.
   const names = new Map<string, Promise<string>>();
   const nameOf = (versionId: string) => {
     let name = names.get(versionId);
@@ -135,28 +109,25 @@ export async function writeEffects(
           ctx.actorId,
         );
         if (userIds.length === 0) break;
-        const teamSlug = await teamSlugOf();
         const people = linkMayMove(effect.link)
           ? await recipientFacts(tx, userIds)
           : new Map<string, RecipientFacts>();
         await tx.insert(notifications).values(
-          userIds.map((userId) => {
-            const person = people.get(userId);
-            const opens = person
-              ? recipientLink(person, teamSlug, effect.link)
-              : { teamSlug, link: effect.link };
-            return {
-              id: newId("nt"),
-              userId,
-              teamId: ctx.teamId,
-              kind: effect.notification,
-              title: effect.title,
-              body: effect.body ?? null,
-              href: notificationHref(opens.teamSlug, opens.link),
-              createdAt,
-              readAt: null,
-            };
-          }),
+          userIds.map((userId) => ({
+            id: newId("nt"),
+            userId,
+            teamId: ctx.teamId,
+            kind: effect.notification,
+            facts: effect.facts,
+            link: recipientLink(
+              people.get(userId) ?? null,
+              ctx.teamId,
+              effect.link,
+            ),
+            body: effect.body ?? null,
+            createdAt,
+            readAt: null,
+          })),
         );
         written.notifications += userIds.length;
         break;
@@ -187,18 +158,6 @@ export async function writeEffects(
   return written;
 }
 
-/** The slug of the template's team (`ctx.teamId`): notifications link under it (decision 0053). */
-async function teamSlug(tx: Tx, ctx: EffectContext): Promise<string> {
-  const rows = await tx
-    .select({ teamSlug: teams.slug })
-    .from(teams)
-    .where(eq(teams.id, ctx.teamId))
-    .limit(1);
-  if (!rows[0])
-    throw new Error(`Effects for team ${ctx.teamId}, which isn't there.`);
-  return rows[0].teamSlug;
-}
-
 /**
  * The name a notice carries: the one the version it is about has, as written now. A new version's
  * notice names it as approved; a sunset or a revoke names the old version as its consumers know it.
@@ -227,7 +186,6 @@ async function membershipsWhere(
       userId: memberships.userId,
       status: memberships.status,
       teamId: teams.id,
-      teamSlug: teams.slug,
       teamName: teams.name,
     })
     .from(memberships)
@@ -324,23 +282,4 @@ async function recentConsumers(tx: Tx, ctx: EffectContext): Promise<string[]> {
       ),
     );
   return rows.map((r) => r.consumerId).sort();
-}
-
-// ── Transactions ──────────────────────────────────────────────
-
-/**
- * One write transaction (`BEGIN IMMEDIATE`), run once. Every write transaction in the app runs here: the
- * server actions (`actions/kit.ts`), autosave (`drafts/apply-patch.ts`), import (`import/create.ts`) and
- * the sweeps. Two writes at once never collide: the database client makes the second wait its turn, at
- * most 5 s (src/lib/serialized-writes.ts, the only place the app waits, which also says what a lock held
- * by another process does: it freezes the event loop and fails queued writes one by one). Past the wait
- * it fails with SQLITE_BUSY, and the failure is the answer: a retry here would wait again for every
- * attempt. The transaction reads what it checks, so whichever
- * write goes second sees the first one's, and its compare-and-set refuses if the row moved.
- */
-export function inTransaction<T>(
-  db: Db,
-  run: (tx: Tx) => Promise<T>,
-): Promise<T> {
-  return db.transaction(run);
 }

@@ -18,7 +18,7 @@ import {
 import type { TeamRole } from "../types";
 import { reinstatedSet } from "./members";
 import { ACCESS_REFUSALS } from "./refusals";
-import { ROLE_LABEL, sortRoles, isRequestableRole } from "./roles";
+import { sortRoles, isRequestableRole } from "./roles";
 
 export interface NewAccessRequest {
   userId: string;
@@ -102,7 +102,7 @@ export function requestAccess(input: {
           exceptUserIds: [requester.id],
         },
         teamId: team.id,
-        title: `${requester.name} asked for ${ROLE_LABEL[role]} access to ${team.name}.`,
+        facts: { actorName: requester.name, teamName: team.name, role },
         body: reason,
         link: { to: "settings", teamId: team.id, section: "access-requests" },
       },
@@ -204,7 +204,7 @@ export function decideAccessRequest(input: {
           notification: "access_denied",
           to: { kind: "user", userId: requester.id },
           teamId: team.id,
-          title: `${actor.name} declined your request for ${ROLE_LABEL[role]} access to ${team.name}.`,
+          facts: { actorName: actor.name, teamName: team.name, role },
           body: note,
           link: { to: "request-access" },
         },
@@ -261,7 +261,7 @@ export function decideAccessRequest(input: {
         notification: "access_granted",
         to: { kind: "user", userId: requester.id },
         teamId: team.id,
-        title: `${actor.name} approved your ${ROLE_LABEL[role]} access to ${team.name}.`,
+        facts: { actorName: actor.name, teamName: team.name, role },
         body: note || undefined,
         link: { to: "library", teamId: team.id },
       },

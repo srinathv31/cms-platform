@@ -1,15 +1,19 @@
 // Who a lifecycle notification reaches, and where its link opens for each person. Pure TypeScript: every
 // implementation behind the service interfaces follows these rules over the facts it loads (the local one from
-// the database in src/server/effects.ts, the fake from its arrays), so the two can't word them apart.
+// the database in src/server/services/local/effects.ts, the fake from its arrays), so the two can't place them
+// apart. A link is placed in a team by its id; the BFF builds its href from the team's slug when it reads it.
 
-import type { NotificationLink, Recipients } from "./review-types";
+import type {
+  NotificationLink,
+  PlacedNotificationLink,
+  Recipients,
+} from "./review-types";
 import type { MembershipStatus, PlatformRole, TeamRole } from "./types";
 
 /** One membership, as these rules read it. */
 export interface RecipientMembership {
   userId: string;
   teamId: string;
-  teamSlug: string;
   teamName: string;
   status: MembershipStatus;
   roles: readonly TeamRole[];
@@ -62,41 +66,60 @@ export function linkMayMove(link: NotificationLink): boolean {
 }
 
 /**
- * Where one recipient opens a notification's link: the template's team (`teamSlug`) when they can see it (an
- * active membership with a role there, or a platform role). A stage reviewer outside the team can't open the
- * workspace, so a review link opens in their own first space by name, and a template link that names a version
- * becomes that version's review there.
+ * Where one recipient opens a notification's link, placed in a team by its id: the template's team (`teamId`)
+ * when they can see it (an active membership with a role there, or a platform role). A stage reviewer outside
+ * the team can't open the workspace, so a review link opens in their own first space by name, and a template
+ * link that names a version becomes that version's review there. `recipient` is read only for a link that may
+ * move (`linkMayMove`); null places it in the template's team.
  */
 export function recipientLink(
-  recipient: RecipientFacts,
-  teamSlug: string,
+  recipient: RecipientFacts | null,
+  teamId: string,
   link: NotificationLink,
-): { teamSlug: string; link: NotificationLink } {
-  if (!linkMayMove(link)) return { teamSlug, link };
-  const own = ownSpace(recipient, teamSlug);
-  if (own === null) return { teamSlug, link };
-  return {
-    teamSlug: own,
-    link:
-      link.to === "template" && link.reviewVersion !== undefined
-        ? {
-            to: "review",
-            templateId: link.templateId,
-            versionNumber: link.reviewVersion.number,
-            round: link.reviewVersion.round,
-          }
-        : link,
-  };
+): PlacedNotificationLink {
+  const own =
+    recipient && linkMayMove(link) ? ownSpace(recipient, teamId) : null;
+  if (own === null) return placed(link, teamId);
+  if (link.to === "template" && link.reviewVersion !== undefined) {
+    const { number, round } = link.reviewVersion;
+    return placed(
+      {
+        to: "review",
+        templateId: link.templateId,
+        versionNumber: number,
+        ...(round === undefined ? {} : { round }),
+      },
+      own,
+    );
+  }
+  return placed(link, own);
 }
 
-/** The recipient's own first space by name, or null when they can see the template's team. */
-function ownSpace(recipient: RecipientFacts, teamSlug: string): string | null {
+/** A link placed in a team, as a row stores it: a template link's `reviewVersion` has done its work by then. */
+function placed(
+  link: NotificationLink,
+  teamId: string,
+): PlacedNotificationLink {
+  switch (link.to) {
+    case "review": {
+      const { templateId, versionNumber, round } = link;
+      return round === undefined
+        ? { to: "review", teamId, templateId, versionNumber }
+        : { to: "review", teamId, templateId, versionNumber, round };
+    }
+    case "template":
+    case "versions":
+      return { to: link.to, teamId, templateId: link.templateId };
+  }
+}
+
+/** The id of the recipient's own first space by name, or null when they can see the template's team. */
+function ownSpace(recipient: RecipientFacts, teamId: string): string | null {
   if (recipient.platformRole) return null;
   const mine = recipient.memberships.filter(
     (m) => m.status === "active" && m.roles.length > 0,
   );
-  if (mine.length === 0 || mine.some((m) => m.teamSlug === teamSlug))
-    return null;
+  if (mine.length === 0 || mine.some((m) => m.teamId === teamId)) return null;
   return [...mine].sort((a, b) => a.teamName.localeCompare(b.teamName))[0]!
-    .teamSlug;
+    .teamId;
 }

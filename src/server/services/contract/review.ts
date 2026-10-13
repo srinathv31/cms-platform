@@ -45,12 +45,22 @@ export function reviewContract(h: ContractHarness, base: Date) {
   /** What a command can have written about a template's v1: its audit rows, Coral's notices, Priya's notifications. */
   async function written(templateId: string) {
     const { version } = await versionOf(templateId);
+    const bell = await h
+      .services()
+      .notifications.list(await h.as("priya"), { limit: 100 });
+    if (!bell.ok) throw new Error(bell.code);
     return {
       audit: await h.probe.auditEvents({ versionId: version.id }),
       notices: await h.consumerNotices(CORAL, templateId),
-      priya: await h.probe.notifications({ userId: "priya" }),
+      priya: bell.items,
     };
   }
+
+  /** The notifications in `after` that `before` didn't have (the bell lists newest first). */
+  const told = <T extends { id: string }>(
+    before: readonly T[],
+    after: readonly T[],
+  ) => after.filter((n) => !before.some((b) => b.id === n.id));
 
   describe("review.setSunset", () => {
     it("moves a Superseded version's sunset to 00:00 in the business time zone, dates it by the backend's clock, and tells Coral and the author", async () => {
@@ -103,8 +113,27 @@ export function reviewContract(h: ContractHarness, base: Date) {
           zone: EASTERN,
         }),
       ]);
-      expect(added(before.priya, after.priya)).toEqual([
-        { userId: "priya", kind: "sunset_scheduled" },
+      // Facts and a link placed by the team's id: the words and the href are the BFF's (decision 0055).
+      expect(told(before.priya, after.priya)).toEqual([
+        {
+          id: expect.any(String),
+          kind: "sunset_scheduled",
+          facts: {
+            templateName: history.template.name,
+            number: 1,
+            sunsetAt: instant,
+            sunsetDay: day,
+            zone: EASTERN,
+          },
+          link: {
+            to: "versions",
+            teamId: history.template.teamId,
+            templateId,
+          },
+          body: null,
+          createdAt: minute(1).toISOString(),
+          readAt: null,
+        },
       ]);
     });
 

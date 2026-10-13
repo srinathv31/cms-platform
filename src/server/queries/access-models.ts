@@ -355,11 +355,13 @@ export const AUDIT_PAGE_LIMIT = 500;
 
 // ── Notifications (the bell) ─────────────────────────────────────────────────
 
-/** The bell's row. Supersedes server/queries/notifications.ts's NotificationItem (additive fields). */
+/** The bell's row: a stored notification worded and linked for the viewer (server/queries/notifications.ts). */
 export interface NotificationView {
   id: string;
-  kind: AnyNotificationKind | string; // older seeded spellings stay readable
+  /** null: a kind this app doesn't know yet (the backend added it first), worded generically. */
+  kind: AnyNotificationKind | null;
   title: string;
+  /** A person's own words, or the second line the facts word ("Next: Legal."); null for neither. */
   body: string | null;
   href: string | null;
   createdAt: string;

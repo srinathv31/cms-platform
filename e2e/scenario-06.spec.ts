@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { describeNotification } from "@/domain/notifications";
 import {
   correlation,
   expectError,
@@ -414,14 +415,22 @@ test.describe("scenario 6: revoke", () => {
         fresh.map((n) => n.userId).sort(),
         "to the approvers other than Jordan",
       ).toEqual(approvers.filter((id) => id !== "jordan"));
+      // Stored as facts and a link by team id (decision 0055), worded when the bell reads them.
       for (const note of fresh) {
         expect(note).toMatchObject({
           teamId: v1.teamId,
-          title: `Jordan Ellis started revoking ${NAME} v1. Confirm or cancel.`,
+          facts: { actorName: "Jordan Ellis", templateName: NAME, number: 1 },
           body: REASON,
-          href: `/${TEAM}/templates/${v1.templateId}/versions`,
+          link: {
+            to: "versions",
+            teamId: v1.teamId,
+            templateId: v1.templateId,
+          },
           readAt: null,
         });
+        expect(
+          describeNotification(note.kind, note.facts, note.userId).title,
+        ).toBe(`Jordan Ellis started revoking ${NAME} v1. Confirm or cancel.`);
       }
 
       const notices = (
@@ -780,11 +789,18 @@ test.describe("scenario 6: revoke", () => {
       for (const note of revoked) {
         expect(note).toMatchObject({
           teamId: v1.teamId,
-          title: `Alex Kim confirmed the revoke of ${NAME} v1.`,
+          facts: { actorName: "Alex Kim", templateName: NAME, number: 1 },
           body: REASON,
-          href: `/${TEAM}/templates/${v1.templateId}/versions`,
+          link: {
+            to: "versions",
+            teamId: v1.teamId,
+            templateId: v1.templateId,
+          },
           readAt: null,
         });
+        expect(
+          describeNotification(note.kind, note.facts, note.userId).title,
+        ).toBe(`Alex Kim confirmed the revoke of ${NAME} v1.`);
       }
 
       // The other version is as it was.

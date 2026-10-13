@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccessAuditAction, AuditFilters, AuditRow } from "./access-types";
 import {
-  NOTIFICATION_KINDS,
   actionLabel,
   actionOptions,
   activeFilterCount,
@@ -17,7 +16,6 @@ import {
   filterAuditRows,
   filterValues,
   isDay,
-  notificationFallback,
   parseAuditFilters,
   parseCsv,
   toCsv,
@@ -178,8 +176,11 @@ const DETAILS: Record<AccessAuditAction, Record<string, unknown>> = {
   },
   "platform.config_changed": {
     area: "channel_rules",
-    summary:
-      "Turned off PDF for Disclosure: 2 Active versions stopped rendering to PDF",
+    contentTypeId: "ct_disclosure",
+    contentTypeName: "Disclosure",
+    channel: "pdf",
+    allowed: false,
+    activeUsing: 2,
   },
 };
 
@@ -436,12 +437,90 @@ describe("describeAuditEvent", () => {
     expect(
       say("platform.config_changed", riley, {
         area: "teams",
-        summary: "Created team Coral Offers",
+        teamName: "Coral Offers",
+        slug: "coral-offers",
+        userId: "alex",
+        userName: "Alex Kim",
       }),
-    ).toBe("Riley Brooks created team Coral Offers.");
+    ).toBe(
+      "Riley Brooks created team Coral Offers with Alex Kim as Team Admin.",
+    );
+    expect(
+      say("platform.config_changed", riley, {
+        area: "content_types",
+        contentTypeName: "Disclosure",
+        added: ["Eligibility", "Fees"],
+        removed: ["Legal notices"],
+        renamed: [{ from: "Rates", to: "Rates and fees" }],
+        reordered: true,
+        sections: ["Rates and fees", "Eligibility", "Fees"],
+      }),
+    ).toBe(
+      "Riley Brooks changed Disclosure required sections: added Eligibility and Fees; removed Legal notices; renamed Rates to Rates and fees; reordered the sections.",
+    );
+    expect(
+      say("platform.config_changed", riley, {
+        area: "content_types",
+        contentTypeName: "Alert",
+        created: true,
+        added: [],
+        removed: [],
+        renamed: [],
+        reordered: false,
+        sections: [],
+      }),
+    ).toBe("Riley Brooks created content type Alert.");
+    expect(
+      say("platform.config_changed", riley, {
+        area: "channel_rules",
+        contentTypeName: "Alert",
+        channel: "sms",
+        allowed: true,
+        activeUsing: 0,
+      }),
+    ).toBe("Riley Brooks turned on SMS for Alert.");
+    // A stage that names a person keeps the name they had (`userName`), not a lookup.
+    expect(
+      say("platform.config_changed", riley, {
+        area: "approval_chains",
+        contentTypeName: "Disclosure",
+        before: ["Team approver"],
+        after: ["Team approver", "Legal reviewer"],
+        stages: [
+          {
+            name: "Team approver",
+            rule: { kind: "team_role", role: "approver" },
+          },
+          {
+            name: "Legal reviewer",
+            rule: { kind: "user", userId: "dana" },
+            userName: "Dana Park",
+          },
+        ],
+      }),
+    ).toBe(
+      "Riley Brooks set Disclosure approval chain: Team approver (Approver role) → Legal reviewer (Dana Park).",
+    );
+    expect(
+      say("platform.config_changed", riley, {
+        area: "business_zone",
+        from: "America/New_York",
+        to: "America/Los_Angeles",
+        pendingSunsets: 1,
+      }),
+    ).toBe(
+      "Riley Brooks set the business time zone to Pacific (America/Los_Angeles).",
+    );
+    // Details that don't word a change (a row from before its area's facts) name the area.
     expect(
       say("platform.config_changed", riley, { area: "approval_chains" }),
     ).toBe("Riley Brooks changed the approval chains.");
+    expect(
+      say("platform.config_changed", riley, {
+        area: "channel_rules",
+        summary: "An English sentence is no longer read",
+      }),
+    ).toBe("Riley Brooks changed the channel rules.");
   });
 
   it("survives missing and malformed details", () => {
@@ -842,55 +921,5 @@ describe("toCsv", () => {
 
   it("is the contract's toCsv", () => {
     expect(auditDomain.toCsv(rows)).toBe(toCsv(rows));
-  });
-});
-
-// ── Notifications ───────────────────────────────────────────
-
-describe("notification fallbacks", () => {
-  it("gives every kind a sentence and a link, with and without a team", () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(18);
-    for (const kind of NOTIFICATION_KINDS) {
-      for (const where of [
-        { teamSlug: "coral-offers", teamName: "Coral Offers" },
-        { teamSlug: null, teamName: null },
-      ]) {
-        const f = notificationFallback(kind, where);
-        expect(f.title, kind).toMatch(/^[A-Z].*[.]$/);
-        expect(f.title, kind).not.toMatch(/undefined|null/);
-        expect(f.href, kind).toMatch(/^\/[a-z0-9/-]*$/);
-      }
-    }
-  });
-
-  it("links to the place the person acts", () => {
-    const at = (kind: string) =>
-      notificationFallback(kind, {
-        teamSlug: "coral-offers",
-        teamName: "Coral Offers",
-      });
-    expect(at("access_requested")).toEqual({
-      title: "Someone asked for access to Coral Offers.",
-      href: "/coral-offers/settings/access-requests",
-    });
-    expect(at("recert_due").href).toBe(
-      "/coral-offers/settings/recertification",
-    );
-    expect(at("inactivity_flagged").href).toBe(
-      "/coral-offers/settings/inactivity",
-    );
-    expect(at("access_denied").href).toBe("/request-access");
-    expect(at("review_requested").href).toBe("/coral-offers/review");
-    expect(at("version_live").href).toBe("/coral-offers/library");
-    expect(at("an_old_spelling")).toEqual({
-      title: "Something changed in Stencil.",
-      href: "/coral-offers/library",
-    });
-    expect(
-      notificationFallback("access_granted", {
-        teamSlug: null,
-        teamName: null,
-      }).title,
-    ).toBe("You now have access to your team.");
   });
 });

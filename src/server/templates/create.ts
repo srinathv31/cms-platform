@@ -14,7 +14,8 @@ import { conformToSections } from "@/domain/platform-config/sections";
 import type { Channel, ChannelFamily, RequiredSection } from "@/domain/types";
 import { db, type Db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
-import { writeEffects, type Tx } from "@/server/effects";
+import { writeEffects } from "@/server/services/local/effects";
+import type { Tx } from "@/server/services/local/transaction";
 import { newId, newTemplateId } from "@/server/ids";
 
 // The write side of "a new template and its first draft", shared by New template (a starter,

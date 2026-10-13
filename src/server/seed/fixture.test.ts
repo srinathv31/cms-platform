@@ -136,22 +136,14 @@ describe("the seed fixture", () => {
     }
   });
 
-  it("loads at another moment as the seed built then, but for its render times and notification sentences", () => {
+  it("loads at another moment as the seed built then, but for its render times", () => {
     // Another quarter, and another time of day: 23:30 the evening before in New York.
     const later = new Date("2026-05-17T03:30:00.000Z");
+    // The render history is one realization of the reset's calendar (business hours, weekdays): built at another
+    // moment, the seed draws other times. A loader loads the realization the file holds. Notifications store
+    // facts (decision 0055), so they load as the seed built then, sunsets and deadlines included.
     const comparable = (tables: ReturnType<typeof loadFixture>["tables"]) =>
-      tables
-        // The render history is one realization of the reset's calendar (business hours, weekdays): built at
-        // another moment, the seed draws other times. A loader loads the realization the file holds.
-        .filter((t) => t.name !== "render_log")
-        .map((t) =>
-          t.name === "notifications"
-            ? {
-                ...t,
-                rows: t.rows.map((r) => ({ ...r, title: null, body: null })),
-              }
-            : t,
-        );
+      tables.filter((t) => t.name !== "render_log");
     const loaded = loadFixture(fixture, later);
     expect(comparable(loaded.tables)).toEqual(
       comparable(loadFixture(buildFixture(later), later).tables),
@@ -163,21 +155,7 @@ describe("the seed fixture", () => {
 
   it("holds no absolute time: a seed built a week later is the same file", () => {
     const later = buildFixture(new Date(FIXTURE_BASE.getTime() + 7 * DAY_MS));
-    // The sentences the seed words from a date (the inactivity notification's) are the one exception, until
-    // notifications store facts instead of sentences (decision 0055).
-    const withoutSentences = (f: SeedFixture) =>
-      stringifyFixture({
-        ...f,
-        tables: f.tables.map((t) =>
-          t.name === "notifications"
-            ? {
-                ...t,
-                rows: t.rows.map((r) => ({ ...r, title: null, body: null })),
-              }
-            : t,
-        ),
-      });
-    expect(withoutSentences(later)).toBe(withoutSentences(fixture));
+    expect(stringifyFixture(later)).toBe(stringifyFixture(fixture));
   });
 
   it("leaves no ISO instant or calendar day as a string", () => {

@@ -4,12 +4,11 @@ import type { AccessEffect } from "@/domain/access-types";
 import * as schema from "@/server/db/schema/ucomp";
 import { standaloneDatabasePerTest } from "@/server/testing/review-fixtures";
 import {
-  accessHref,
   applyMembershipChange,
   resolveAccessRecipients,
   writeAccessEffects,
 } from "./access-effects";
-import { inTransaction } from "./effects";
+import { inTransaction } from "./transaction";
 
 // The access effects writer against a temporary database filled by the real seed: Alex is Coral
 // Offers' only Team Admin; Naomi is Deposits'.
@@ -21,24 +20,6 @@ const { db } = standaloneDatabasePerTest({ base: BASE });
 
 let tick = 0;
 const instant = () => new Date(BASE.getTime() + ++tick * 1000);
-
-describe("accessHref", () => {
-  it("builds a team's link under its slug, never its id", () => {
-    expect(
-      accessHref(
-        { to: "settings", teamId: "t_coral", section: "access-requests" },
-        "coral-offers",
-      ),
-    ).toBe("/coral-offers/settings/access-requests");
-    expect(
-      accessHref({ to: "library", teamId: "t_deposits" }, "deposits"),
-    ).toBe("/deposits/library");
-    expect(accessHref({ to: "request-access" }, null)).toBe("/request-access");
-    expect(accessHref({ to: "platform", section: "teams" }, null)).toBe(
-      "/all/settings/teams",
-    );
-  });
-});
 
 describe("resolveAccessRecipients", () => {
   it("finds the team's active Team Admins, minus the exceptions", async () => {
@@ -73,7 +54,7 @@ describe("resolveAccessRecipients", () => {
 });
 
 describe("writeAccessEffects", () => {
-  it("writes audit rows (actor from the context, or the system) and notifications with hrefs", async () => {
+  it("writes audit rows (actor from the context, or the system) and notifications as facts and a link by team id", async () => {
     const now = instant();
     const backdated = new Date(now.getTime() - 86_400_000);
     const effects: AccessEffect[] = [
@@ -100,7 +81,11 @@ describe("writeAccessEffects", () => {
           exceptUserIds: ["morgan"],
         },
         teamId: "t_coral",
-        title: "Morgan Lee asked for Author access to Coral Offers.",
+        facts: {
+          actorName: "Morgan Lee",
+          teamName: "Coral Offers",
+          role: "author",
+        },
         body: "Drafting.",
         link: {
           to: "settings",
@@ -142,9 +127,19 @@ describe("writeAccessEffects", () => {
           eq(notifications.createdAt, now),
         ),
       );
-    expect(note).toMatchObject({
-      href: "/coral-offers/settings/access-requests",
+    expect(note).toEqual({
+      id: expect.any(String),
+      userId: "alex",
+      teamId: "t_coral",
+      kind: "access_requested",
+      facts: {
+        actorName: "Morgan Lee",
+        teamName: "Coral Offers",
+        role: "author",
+      },
+      link: { to: "settings", teamId: "t_coral", section: "access-requests" },
       body: "Drafting.",
+      createdAt: now,
       readAt: null,
     });
   });
@@ -160,8 +155,11 @@ describe("writeAccessEffects", () => {
             notification: "recert_due",
             to: { kind: "team_admins", teamId: "t_coral" },
             teamId: "t_coral",
-            title:
-              "Q1 2027 access review for Coral Offers is due March 3, 2027.",
+            facts: {
+              teamName: "Coral Offers",
+              dueAt: "2027-03-03T12:00:00.000Z",
+              members: 6,
+            },
             link: {
               to: "settings",
               teamId: "t_coral",

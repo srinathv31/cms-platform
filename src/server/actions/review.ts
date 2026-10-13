@@ -30,7 +30,8 @@ import {
   comments,
   versions,
 } from "@/server/db/schema/ucomp";
-import { writeEffects, type Tx } from "@/server/effects";
+import { writeEffects } from "@/server/services/local/effects";
+import type { Tx } from "@/server/services/local/transaction";
 import { newId } from "@/server/ids";
 import {
   loadChain,

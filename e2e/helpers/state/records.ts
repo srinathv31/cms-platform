@@ -131,14 +131,21 @@ export interface AuditEventRecord {
   sessionKey: string | null;
 }
 
+/**
+ * A notification as stored (decision 0055): its kind's facts (names as they were) and a link descriptor that
+ * names its team by id. The bell words it and builds its href when it reads it; `body` is a person's own words.
+ */
 export interface NotificationRecord {
   id: string;
   userId: string;
   teamId: string | null;
   kind: string;
-  title: string;
+  facts: Record<string, unknown>;
+  link: { to: string; teamId?: string; templateId?: string } & Record<
+    string,
+    unknown
+  >;
   body: string | null;
-  href: string | null;
   createdAt: number;
   readAt: number | null;
 }
@@ -252,6 +259,7 @@ const JSON_COLUMNS: Record<string, readonly string[]> = {
   ],
   approvals: ["sample_sets_seen"],
   audit_events: ["details"],
+  notifications: ["facts", "link"],
   consumer_notices: ["payload"],
   approval_stages: ["approver_rule"],
   content_types: ["required_sections", "allowed_channels"],

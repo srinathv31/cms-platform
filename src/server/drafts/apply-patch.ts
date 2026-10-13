@@ -23,7 +23,7 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { prepareBody, prepareField } from "@/server/documents/prepare";
-import { inTransaction } from "@/server/effects";
+import { inTransaction } from "@/server/services/local/transaction";
 import { newId } from "@/server/ids";
 import {
   DRAFT_EDITED,

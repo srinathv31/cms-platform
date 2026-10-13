@@ -6,14 +6,14 @@
 //     domain/activity.ts, access and platform actions read their details;
 //   - the filters (`?team&person&action&template&from&to`, each a comma list), their matching and
 //     the facet counts the five menus show;
-//   - the CSV export (RFC 4180);
-//   - a fallback sentence and link for every notification kind the bell shows.
+//   - the CSV export (RFC 4180).
+//
+// The bell's notifications are worded in notifications.ts.
 //
 // No framework imports: the server queries, the export route and client components all use it.
 
 import { ROLE_LABEL, rolesLabel } from "./access/roles";
 import type {
-  AnyNotificationKind,
   AuditCategory,
   AuditDomain,
   AuditFilters,
@@ -28,6 +28,7 @@ import {
   isCalendarDay,
   utcDay,
 } from "./dates";
+import { describeConfigChange } from "./platform-config/effects";
 import { plural } from "./plural";
 import type { Person } from "./review-types";
 import type { NumberedRound } from "./rounds";
@@ -168,8 +169,9 @@ export interface AuditEventInput {
 }
 
 /**
- * One sentence. Lifecycle actions delegate to `describeActivity`; access and platform actions read
- * their details (userName, role/roles, from/to, reason, note, label, dueAt, area, summary).
+ * One sentence. Lifecycle actions delegate to `describeActivity`; access actions read their details
+ * (userName, role/roles, from/to, reason, note, label, dueAt), and platform ones their area's facts
+ * (`describeConfigChange`).
  * Details never hold variable values, so nothing here can leak one.
  */
 export function describeAuditEvent(
@@ -306,17 +308,14 @@ export function describeAuditEvent(
     }
 
     case "platform.config_changed": {
-      const summary = text(d.summary);
-      return summary
-        ? continued(who, summary)
+      const done = describeConfigChange(d);
+      return done
+        ? `${who} ${done}${/[.!?]$/.test(done) ? "" : "."}`
         : `${who} changed the ${areaText(d.area)}.`;
     }
 
-    default: {
-      const summary = text(d.summary);
-      if (summary) return continued(who, summary);
+    default:
       return `${who}: ${actionLabel(e.action).toLowerCase()}.`;
-    }
   }
 }
 
@@ -677,148 +676,6 @@ export function parseCsv(csv: string): string[][] {
   return rows;
 }
 
-// ── Notifications (the bell) ────────────────────────────────────────────────
-
-/** Every kind the bell knows, lifecycle (Phase 4) then access (Phase 6). */
-export const NOTIFICATION_KINDS = [
-  "review_requested",
-  "changes_requested",
-  "stage_approved",
-  "version_live",
-  "comment_added",
-  "revoke_started",
-  "version_revoked",
-  "sunset_scheduled",
-  "access_requested",
-  "access_granted",
-  "access_denied",
-  "roles_changed",
-  "access_removed",
-  "access_lapsed",
-  "access_suspended",
-  "inactivity_flagged",
-  "recert_due",
-  "team_admin_appointed",
-] as const satisfies readonly AnyNotificationKind[];
-
-// Fails to compile when a kind is added to AnyNotificationKind but not listed above.
-type MissingKind = Exclude<
-  AnyNotificationKind,
-  (typeof NOTIFICATION_KINDS)[number]
->;
-const allKindsListed: MissingKind extends never ? true : MissingKind = true;
-void allKindsListed;
-
-export function isNotificationKind(kind: string): kind is AnyNotificationKind {
-  return (NOTIFICATION_KINDS as readonly string[]).includes(kind);
-}
-
-/** The notification's team: its slug, for the link, and its name. */
-type Where = { teamSlug: string | null; teamName: string | null };
-
-const NOTIFICATION_FALLBACKS: Record<
-  AnyNotificationKind,
-  { title: (t: string) => string; href: (w: Where) => string }
-> = {
-  review_requested: {
-    title: () => "A version is waiting for your review.",
-    href: (w) => teamPath(w, "review"),
-  },
-  changes_requested: {
-    title: () => "Changes were requested on a version you submitted.",
-    href: (w) => teamPath(w, "library"),
-  },
-  stage_approved: {
-    title: () => "A version passed a review stage.",
-    href: (w) => teamPath(w, "review"),
-  },
-  version_live: {
-    title: () => "A version is now Active.",
-    href: (w) => teamPath(w, "library"),
-  },
-  comment_added: {
-    title: () => "There's a new comment on a version in review.",
-    href: (w) => teamPath(w, "review"),
-  },
-  revoke_started: {
-    title: () => "A revoke is waiting for a second approver.",
-    href: (w) => teamPath(w, "review"),
-  },
-  version_revoked: {
-    title: () => "A version was revoked.",
-    href: (w) => teamPath(w, "library"),
-  },
-  sunset_scheduled: {
-    title: () => "A sunset date was set.",
-    href: (w) => teamPath(w, "library"),
-  },
-  access_requested: {
-    title: (t) => `Someone asked for access to ${t}.`,
-    href: (w) => teamPath(w, "settings/access-requests"),
-  },
-  access_granted: {
-    title: (t) => `You now have access to ${t}.`,
-    href: (w) => teamPath(w, "library"),
-  },
-  access_denied: {
-    title: (t) => `Your request for access to ${t} was declined.`,
-    href: () => "/request-access",
-  },
-  roles_changed: {
-    title: (t) => `Your roles in ${t} changed.`,
-    href: (w) => teamPath(w, "library"),
-  },
-  access_removed: {
-    title: (t) => `Your access to ${t} was removed.`,
-    href: () => "/request-access",
-  },
-  access_lapsed: {
-    title: (t) => `Access to ${t} lapsed.`,
-    href: () => "/request-access",
-  },
-  access_suspended: {
-    title: (t) => `Access to ${t} was suspended.`,
-    href: () => "/request-access",
-  },
-  inactivity_flagged: {
-    title: (t) =>
-      `A member of ${t} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days.`,
-    href: (w) => teamPath(w, "settings/inactivity"),
-  },
-  recert_due: {
-    title: (t) => `An access review for ${t} is due.`,
-    href: (w) => teamPath(w, "settings/recertification"),
-  },
-  team_admin_appointed: {
-    title: (t) => `You're the Team Admin of ${t}.`,
-    href: (w) => teamPath(w, "settings/members"),
-  },
-};
-
-/** A path in the team's space, by its slug. No team: the app's root, which lands in the viewer's space. */
-function teamPath(w: Where, rest: string): string {
-  return w.teamSlug ? `/${w.teamSlug}/${rest}` : "/";
-}
-
-/**
- * The sentence and link a notification shows when its row lacks them (rows written before a field
- * existed). Writers store both; the stored ones win. Unknown kinds fall back to the team's library.
- */
-export function notificationFallback(
-  kind: string,
-  where: Where,
-): { title: string; href: string } {
-  const teamName = where.teamName ?? "your team";
-  if (isNotificationKind(kind)) {
-    const f = NOTIFICATION_FALLBACKS[kind];
-    return { title: f.title(teamName), href: f.href(where) };
-  }
-  return {
-    title: "Something changed in Stencil.",
-    href: teamPath(where, "library"),
-  };
-}
-
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function text(value: unknown): string {
@@ -870,20 +727,6 @@ function possessive(name: string): string {
 
 function capitalize(s: string): string {
   return s ? s[0]!.toUpperCase() + s.slice(1) : s;
-}
-
-/** "Turned off PDF" → "turned off PDF" (a summary continues the actor's sentence). */
-function lowerFirst(s: string): string {
-  if (!s) return s;
-  // Keep acronyms and names ("PDF", "UCOMP") as they are.
-  if (/^[A-Z]{2,}/.test(s)) return s;
-  return s[0]!.toLowerCase() + s.slice(1);
-}
-
-/** "Riley Brooks turned off PDF for Disclosure." (a summary continues the actor's name). */
-function continued(who: string, summary: string): string {
-  const s = lowerFirst(summary);
-  return `${who} ${s}${/[.!?]$/.test(s) ? "" : "."}`;
 }
 
 /** "Stem: the text." with one closing period; just "Stem." when there's no text. Whitespace collapses. */

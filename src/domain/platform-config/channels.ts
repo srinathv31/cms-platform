@@ -111,22 +111,15 @@ export function setChannelRule(input: {
     c === channel ? allowed : current.includes(c),
   );
 
-  const label = CHANNEL_LABELS[channel];
   const consequences = allowed
     ? []
     : channelOffConsequences(contentType.name, channel, input.activeUsing);
-  const summary = allowed
-    ? `Turned on ${label} for ${contentType.name}`
-    : `Turned off ${label} for ${contentType.name}` +
-      (input.activeUsing > 0
-        ? `: ${formatCount(input.activeUsing)} Active ${pluralWord(input.activeUsing, "version stopped", "versions stopped")} rendering to ${label}`
-        : "");
   return {
     ok: true,
     allowedChannels: next,
     consequences,
     effects: [
-      configChanged("channel_rules", null, summary, {
+      configChanged("channel_rules", null, {
         contentTypeId: contentType.id,
         contentTypeName: contentType.name,
         channel,

@@ -14,6 +14,7 @@ import {
   seededDatabasePerTest,
 } from "@/server/testing/review-fixtures";
 import { findRound } from "@/server/services/local/find-round";
+import { asShown } from "@/server/testing/notifications";
 import { getViewer } from "@/server/viewer";
 import { addComment, reopenThread, reply, resolveThread } from "./comments";
 
@@ -64,12 +65,15 @@ beforeEach(() => {
 
 const auditAt = (at: Date) =>
   db.select().from(auditEvents).where(eq(auditEvents.at, at));
-const notificationsAt = (at: Date) =>
-  db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.createdAt, at))
-    .orderBy(notifications.userId);
+// The rows as the bell shows them (decision 0055): the stored facts and link, worded and linked on read.
+const notificationsAt = async (at: Date) =>
+  (
+    await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.createdAt, at))
+      .orderBy(notifications.userId)
+  ).map((n) => asShown(n));
 const threadRow = (id: string) =>
   db.query.commentThreads.findFirst({ where: eq(commentThreads.id, id) });
 
@@ -166,6 +170,15 @@ describe("addComment", () => {
         title:
           "Jordan Ellis commented on Cash Back Welcome Bonus — Terms v3, round 2.",
         href: `/coral-offers/review/${ids["cash-back"]}/3?round=2`,
+        // Stored by team id, with the round the label shows.
+        link: {
+          to: "review",
+          teamId: "t_coral",
+          templateId: ids["cash-back"],
+          versionNumber: 3,
+          round: 2,
+        },
+        body: "Is the $1,000 threshold still right?",
       }),
     ]);
   });
@@ -251,6 +264,11 @@ describe("addComment", () => {
       expect.objectContaining({
         userId: "maya",
         href: `/coral-offers/templates/${ids["annual-fee-waiver"]}`,
+        link: {
+          to: "template",
+          teamId: "t_coral",
+          templateId: ids["annual-fee-waiver"],
+        },
       }),
     ]);
   });
@@ -361,10 +379,16 @@ describe("reply notifications outside the team", () => {
     expect(
       await reply({ threadId, body: "Thanks, fixed in the draft." }),
     ).toEqual({ ok: true });
-    const hrefs = Object.fromEntries(
-      (await notificationsAt(at)).map((n) => [n.userId, n.href]),
-    );
+    const sent = await notificationsAt(at);
+    const hrefs = Object.fromEntries(sent.map((n) => [n.userId, n.href]));
     expect(hrefs.naomi).toBe(`/deposits/review/${ids["balance-transfer"]}/2`);
+    // The stored link names Naomi's own team by id; the slug is the BFF's to add.
+    expect(sent.find((n) => n.userId === "naomi")!.link).toEqual({
+      to: "review",
+      teamId: "t_deposits",
+      templateId: ids["balance-transfer"],
+      versionNumber: 2,
+    });
     // Everyone on the team still goes to the template.
     for (const [userId, href] of Object.entries(hrefs)) {
       if (userId !== "naomi")

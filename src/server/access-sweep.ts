@@ -22,8 +22,11 @@ import {
   teams,
   users,
 } from "@/server/db/schema/ucomp";
-import { applyMembershipChange, writeAccessEffects } from "./access-effects";
-import { inTransaction, type Tx } from "./effects";
+import {
+  applyMembershipChange,
+  writeAccessEffects,
+} from "@/server/services/local/access-effects";
+import { inTransaction, type Tx } from "@/server/services/local/transaction";
 
 // The clock-driven access sweep (domain/access/sweep.ts `sweepAccess`) and the fact readers the access
 // actions and queries share. The sweep runs on "Advance clock" and on a persona switch (the demo's

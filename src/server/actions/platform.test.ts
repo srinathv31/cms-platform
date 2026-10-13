@@ -8,6 +8,7 @@ import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { OUTPUT_KEYS } from "@/domain/review-outputs";
 import { PLATFORM_REFUSALS } from "@/domain/platform-config/refusals";
+import { describeConfigChange } from "@/domain/platform-config/effects";
 import { describeZoneChange } from "@/domain/platform-config/time-zone";
 import { validateChain } from "@/domain/platform-config/approval-chains";
 import type { ApproverRule, Viewer } from "@/domain/types";
@@ -25,12 +26,14 @@ import {
   getReviewQueue,
   getReviewScreen,
 } from "@/server/queries/review";
+import { asShown } from "@/server/testing/notifications";
 import {
   createTemplateWithDraft,
   draftRev,
   loadPersona,
   seededDatabasePerTest,
 } from "@/server/testing/review-fixtures";
+import { TEAM_SLUGS } from "@/server/seed/teams";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
 import {
@@ -126,12 +129,16 @@ const auditAt = (at: Date) =>
     .from(auditEvents)
     .where(gte(auditEvents.at, at))
     .orderBy(asc(auditEvents.id));
-const notificationsAt = (at: Date) =>
-  db
-    .select()
-    .from(notifications)
-    .where(gte(notifications.createdAt, at))
-    .orderBy(asc(notifications.userId));
+// The rows as the bell shows them (decision 0055): the stored facts and link, worded and linked on read. A team
+// the test created isn't in the seed's slugs, so the tests that need it pass its own.
+const notificationsAt = async (at: Date, slugs?: Record<string, string>) =>
+  (
+    await db
+      .select()
+      .from(notifications)
+      .where(gte(notifications.createdAt, at))
+      .orderBy(asc(notifications.userId))
+  ).map((n) => asShown(n, slugs));
 const chain = () =>
   db
     .select()
@@ -274,10 +281,20 @@ describe("createTeam", () => {
       ["access.granted", team!.id, "riley"],
       ["platform.config_changed", team!.id, "riley"],
     ]);
+    // The new team isn't in the seed's slugs; the row names it by id and the BFF finds its slug.
+    const slugs = { ...TEAM_SLUGS, [team!.id]: "home-loans" };
     expect(
-      (await notificationsAt(at)).map((n) => [n.userId, n.kind, n.href]),
+      (await notificationsAt(at, slugs)).map((n) => [n.userId, n.kind, n.href]),
     ).toEqual([
       ["alex", "team_admin_appointed", "/home-loans/settings/members"],
+    ]);
+    expect(
+      (await notificationsAt(at, slugs)).map((n) => [n.facts, n.link]),
+    ).toEqual([
+      [
+        { actorName: "Riley Brooks", teamName: "Home Loans" },
+        { to: "settings", teamId: team!.id, section: "members" },
+      ],
     ]);
     expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -384,6 +401,13 @@ describe("updateContentType", () => {
         (r.details as { area: string }).area,
       ]),
     ).toEqual([["platform.config_changed", null, "content_types"]]);
+    // The details are facts (no sentence); a section change says whether it only reordered.
+    const [changed] = await auditAt(at);
+    expect(changed!.details).toMatchObject({ reordered: false });
+    expect(changed!.details).not.toHaveProperty("summary");
+    expect(describeConfigChange(changed!.details!)).toBe(
+      "changed Disclosure required sections: added Privacy; removed Rates and fees; renamed Offer details to Offer summary",
+    );
 
     // An existing draft that still has "Rates and fees" submits as before (nothing at submit checks sections).
     const templateId = await submitted("t_coral", "maya");
@@ -627,11 +651,15 @@ describe("setBusinessZone", () => {
     });
     expect(audit?.details).toMatchObject({
       area: "business_zone",
-      summary: "Set the business time zone to Pacific (America/Los_Angeles)",
       from: "America/New_York",
       to: "America/Los_Angeles",
       pendingSunsets: 1,
     });
+    // The sentence is worded on read, never stored in the details.
+    expect(audit?.details).not.toHaveProperty("summary");
+    expect(describeConfigChange(audit!.details!)).toBe(
+      "set the business time zone to Pacific (America/Los_Angeles)",
+    );
     expect(refresh).toHaveBeenCalledTimes(1);
     // Sunsets keep their instants: their consumers have been told when they end.
     const sunsetAfter = (
@@ -707,13 +735,18 @@ describe("saveApprovalChain", () => {
     ]);
     expect((await chain())[0]!.id).toBe(TEAM_STAGE);
     expect((await versionOf(waiting))?.currentStage).toBe(0);
-    expect(
-      (await auditAt(at)).map(
-        (r) => (r.details as { summary: string }).summary,
-      ),
-    ).toEqual([
-      "Set Disclosure approval chain: Team approver (Approver role) → Legal reviewer (Dana Park)",
+    const changed = await auditAt(at);
+    expect(changed.map((r) => describeConfigChange(r.details!))).toEqual([
+      "set Disclosure approval chain: Team approver (Approver role) → Legal reviewer (Dana Park)",
     ]);
+    // The stages are stored as facts: a user rule keeps the name the person had, and no sentence is stored.
+    expect(changed[0]!.details).not.toHaveProperty("summary");
+    expect(changed[0]!.details).toMatchObject({
+      stages: [
+        { name: "Team approver", rule: TEAM_RULE },
+        { name: "Legal reviewer", rule: LEGAL.rule, userName: "Dana Park" },
+      ],
+    });
 
     const section = (await getApprovalChainsSection()).chains.find(
       (c) => c.contentTypeId === CT,
@@ -1080,20 +1113,29 @@ describe("saveApprovalChain", () => {
         stages: stages({ kind: "user", userId: "naomi" }),
       }),
     ).toEqual({ ok: true });
-    const told = await db
-      .select()
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.userId, "naomi"),
-          eq(notifications.kind, "review_requested"),
-          gte(notifications.createdAt, at),
-        ),
-      );
+    const told = (
+      await db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, "naomi"),
+            eq(notifications.kind, "review_requested"),
+            gte(notifications.createdAt, at),
+          ),
+        )
+    ).map((n) => asShown(n));
     // Naomi isn't on Coral Offers: the link opens in her own space.
     expect(told.map((n) => n.href)).toContainEqual(
       `/deposits/review/${templateId}/1`,
     );
+    // The stored link names her own team by id.
+    expect(told.map((n) => n.link)).toContainEqual({
+      to: "review",
+      teamId: "t_deposits",
+      templateId,
+      versionNumber: 1,
+    });
     as("riley");
     expect(
       await saveApprovalChain({ contentTypeId: CT, stages: stages(TEAM_RULE) }),

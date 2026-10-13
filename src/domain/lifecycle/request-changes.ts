@@ -12,7 +12,7 @@ import {
   type LifecycleEffect,
 } from "../review-types";
 import { copyToDraft } from "./drafts";
-import { roundOf, sentence, trimmed, notify } from "./helpers";
+import { roundOf, trimmed, notify } from "./helpers";
 import { REFUSALS } from "./refusals";
 import type {
   DraftFields,
@@ -66,13 +66,16 @@ export function requestChanges(input: {
     },
   ];
   if (version.submittedBy) {
-    // Labelled as it is now, sent back: "v1, round 1".
-    const sentBack = sentence({ number, round, state: "changes_requested" });
     effects.push(
       notify({
         notification: "changes_requested",
         to: { kind: "user", userId: version.submittedBy },
-        title: `${input.actorName} requested changes on ${input.templateName} ${sentBack}.`,
+        facts: {
+          actorName: input.actorName,
+          templateName: input.templateName,
+          number,
+          round,
+        },
         body: reason,
         link: { to: "template", templateId: version.templateId },
       }),

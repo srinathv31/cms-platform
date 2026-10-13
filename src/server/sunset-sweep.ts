@@ -9,7 +9,8 @@ import { now } from "@/server/clock";
 import { db, type Db } from "@/server/db/client";
 import { auditEvents, templates, versions } from "@/server/db/schema/ucomp";
 import { readBusinessZone } from "@/server/services/local/business-zone";
-import { inTransaction, writeEffects, type Tx } from "./effects";
+import { writeEffects } from "@/server/services/local/effects";
+import { inTransaction, type Tx } from "@/server/services/local/transaction";
 
 // The clock-driven sunset sweep (domain/lifecycle/sunset.ts `sweepSunsets`): for each sunset the demo clock has
 // passed, one `version.sunset_passed` audit row dated at the sunset, so the audit log and the Activity tab say
