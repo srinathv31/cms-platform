@@ -3,8 +3,8 @@
 //
 //   "Jordan Ellis started revoking v1: Wrong APR in legal notices."
 //
-// It reads every AuditAction the lifecycle and the sunset sweep write, plus the older spellings the seed
-// uses (version.approved, version.revoke_confirmed, comment.resolved). A null actor is the system.
+// It reads every AuditAction the lifecycle and the sunset sweep write, and no other spelling: the seed writes
+// the same names (decision 0064). A null actor is the system.
 //
 // A review event names the round as the review history does (rounds.ts, `history`): "Maya Chen submitted
 // v3, round 1 for review.", "Jordan Ellis approved v2 on round 3, making it Active." Every other event is
@@ -15,7 +15,7 @@ import { formatLongDate, formatRecordedDate } from "./dates";
 import type { AuditAction, Person } from "./review-types";
 import { versionLabel, type LabelStyle, type NumberedRound } from "./rounds";
 
-/** Who a null actor is: the platform itself (the seed's activations, the sunset sweep). */
+/** Who a null actor is: the platform itself (the sunset sweep). */
 export const SYSTEM_ACTOR = "Stencil";
 export const SYSTEM_INITIALS = "S";
 
@@ -34,11 +34,9 @@ export const REVIEW_EVENT_ACTIONS: ReadonlySet<string> = new Set([
   "version.submitted",
   "version.changes_requested",
   "version.stage_approved",
-  "version.approved",
   "version.activated",
   "comment.added",
   "thread.resolved",
-  "comment.resolved",
   "thread.reopened",
 ]);
 
@@ -87,25 +85,18 @@ export function describeActivity(
       return withText(`${who} submitted ${v} for review`, d.note);
     case "version.changes_requested":
       return withText(`${who} requested changes on ${v}`, d.reason);
-    case "version.stage_approved":
-    case "version.approved": {
+    case "version.stage_approved": {
       const stage = text(d.stage);
       return stage
         ? `${who} approved ${v} (${stage}).`
         : `${who} approved ${v}.`;
     }
     case "version.activated": {
-      // The released number, and the round it was approved on when that wasn't the first.
+      // The last stage's approval: the released number, and the round it was approved on when that wasn't the first.
       const live = version === null ? v : `v${version.number}`;
-      if (actor) {
-        return version !== null && version.round > 1
-          ? `${who} approved ${live} on round ${version.round}, making it Active.`
-          : `${who} approved ${live}, making it Active.`;
-      }
-      const replaced = numberOr(d.supersedes);
-      return replaced === null
-        ? `${live} became Active.`
-        : `${live} became Active, replacing v${replaced}.`;
+      return version !== null && version.round > 1
+        ? `${who} approved ${live} on round ${version.round}, making it Active.`
+        : `${who} approved ${live}, making it Active.`;
     }
     case "version.superseded": {
       const by = numberOr(d.supersededBy);
@@ -134,12 +125,10 @@ export function describeActivity(
     case "version.revoke_cancelled":
       return `${who} canceled the revoke of ${v}.`;
     case "version.revoked":
-    case "version.revoke_confirmed":
       return withText(`${who} confirmed the revoke of ${v}`, d.reason);
     case "comment.added":
       return `${who} commented on ${v}.`;
-    case "thread.resolved":
-    case "comment.resolved": {
+    case "thread.resolved": {
       // Submitting the next round resolves the change request that sent this one back: the round already
       // says which, so the sentence names it once. A row from before rounds names the next version instead.
       const answeredBy = numberOr(d.resolvedWith);

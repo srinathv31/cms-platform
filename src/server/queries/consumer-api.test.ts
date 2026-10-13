@@ -770,7 +770,7 @@ describe("listNotices", () => {
     });
   });
 
-  it("a seeded revoke gets the version that was Active then", async () => {
+  it("a seeded revoke names the version that was Active then", async () => {
     const { notices } = await listNotices("coral", {
       templateId: id("holiday-points"),
       limit: 50,

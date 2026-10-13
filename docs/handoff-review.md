@@ -530,7 +530,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D10 · Medium: Audit and notice payloads are untyped
 
-- **Status:** Open
+- **Status:** Partly fixed. The seed writes the runtime's audit action names and notice fields, so there are no aliases and `noticeView` reads one shape ([decision 0064](decisions/0064-payloads-are-facts-with-one-shape-per-event.md), `src/server/seed/templates/build.ts`). A typed payload per action is still open: the catalogue is written with the handoff package and the types are generated from the enterprise API design.
 - **Where:** `src/domain/review-types.ts` line 52; `src/domain/audit.ts` line 140
 - **What happens:** `details: Record`. The sentence builders guess which fields exist, notices read two payload shapes (the seed's and live rows'), and audit aliases exist only to cover the seed's spellings.
 - **Fix:** A typed payload per action, and migrate the seed instead of aliasing it.
@@ -538,7 +538,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### D11 · Low: JavaScript-only behavior that won't port cleanly
 
-- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant` is gone with the notices `since` parameter, and the consumer API's search compares names and ids by code point (`compareCodePoints` in `src/domain/golive/cursor.ts`, PR #10). `localeCompare` ordering elsewhere (the read models' sorts, `domain/golive/usage.ts`, `domain/consequences.ts`) and `canonicalAction` remain. The contract matcher reports a new variable on a renamed variable's old key as an addition beside the rename (D8).
+- **Status:** Partly fixed. us_state lookups use `Object.hasOwn` (PR #6). `parseInstant` is gone with the notices `since` parameter, and the consumer API's search compares names and ids by code point (`compareCodePoints` in `src/domain/golive/cursor.ts`, PR #10). `localeCompare` ordering elsewhere (the read models' sorts, `domain/golive/usage.ts`, `domain/consequences.ts`) remain. `canonicalAction` and the Audit action catalog no longer look a name up on a plain object (`Object.hasOwn`). The contract matcher reports a new variable on a renamed variable's old key as an addition beside the rename (D8).
 - **Where:** `src/domain/audit.ts` line 93; `src/domain/golive/api-errors.ts` line 61
 - **What happens:** A plain-object lookup with untrusted keys (`canonicalAction("toString")` returns a function). `parseInstant("2026-02-30")` rolls over to March 2. `localeCompare` orders ids and names (ICU collation, unlike Java's `compareTo`). If a key is renamed and a new variable reuses the old key, the diff reports only the rename.
 - **Fix:** Use `Map` or `Object.hasOwn`; validate dates by round-trip; compare ids by code point; fix the contract matcher.

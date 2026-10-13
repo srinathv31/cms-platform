@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { AccessAuditAction } from "@/domain/access-types";
 import { sunsetDay, sunsetInstant, todayIn } from "@/domain/business-zone";
 import {
   ALL_CHANNEL_FIELDS,
@@ -17,7 +18,8 @@ import {
   normalizeAndCheckChannelField,
   type ChannelFields,
 } from "@/domain/channel-fields";
-import { DOCUMENT_THREAD } from "@/domain/review-types";
+import { RESERVED_SLUGS } from "@/domain/platform-config/limits";
+import { DOCUMENT_THREAD, type AuditAction } from "@/domain/review-types";
 import { headOf, isReleased } from "@/domain/rounds";
 import type { JSONContent } from "@/domain/types";
 import { fileUrlOfPath } from "@/lib/file-url";
@@ -298,6 +300,11 @@ describe("people, teams and access", () => {
       "deposits",
     ]);
     for (const t of teams) expect(t.slug).toBe(t.id);
+  });
+
+  it("gives no team a slug the app's own routes use (decision 0071)", () => {
+    // A team's slug is the first segment of its URLs, so a slug a route already owns would shadow that route.
+    for (const t of teams) expect(RESERVED_SLUGS.has(t.slug)).toBe(false);
   });
 
   it("matches the persona table in the build plan", async () => {
@@ -1245,10 +1252,7 @@ describe("notifications, access and audit", () => {
       "version.sunset_set",
     );
     expect(forVersion(version("holiday-points", 1).id)).toEqual(
-      expect.arrayContaining([
-        "version.revoke_started",
-        "version.revoke_confirmed",
-      ]),
+      expect.arrayContaining(["version.revoke_started", "version.revoked"]),
     );
     for (const v of versions.filter((x) => x.number !== null)) {
       expect(forVersion(v.id)).toContain("version.submitted");
@@ -1282,6 +1286,275 @@ describe("notifications, access and audit", () => {
     const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     expect(settings.clock_offset_days).toBe(0);
     expect(settings.seed_version).toBeTruthy();
+  });
+});
+
+// Decision 0064: an audit action and a notice kind have one spelling and one shape, the runtime's, and the
+// seed writes it exactly as the transitions do.
+describe("one spelling per event", () => {
+  const eventsOf = async (action: string) =>
+    (await db.select().from(ucomp.auditEvents)).filter(
+      (e) => e.action === action,
+    );
+  const keysOf = (rows: { details: unknown }[]) =>
+    [
+      ...new Set(
+        rows.flatMap((r) => Object.keys(r.details as Record<string, unknown>)),
+      ),
+    ].sort();
+
+  it("writes only audit actions the runtime writes", async () => {
+    const written = new Set(
+      (await db.select().from(ucomp.auditEvents)).map((e) => e.action),
+    );
+    // Every action a transition or sweep can write (`AuditAction`, `AccessAuditAction`).
+    const runtime: readonly (AuditAction | AccessAuditAction)[] = [
+      "template.created",
+      "draft.started",
+      "draft.edited",
+      "version.submitted",
+      "version.changes_requested",
+      "version.stage_approved",
+      "version.activated",
+      "version.superseded",
+      "version.sunset_set",
+      "version.sunset_passed",
+      "version.revoke_started",
+      "version.revoke_cancelled",
+      "version.revoked",
+      "comment.added",
+      "thread.resolved",
+      "thread.reopened",
+      "access.requested",
+      "access.granted",
+      "access.denied",
+      "access.role_changed",
+      "access.removed",
+      "access.flagged_inactive",
+      "access.kept",
+      "access.suspended",
+      "access.lapsed",
+      "access.reinstated",
+      "access.kept_last_admin",
+      "recert.started",
+      "recert.kept",
+      "recert.removed",
+      "recert.closed",
+      "platform.config_changed",
+    ];
+    for (const action of written) expect(runtime).toContain(action);
+    for (const old of [
+      "version.approved",
+      "version.revoke_confirmed",
+      "comment.resolved",
+    ])
+      expect(written).not.toContain(old);
+  });
+
+  it("records an approval as the approver's version.activated, and the replaced version as superseded", async () => {
+    const v2 = version("balance-transfer", 2);
+    const v1 = version("balance-transfer", 1);
+    const [activated] = (await eventsOf("version.activated")).filter(
+      (e) => e.versionId === v2.id,
+    );
+    expect(activated).toMatchObject({
+      actorId: "jordan",
+      details: {
+        number: 2,
+        round: 1,
+        supersedes: 1,
+        stage: "Team approver",
+        outputsViewed: ["pdf", "web"],
+      },
+    });
+    expect(activated.at).toEqual(v2.activatedAt);
+    const [superseded] = (await eventsOf("version.superseded")).filter(
+      (e) => e.versionId === v1.id,
+    );
+    expect(superseded).toMatchObject({
+      actorId: "jordan",
+      details: { number: 1, supersededBy: 2 },
+    });
+    expect(superseded.at).toEqual(v1.supersededAt);
+    // Nothing is activated by the system: every activation is a person's approval.
+    for (const e of await eventsOf("version.activated"))
+      expect(e.actorId).not.toBeNull();
+    // A push's two phones are both viewed.
+    const alert = version("payment-due-reminder", 1);
+    const [alertActivated] = (await eventsOf("version.activated")).filter(
+      (e) => e.versionId === alert.id,
+    );
+    expect(alertActivated.details).toMatchObject({
+      outputsViewed: ["push.ios", "push.android", "sms"],
+    });
+  });
+
+  it("writes the revoke as version.revoked, with whether the version was still Active", async () => {
+    const v1 = version("holiday-points", 1);
+    const [revoked] = (await eventsOf("version.revoked")).filter(
+      (e) => e.versionId === v1.id,
+    );
+    expect(revoked.details).toEqual({
+      number: 1,
+      reason: v1.revoke!.reason,
+      startedBy: v1.revoke!.startedBy,
+      wasActive: false,
+    });
+  });
+
+  it("writes the facts the runtime's comment, resolve, sunset and draft events hold", async () => {
+    expect(keysOf(await eventsOf("comment.added"))).toEqual([
+      "blockId",
+      "number",
+      "quote",
+      "reply",
+      "round",
+      "threadId",
+    ]);
+    expect(keysOf(await eventsOf("thread.resolved"))).toEqual([
+      "auto",
+      "blockId",
+      "number",
+      "resolvedWith",
+      "resolvedWithRound",
+      "round",
+      "threadId",
+    ]);
+    expect(await eventsOf("version.sunset_set")).toEqual([
+      expect.objectContaining({
+        details: expect.objectContaining({ previousSunsetAt: null }),
+      }),
+    ]);
+    // A draft copied from a version starts with `draft.started`, and the editing sessions that follow add up to its rev.
+    const started = await eventsOf("draft.started");
+    expect(keysOf(started)).toEqual(["basedOn"]);
+    expect(started).toHaveLength(
+      versions.filter((v) => v.basedOnVersionId).length,
+    );
+    const edits = await eventsOf("draft.edited");
+    expect(keysOf(edits)).toEqual(["fields", "rev", "saves", "since"]);
+    for (const v of versions) {
+      const sessions = edits
+        .filter((e) => e.versionId === v.id)
+        .sort((a, b) => a.at.getTime() - b.at.getTime());
+      const details = sessions.map(
+        (e) => e.details as { saves: number; rev: number; since: string },
+      );
+      expect(details.at(-1)!.rev).toBe(v.rev);
+      expect(details.reduce((sum, d) => sum + d.saves, 0)).toBe(v.rev);
+      for (const [i, d] of details.entries()) {
+        expect(d.saves).toBeGreaterThan(0);
+        // The session's first save came before its latest, which dates the row.
+        expect(new Date(d.since).getTime()).toBeLessThan(
+          sessions[i].at.getTime(),
+        );
+      }
+    }
+  });
+
+  it("writes the access and platform facts the runtime's builders write", async () => {
+    expect(await eventsOf("access.requested")).toEqual([
+      expect.objectContaining({
+        actorId: "chris",
+        details: expect.objectContaining({
+          userId: "chris",
+          userName: "Chris Morales",
+          role: "author",
+        }),
+      }),
+    ]);
+    expect(await eventsOf("recert.started")).toEqual([
+      expect.objectContaining({ actorId: "alex", teamId: "coral-offers" }),
+    ]);
+    const granted = await eventsOf("access.granted");
+    for (const e of granted) {
+      const d = e.details as { role: string; roles: string[] };
+      expect(d.roles).toContain(d.role);
+    }
+    // Each team's first Team Admin is appointed, once.
+    expect(
+      granted.filter((e) => (e.details as { appointed?: true }).appointed),
+    ).toHaveLength(3);
+
+    const config = await eventsOf("platform.config_changed");
+    const byArea = (area: string) =>
+      config.filter((e) => (e.details as { area: string }).area === area);
+    expect(keysOf(byArea("teams"))).toEqual([
+      "area",
+      "slug",
+      "summary",
+      "teamName",
+      "userId",
+      "userName",
+    ]);
+    expect(byArea("channel_rules").map((e) => e.details)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          contentTypeName: "Disclosure",
+          channel: "pdf",
+          allowed: true,
+          activeUsing: 0,
+        }),
+        expect.objectContaining({ contentTypeName: "Alert", channel: "sms" }),
+      ]),
+    );
+    expect(byArea("approval_chains")[0].details).toMatchObject({
+      before: [],
+      after: ["Team approver"],
+      stages: [
+        {
+          name: "Team approver",
+          rule: { kind: "team_role", role: "approver" },
+        },
+      ],
+    });
+    expect(byArea("content_types")[0].details).toMatchObject({
+      contentTypeName: "Disclosure",
+      added: ["Offer details", "Rates and fees", "Legal notices"],
+      sections: ["Offer details", "Rates and fees", "Legal notices"],
+    });
+  });
+
+  it("writes every consumer notice with the fields a live one has, under no other spelling", async () => {
+    const notices = await db.select().from(ucomp.consumerNotices);
+    const payloads = (kind: string) =>
+      notices
+        .filter((n) => n.kind === kind)
+        .map((n) => n.payload as Record<string, unknown>);
+    for (const payload of payloads("new_version")) {
+      expect(Object.keys(payload).sort()).toEqual([
+        "activeVersion",
+        "contractChanges",
+        "templateName",
+        "versionNumber",
+      ]);
+      expect(payload.activeVersion).toBe(payload.versionNumber);
+    }
+    expect(payloads("sunset_scheduled")).toEqual([
+      expect.objectContaining({
+        versionNumber: 1,
+        activeVersion: 2,
+        zone: "America/New_York",
+      }),
+    ]);
+    expect(Object.keys(payloads("sunset_scheduled")[0]).sort()).toEqual([
+      "activeVersion",
+      "contractChanges",
+      "sunsetAt",
+      "sunsetDay",
+      "templateName",
+      "versionNumber",
+      "zone",
+    ]);
+    // Holiday Points v1 was revoked after v2 replaced it, so v2 is the version to move to.
+    expect(payloads("revoked")).toEqual([
+      {
+        templateName: expect.any(String),
+        versionNumber: 1,
+        activeVersion: 2,
+        reason: expect.any(String),
+      },
+    ]);
   });
 });
 

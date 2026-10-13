@@ -1,7 +1,7 @@
 // A consumer_notices row as the consumer API serves it. Pure TypeScript.
 //
-// Seeded rows and the rows server/effects.ts writes at runtime carry slightly different payloads
-// (see `NoticeRow` in golive-types.ts); `noticeView` reads either and words the one-line `message`.
+// The rows server/effects.ts writes, and the seed's (it writes the same fields, decision 0064), carry the
+// payloads `NoticeRow` in golive-types.ts lists; `noticeView` reads one and words the one-line `message`.
 // Payloads never hold variable values, and neither does anything here.
 
 import { recordedSunsetDay } from "../business-zone";
@@ -18,8 +18,6 @@ const str = (value: unknown): string | null =>
   typeof value === "string" && value !== "" ? value : null;
 const int = (value: unknown): number | null =>
   typeof value === "number" && Number.isInteger(value) ? value : null;
-const has = (payload: Record<string, unknown>, key: string) =>
-  Object.hasOwn(payload, key);
 
 /** The payload's contract changes that have every field of their kind. */
 function changesOf(value: unknown): ContractChange[] {
@@ -107,10 +105,7 @@ export function noticeView(row: NoticeRow): ApiNotice {
 
   switch (row.kind) {
     case "new_version": {
-      // Live rows say which version is Active; a seeded row's new version is the Active one.
-      const activeVersion = has(p, "activeVersion")
-        ? int(p.activeVersion)
-        : versionNumber;
+      const activeVersion = int(p.activeVersion);
       const raw = changesOf(p.contractChanges);
       const changes = apiChanges(raw, versionNumber);
       const summary = changeSummary(raw);
@@ -125,10 +120,7 @@ export function noticeView(row: NoticeRow): ApiNotice {
     }
 
     case "sunset_scheduled": {
-      // Live rows: activeVersion. Seeded rows: replacedByVersionNumber.
-      const activeVersion = has(p, "activeVersion")
-        ? int(p.activeVersion)
-        : int(p.replacedByVersionNumber);
+      const activeVersion = int(p.activeVersion);
       const sunset = sunsetOf();
       const changes =
         activeVersion === null

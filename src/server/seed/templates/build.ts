@@ -1,22 +1,30 @@
 // Turns a declarative `SeedTemplate` into rows. One template at a time, `buildTemplate` puts the template
 // row in the sink and then, for each version in the spec, calls the emit functions below in the order the
-// events happened: `emitVersion` (the row, its draft saves, its submit), `emitApprovals` (each decision),
-// `emitLifecycleNotices` (going Active, a sunset, a revoke: the audit event and the consumers' notices).
-// After the versions, `emitThreads` writes the comment threads. Everything comes from the one spec, so
-// the rows cannot disagree.
+// events happened: `emitVersion` (the row, how it was drafted, its submit), `emitApprovals` (each decision,
+// and what an approval that goes live sets off), `emitLifecycleNotices` (a sunset, a revoke, and the
+// consumers' notices). After the versions, `emitThreads` writes the comment threads. Everything comes from
+// the one spec, so the rows cannot disagree.
+//
+// The audit events and notice payloads are written as the runtime writes them: the same action names, the
+// same fields (decision 0064), so the Activity tab, the Audit page and the consumer API read a seeded row
+// and a live one the same way.
 
 import {
   DEFAULT_BUSINESS_ZONE,
   sunsetInstant,
   todayIn,
 } from "@/domain/business-zone";
+import { QUOTE_MAX } from "@/domain/comments";
+import { requiredOutputs } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
+import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
+import { DRAFT_FIELDS, type DraftField } from "@/server/drafts/audit-merge";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
 import { blockId, blockText } from "../content";
 import { SEED_CONTENT_TYPES } from "../platform";
 import { int, type Rng } from "../rng";
-import { userName } from "../people";
 import {
+  checkApprovals,
   checkIds,
   checkRounds,
   checkSendBacks,
@@ -49,7 +57,7 @@ interface TemplateBuild {
   versionSpec(ref: string): SeedVersion;
   /** A unique id for one of this template's rows, from this template's own sequence for that prefix. */
   id(prefix: string): string;
-  /** This template's random draws (a version's `rev`, the saves in an editing session): a sequence no other template shares. */
+  /** This template's random draws (a version's `rev`): a sequence no other template shares. */
   random: Rng;
   /** Writes an audit event for this template. */
   audit(event: AuditSpec): void;
@@ -98,6 +106,46 @@ function writersOf(spec: SeedTemplate, version: SeedVersion): string[] {
   ];
 }
 
+/** The version Active `at` days before the reset: activated by then, and not yet superseded. */
+function activeAt(spec: SeedTemplate, at: number): SeedVersion | undefined {
+  return spec.versions.find(
+    (v) =>
+      v.activatedAt !== undefined &&
+      v.activatedAt >= at &&
+      (v.supersededAt === undefined || v.supersededAt < at),
+  );
+}
+
+/** How long one seeded save is taken to last, which dates an editing session's first save. */
+const SAVE_MS = 30_000;
+
+/**
+ * The fields an editing session saved (`DraftEditedDetails.fields`): the first session wrote everything the
+ * version has, the later ones its content, the body of a document or an alert's short fields.
+ */
+function draftFields(
+  version: SeedVersion,
+  type: SeedType,
+  first: boolean,
+): DraftField[] {
+  const isDocument = type.requiredSections.length > 0;
+  const changed = new Set<DraftField>(isDocument ? ["body"] : []);
+  for (const field of ALL_CHANNEL_FIELDS) {
+    if (channelFieldValue(version.channelFields ?? {}, field))
+      changed.add(field.id);
+  }
+  if (first) {
+    for (const field of [
+      "variables",
+      "name",
+      "channels",
+      "sampleSets",
+    ] as const)
+      changed.add(field);
+  }
+  return DRAFT_FIELDS.filter((field) => changed.has(field));
+}
+
 export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   const type: SeedType = SEED_CONTENT_TYPES[spec.contentType ?? "disclosure"];
   checkIds(spec);
@@ -114,6 +162,7 @@ export function buildTemplate(ctx: SeedCtx, spec: SeedTemplate): TemplateRef {
   };
   checkRounds(spec);
   checkSendBacks(spec);
+  checkApprovals(spec);
   for (const version of spec.versions) {
     ref.versions[version.ref] = {
       id: ctx.claimId(version.id),
@@ -192,6 +241,10 @@ function emitVersion(build: TemplateBuild, version: SeedVersion) {
   const built = build.versionRef(version.ref);
   const isDraft = version.state === "draft";
   const stage = type.stage;
+  // Every save bumps `rev` by one, so a version's editing sessions together made its `rev`.
+  const rev =
+    version.rev ??
+    (isDraft ? int(build.random, 12, 40) : int(build.random, 40, 190));
 
   ctx.sink.versions.push({
     id: built.id,
@@ -215,9 +268,7 @@ function emitVersion(build: TemplateBuild, version: SeedVersion) {
     // Every submitted version went through the one-stage chain the seed configures for its content type.
     stages: isDraft ? null : [{ id: stage.id, name: stage.name }],
     currentStage: 0,
-    rev:
-      version.rev ??
-      (isDraft ? int(build.random, 12, 40) : int(build.random, 40, 190)),
+    rev,
     createdBy: version.createdBy,
     writers: writersOf(spec, version),
     createdAt: ctx.at(version.createdAt),
@@ -246,23 +297,43 @@ function emitVersion(build: TemplateBuild, version: SeedVersion) {
     importUploadId: null,
   });
 
-  // Draft saves: one audit row per editing session, never a version number.
+  // A draft copied from a version starts with `draft.started`.
+  if (version.basedOn) {
+    build.audit({
+      at: version.createdAt,
+      actor: version.createdBy,
+      action: "draft.started",
+      version: built,
+      details: { basedOn: build.versionRef(version.basedOn).number },
+    });
+  }
+
+  // Draft saves: one audit row per editing session, never a version number. A session's row is dated its
+  // latest save, and says when its first was and the `rev` its latest produced.
   const sessions = version.editSessions ?? (isDraft ? 3 : 2);
+  if (rev < sessions)
+    throw new Error(
+      `Seed: ${spec.key}/${version.ref} has rev ${rev}, fewer saves than its ${sessions} editing sessions`,
+    );
   const editsEnd = version.submittedAt ?? version.updatedAt ?? 0.3;
+  let revBefore = 0;
   for (let session = 0; session < sessions; session++) {
     const at =
       version.createdAt -
       ((version.createdAt - editsEnd) * (session + 1)) / (sessions + 1);
+    const revAfter = Math.round((rev * (session + 1)) / sessions);
+    const saves = revAfter - revBefore;
+    revBefore = revAfter;
     build.audit({
       at,
       actor: version.createdBy,
       action: "draft.edited",
       version: built,
       details: {
-        saves: int(build.random, 3, 28),
-        ...(version.basedOn
-          ? { basedOn: build.versionRef(version.basedOn).number }
-          : {}),
+        saves,
+        fields: draftFields(version, type, session === 0),
+        since: new Date(ctx.at(at).getTime() - saves * SAVE_MS).toISOString(),
+        rev: revAfter,
       },
       sessionKey: build.id("sess"),
     });
@@ -286,7 +357,12 @@ function emitVersion(build: TemplateBuild, version: SeedVersion) {
   }
 }
 
-/** One approval row and one audit event for each decision on the version. */
+/**
+ * One approval row for each decision on the version, and its audit events. A send-back is
+ * `version.changes_requested`. An approval is the last stage's (the seed's chain has one), so it makes the
+ * version Active: `approve` writes `version.activated` by the approver, and `version.superseded` on the
+ * version it replaced.
+ */
 function emitApprovals(build: TemplateBuild, version: SeedVersion) {
   const { ctx } = build;
   const built = build.versionRef(version.ref);
@@ -305,66 +381,75 @@ function emitApprovals(build: TemplateBuild, version: SeedVersion) {
       sampleSetsSeen: approval.seen ?? ["typical", "long"],
       decidedAt: ctx.at(approval.at),
     });
+    if (approval.decision === "changes_requested") {
+      build.audit({
+        at: approval.at,
+        actor: approval.actor,
+        action: "version.changes_requested",
+        version: built,
+        details: {
+          number: version.number,
+          round: built.round,
+          stage: stage.name,
+          reason: approval.reason,
+        },
+      });
+      continue;
+    }
+
+    const replaced = version.supersedes
+      ? build.versionRef(version.supersedes)
+      : null;
     build.audit({
       at: approval.at,
       actor: approval.actor,
-      action:
-        approval.decision === "approved"
-          ? "version.approved"
-          : "version.changes_requested",
-      version: built,
-      details: {
-        number: version.number,
-        round: built.round,
-        stage: stage.name,
-        ...(approval.reason ? { reason: approval.reason } : {}),
-      },
-    });
-  }
-}
-
-/**
- * What going Active, a sunset and a revoke each leave behind: an audit event, and a notice to every
- * consumer of the template.
- */
-function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
-  const { ctx, spec } = build;
-  const built = build.versionRef(version.ref);
-  const consumers = spec.consumers ?? [];
-
-  if (version.activatedAt !== undefined) {
-    const replaced = version.supersedes
-      ? build.versionRef(version.supersedes).number
-      : null;
-    build.audit({
-      at: version.activatedAt,
-      actor: null,
       action: "version.activated",
       version: built,
       details: {
         number: version.number,
         round: built.round,
-        supersedes: replaced,
+        supersedes: replaced?.number ?? null,
+        stage: stage.name,
+        // The runtime refuses an approval until every output has been viewed.
+        outputsViewed: requiredOutputs(version.channels),
       },
     });
-    // The first version has nothing to replace, so nobody has anything to move off.
-    if (replaced !== null) {
-      for (const consumerId of consumers) {
-        ctx.sink.consumerNotices.push({
-          id: build.id("cn"),
-          consumerId,
-          templateId: build.ref.id,
-          versionId: built.id,
-          kind: "new_version",
-          payload: {
-            templateName: spec.name,
-            versionNumber: version.number,
-            previousVersionNumber: replaced,
-            contractChanges: version.contractChanges ?? [],
-          },
-          createdAt: ctx.at(version.activatedAt),
-        });
-      }
+    if (replaced) {
+      build.audit({
+        at: approval.at,
+        actor: approval.actor,
+        action: "version.superseded",
+        version: replaced,
+        details: { number: replaced.number, supersededBy: version.number },
+      });
+    }
+  }
+}
+
+/** What a sunset and a revoke leave behind: their audit events, and a notice to every consumer of the template. */
+function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
+  const { ctx, spec } = build;
+  const built = build.versionRef(version.ref);
+  const consumers = spec.consumers ?? [];
+
+  // Going Active told the consumers of what it replaced to move to it. The first version has nothing to
+  // replace, so nobody has anything to move off.
+  if (version.activatedAt !== undefined && version.supersedes) {
+    for (const consumerId of consumers) {
+      ctx.sink.consumerNotices.push({
+        id: build.id("cn"),
+        consumerId,
+        templateId: build.ref.id,
+        versionId: built.id,
+        kind: "new_version",
+        payload: {
+          templateName: spec.name,
+          versionNumber: version.number,
+          activeVersion: version.number,
+          contractChanges: version.contractChanges ?? [],
+        },
+        createdAt: ctx.at(version.activatedAt),
+      });
     }
   }
 
@@ -382,6 +467,7 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
         sunsetAt,
         sunsetDay: sunset.day,
         zone: DEFAULT_BUSINESS_ZONE,
+        previousSunsetAt: null,
       },
     });
     for (const consumerId of consumers) {
@@ -397,7 +483,7 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
           sunsetAt,
           sunsetDay: sunset.day,
           zone: DEFAULT_BUSINESS_ZONE,
-          replacedByVersionNumber: successor?.number ?? null,
+          activeVersion: successor?.number ?? null,
           contractChanges: successor?.contractChanges ?? [],
         },
         createdAt: ctx.at(version.sunset.setAt),
@@ -406,6 +492,9 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
   }
 
   if (version.revoke) {
+    // The version Active when the revoke was confirmed: this one, if nothing had replaced it yet.
+    const active = activeAt(spec, version.revoke.confirmedAt);
+    const wasActive = active === version;
     build.audit({
       at: version.revoke.startedAt,
       actor: version.revoke.startedBy,
@@ -416,12 +505,13 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
     build.audit({
       at: version.revoke.confirmedAt,
       actor: version.revoke.confirmedBy,
-      action: "version.revoke_confirmed",
+      action: "version.revoked",
       version: built,
       details: {
         number: version.number,
         reason: version.revoke.reason,
         startedBy: version.revoke.startedBy,
+        wasActive,
       },
     });
     for (const consumerId of consumers) {
@@ -434,6 +524,8 @@ function emitLifecycleNotices(build: TemplateBuild, version: SeedVersion) {
         payload: {
           templateName: spec.name,
           versionNumber: version.number,
+          // The Active version consumers can move to: none when this was it.
+          activeVersion: wasActive ? null : (active?.number ?? null),
           reason: version.revoke.reason,
         },
         createdAt: ctx.at(version.revoke.confirmedAt),
@@ -476,18 +568,19 @@ function emitThreads(build: TemplateBuild) {
 
     const threadId = build.id("th");
     const first = thread.comments[0];
+    const quote = thread.quote ?? (whole ? null : blockText(anchored));
     ctx.sink.commentThreads.push({
       id: threadId,
       templateId: build.ref.id,
       originVersionId: origin.id,
       blockId: blockKey,
-      quote: thread.quote ?? (whole ? null : blockText(anchored)),
+      quote,
       status: thread.resolved ? "resolved" : "open",
       resolvedBy: thread.resolved?.by ?? null,
       resolvedAt: thread.resolved ? ctx.at(thread.resolved.at) : null,
       createdAt: ctx.at(first.at),
     });
-    for (const comment of thread.comments) {
+    for (const [position, comment] of thread.comments.entries()) {
       ctx.sink.comments.push({
         id: build.id("cm"),
         threadId,
@@ -496,6 +589,7 @@ function emitThreads(build: TemplateBuild) {
         kind: comment.kind ?? "comment",
         createdAt: ctx.at(comment.at),
       });
+      // A change request is written by `requestChanges`, which has its own event.
       if ((comment.kind ?? "comment") === "comment") {
         build.audit({
           at: comment.at,
@@ -505,7 +599,14 @@ function emitThreads(build: TemplateBuild) {
           details: {
             threadId,
             blockId: blockKey,
-            author: userName(comment.author),
+            number: origin.number,
+            round: origin.round,
+            // A thread's first comment quotes the text it is about; every later one is a reply.
+            ...(position === 0
+              ? quote
+                ? { quote: quote.slice(0, QUOTE_MAX) }
+                : {}
+              : { reply: true }),
           },
         });
       }
@@ -545,9 +646,14 @@ function emitThreads(build: TemplateBuild) {
       build.audit({
         at: thread.resolved.at,
         actor: thread.resolved.by,
-        action: "comment.resolved",
+        action: "thread.resolved",
         version: origin,
-        details: { threadId, blockId: blockKey },
+        details: {
+          threadId,
+          blockId: blockKey,
+          number: origin.number,
+          round: origin.round,
+        },
       });
     }
   }

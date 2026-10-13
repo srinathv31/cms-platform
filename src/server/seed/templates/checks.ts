@@ -141,6 +141,42 @@ export function checkRounds(spec: SeedTemplate) {
 }
 
 /**
+ * Fails if an approval isn't what the seed's one-stage chain makes: approving is the last stage, so it
+ * activates the version at that moment (`approve`), and replaces the version it `supersedes` at the same
+ * moment. A version has an approval exactly when it was activated.
+ */
+export function checkApprovals(spec: SeedTemplate) {
+  for (const version of spec.versions) {
+    const where = `${spec.key}/${version.ref}`;
+    const approved = (version.approvals ?? []).filter(
+      (approval) => approval.decision === "approved",
+    );
+    if (approved.length > 1) {
+      throw new Error(`Seed: ${where} is approved more than once`);
+    }
+    const approval = approved[0];
+    if ((approval !== undefined) !== (version.activatedAt !== undefined)) {
+      throw new Error(
+        `Seed: ${where} needs an approval exactly when it has activatedAt`,
+      );
+    }
+    if (approval && approval.at !== version.activatedAt) {
+      throw new Error(
+        `Seed: ${where} is activated at ${version.activatedAt}, not when it was approved (${approval.at})`,
+      );
+    }
+    if (version.supersedes) {
+      const replaced = spec.versions.find((v) => v.ref === version.supersedes);
+      if (!replaced || replaced.supersededAt !== version.activatedAt) {
+        throw new Error(
+          `Seed: ${where} supersedes ${version.supersedes}, which must be superseded when it is activated`,
+        );
+      }
+    }
+  }
+}
+
+/**
  * Fails if a send-back isn't shaped as `requestChanges` writes it: every changes-requested decision has a
  * whole-version thread on that round whose first comment is the reason, a change request by the approver at
  * the moment they decided.

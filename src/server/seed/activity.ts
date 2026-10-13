@@ -38,7 +38,12 @@ export function seedActivity(ctx: SeedCtx) {
     actorId: "chris",
     teamId: coral,
     action: "access.requested",
-    details: { role: "author", reason: requestReason },
+    details: {
+      userId: "chris",
+      userName: userName("chris"),
+      role: "author",
+      reason: requestReason,
+    },
   });
 
   // ── Quarterly recertification, due in 30 days ──────────────────
@@ -66,7 +71,8 @@ export function seedActivity(ctx: SeedCtx) {
   sink.auditEvents.push({
     id: ctx.id("activity", "ae"),
     at: ctx.at(4),
-    actorId: null,
+    // A Team Admin starts a review (`startRecert`); Coral Offers' is Alex.
+    actorId: "alex",
     teamId: coral,
     action: "recert.started",
     details: { label, dueAt: dueAt.toISOString(), members: members.length },

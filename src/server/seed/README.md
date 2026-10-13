@@ -42,13 +42,29 @@ version that is Active has an activation event, an approval, and a notice for ea
 buildTemplate(ctx, spec)
   template row + template.created
   for each version in the spec:
-    emitVersion            the versions row, its draft.edited sessions, version.submitted
-    emitApprovals          approvals rows and one audit event per decision
-    emitLifecycleNotices   going Active, a sunset, a revoke: the audit event and a notice per consumer
+    emitVersion            the versions row, draft.started, its draft.edited sessions, version.submitted
+    emitApprovals          approvals rows; a send-back is version.changes_requested, an approval is
+                           version.activated (and version.superseded on the version it replaced)
+    emitLifecycleNotices   a sunset, a revoke, and the notice each consumer gets (going Active included)
   emitThreads              comment threads, comments, and their audit events
 ```
 
 A new template or a changed lifecycle goes in the spec. A new kind of row goes in an emit function.
+
+### Events are written as the runtime writes them
+
+The seed writes each audit event and consumer notice with the action name and the fields the transitions write
+([decision 0064](../../../docs/decisions/0064-payloads-are-facts-with-one-shape-per-event.md)), so the Activity tab,
+the Audit page and the consumer API read a seeded row and a live one the same way, and nothing aliases a seed
+spelling. An approval is one `version.activated` by the approver (the seed's chain has one stage), with `supersedes`,
+`stage` and `outputsViewed`; the replaced version gets `version.superseded`. A revoke is `version.revoked` with
+`wasActive`, and its notice names the `activeVersion` consumers move to. A draft's editing sessions add up to its
+`rev` (`saves`, `fields`, `since`, `rev`), and a draft copied from a version starts with `draft.started`. The access
+and platform events carry the facts their builders write: `access.requested` has `userId` and `userName`,
+`access.granted` its `role`, `platform.config_changed` the fields of its area (built with `configChanged`, one
+event per channel for a channel rule), and a recertification is started by its Team Admin. `checks.ts` refuses a
+spec the one-stage chain couldn't have produced: an approval exactly when it was activated, at that moment, and
+replacing a version at the same moment.
 
 ## Ids
 
