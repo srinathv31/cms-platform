@@ -13,7 +13,7 @@ consumer (`integration.ts`), and for the notice audience, the consumers with a r
 (`recentConsumers` in `src/server/services/local/effects.ts`, [0032](0032-consumers-are-told-when-a-sunset-passes.md)).
 
 `audit_events` feeds the Audit page, its CSV export and the Activity tab, and two business rules read it: the sunset
-sweep writes its row once by checking whether a `version.sunset_passed` row exists (`src/server/sunset-sweep.ts`,
+sweep writes its row once by checking whether a `version.sunset_passed` row exists (`recordedSunsets` in `src/server/services/local/sweeps.ts` now,
 [0026](0026-a-passed-sunset-is-recorded-by-a-sweep.md)), and autosave recovers a lost response from the `draft.edited`
 row's `rev` ([B5](../handoff-review.md#b5--medium-autosave-conflict-recovery-reads-the-audit-log)). Autosave also
 updates that row in place, merging every save of an editing session (`server/drafts/apply-patch.ts` then; `src/server/services/local/drafts.ts` now). A regulated

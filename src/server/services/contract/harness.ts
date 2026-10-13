@@ -37,8 +37,9 @@ export interface ContractHarness {
   /** Sets (or clears) the hooks the next commands run with (`TestHooks`), e.g. a competing compare-and-set write. */
   hooks(hooks: TestHooks): void;
   /**
-   * Runs the backend's scheduled jobs at `at`: the sunset sweep (the access sweep joins with plan P2). Locally and
-   * in the fake a direct call; for Java a test endpoint, since they are its scheduled jobs.
+   * Runs the backend's scheduled jobs at `at`: the access sweep (recertification lapses, the inactivity flag and
+   * suspension), then the sunset sweep. Locally and in the fake a direct call; for Java a test endpoint, since
+   * they are its scheduled jobs.
    */
   runScheduledJobs(at: Date): Promise<void>;
   /** A consumer's notices as `GET /api/v1/consumers/{id}/notices` serves them, oldest first (commit order). */

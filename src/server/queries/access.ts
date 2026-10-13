@@ -59,7 +59,7 @@ import {
   loadMembershipFacts,
   loadRecertFacts,
   loadRequestFacts,
-} from "@/server/access-sweep";
+} from "@/server/services/local/access-facts";
 import { db } from "@/server/db/client";
 import {
   accessRequests,

@@ -8,7 +8,7 @@ import {
 } from "@/server/testing/review-fixtures";
 import { getViewer } from "@/server/viewer";
 import { decideAccessRequest, requestAccess } from "@/server/actions/access";
-import { runAccessSweep } from "@/server/access-sweep";
+import { runAccessSweep } from "@/server/services/local/sweeps";
 import {
   getAccessRequestsSection,
   getHomeCard,
@@ -277,7 +277,7 @@ describe("access read models", () => {
 
   it("after 31 days: Sam's ended access shows on Request access; the closed review names who lapsed", async () => {
     env.now = new Date(BASE.getTime() + 31 * DAY);
-    await runAccessSweep();
+    await runAccessSweep(env.now);
     vi.mocked(getViewer).mockResolvedValue(await loadPersona(db, "sam"));
     expect((await getRequestAccessData()).ended).toEqual([
       {

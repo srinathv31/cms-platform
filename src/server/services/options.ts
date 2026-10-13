@@ -14,9 +14,17 @@ export interface TestHooks {
    * the row first, as another writer committing in between would on a database that doesn't serialize writes:
    * the write then finds the row moved. On a version the command is refused `version_changed` and writes
    * nothing; on a notification the competing write marks it read first, so `markRead` finds nothing to change.
+   * On an access request another Team Admin decides it first (`request_decided`); on a recertification item
+   * (`id` is `recertId:userId`) another decision lands first (`already_recertified`); on a membership every
+   * other active Team Admin of its team loses the role first, so a change that ends this one's is `last_admin`.
    */
   beforeCompareAndSet?(target: {
-    table: "versions" | "notifications";
+    table:
+      | "versions"
+      | "notifications"
+      | "memberships"
+      | "access_requests"
+      | "recert_items";
     id: string;
   }): "competing_write" | undefined;
 }

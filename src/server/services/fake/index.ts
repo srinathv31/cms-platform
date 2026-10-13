@@ -1,18 +1,18 @@
-import type { AccessService } from "../access";
 import type { AuditService } from "../audit";
 import type { CommentService } from "../comments";
-import type { DemoService } from "../demo";
 
 import { notMovedArea } from "../not-moved";
 import type { Clock, ImplementationOptions, TestHooks } from "../options";
-import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
 import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
+import { fakeAccess } from "./access";
+import { fakeDemo } from "./demo";
 import { fakeDrafts } from "./drafts";
 import { fakeIdentity } from "./identity";
 import { fakeNotifications } from "./notifications";
+import { fakePlatform } from "./platform";
 import { fakeReview } from "./review";
 import type { FakeState } from "./state";
 import { FakeStore } from "./store";
@@ -47,15 +47,16 @@ export function fakeServices(
     clock: options.clock ?? (async () => new Date()),
     hooks: options.hooks ?? {},
   };
+  const identity = fakeIdentity(state);
   return {
-    identity: fakeIdentity(state),
+    identity,
     review: fakeReview(deps),
     versions: fakeVersions(deps),
     templates: notMovedArea<TemplateService>("templates"),
     drafts: fakeDrafts(deps),
     comments: notMovedArea<CommentService>("comments"),
-    access: notMovedArea<AccessService>("access"),
-    platform: notMovedArea<PlatformService>("platform"),
+    access: fakeAccess(deps),
+    platform: fakePlatform(deps),
     notifications: fakeNotifications(deps),
     audit: notMovedArea<AuditService>("audit"),
     usage: notMovedArea<UsageService>("usage"),
@@ -68,6 +69,6 @@ export function fakeServices(
         );
       },
     } satisfies RenderService,
-    demo: notMovedArea<DemoService>("demo"),
+    demo: fakeDemo(deps, identity),
   };
 }

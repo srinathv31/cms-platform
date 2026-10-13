@@ -601,7 +601,7 @@ The audit log and the render log are kept differently
   CSV export and the Activity tab read it. `draft.edited` stops being updated in place: one row per save, or an
   edit-session table with one audit row when the session ends, the Java team's choice.
 - **No business rule reads the audit log.** Two do today, and both move to the version row:
-  - The sunset sweep's "once" (`runSunsetSweep` in `src/server/sunset-sweep.ts`) checks for a
+  - The sunset sweep's "once" (`recordedSunsets` in `src/server/services/local/sweeps.ts`) checks for a
     `version.sunset_passed` row; it becomes `versions.sunset_recorded_at`. The audit row is still written, dated at
     the sunset ([0026](../decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
   - Autosave's recovery from a lost response (`sessionOwnsRev` in `src/domain/lifecycle/autosave.ts`, given what `lastSaveOf` in

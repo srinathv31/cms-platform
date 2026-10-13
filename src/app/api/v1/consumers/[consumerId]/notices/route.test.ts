@@ -267,7 +267,7 @@ describe("GET /api/v1/consumers/[consumerId]/notices: a sunset that passed", () 
   // notice when it runs, after the sunset.
   it("arrives once as sunset_passed, after the cursor a poll kept, with the instant, the day and the zone", async () => {
     const { db } = await import("@/server/db/client");
-    const { runSunsetSweep } = await import("@/server/sunset-sweep");
+    const { runSunsetSweep } = await import("@/server/services/local/sweeps");
     const balance = ids["balance-transfer"]!;
     const [v1] = await db
       .select()
@@ -283,7 +283,7 @@ describe("GET /api/v1/consumers/[consumerId]/notices: a sunset that passed", () 
     const was = env.now;
     env.now = new Date(sunsetAt.getTime() + 3 * 86_400_000);
     try {
-      expect((await runSunsetSweep()).map((p) => p.versionId)).toEqual([
+      expect((await runSunsetSweep(env.now)).map((p) => p.versionId)).toEqual([
         v1!.id,
       ]);
 
@@ -324,7 +324,7 @@ describe("GET /api/v1/consumers/[consumerId]/notices: a sunset that passed", () 
       ]);
 
       // Another sweep writes nothing: the poll stays empty.
-      expect(await runSunsetSweep()).toEqual([]);
+      expect(await runSunsetSweep(env.now)).toEqual([]);
       expect(await list("coral", `?after=${fresh.nextCursor}`)).toMatchObject({
         notices: [],
         hasMore: false,

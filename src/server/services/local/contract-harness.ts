@@ -3,7 +3,6 @@ import { beforeAll, beforeEach } from "vitest";
 import type { Db } from "@/server/db/client";
 import { auditEvents, versions } from "@/server/db/schema/ucomp";
 import { listNotices } from "@/server/queries/consumer-api";
-import { runSunsetSweep } from "@/server/sunset-sweep";
 import {
   loadPersona,
   seededDatabasePerTest,
@@ -11,6 +10,7 @@ import {
 import { probeVersion, type ContractHarness } from "../contract/harness";
 import type { TestHooks } from "../options";
 import { localServices } from "./index";
+import { runScheduledJobs } from "./sweeps";
 
 // The local implementation as the contract suite runs it (src/server/services/README.md, "The contract
 // suite"). Test support, not a test file: the real seed on a database of its own for every test
@@ -56,8 +56,7 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
       hooks = next;
     },
     async runScheduledJobs(at) {
-      // The sunset sweep; the access sweep joins when the fake has its twin (plan P2).
-      await runSunsetSweep(at);
+      await runScheduledJobs(at);
     },
     async consumerNotices(consumerId, templateId) {
       const page = await listNotices(consumerId, {

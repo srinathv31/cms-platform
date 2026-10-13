@@ -62,6 +62,36 @@ export function losesLastAdmin(
   );
 }
 
+/** Whether the team has an active Team Admin among `memberships`. */
+function hasActiveAdmin(
+  memberships: readonly MembershipFacts[],
+  teamId: string,
+): boolean {
+  return memberships.some(
+    (m) =>
+      m.teamId === teamId &&
+      m.status === "active" &&
+      m.roles.includes("team_admin"),
+  );
+}
+
+/**
+ * The "at least one active Team Admin" rule, checked again once a change is written: `before` is the team as the
+ * command read it, `after` the team as it stands with the change. A team that had an active Team Admin keeps one.
+ * The transitions check it on what they read (`losesLastAdmin`); where writes don't take turns, two admins
+ * demoting each other can each read the other as still there, and this refuses the second at its write. Null
+ * when the team keeps an admin.
+ */
+export function lastAdminRefusal(
+  team: Named,
+  before: readonly MembershipFacts[],
+  after: readonly MembershipFacts[],
+): Refusal | null {
+  return hasActiveAdmin(before, team.id) && !hasActiveAdmin(after, team.id)
+    ? ACCESS_REFUSALS.lastAdmin(team.name)
+    : null;
+}
+
 export function changeRoles(
   input: MemberInput & TeamMemberships & { roles: readonly TeamRole[] },
 ):
