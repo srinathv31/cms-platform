@@ -199,6 +199,8 @@ What the Java API's MSSQL schema does instead: team and user ids
 ([0065](decisions/0065-documents-are-validated-against-a-generated-json-schema.md)), logs
 ([0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and test data
 ([0069](decisions/0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)).
+[Porting the data model](reference/data-model.md) puts them together table by table, with every audit action's and
+notice kind's payload.
 
 ## Time, identity, and demo data
 

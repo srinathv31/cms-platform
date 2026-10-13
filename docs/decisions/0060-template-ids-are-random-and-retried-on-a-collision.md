@@ -1,6 +1,7 @@
 # 0060. Template ids are random and retried on a collision; a readable id would be its own column
 
 Status: Accepted
+Amended 2026-10-12: `consumer_notices` clusters on the `seq` it already has, which the notice counter assigns in commit order ([0062](0062-invariants-hold-in-the-database-not-in-one-writer.md)), not on an IDENTITY: an IDENTITY isn't commit-ordered. The other three log tables get the IDENTITY ([porting the data model](../reference/data-model.md)).
 Date: 2026-10-12
 
 ## Context
