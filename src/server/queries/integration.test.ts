@@ -1,70 +1,136 @@
-import { and, eq } from "drizzle-orm";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RESPONSE_FORMATS } from "@/domain/golive/samples";
-import type { Viewer } from "@/domain/types";
-import type { Db } from "@/server/db/client";
-import * as schema from "@/server/db/schema/ucomp";
-import {
-  loadPersona,
-  seededDatabasePerTest,
-} from "@/server/testing/review-fixtures";
-import { getIntegrationPanel, loadIntegrationPanel } from "./integration";
+import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { Variable } from "@/domain/types";
+import type { RequestContext } from "@/server/context/request";
+import type { IntegrationFacts } from "@/server/services/templates";
+import { integrationPanel, loadIntegrationPanel } from "./integration";
 
-// The integration panel's data and its viewer-checked loader (the GET route's read) against a temporary database
-// filled by the real seed. Balance Transfer: v2 Active (pdf, web), v1 Superseded with a sunset.
+// The SHARE panel as the BFF builds it: facts in (IntegrationFacts, what the templates service answers), the
+// worded panel out. `integrationPanel` is pure, so its tests hand it facts directly; what the service decides
+// (the Active version, the channels it still allows, the consumer the examples name, each older version's sunset,
+// who may read the details) is the contract suite's. `loadIntegrationPanel` is checked for what it adds: the
+// parse, the refusals passed through, and the origin the examples call, read from the request's headers.
+// Balance Transfer Intro: v2 Active (pdf, web), v1 Superseded with a sunset, and v2 adds an optional variable.
 
 const env = vi.hoisted(() => ({
-  dir: "",
-  host: "localhost:3001",
-  proto: null as string | null,
-  now: new Date("2026-10-04T12:00:00.000Z"),
+  headers: {} as Record<string, string>,
+  integration: vi.fn(),
 }));
-
-vi.mock("@/server/db/client", async () => {
-  const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  return tempDatabase("ucomp-integration-");
-});
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("next/headers", () => ({
-  headers: vi.fn(
-    async () =>
-      new Headers({
-        host: env.host,
-        ...(env.proto ? { "x-forwarded-proto": env.proto } : {}),
-      }),
-  ),
+  headers: async () => new Headers(env.headers),
+}));
+vi.mock("@/server/services", () => ({
+  services: () => ({ templates: { integration: env.integration } }),
 }));
 
-const { renderLog, versions } = schema;
-const BASE = new Date("2026-10-04T12:00:00.000Z");
+const TEMPLATE = "UC-4F7K2Q";
 const ORIGIN = "http://localhost:3001";
+const ASOF = "2026-10-04T12:00:00.000Z";
+const maya: RequestContext = {
+  viewer: { userId: "maya" } as RequestContext["viewer"],
+  correlationId: "req_test",
+  credential: { kind: "in_process", userId: "maya" },
+};
 
-let db: Db;
-const people: Record<string, Viewer> = {};
+const firstName: Variable = {
+  key: "first_name",
+  label: "First name",
+  type: "text",
+  required: true,
+  sample: "Maya",
+};
+const lastName: Variable = {
+  key: "last_name",
+  label: "Last name",
+  type: "text",
+  required: true,
+  sample: "Chen",
+};
+const purchaseApr: Variable = {
+  key: "purchase_apr",
+  label: "Purchase APR",
+  type: "percent",
+  required: true,
+  sample: "21.99",
+};
+const homeState: Variable = {
+  key: "home_state",
+  label: "Home state",
+  type: "us_state",
+  required: true,
+  sample: "NJ",
+};
+const offerEndDate: Variable = {
+  key: "offer_end_date",
+  label: "Offer end date",
+  type: "date",
+  required: false,
+  sample: "2026-11-18",
+};
+const annualFee: Variable = {
+  key: "annual_fee",
+  label: "Annual fee",
+  type: "currency",
+  required: true,
+  sample: "95",
+};
 
-const ids = seededDatabasePerTest({ base: BASE });
+const V2 = [firstName, lastName, purchaseApr, homeState, offerEndDate];
+const V1 = [firstName, lastName, purchaseApr, homeState];
 
-beforeAll(async () => {
-  ({ db } = await import("@/server/db/client"));
-  for (const id of ["maya", "sam", "morgan", "riley"])
-    people[id] = await loadPersona(db, id);
-});
+/** The facts of a template whose v2 is Active, as the service answers them. */
+function facts(over: Partial<IntegrationFacts> = {}): IntegrationFacts {
+  return {
+    asOf: ASOF,
+    template: {
+      id: TEMPLATE,
+      teamSlug: "coral-offers",
+      teamName: "Coral Offers",
+      name: "Balance Transfer Intro — Terms",
+    },
+    active: {
+      number: 2,
+      activatedAt: "2026-09-10T12:00:00.000Z",
+      channels: ["pdf", "web"],
+      variables: V2,
+    },
+    sampleConsumerId: "coral",
+    older: [
+      {
+        number: 1,
+        state: "superseded",
+        sunsetDay: "2026-10-25",
+        sunsetPassed: false,
+        variables: V1,
+      },
+    ],
+    ...over,
+  };
+}
 
-const id = (key: string) => ids[key]!;
-
-describe("getIntegrationPanel", () => {
-  it("the Active version: id, channels, contract rows, schema, endpoint", async () => {
-    const panel = (await getIntegrationPanel(
-      id("balance-transfer"),
-      `${ORIGIN}/`,
-    ))!;
+describe("integrationPanel", () => {
+  it("the Active version: the template, its channels, contract rows, schema and endpoint", () => {
+    const panel = integrationPanel(facts(), `${ORIGIN}/`);
     expect(panel.template).toEqual({
-      id: id("balance-transfer"),
+      id: TEMPLATE,
       name: "Balance Transfer Intro — Terms",
       teamSlug: "coral-offers",
       teamName: "Coral Offers",
     });
-    expect(panel.active).toMatchObject({ number: 2, channels: ["pdf", "web"] });
+    expect(panel.active).toEqual({
+      number: 2,
+      activatedAt: "2026-09-10T12:00:00.000Z",
+      channels: ["pdf", "web"],
+    });
+    expect(panel.contract.map((row) => row.key)).toEqual([
+      "first_name",
+      "last_name",
+      "purchase_apr",
+      "home_state",
+      "offer_end_date",
+    ]);
     expect(panel.contract[2]).toEqual({
       key: "purchase_apr",
       label: "Purchase APR",
@@ -73,20 +139,16 @@ describe("getIntegrationPanel", () => {
       required: true,
       example: "21.99",
     });
-    expect(panel.contract.map((r) => r.key)).toEqual([
-      "first_name",
-      "last_name",
-      "purchase_apr",
-      "home_state",
-      "offer_end_date",
-    ]);
     expect(panel.jsonSchema.$id).toBe(
-      `https://stencil.example/schemas/${id("balance-transfer")}/v2/values.json`,
+      `https://stencil.example/schemas/${TEMPLATE}/v2/values.json`,
+    );
+    expect(panel.jsonSchema.title).toBe(
+      "Balance Transfer Intro — Terms v2: values",
     );
     expect(panel.jsonSchemaText).toBe(
       JSON.stringify(panel.jsonSchema, null, 2),
     );
-    const path = `/api/v1/templates/${id("balance-transfer")}/render`;
+    const path = `/api/v1/templates/${TEMPLATE}/render`;
     expect(panel.endpoint).toEqual({
       method: "POST",
       path,
@@ -98,49 +160,57 @@ describe("getIntegrationPanel", () => {
     );
   });
 
-  it("one sample per enabled channel, PDF first, naming the consumer that renders it", async () => {
-    const panel = (await getIntegrationPanel(id("balance-transfer"), ORIGIN))!;
+  it("drops every trailing slash of the origin", () => {
+    const panel = integrationPanel(facts(), `${ORIGIN}///`);
+    expect(panel.endpoint.url).toBe(
+      `${ORIGIN}/api/v1/templates/${TEMPLATE}/render`,
+    );
+    expect(panel.samples[0]!.curl).toContain(
+      `curl -X POST '${ORIGIN}/api/v1/templates/${TEMPLATE}/render'`,
+    );
+  });
+
+  it("one sample per channel, in the facts' order, naming the consumer the facts name", () => {
+    const panel = integrationPanel(facts(), ORIGIN);
     expect(panel.samples.map((s) => s.channel)).toEqual(["pdf", "web"]);
     expect(panel.samples[0]!.curl).toContain(
-      `curl -X POST '${ORIGIN}/api/v1/templates/${id("balance-transfer")}/render'`,
+      `curl -X POST '${ORIGIN}/api/v1/templates/${TEMPLATE}/render'`,
     );
     expect(panel.samples[0]!.curl).toContain("-H 'X-Consumer-Id: coral'");
     expect(panel.samples[0]!.curl).toContain("--output");
+    expect(panel.samples[1]!.curl).not.toContain("--output");
     expect(panel.samples[1]!.fetch).toContain('"channel": "web"');
+    expect(panel.samples[1]!.fetch).toContain('"X-Consumer-Id": "coral"');
 
-    const deposits = (await getIntegrationPanel(
-      id("high-yield-savings"),
+    const reordered = integrationPanel(
+      facts({
+        active: { ...facts().active, channels: ["web", "pdf"] },
+        sampleConsumerId: "deposits-online",
+      }),
       ORIGIN,
-    ))!;
-    expect(deposits.samples[0]!.curl).toContain(
+    );
+    expect(reordered.samples.map((s) => s.channel)).toEqual(["web", "pdf"]);
+    expect(reordered.samples[0]!.curl).toContain(
       "-H 'X-Consumer-Id: deposits-online'",
     );
   });
 
-  it("with no renders yet, the samples name the first registered consumer", async () => {
-    const templateId = id("rate-change-notice");
-    const saved = await db
-      .select()
-      .from(renderLog)
-      .where(eq(renderLog.templateId, templateId));
-    await db.delete(renderLog).where(eq(renderLog.templateId, templateId));
-    try {
-      const panel = (await getIntegrationPanel(templateId, ORIGIN))!;
-      expect(panel.samples[0]!.curl).toContain("X-Consumer-Id: coral");
-    } finally {
-      for (let i = 0; i < saved.length; i += 400)
-        await db.insert(renderLog).values(saved.slice(i, i + 400));
-    }
+  it("a channel the facts leave out has no sample", () => {
+    const panel = integrationPanel(
+      facts({ active: { ...facts().active, channels: ["pdf"] } }),
+      ORIGIN,
+    );
+    expect(panel.active.channels).toEqual(["pdf"]);
+    expect(panel.samples.map((s) => s.channel)).toEqual(["pdf"]);
   });
 
-  it("'since' lists the older released versions, newest first, with the diff to the Active one", async () => {
-    const panel = (await getIntegrationPanel(id("balance-transfer"), ORIGIN))!;
+  it("'since' has one entry per older version, with the service's sunset and the diff to the Active version", () => {
+    const panel = integrationPanel(facts(), ORIGIN);
     expect(panel.since).toEqual([
       {
         number: 1,
         state: "superseded",
-        // Its sunset's day in the business time zone (Eastern until changed).
-        sunsetDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        sunsetDay: "2026-10-25",
         sunsetPassed: false,
         diff: {
           breaking: false,
@@ -155,177 +225,173 @@ describe("getIntegrationPanel", () => {
         },
       },
     ]);
-    const holiday = (await getIntegrationPanel(id("holiday-points"), ORIGIN))!;
-    expect(holiday.since.map((s) => [s.number, s.state])).toEqual([
-      [1, "revoked"],
+  });
+
+  it("'since' keeps the service's order and words each version against the Active one", () => {
+    const panel = integrationPanel(
+      facts({
+        active: {
+          ...facts().active,
+          number: 3,
+          variables: [firstName, lastName, purchaseApr, annualFee],
+        },
+        older: [
+          {
+            number: 2,
+            state: "revoked",
+            sunsetDay: null,
+            sunsetPassed: false,
+            variables: V2,
+          },
+          {
+            number: 1,
+            state: "superseded",
+            sunsetDay: "2026-09-20",
+            sunsetPassed: true,
+            variables: V1,
+          },
+        ],
+      }),
+      ORIGIN,
+    );
+    expect(
+      panel.since.map((s) => [s.number, s.state, s.sunsetDay, s.sunsetPassed]),
+    ).toEqual([
+      [2, "revoked", null, false],
+      [1, "superseded", "2026-09-20", true],
     ]);
+    // Both moves to v3 add a required variable and drop `home_state`: breaking.
+    expect(panel.since.map((s) => s.diff.breaking)).toEqual([true, true]);
+    expect(panel.since[1]!.diff.items.map((i) => [i.kind, i.key])).toEqual(
+      expect.arrayContaining([
+        ["added", "annual_fee"],
+        ["removed", "home_state"],
+      ]),
+    );
     expect(
-      (await getIntegrationPanel(id("rate-change-notice"), ORIGIN))!.since,
-    ).toEqual([]);
+      panel.since[1]!.diff.items.find((i) => i.key === "annual_fee")!.text,
+    ).toBe("v3 adds required `annual_fee` (Currency).");
   });
 
-  it("'since' says a sunset has passed once the clock is past it (the badge reads \"Sunset passed\")", async () => {
-    const [v1] = (await getIntegrationPanel(id("balance-transfer"), ORIGIN))!
-      .since;
-    expect(v1).toMatchObject({ number: 1, sunsetPassed: false });
-    // v1's sunset is Oct 25, 00:00 Eastern.
-    env.now = new Date(BASE.getTime() + 22 * 86_400_000);
-    try {
-      const [later] = (await getIntegrationPanel(
-        id("balance-transfer"),
-        ORIGIN,
-      ))!.since;
-      expect(later).toMatchObject({
-        number: 1,
-        state: "superseded",
-        sunsetDay: v1!.sunsetDay,
-        sunsetPassed: true,
-      });
-    } finally {
-      env.now = BASE;
-    }
-  });
-
-  it("versions in review don't count: Cash Back's panel is v2's", async () => {
-    const panel = (await getIntegrationPanel(id("cash-back"), ORIGIN))!;
-    expect(panel.active.number).toBe(2);
-    expect(panel.contract.map((r) => r.key)).not.toContain("annual_fee");
-  });
-
-  it("a channel Channel rules turned off has no sample and isn't listed", async () => {
-    const { contentTypes } = schema;
-    const [disclosure] = await db
-      .select()
-      .from(contentTypes)
-      .where(eq(contentTypes.key, "disclosure"));
-    const before = disclosure!.allowedChannels;
-    await db
-      .update(contentTypes)
-      .set({ allowedChannels: ["pdf", "email"] })
-      .where(eq(contentTypes.id, disclosure!.id));
-    try {
-      const panel = (await getIntegrationPanel(
-        id("balance-transfer"),
-        ORIGIN,
-      ))!;
-      expect(panel.active.channels).toEqual(["pdf"]);
-      expect(panel.samples.map((s) => s.channel)).toEqual(["pdf"]);
-    } finally {
-      await db
-        .update(contentTypes)
-        .set({ allowedChannels: before })
-        .where(eq(contentTypes.id, disclosure!.id));
-    }
-  });
-
-  it("null with no Active version or no template", async () => {
-    expect(
-      await getIntegrationPanel(id("annual-fee-waiver"), ORIGIN),
-    ).toBeNull();
-    expect(await getIntegrationPanel("UC-ZZZZZZ", ORIGIN)).toBeNull();
+  it("'since' is empty for a first version", () => {
+    expect(integrationPanel(facts({ older: [] }), ORIGIN).since).toEqual([]);
   });
 });
 
 describe("loadIntegrationPanel", () => {
   beforeEach(() => {
-    env.host = "localhost:3001";
-    env.proto = null;
+    env.headers = { host: "localhost:3001" };
+    env.integration.mockReset().mockResolvedValue({ ok: true, ...facts() });
   });
 
-  const as = (userId: string) => people[userId]!;
-
-  it("an author and a viewer on the team can load it; the origin comes from the request", async () => {
-    const result = await loadIntegrationPanel(as("maya"), {
-      templateId: id("balance-transfer"),
+  it("asks the service for the template as the person asking, and answers the panel on the request's origin", async () => {
+    const result = await loadIntegrationPanel(maya, { templateId: TEMPLATE });
+    expect(env.integration).toHaveBeenCalledExactlyOnceWith(maya, {
+      templateId: TEMPLATE,
     });
     expect(result.ok).toBe(true);
-    if (result.ok)
+    if (result.ok) {
+      expect(result.panel).toEqual(integrationPanel(facts(), ORIGIN));
       expect(result.panel.endpoint.url).toBe(
-        `http://localhost:3001/api/v1/templates/${id("balance-transfer")}/render`,
+        `${ORIGIN}/api/v1/templates/${TEMPLATE}/render`,
       );
-
-    expect(
-      (
-        await loadIntegrationPanel(as("sam"), {
-          templateId: id("balance-transfer"),
-        })
-      ).ok,
-    ).toBe(true);
-  });
-
-  it("behind a proxy: the forwarded protocol; a public host defaults to https", async () => {
-    env.host = "ucomp.example";
-    const https = await loadIntegrationPanel(as("maya"), {
-      templateId: id("balance-transfer"),
-    });
-    expect(
-      https.ok && https.panel.endpoint.url.startsWith("https://ucomp.example/"),
-    ).toBe(true);
-    env.proto = "http";
-    const http = await loadIntegrationPanel(as("maya"), {
-      templateId: id("balance-transfer"),
-    });
-    expect(
-      http.ok && http.panel.endpoint.url.startsWith("http://ucomp.example/"),
-    ).toBe(true);
-  });
-
-  it("someone without the team is refused with the permission's reason", async () => {
-    const result = await loadIntegrationPanel(as("morgan"), {
-      templateId: id("balance-transfer"),
-    });
-    expect(result).toMatchObject({ ok: false, status: 403 });
-    if (!result.ok) expect(result.reason).toMatch(/\S/);
-  });
-
-  it("no template, or nothing Active yet", async () => {
-    expect(
-      await loadIntegrationPanel(as("riley"), { templateId: "UC-ZZZZZZ" }),
-    ).toEqual({
-      ok: false,
-      status: 404,
-      code: "template_gone",
-      reason: "This template no longer exists.",
-    });
-    expect(await loadIntegrationPanel(as("riley"), { templateId: "" })).toEqual(
-      {
-        ok: false,
-        status: 400,
-        code: "template_gone",
-        reason: "This template no longer exists.",
-      },
-    );
-    expect(
-      await loadIntegrationPanel(as("maya"), {
-        templateId: id("annual-fee-waiver"),
-      }),
-    ).toEqual({
-      ok: false,
-      status: 409,
-      code: "no_active_version",
-      reason: "This template has no Active version yet.",
-    });
-  });
-
-  it("a revoked-only template has no panel", async () => {
-    const where = and(
-      eq(versions.templateId, id("rate-change-notice")),
-      eq(versions.number, 1),
-    );
-    await db.update(versions).set({ state: "revoked" }).where(where);
-    try {
-      expect(
-        await loadIntegrationPanel(as("maya"), {
-          templateId: id("rate-change-notice"),
-        }),
-      ).toEqual({
-        ok: false,
-        status: 409,
-        code: "no_active_version",
-        reason: "This template has no Active version yet.",
-      });
-    } finally {
-      await db.update(versions).set({ state: "active" }).where(where);
     }
+  });
+
+  it("trims the template id before it asks", async () => {
+    await loadIntegrationPanel(maya, { templateId: `  ${TEMPLATE} ` });
+    expect(env.integration.mock.calls[0]![1]).toEqual({ templateId: TEMPLATE });
+  });
+
+  it("400 template_gone for a blank or an over-long id, without asking the service", async () => {
+    const gone = {
+      ok: false,
+      status: 400,
+      ...REQUEST_REFUSALS.templateGone,
+    };
+    expect(await loadIntegrationPanel(maya, { templateId: "" })).toEqual(gone);
+    expect(await loadIntegrationPanel(maya, { templateId: "  " })).toEqual(
+      gone,
+    );
+    expect(
+      await loadIntegrationPanel(maya, { templateId: "U".repeat(65) }),
+    ).toEqual(gone);
+    expect(env.integration).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "403, the permission's refusal",
+      { ok: false, status: 403, ...REASONS.generic },
+    ],
+    [
+      "404 template_gone",
+      { ok: false, status: 404, ...REQUEST_REFUSALS.templateGone },
+    ],
+    [
+      "409 no_active_version",
+      { ok: false, status: 409, ...REQUEST_REFUSALS.noActiveVersion },
+    ],
+  ])(
+    "passes the service's refusal through unchanged: %s",
+    async (_, refusal) => {
+      env.integration.mockResolvedValue(refusal);
+      expect(await loadIntegrationPanel(maya, { templateId: TEMPLATE })).toBe(
+        refusal,
+      );
+    },
+  );
+
+  describe("the origin of the examples", () => {
+    const urlWith = async (headers: Record<string, string>) => {
+      env.headers = headers;
+      const result = await loadIntegrationPanel(maya, { templateId: TEMPLATE });
+      return result.ok ? result.panel.endpoint.url : undefined;
+    };
+    const path = `/api/v1/templates/${TEMPLATE}/render`;
+
+    it("a local host is plain http", async () => {
+      expect(await urlWith({ host: "localhost:3001" })).toBe(
+        `http://localhost:3001${path}`,
+      );
+      expect(await urlWith({ host: "127.0.0.1:3000" })).toBe(
+        `http://127.0.0.1:3000${path}`,
+      );
+      expect(await urlWith({ host: "localhost" })).toBe(
+        `http://localhost${path}`,
+      );
+    });
+
+    it("a public host defaults to https", async () => {
+      expect(await urlWith({ host: "ucomp.example" })).toBe(
+        `https://ucomp.example${path}`,
+      );
+    });
+
+    it("the forwarded protocol wins over the host's default", async () => {
+      expect(
+        await urlWith({ host: "ucomp.example", "x-forwarded-proto": "http" }),
+      ).toBe(`http://ucomp.example${path}`);
+      expect(
+        await urlWith({
+          host: "localhost:3000",
+          "x-forwarded-proto": "https, http",
+        }),
+      ).toBe(`https://localhost:3000${path}`);
+    });
+
+    it("the first forwarded host wins over the host", async () => {
+      expect(
+        await urlWith({
+          host: "internal:3000",
+          "x-forwarded-host": "stencil.example, proxy.internal",
+          "x-forwarded-proto": "https",
+        }),
+      ).toBe(`https://stencil.example${path}`);
+    });
+
+    it("with no host at all, it is the dev server's", async () => {
+      expect(await urlWith({})).toBe(`http://localhost:3000${path}`);
+    });
   });
 });
