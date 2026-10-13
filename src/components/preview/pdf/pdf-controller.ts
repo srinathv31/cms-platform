@@ -13,6 +13,9 @@
 // loses it. Canvases render through a small queue, nearest the viewport first, two at a time. Text
 // layers are kept once built (they are light), and the pages nobody has scrolled to get theirs in idle
 // time, so the whole document is there for screen readers and find in page.
+//
+// The decisions (which pages would be on screen, which queued page goes next, when a page is out of date)
+// are pure functions in page-schedule.ts; this class measures the page, asks them, and acts.
 
 import type { PDFPageProxy } from "pdfjs-dist";
 import {
@@ -30,6 +33,18 @@ import {
   TEXT_LAYER_CLASS,
   type PageSize,
 } from "./page-layers";
+import {
+  canvasKey,
+  canvasPixelWidth,
+  firstFreeForText,
+  lacks,
+  MAX_BUSY_ROUNDS,
+  nearestToMiddle,
+  needsRender,
+  pagesInBand,
+  slotsMissingText,
+  type SlotFacts,
+} from "./page-schedule";
 
 /** A loaded document, ready to be shown. */
 export interface LoadedPdf {
@@ -68,12 +83,10 @@ const KEEP_MARGIN = "250% 0px";
 const MAX_CONCURRENT_RENDERS = 2;
 /** Resizes settle for this long before the pages re-render at the new width. */
 const RESIZE_DEBOUNCE_MS = 150;
-/** At most this many pages are drawn before a swap; the rest render as they come into view. */
-const MAX_PREPARED_PAGES = 4;
 
-class PageSlot {
+class PageSlot implements SlotFacts {
   canvas: HTMLCanvasElement | null = null;
-  /** `${generation}:${pixelWidth}` of the canvas on screen. */
+  /** The `canvasKey` of the canvas on screen. */
   canvasKey = "";
   text: HTMLDivElement | null = null;
   textGeneration = -1;
@@ -83,6 +96,10 @@ class PageSlot {
     readonly index: number,
     readonly el: HTMLElement,
   ) {}
+
+  get jobKey() {
+    return this.job?.key ?? null;
+  }
 
   showCanvas(canvas: HTMLCanvasElement, key: string) {
     if (this.canvas) {
@@ -271,7 +288,7 @@ export class PdfController {
       loaded.prepared.delete(slot.index);
       slot.showCanvas(
         prepared.canvas,
-        `${loaded.generation}:${prepared.pixelWidth}`,
+        canvasKey(loaded.generation, prepared.pixelWidth),
       );
       if (prepared.text) slot.showText(prepared.text, loaded.generation);
     }
@@ -412,18 +429,19 @@ export class PdfController {
   // ── Rendering ───────────────────────────────────────────────────────────
 
   private pixelWidth() {
-    return Math.max(1, Math.round(this.renderWidth * window.devicePixelRatio));
+    return canvasPixelWidth(this.renderWidth, window.devicePixelRatio);
   }
 
   private schedule(slot: PageSlot | undefined) {
     const doc = this.current;
-    if (!slot || !doc || slot.index >= doc.numPages || this.renderWidth < 1)
-      return;
-    if (!this.near.has(slot.index)) return;
-    const key = `${doc.generation}:${this.pixelWidth()}`;
-    if (slot.canvasKey === key && slot.textGeneration === doc.generation)
-      return;
-    if (slot.job?.key === key) return;
+    if (!slot || !doc) return;
+    const key = canvasKey(doc.generation, this.pixelWidth());
+    const view = {
+      near: this.near.has(slot.index),
+      renderWidth: this.renderWidth,
+      key,
+    };
+    if (!needsRender(slot, doc, view)) return;
     this.cancelJob(slot);
     this.queue.add(slot);
     this.pump();
@@ -445,41 +463,35 @@ export class PdfController {
 
   /** The queued page nearest the middle of the visible area. */
   private nextInQueue(): PageSlot {
-    const { top, bottom } = this.visibleRect();
-    const middle = (top + bottom) / 2;
-    let best: PageSlot | null = null;
-    let bestDistance = Infinity;
-    for (const slot of this.queue) {
-      const rect = slot.el.getBoundingClientRect();
-      const distance = Math.abs((rect.top + rect.bottom) / 2 - middle);
-      if (distance < bestDistance) [best, bestDistance] = [slot, distance];
-    }
-    return best as PageSlot;
+    const queued = [...this.queue].map((slot) => {
+      const { top, bottom } = slot.el.getBoundingClientRect();
+      return { item: slot, top, bottom };
+    });
+    return nearestToMiddle(queued, this.visibleRect()) as PageSlot;
   }
 
   private async run(slot: PageSlot) {
     const doc = this.current;
     if (!doc) return;
     const pixelWidth = this.pixelWidth();
-    const key = `${doc.generation}:${pixelWidth}`;
+    const key = canvasKey(doc.generation, pixelWidth);
     const abort = new AbortController();
     slot.job = { key, abort };
     this.running++;
     try {
       const page = doc.pages[slot.index];
-      const canvas =
-        slot.canvasKey === key
-          ? null
-          : await drawCanvas(
-              page,
-              doc.sizes[slot.index],
-              pixelWidth,
-              abort.signal,
-            );
-      const text =
-        slot.textGeneration === doc.generation
-          ? null
-          : await drawTextLayer(doc.runtime.pdfjs, page, abort.signal);
+      // The text layer is asked about after the canvas is drawn: a render that finished meanwhile may have built it.
+      const canvas = lacks(slot, key, doc.generation).canvas
+        ? await drawCanvas(
+            page,
+            doc.sizes[slot.index],
+            pixelWidth,
+            abort.signal,
+          )
+        : null;
+      const text = lacks(slot, key, doc.generation).text
+        ? await drawTextLayer(doc.runtime.pdfjs, page, abort.signal)
+        : null;
       if (abort.signal.aborted) {
         if (canvas) releaseCanvas(canvas);
         return;
@@ -504,19 +516,18 @@ export class PdfController {
     void (async () => {
       // A page with a render in flight gets its text from that render; if the render is dropped
       // (scrolled past), a later round picks the page up. Rounds that find only busy pages are capped.
-      for (let busyRounds = 0; !signal.aborted && busyRounds < 20;) {
-        const missing = [...this.slots.values()].filter(
-          (s) =>
-            s.index < doc.numPages &&
-            s.textGeneration !== doc.generation &&
-            !tried.has(s),
-        );
+      for (
+        let busyRounds = 0;
+        !signal.aborted && busyRounds < MAX_BUSY_ROUNDS;
+      ) {
+        const missing = slotsMissingText(this.slots.values(), doc, tried);
         if (missing.length === 0) return;
         await whenIdle(signal);
         if (signal.aborted) return;
-        const slot = missing.find(
-          (s) =>
-            !s.job && !this.queue.has(s) && s.textGeneration !== doc.generation,
+        const slot = firstFreeForText(
+          missing,
+          doc.generation,
+          (s) => s.job !== null || this.queue.has(s),
         );
         if (!slot) {
           busyRounds++;
@@ -571,19 +582,11 @@ export class PdfController {
     if (!column) return [0];
     const style = getComputedStyle(column);
     const gap = parseFloat(style.rowGap) || 0;
-    let top =
+    const firstTop =
       column.getBoundingClientRect().top +
       (parseFloat(style.paddingTop) || 0) +
       (parseFloat(style.borderTopWidth) || 0);
-    const view = this.visibleRect();
-    const indices: number[] = [];
-    for (let index = 0; index < sizes.length && top < view.bottom; index++) {
-      const height = (width * sizes[index].height) / sizes[index].width;
-      if (top + height > view.top) indices.push(index);
-      if (indices.length === MAX_PREPARED_PAGES) break;
-      top += height + gap;
-    }
-    return indices;
+    return pagesInBand(sizes, width, { firstTop, gap }, this.visibleRect());
   }
 
   // ── Environment ─────────────────────────────────────────────────────────
