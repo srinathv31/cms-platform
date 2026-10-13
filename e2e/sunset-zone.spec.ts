@@ -39,8 +39,11 @@ const longDay = (day: string) =>
   }).format(new Date(`${day}T00:00:00Z`));
 
 test.beforeAll(async () => {
-  // The zone change writes a platform.config_changed audit row; both it and the zone go back in afterAll.
-  await changes.watchAuditEvents("platform.config_changed");
+  // The zone change writes a platform.config_changed audit row (area business_zone); both it and the zone go
+  // back in afterAll. Settings changes of other areas are not this file's to remove.
+  await changes.watchAuditEvents("platform.config_changed", {
+    area: "business_zone",
+  });
   // Eastern, the default, whatever an earlier run left.
   await changes.deleteSetting("business_zone");
 

@@ -83,13 +83,20 @@ export async function storedTextAbout(templateId: string): Promise<string> {
 /**
  * Remembers which audit events with this action exist. The returned function removes the ones written since. For
  * the events a spec makes the app write (a sweep's, a settings change's) and that must not stay in the log.
+ * With `area`, only the events whose details name that area: against a shared server, other people's events of
+ * the same action are not this spec's to remove.
  */
 export async function rememberAuditEvents(
   action: string,
+  scope: { area?: string } = {},
 ): Promise<() => Promise<void>> {
-  const before = new Set((await auditEvents({ action })).map((e) => e.id));
+  const mine = async () =>
+    (await auditEvents({ action })).filter(
+      (event) => scope.area === undefined || event.details?.area === scope.area,
+    );
+  const before = new Set((await mine()).map((e) => e.id));
   return async () => {
-    for (const event of await auditEvents({ action }))
+    for (const event of await mine())
       if (!before.has(event.id))
         await execute("DELETE FROM audit_events WHERE id = ?", [event.id]);
   };

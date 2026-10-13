@@ -84,9 +84,15 @@ export class Changes {
     this.onUndo(await rememberAllowedChannels(contentTypeKey));
   }
 
-  /** The audit events with this action: `undo` removes the ones written since. */
-  async watchAuditEvents(action: string): Promise<void> {
-    this.onUndo(await rememberAuditEvents(action));
+  /**
+   * The audit events with this action: `undo` removes the ones written since. With `area`, only those whose
+   * details name that area (a settings change's `details.area`).
+   */
+  async watchAuditEvents(
+    action: string,
+    scope: { area?: string } = {},
+  ): Promise<void> {
+    this.onUndo(await rememberAuditEvents(action, scope));
   }
 
   /** The consumer notices of this kind: `undo` removes the ones written since, and Coral's read marks on them. */
