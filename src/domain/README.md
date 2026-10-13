@@ -267,8 +267,8 @@ Read these before you assume a rule is missing. When you change one, move it her
   each has a `fixtures.ts` for the inputs more than one of its test files builds. Everywhere else a file builds its
   inputs inline, with the seed's ids and names (`maya`, `jordan`, `coral-offers`).
   [copilot.test.ts](copilot.test.ts) uses inline snapshots.
-- Gotchas: [platform-config/teams.test.ts](platform-config/teams.test.ts) reads `src/app` and fails if a top-level route
-  segment is missing from `RESERVED_SLUGS`. [golive/json-schema.test.ts](golive/json-schema.test.ts) checks
+- Gotchas: [platform-config/teams.test.ts](platform-config/teams.test.ts) reads `src/app` and `public/` and fails if a
+  top-level route segment or public folder is missing from `RESERVED_SLUGS`. [golive/json-schema.test.ts](golive/json-schema.test.ts) checks
   schemas with zod's `fromJSONSchema`. [schema-check.test.ts](../server/render/schema-check.test.ts) fails when
   the editor schema gains a node or mark that `render/resolve.ts` doesn't handle.
 - Tests of the write side (effects, transactions, actions) run against a temporary database next to the server

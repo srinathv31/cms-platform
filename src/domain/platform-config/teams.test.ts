@@ -1,4 +1,12 @@
-import { readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PLATFORM_REFUSALS } from "./refusals";
@@ -168,30 +176,87 @@ describe("createTeam", () => {
     ).toBeNull();
   });
 
-  it("refuses a name whose slug is a top-level route: every top-level segment under src/app is reserved", () => {
-    expect(run({ name: "SIM" })).toEqual({
-      ok: false,
-      code: "team_name_reserved",
-      reason: '"SIM" can\'t be used as a team name.',
+  it("refuses a name whose slug is a top-level route", () => {
+    for (const name of ["SIM", "api", "Request Access"])
+      expect(run({ name })).toEqual({
+        ok: false,
+        code: "team_name_reserved",
+        reason: `"${name}" can't be used as a team name.`,
+      });
+  });
+});
+
+/**
+ * The URL segments at the root of an app folder, which a team's slug (`/[team]/…`) must not equal
+ * (decision 0071): the folders directly under `dir`, looking through route groups "(x)", which add no
+ * segment. Not segments: a dynamic folder "[x]" (the team itself is one), a private folder "_x", a
+ * parallel-route slot "@x", and an intercepting route "(.)x", which shows an existing route in place.
+ * Files are not segments either: a file route (favicon.ico, robots.txt) has an extension, and a slug
+ * has no dot.
+ */
+function rootSegments(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => {
+      if (/^\((?!\.)[^)]*\)$/.test(entry.name))
+        return rootSegments(join(dir, entry.name));
+      if (/^[[_@(]/.test(entry.name)) return [];
+      return [entry.name];
     });
-    // Route groups "(x)" are looked through; dynamic "[x]", private "_x" and files are not segments.
-    const segments = (dir: string): string[] =>
-      readdirSync(dir, { withFileTypes: true })
-        .filter(
-          (e) =>
-            e.isDirectory() &&
-            !e.name.startsWith("[") &&
-            !e.name.startsWith("_") &&
-            !e.name.startsWith("@"),
-        )
-        .flatMap((e) =>
-          e.name.startsWith("(") ? segments(join(dir, e.name)) : [e.name],
-        );
-    const top = segments(join(process.cwd(), "src/app"));
-    expect(top).toEqual(
-      expect.arrayContaining(["api", "sim", "request-access", "editor-lab"]),
+}
+
+describe("RESERVED_SLUGS holds every top-level URL segment, read from the folders (decision 0071)", () => {
+  const root = process.cwd();
+
+  it("reads a folder tree the way Next.js routes it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "segments-"));
+    try {
+      for (const path of [
+        "(product)/[team]/templates",
+        "(product)/request-access",
+        "(product)/(nested)/pricing",
+        "(.)modal/inner",
+        "(simulator)/sim/customers",
+        "_private/hidden",
+        "@slot/panel",
+        "api/v1",
+        "[team]",
+      ])
+        mkdirSync(join(dir, path), { recursive: true });
+      writeFileSync(join(dir, "favicon.ico"), "");
+      expect(rootSegments(dir).sort()).toEqual([
+        "api",
+        "pricing",
+        "request-access",
+        "sim",
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("finds the segments of every route group under src/app, and api", () => {
+    expect(rootSegments(join(root, "src/app"))).toEqual(
+      expect.arrayContaining([
+        "api",
+        "sim",
+        "request-access",
+        "editor-lab",
+        "pdf-lab",
+      ]),
     );
-    expect(top.filter((s) => !RESERVED_SLUGS.has(s))).toEqual([]);
+  });
+
+  it("reserves every top-level segment under src/app (product, simulator, dev, api)", () => {
+    const segments = rootSegments(join(root, "src/app"));
+    expect(segments.filter((s) => !RESERVED_SLUGS.has(s))).toEqual([]);
+  });
+
+  it("reserves every top-level folder or extensionless file under public/", () => {
+    const publicNames = existsSync(join(root, "public"))
+      ? readdirSync(join(root, "public")).filter((name) => !name.includes("."))
+      : [];
+    expect(publicNames.filter((s) => !RESERVED_SLUGS.has(s))).toEqual([]);
   });
 });
 

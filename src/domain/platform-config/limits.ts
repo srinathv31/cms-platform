@@ -48,8 +48,10 @@ export const TEAM_ICONS = [
 ] as const;
 
 /**
- * Slugs the app's own routes use: a team can't take them. Every top-level segment under src/app
- * (route groups looked through) must be here; teams.test.ts checks the folder.
+ * Slugs the app's own routes use: a team can't take them (decision 0071). Every top-level segment under
+ * src/app (route groups looked through) and every top-level folder in public/ must be here; teams.test.ts
+ * reads both folders, so a new route can't be added without reserving its name. The rest are words kept
+ * for the platform's own pages, with no folder yet.
  */
 export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "all",
