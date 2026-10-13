@@ -12,8 +12,8 @@ code it was read from and the decision record behind it, so it can be checked.
 ## How to read this page
 
 - **It describes the contract as decided.** Where the Node prototype still does something else, a line starting
-  **Node today** says what it does, and what changes it: a wave of the pre-handoff work, the port to Java, or a choice
-  left to the handoff package.
+  **Node today** says what it does, and what changes it: a change in the pre-handoff work (the plan is `to-do.md`),
+  the port to Java, or a choice left to the handoff package.
 - **A decision record wins** over this page and over the code. The records are in
   [docs/decisions](../decisions/README.md) and are linked where they apply. Where a record leaves something open,
   [section 15](#15-open-for-the-handoff) lists it instead of guessing.
@@ -57,21 +57,21 @@ behind them.
 
 ## 2. What differs from the Node code today
 
-| Area                                  | Node today                                                                                                    | Decided                                                                      | Changed by                                                                 | Record                                                                                                                                                  |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| How a consumer proves who it is       | An `X-Consumer-Id: coral` header, with no credential                                                          | OAuth 2.0 client credentials with Entra ID; 401 and 403 as in section 3      | The Java API, at the port                                                  | [0057](../decisions/0057-consumers-authenticate-with-client-credentials.md)                                                                             |
-| Error body                            | `{ "error": { "code", "message", "details"? } }`                                                              | The UCOMP API's error format, carrying a stable code and that code's details | The Java API at the port; the CMS preview route in the same change         | [0056](../decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md)                                                                            |
-| A JSON number in render `values`      | Read from its exact source text (`21.90` is `"21.90"`)                                                        | Refused: 422 `invalid_values`                                                | Node in wave 2.1 (lane I); Java from the start                             | [0058](../decisions/0058-render-values-are-strings.md)                                                                                                  |
-| An unexpected failure on a GET route  | Next.js's default HTML 500 ([A4](../handoff-review.md#a4--medium-get-apiv1-routes-can-return-a-non-json-500)) | The error format, with a code and the correlation id                         | The Java API                                                               | A4                                                                                                                                                      |
-| The HTTP `Date` header                | The demo clock (`withDemoDate` in `src/server/api/http.ts`)                                                   | Real time; a demo clock, if one survives, in a header of its own             | The Java API from the start; Node when the demo clock goes                 | [A7](../handoff-review.md#a7--medium-the-http-date-header-carries-the-demo-clock)                                                                       |
-| The clock behind `asOf` and the rules | The demo clock (real time plus an offset the demo moves)                                                      | The server's clock, with a test-only offset in demo and test environments    | The Java API                                                               | [0068](../decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)                                                                    |
-| Search                                | Loads every Active version and ranks in memory                                                                | Filters, ranks and pages in SQL, with the same matches and order             | The Java API                                                               | [0059](../decisions/0059-template-search-ranks-and-pages-in-sql.md)                                                                                     |
-| `team.id`                             | Equal to the team's slug (`coral-offers`)                                                                     | An opaque id, never equal to a slug                                          | Node in wave 2.2 (lane F)                                                  | [0053](../decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)                                                                           |
-| `templateId`                          | `UC-` and six characters, described by its format in code comments                                            | An opaque string with a maximum length and examples, no pattern              | The spec                                                                   | [0060](../decisions/0060-template-ids-are-random-and-retried-on-a-collision.md)                                                                         |
-| Which check runs first on a render    | The body, then the consumer header, then the template and version, then whether the consumer is registered    | Authentication and the consumer first, before the body is read               | The gateway and Spring Security                                            | 0057                                                                                                                                                    |
-| Rate limits                           | None                                                                                                          | Per client id, at the gateway                                                | The gateway                                                                | 0057                                                                                                                                                    |
-| Stored notice payloads                | Carry `contractLines` (English nothing reads); seeded rows spell one field differently                        | Facts only, one shape per kind. Nothing a consumer receives changes          | Node in wave 2.2 (lane F, `contractLines`) and wave 2.1 (lane K, the seed) | [0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md), [0064](../decisions/0064-payloads-are-facts-with-one-shape-per-event.md) |
-| Rendering                             | The Node engine                                                                                               | A Java engine, held to the render spec and the golden files                  | The Java API, at the port                                                  | [0067](../decisions/0067-java-renders-every-channel.md)                                                                                                 |
+| Area                                  | Node today                                                                                                        | Decided                                                                                  | Changed by                                                                                          | Record                                                                                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| How a consumer proves who it is       | An `X-Consumer-Id: coral` header, with no credential                                                              | OAuth 2.0 client credentials with Entra ID; 401 and 403 as in section 3                  | The Java API, at the port                                                                           | [0057](../decisions/0057-consumers-authenticate-with-client-credentials.md)                                                                             |
+| Error body                            | `{ "error": { "code", "message", "details"? } }`                                                                  | The UCOMP API's error format, carrying a stable code and that code's details             | The Java API at the port; the CMS preview route in the same change                                  | [0056](../decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md)                                                                            |
+| A JSON number in render `values`      | Read from its exact source text (`21.90` is `"21.90"`)                                                            | Refused: 422 `invalid_values`                                                            | Node, in the change 0058 describes; Java from the start                                             | [0058](../decisions/0058-render-values-are-strings.md)                                                                                                  |
+| An unexpected failure on a GET route  | Next.js's default HTML 500 ([A4](../handoff-review.md#a4--medium-get-apiv1-routes-can-return-a-non-json-500))     | The error format, with a code and the correlation id                                     | The Java API                                                                                        | A4                                                                                                                                                      |
+| The HTTP `Date` header                | The demo clock (`withDemoDate` in `src/server/api/http.ts`)                                                       | Real time; a demo clock, if one survives, in a header of its own                         | The Java API from the start; Node when the demo clock goes                                          | [A7](../handoff-review.md#a7--medium-the-http-date-header-carries-the-demo-clock)                                                                       |
+| The clock behind `asOf` and the rules | The demo clock (real time plus an offset the demo moves)                                                          | The server's clock, with a test-only offset in demo and test environments                | The Java API                                                                                        | [0068](../decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)                                                                    |
+| Search                                | Loads every Active version and ranks in memory                                                                    | Filters, ranks and pages in SQL, with the same matches and order                         | The Java API                                                                                        | [0059](../decisions/0059-template-search-ranks-and-pages-in-sql.md)                                                                                     |
+| `team.id`                             | Equal to the team's slug (`coral-offers`)                                                                         | An opaque id, never equal to a slug                                                      | Node, in the backend seam work (to-do item 3)                                                       | [0053](../decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)                                                                           |
+| `templateId`                          | `UC-` and six characters, described by its format in code comments                                                | An opaque string with a maximum length and examples, no pattern                          | The spec                                                                                            | [0060](../decisions/0060-template-ids-are-random-and-retried-on-a-collision.md)                                                                         |
+| Which check runs first on a render    | The body, then the consumer header, then the template and version, then whether the consumer is registered        | _Proposed:_ authentication and the consumer first, before the body is read (section 4.4) | The gateway and Spring Security                                                                     | None: 0057 fixes the statuses, not an order (section 15)                                                                                                |
+| Rate limits                           | None                                                                                                              | Per client id, at the gateway                                                            | The gateway                                                                                         | 0057                                                                                                                                                    |
+| Stored notice payloads                | Carry `contractLines` (English nothing reads); seeded rows differ from the runtime's in a few fields (section 12) | Facts only, one shape per kind. Nothing a consumer receives changes                      | Node: the backend seam work (`contractLines`, to-do item 3) and the seed work (the spellings, 0064) | [0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md), [0064](../decisions/0064-payloads-are-facts-with-one-shape-per-event.md) |
+| Rendering                             | The Node engine                                                                                                   | A Java engine, held to the render spec and the golden files                              | The Java API, at the port                                                                           | [0067](../decisions/0067-java-renders-every-channel.md)                                                                                                 |
 
 ## 3. Security
 
@@ -85,12 +85,12 @@ Decision [0057](../decisions/0057-consumers-authenticate-with-client-credentials
 - **The token names the consumer.** Its client id (`azp` in v2.0 tokens, `appid` in v1.0) is looked up in
   `consumers.entra_app_id`, unique, which replaces today's `client_name`. That row's `id` (`coral`) is the consumer id
   the API uses in paths, cursors and notices.
-- **App roles** scope what a consumer may do, in the token's `roles` claim: `Stencil.Render` for the render route,
-  `Stencil.Notices.Read` for the notices route. Which role the two template reads need isn't decided
-  ([section 15](#15-open-for-the-handoff)).
+- **App roles** scope what a consumer may do, in the token's `roles` claim: `Stencil.Render` and
+  `Stencil.Notices.Read` (the names are 0057's; this brief reads them as guarding the render and the notices route).
+  Which role the two template reads need isn't decided ([section 15](#15-open-for-the-handoff)).
 - **Statuses.** No token, or a bad one (expired, wrong audience, bad signature): **401**. A valid token whose client
-  isn't a registered consumer: **403** `unknown_consumer`. A registered consumer without the operation's role: **403**,
-  code to be named. A notices path naming any consumer but the caller: **403** `consumer_mismatch`, whether or not that
+  isn't a registered consumer: **403** `unknown_consumer`. _Proposed (0057 doesn't say):_ a registered consumer without
+  the operation's role: **403**, code to be named. A notices path naming any consumer but the caller: **403** `consumer_mismatch`, whether or not that
   id exists, so no answer says which consumers exist. _Suggestion:_ send `WWW-Authenticate: Bearer` on the 401
   (RFC 6750).
 - **401 and 403 use the error format** of [section 4](#4-errors) even when the gateway or Spring Security answers
@@ -120,27 +120,27 @@ security:
 
 **Node today:** a consumer names itself in `X-Consumer-Id` and proves nothing (`requireConsumer` in
 `src/server/queries/consumer-api.ts`). No header is 400 `consumer_required`; an id that isn't in `consumers` is 403
-`unknown_consumer`; a notices path that isn't the header's id is 403 `consumer_mismatch`. Wave 1 already stopped two
-leaks: an unregistered caller writes no `render_log` row, and the notices route no longer has a `consumer_not_found`
-code that told callers which ids exist. Consumers come from the seed. Coral, the simulated consumer in this repo,
+`unknown_consumer`; a notices path that isn't the header's id is 403 `consumer_mismatch`. Two leaks are already
+stopped: an unregistered caller writes no `render_log` row, and the notices route no longer has a
+`consumer_not_found` code that told callers which ids exist. Consumers come from the seed. Coral, the simulated consumer in this repo,
 will call Java with a dev token, or with the header on a demo-only path behind `DEMO_MODE`; that is decided when Coral
 is pointed at Java.
 
 ### 3.2 Headers
 
-| Header                            | Direction         | Rule                                                                                                                                                                                              |
-| --------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Authorization`                   | request           | `Bearer <token>` (section 3.1). Replaces `X-Consumer-Id`.                                                                                                                                         |
-| `X-Correlation-Id`                | request, optional | Echoed back when it is 1 to 128 visible ASCII characters (`0x21` to `0x7E`) after trimming; otherwise the server makes one, `req_` and 12 characters. The render route's failure log names it.    |
-| `X-Correlation-Id`                | every response    | The request's, or the one the server made.                                                                                                                                                        |
-| `Cache-Control: no-store`         | every response    | No response is cached.                                                                                                                                                                            |
-| `X-Content-Type-Options: nosniff` | every response    | Always.                                                                                                                                                                                           |
-| `Date`                            | every response    | Real time ([section 8](#8-time-days-and-sunsets)).                                                                                                                                                |
-| `X-Stencil-Template-Id`           | render 200        | The template id from the path.                                                                                                                                                                    |
-| `X-Stencil-Version`               | render 200        | The rendered version's number.                                                                                                                                                                    |
-| `X-Stencil-Newer-Version`         | render 200        | The Active version's number, only when the rendered version is Superseded and a version is Active.                                                                                                |
-| `Content-Disposition`             | render 200, PDF   | `inline; filename="UC-4F7K2Q-v2.pdf"`: the template id and version, with any character outside `[A-Za-z0-9_.-]` replaced by `_`.                                                                  |
-| `Content-Security-Policy`         | render 200, web   | `default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'`: the document has no scripts and loads nothing, and stays that way if opened directly. |
+| Header                            | Direction                          | Rule                                                                                                                                                                                              |
+| --------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Authorization`                   | request                            | `Bearer <token>` (section 3.1). Replaces `X-Consumer-Id`.                                                                                                                                         |
+| `X-Correlation-Id`                | request, optional                  | Echoed back when it is 1 to 128 visible ASCII characters (`0x21` to `0x7E`) after trimming; otherwise the server makes one, `req_` and 12 characters. The render route's failure log names it.    |
+| `X-Correlation-Id`                | every response                     | The request's, or the one the server made.                                                                                                                                                        |
+| `Cache-Control: no-store`         | every response                     | No response is cached.                                                                                                                                                                            |
+| `X-Content-Type-Options: nosniff` | every response                     | Always.                                                                                                                                                                                           |
+| `Date`                            | every response                     | Real time ([section 8](#8-time-days-and-sunsets)).                                                                                                                                                |
+| `X-Stencil-Template-Id`           | render 200                         | The template id from the path.                                                                                                                                                                    |
+| `X-Stencil-Version`               | render 200                         | The rendered version's number.                                                                                                                                                                    |
+| `X-Stencil-Newer-Version`         | render 200                         | The Active version's number, only when the rendered version is Superseded and a version is Active.                                                                                                |
+| `Content-Disposition`             | render 200, PDF without `encoding` | `inline; filename="UC-4F7K2Q-v2.pdf"`: the template id and version, with any character outside `[A-Za-z0-9_.-]` replaced by `_`.                                                                  |
+| `Content-Security-Policy`         | render 200, web without `encoding` | `default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'`: the document has no scripts and loads nothing, and stays that way if opened directly. |
 
 The header names are `API_HEADERS` in `src/contracts/api-v1.ts`; the shared ones are set in `src/server/api/http.ts`,
 the render ones in `src/server/api/render-http.ts`.
@@ -194,50 +194,50 @@ a code has none (`errorResponse` in `src/server/api/http.ts`):
 `API_ERROR_STATUS` in `src/domain/golive-types.ts` is the table. The render route's codes and sentences are built in
 `src/domain/render/errors.ts`, the GET routes' own in `src/domain/golive/api-errors.ts`.
 
-| Status | Code                     | Returned by           | When                                                                                                          |
-| ------ | ------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 400    | `bad_request`            | all four              | A parameter or the body doesn't fit (each route's sentences are in section 5).                                |
-| 400    | `consumer_required`      | Node only             | No `X-Consumer-Id`. Retires with the header: its case becomes the 401.                                        |
-| 401    | new, name open           | all four (Java)       | No token or a bad one. _Suggestion:_ `unauthenticated`.                                                       |
-| 403    | `unknown_consumer`       | all four              | The caller isn't a registered consumer.                                                                       |
-| 403    | new, name open           | all four (Java)       | A registered consumer without the operation's app role. _Suggestion:_ `role_required`.                        |
-| 403    | `consumer_mismatch`      | notices               | The path names a consumer other than the caller.                                                              |
-| 403    | `preview_forbidden`      | never `/api/v1`       | The CMS preview route's: the viewer may not see that version. In `ApiErrorCode` only so the code lists match. |
-| 404    | `template_not_found`     | template, render      | No template with that id; for the template read, also a template with no released version.                    |
-| 404    | `version_not_found`      | template, render      | The template has no version with that number.                                                                 |
-| 409    | `version_not_released`   | template, render      | The number exists but isn't released: a draft, in review, or sent back for changes.                           |
-| 410    | `version_sunset`         | render                | A Superseded version whose sunset has passed.                                                                 |
-| 410    | `version_revoked`        | render                | A revoked version.                                                                                            |
-| 413    | `body_too_large`         | render                | The body is over 1,000,000 bytes.                                                                             |
-| 422    | `channel_not_allowed`    | render                | The template's content type doesn't allow the channel (any more).                                             |
-| 422    | `channel_not_enabled`    | render                | The version doesn't have the channel turned on.                                                               |
-| 422    | `missing_variables`      | render                | A required variable has no value (and any invalid values are reported with it).                               |
-| 422    | `invalid_values`         | render                | A value doesn't fit its type, is over 1,000 characters, or isn't a JSON string.                               |
-| 422    | `push_payload_too_large` | render                | The push, with these values, is over 4,096 bytes on its platform.                                             |
-| 422    | `sms_too_long`           | render                | The SMS, with these values, is over 10 parts.                                                                 |
-| 429    | new, name open           | all four (gateway)    | Over the client's rate limit.                                                                                 |
-| 500    | `render_failed`          | render                | The render couldn't be produced (section 4.3 says when the caller can act on it).                             |
-| 500    | new, name open           | the GET routes (Java) | An unexpected failure. Node has no code for it today (A4). _Suggestion:_ `internal_error`.                    |
+| Status | Code                     | Returned by           | When                                                                                                                                                                  |
+| ------ | ------------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400    | `bad_request`            | all four              | A parameter or the body doesn't fit (each route's sentences are in section 5).                                                                                        |
+| 400    | `consumer_required`      | Node only             | No `X-Consumer-Id`. Retires with the header: its case becomes the 401.                                                                                                |
+| 401    | new, name open           | all four (Java)       | No token or a bad one. _Suggestion:_ `unauthenticated`.                                                                                                               |
+| 403    | `unknown_consumer`       | all four              | The caller isn't a registered consumer.                                                                                                                               |
+| 403    | new, name open           | all four (Java)       | _Proposed (0057 doesn't say):_ a registered consumer without the operation's app role. _Suggestion:_ `role_required`.                                                 |
+| 403    | `consumer_mismatch`      | notices               | The path names a consumer other than the caller.                                                                                                                      |
+| 403    | `preview_forbidden`      | never `/api/v1`       | The CMS preview route's: the viewer may not see that version. In `ApiErrorCode` only so the code lists match.                                                         |
+| 404    | `template_not_found`     | template, render      | No template with that id; for the template read, also a template with no released version.                                                                            |
+| 404    | `version_not_found`      | template, render      | The template has no version with that number.                                                                                                                         |
+| 409    | `version_not_released`   | template, render      | The number exists but isn't released: in review, or sent back for changes. A draft has no number yet, so a number only a draft would take is 404 `version_not_found`. |
+| 410    | `version_sunset`         | render                | A Superseded version whose sunset has passed.                                                                                                                         |
+| 410    | `version_revoked`        | render                | A revoked version.                                                                                                                                                    |
+| 413    | `body_too_large`         | render                | The body is over 1,000,000 bytes.                                                                                                                                     |
+| 422    | `channel_not_allowed`    | render                | The template's content type doesn't allow the channel (any more).                                                                                                     |
+| 422    | `channel_not_enabled`    | render                | The version doesn't have the channel turned on.                                                                                                                       |
+| 422    | `missing_variables`      | render                | A required variable has no value (and any invalid values are reported with it).                                                                                       |
+| 422    | `invalid_values`         | render                | A value doesn't fit its type, is over 1,000 characters, or isn't a JSON string.                                                                                       |
+| 422    | `push_payload_too_large` | render                | The push, with these values, is over 4,096 bytes on its platform.                                                                                                     |
+| 422    | `sms_too_long`           | render                | The SMS, with these values, is over 10 parts.                                                                                                                         |
+| 429    | new, name open           | all four (gateway)    | Over the client's rate limit.                                                                                                                                         |
+| 500    | `render_failed`          | render                | The render couldn't be produced (section 4.3 says when the caller can act on it).                                                                                     |
+| 500    | new, name open           | the GET routes (Java) | An unexpected failure. Node has no code for it today (A4). _Suggestion:_ `internal_error`.                                                                            |
 
-`consumer_not_found` is gone (wave 1): the notices route answers `consumer_mismatch` for every path but the caller's.
+`consumer_not_found` is gone: the notices route answers `consumer_mismatch` for every path but the caller's.
 
 ### 4.3 Details per code
 
 This resolves `ApiError.details`, which the TypeScript declares as a union ending in `Record<string, unknown>`: the
-channel and `render_failed` shapes below reach it only through that catch-all. Model `details` per code.
+`channel_not_allowed`, `channel_not_enabled` and `render_failed` shapes below reach it only through that catch-all. Model `details` per code.
 
-| Code                                  | `details`                                                                                                                                                                                                                             | Example                                                                              |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `missing_variables`, `invalid_values` | `missing`: keys (string array); `invalid`: `{ key, expected, maxLength? }` array. Both always present, in the version's variable order. `expected` is the variable's type; `maxLength` (1000) only for a value over the length limit. | `{"missing":["first_name"],"invalid":[{"key":"purchase_apr","expected":"percent"}]}` |
-| `version_not_released`                | `version` (integer); `activeVersion` (integer or null).                                                                                                                                                                               | `{"version":3,"activeVersion":2}`                                                    |
-| `version_sunset`                      | `version`; `activeVersion`; `at` (the sunset instant); `sunsetDay`; `zone` (section 8).                                                                                                                                               | as in section 4.1                                                                    |
-| `version_revoked`                     | `version`; `activeVersion`; `at` (the instant the revoke was confirmed). Stencil always records it, so `at` is always there.                                                                                                          | `{"version":1,"activeVersion":2,"at":"2026-09-14T15:20:00.000Z"}`                    |
-| `channel_not_allowed`                 | `channel` (the one asked for).                                                                                                                                                                                                        | `{"channel":"push"}`                                                                 |
-| `channel_not_enabled`                 | `channel`; `channels` (the version's channels, in the order pdf, web, email, push, sms).                                                                                                                                              | `{"channel":"email","channels":["pdf","web"]}`                                       |
-| `push_payload_too_large`              | `platform` (`ios` or `android`); `payloadBytes`; `maxBytes` (4096).                                                                                                                                                                   | `{"platform":"ios","payloadBytes":4321,"maxBytes":4096}`                             |
-| `sms_too_long`                        | `parts`; `maxParts` (10); `encoding` (`GSM-7` or `UCS-2`); `characters`.                                                                                                                                                              | `{"parts":11,"maxParts":10,"encoding":"UCS-2","characters":700}`                     |
-| `render_failed`                       | `{ reason: "document" }` when the stored document or a channel field fails the document check; `{ reason: "glyphs", characters: ["U+1EA1", …] }` when the PDF's font can't draw characters; absent for any other failure.             | `{"reason":"glyphs","characters":["U+1EA1"]}`                                        |
-| every other code                      | none                                                                                                                                                                                                                                  |                                                                                      |
+| Code                                  | `details`                                                                                                                                                                                                                                                       | Example                                                                              |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `missing_variables`, `invalid_values` | `missing`: keys (string array); `invalid`: `{ key, expected, maxLength? }` array. Both always present, in the version's variable order. `expected` is the variable's type; `maxLength` (1000) only for a value over the length limit.                           | `{"missing":["first_name"],"invalid":[{"key":"purchase_apr","expected":"percent"}]}` |
+| `version_not_released`                | `version` (integer); `activeVersion` (integer or null).                                                                                                                                                                                                         | `{"version":3,"activeVersion":2}`                                                    |
+| `version_sunset`                      | `version`; `activeVersion`; `at` (the sunset instant); `sunsetDay`; `zone` (section 8).                                                                                                                                                                         | as in section 4.1                                                                    |
+| `version_revoked`                     | `version`; `activeVersion`; `at` (the instant the revoke was confirmed). Stencil always records it, so `at` is always there.                                                                                                                                    | `{"version":1,"activeVersion":2,"at":"2026-09-14T15:20:00.000Z"}`                    |
+| `channel_not_allowed`                 | `channel` (the one asked for).                                                                                                                                                                                                                                  | `{"channel":"push"}`                                                                 |
+| `channel_not_enabled`                 | `channel`; `channels` (the version's channels, in the order pdf, web, email, push, sms).                                                                                                                                                                        | `{"channel":"email","channels":["pdf","web"]}`                                       |
+| `push_payload_too_large`              | `platform` (`ios` or `android`); `payloadBytes`; `maxBytes` (4096).                                                                                                                                                                                             | `{"platform":"ios","payloadBytes":4321,"maxBytes":4096}`                             |
+| `sms_too_long`                        | `parts`; `maxParts` (10); `encoding` (`GSM-7` or `UCS-2`); `characters`.                                                                                                                                                                                        | `{"parts":11,"maxParts":10,"encoding":"UCS-2","characters":700}`                     |
+| `render_failed`                       | `{ reason: "document" }` when the stored document or a channel field fails the document check, or the resolver refuses the document; `{ reason: "glyphs", characters: ["U+1EA1", …] }` when the PDF's font can't draw characters; absent for any other failure. | `{"reason":"glyphs","characters":["U+1EA1"]}`                                        |
+| every other code                      | none                                                                                                                                                                                                                                                            |                                                                                      |
 
 When values are both missing and invalid, the code is `missing_variables`, the details carry both lists, and the
 sentence is the missing sentence followed by the invalid ones. _Suggestion:_ in OpenAPI, one schema per details shape,
@@ -259,9 +259,11 @@ When several errors apply, the first check that fails answers. Today's order, pe
   over its limit is 422. Anything that fails outside the engine (the database, the log write) is 500 `render_failed`
   with "… Try again.".
 
-**For Java**, authentication, the registered consumer and the app role come first on every route, before the body is
-read; the rest keeps today's order. So an unregistered caller asking for a template that doesn't exist gets 403, where
-Node answers 404 today.
+**Proposed for Java** (0057 fixes the statuses, not an order; section 15 lists it as open): authentication, the
+registered consumer and the app role come first on every route, before the body is read, and the rest keeps today's
+order. The GET routes already check the consumer before anything else (403 `unknown_consumer`), so for them only the token
+and the role are new. On the render route an unregistered caller asking for a template that doesn't exist gets 403
+`unknown_consumer`, where Node answers 404 today, and the body of a caller that fails these checks is never read.
 
 ### 4.5 The CMS preview route moves with it
 
@@ -288,8 +290,13 @@ Every operation also answers the 401, 403 and 429 of [section 3](#3-security), a
 | Parameter | In    | Type             | Required | Meaning                                                                                                                                             | Example                         |
 | --------- | ----- | ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | `q`       | query | string           | no       | Search text, trimmed. Absent or blank lists every template with an Active version. Matching and order: [section 10](#10-search-matching-and-order). | `travel`, `UC-4F7K2Q`, `4f7k2q` |
-| `limit`   | query | integer, 1 to 50 | no       | Results per page. Absent or blank: 20. Anything but a whole number in range is 400.                                                                 | `20`                            |
+| `limit`   | query | integer, 1 to 50 | no       | Results per page. Absent or blank: 20. Anything but a whole number in range is 400 (grammar below).                                                 | `20`                            |
 | `after`   | query | string           | no       | The `nextCursor` of an earlier page of the same search ([section 9](#9-paging-and-cursors)).                                                        |                                 |
+
+**Parameter grammar.** Every query parameter is trimmed (JavaScript's whitespace set, [render spec section
+5](../render-spec.md#5-values)), and a blank one is absent. `limit` is then ASCII digits only (`^[0-9]+$`) and a safe
+integer in range: a leading zero is accepted (`007` is 7), and a sign, a decimal point or an exponent is 400.
+When a parameter is repeated, Node reads the first.
 
 Only templates with an Active version are listed: a consumer can't start using anything else. A template whose
 versions are all Superseded or Revoked isn't listed, but can still be read by id (section 5.2).
@@ -331,7 +338,9 @@ of this list.".
 | `version`    | query | integer from 1 | no       | The version whose contract to return. Absent: the Active version. Any released version may be named, Superseded and Revoked included, so a consumer pinned to one can still read its contract. | `2`         |
 | `since`      | query | integer from 1 | no       | A lower released version. Adds `changes`: what changed in the contract from `since` to the contract's version.                                                                                 | `1`         |
 
-`version` and `since` are digits with no leading zero, after trimming; blank is absent.
+`version` and `since`, after trimming (blank is absent), are ASCII digits with no leading zero (`^[1-9][0-9]*$`) and a
+safe integer: `0`, `007`, `+2`, `2.0`, `1e1` and a number past 2^53 are 400 `bad_request`. Repeated parameters read as in
+[section 5.1](#51-search-templates).
 
 - **A template with no released version doesn't exist** for a consumer: 404 `template_not_found`, the same answer as
   for an unknown id.
@@ -451,7 +460,7 @@ Here v2's contract was `first_name` and `purchase_apr`, both required, and v3 re
 | `consumerId` | path  | string            | yes      | The caller's own consumer id. Any other is 403 `consumer_mismatch`.                                          | `coral`     |
 | `after`      | query | string            | no       | The `nextCursor` of an earlier page of this list. Absent or blank: from the consumer's oldest notice.        |             |
 | `templateId` | query | string            | no       | One template's notices only. Trimmed; blank is absent. An id with no notices answers an empty page, not 404. | `UC-4F7K2Q` |
-| `limit`      | query | integer, 1 to 200 | no       | Notices per page. Absent or blank: 50.                                                                       | `50`        |
+| `limit`      | query | integer, 1 to 200 | no       | Notices per page. Absent or blank: 50. Grammar as in section 5.1.                                            | `50`        |
 
 Notices come oldest first, in the order Stencil wrote them ([section 9](#9-paging-and-cursors)). To poll, keep the
 last `nextCursor` and call with it: every notice arrives once and in order, however many were written between polls.
@@ -514,13 +523,17 @@ before the notices were reset. Start again without after." or "limit must be a n
 The body is JSON, at most 1,000,000 bytes: refused from a declared `Content-Length` before anything is read, and
 otherwise as soon as the bytes read pass the limit (a chunked body has no length). Nothing past the limit is buffered.
 
-| Field      | Type                                 | Required       | Meaning                                                                                                        | Example                                        |
-| ---------- | ------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `version`  | integer from 1                       | yes            | The released version to render. `"draft"` is 400 here: drafts are the CMS preview's.                           | `2`                                            |
-| `channel`  | `pdf`, `web`, `email`, `push`, `sms` | yes            | The channel. A document template renders to pdf, web and email; a message template (an Alert) to push and sms. | `"pdf"`                                        |
-| `platform` | `ios`, `android`                     | with push only | Required with `push`, refused with any other channel.                                                          | `"ios"`                                        |
-| `values`   | object of string to string           | yes            | A value per variable key ([section 11](#11-values-are-strings)). Keys the version doesn't have are ignored.    | `{"given_name":"Maya","purchase_apr":"21.90"}` |
-| `encoding` | `base64`                             | no             | PDF, web and email only: the answer as JSON with the output base64-encoded.                                    | `"base64"`                                     |
+**Node today:** the route never looks at `Content-Type`: any body that parses as JSON is read. Spring answers 415 to a
+media type it doesn't map. Whether `application/json` is required, and the code a 415 carries, is open
+([section 15](#15-open-for-the-handoff)).
+
+| Field      | Type                                 | Required       | Meaning                                                                                                                                                         | Example                                        |
+| ---------- | ------------------------------------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `version`  | integer from 1                       | yes            | The released version to render. `"draft"` is 400 here: drafts are the CMS preview's.                                                                            | `2`                                            |
+| `channel`  | `pdf`, `web`, `email`, `push`, `sms` | yes            | The channel. A document template renders to pdf, web and email; a message template (an Alert) to push and sms.                                                  | `"pdf"`                                        |
+| `platform` | `ios`, `android`                     | with push only | Required with `push`, refused with any other channel.                                                                                                           | `"ios"`                                        |
+| `values`   | object of string to string or `null` | yes            | A value per variable key ([section 11](#11-values-are-strings)); a `null` is no value, and a JSON number is refused. Keys the version doesn't have are ignored. | `{"given_name":"Maya","purchase_apr":"21.90"}` |
+| `encoding` | `base64`                             | no             | PDF, web and email only: the answer as JSON with the output base64-encoded.                                                                                     | `"base64"`                                     |
 
 Any other field (`preview`, `round`) is ignored.
 
@@ -543,15 +556,16 @@ newer version is only in `X-Stencil-Newer-Version`.
 
 Which versions render:
 
-| The version is                                                  | Answer                                                                                       |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Active                                                          | renders; `newerVersion` null                                                                 |
-| Superseded, with no sunset or one still to come                 | renders; `newerVersion` and `X-Stencil-Newer-Version` name the Active version (null if none) |
-| Superseded, its sunset passed (`sunsetAt` at or before now)     | 410 `version_sunset`                                                                         |
-| Revoked                                                         | 410 `version_revoked`                                                                        |
-| A number with no released round (a draft, in review, sent back) | 409 `version_not_released`                                                                   |
+| The version is                                              | Answer                                                                                       |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Active                                                      | renders; `newerVersion` null                                                                 |
+| Superseded, with no sunset or one still to come             | renders; `newerVersion` and `X-Stencil-Newer-Version` name the Active version (null if none) |
+| Superseded, its sunset passed (`sunsetAt` at or before now) | 410 `version_sunset`                                                                         |
+| Revoked                                                     | 410 `version_revoked`                                                                        |
+| A number with no released round (in review, or sent back)   | 409 `version_not_released`                                                                   |
 
-A version whose revoke was started but not yet confirmed by a second approver is still Active or Superseded, and
+A draft has no number until it is submitted, so a number that only a draft would take is 404 `version_not_found`, not 409. A
+version whose revoke was started but not yet confirmed by a second approver is still Active or Superseded, and
 renders. The rules are `checkVersion` in `src/domain/render/version-rules.ts`.
 
 Errors, in the order they are checked (section 4.4): 413 `body_too_large` "The body must be at most 1,000,000
@@ -623,19 +637,19 @@ Everything describes the template's Active version.
 
 ### 6.5 ApiVersionSummary
 
-| Field          | Type                              | Meaning                                                                                                                      | Example                      |
-| -------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `number`       | integer                           | The version number.                                                                                                          | `2`                          |
-| `state`        | `active`, `superseded`, `revoked` | `ApiVersionState`: the only states a consumer sees.                                                                          | `"superseded"`               |
-| `activatedAt`  | instant                           | When the version went Active.                                                                                                |                              |
-| `supersededAt` | instant or null                   | When a newer version replaced it; null if that never happened (an Active version, or one revoked while Active).              |                              |
-| `sunsetAt`     | instant or null                   | When renders of it stop: 00:00 on `sunsetDay` in `zone` ([section 8](#8-time-days-and-sunsets)). Null when no sunset is set. | `"2027-03-01T05:00:00.000Z"` |
-| `sunsetDay`    | day or null                       | The sunset's day in `zone`: the day to show. Null when `sunsetAt` is.                                                        | `"2027-03-01"`               |
-| `zone`         | IANA zone or null                 | The business time zone in force now. Null when `sunsetAt` is.                                                                | `"America/New_York"`         |
-| `sunsetPassed` | boolean                           | `sunsetAt` is at or before now: renders fail with `version_sunset`.                                                          | `false`                      |
-| `revokedAt`    | instant or null                   | When the revoke was confirmed; null unless `state` is `revoked`.                                                             |                              |
-| `renders`      | boolean                           | A render of it would succeed now: Active, or Superseded before its sunset.                                                   | `true`                       |
-| `channels`     | `ApiChannel[]`                    | Its channels that its content type still allows, in the order pdf, web, email, push, sms.                                    | `["pdf","web"]`              |
+| Field          | Type                              | Meaning                                                                                                                                                                               | Example                      |
+| -------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `number`       | integer                           | The version number.                                                                                                                                                                   | `2`                          |
+| `state`        | `active`, `superseded`, `revoked` | `ApiVersionState`: the only states a consumer sees.                                                                                                                                   | `"superseded"`               |
+| `activatedAt`  | instant                           | When the version went Active.                                                                                                                                                         |                              |
+| `supersededAt` | instant or null                   | When a newer version replaced it; null if that never happened (an Active version, or one revoked while Active).                                                                       |                              |
+| `sunsetAt`     | instant or null                   | When renders of it stop: 00:00 on `sunsetDay` in `zone` ([section 8](#8-time-days-and-sunsets)). Null when no sunset is set.                                                          | `"2027-03-01T05:00:00.000Z"` |
+| `sunsetDay`    | day or null                       | The sunset's day in `zone`: the day to show. Null when `sunsetAt` is.                                                                                                                 | `"2027-03-01"`               |
+| `zone`         | IANA zone or null                 | The business time zone in force now. Null when `sunsetAt` is.                                                                                                                         | `"America/New_York"`         |
+| `sunsetPassed` | boolean                           | `sunsetAt` is at or before now. For a Superseded version, renders fail with `version_sunset`; a Revoked version keeps the sunset it had, and its renders fail with `version_revoked`. | `false`                      |
+| `revokedAt`    | instant or null                   | When the revoke was confirmed; null unless `state` is `revoked`.                                                                                                                      |                              |
+| `renders`      | boolean                           | A render of it would succeed now: Active, or Superseded before its sunset.                                                                                                            | `true`                       |
+| `channels`     | `ApiChannel[]`                    | Its channels that its content type still allows, in the order pdf, web, email, push, sms.                                                                                             | `["pdf","web"]`              |
 
 ### 6.6 ApiContract, ApiVariable and ApiJsonSchema
 
@@ -741,20 +755,20 @@ oldest first).
 `ApiNotice` is flat: every notice has every field, null (or `[]`) where its kind doesn't use it. Per-kind rules are
 [section 12](#12-notices).
 
-| Field           | Type                  | Meaning                                                                                                                                   | Example                      |
-| --------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `id`            | string                | The notice's id, opaque. Don't order by it.                                                                                               | `"cn_7k2m9q4x1p"`            |
-| `kind`          | `ApiNoticeKind`       | `new_version`, `sunset_scheduled`, `sunset_passed` or `revoked`.                                                                          | `"sunset_scheduled"`         |
-| `createdAt`     | instant               | When Stencil wrote it. Not the order: page order is. For `sunset_passed`, when the sweep found the sunset passed.                         | `"2026-10-04T12:00:00.000Z"` |
-| `template`      | `{ id, name }`        | The template, and the name of the version the notice is about as it was when the notice was written.                                      |                              |
-| `versionNumber` | integer               | The version the notice is about.                                                                                                          | `2`                          |
-| `activeVersion` | integer or null       | The Active version when the notice was written: the one to move to. Null when none was Active.                                            | `3`                          |
-| `sunsetAt`      | instant or null       | Sunset kinds: when renders stop (or stopped).                                                                                             | `"2027-03-01T05:00:00.000Z"` |
-| `sunsetDay`     | day or null           | Sunset kinds: the sunset's day in `zone`, as recorded.                                                                                    | `"2027-03-01"`               |
-| `zone`          | IANA zone or null     | Sunset kinds: the zone `sunsetDay` is a day in, as recorded when the notice was written.                                                  | `"America/New_York"`         |
-| `reason`        | string or null        | `revoked` only: the revoker's reason, in their own words, up to 2,000 characters.                                                         |                              |
-| `changes`       | `ApiContractChange[]` | `new_version` and `sunset_scheduled` (section 12); `[]` for the others.                                                                   |                              |
-| `message`       | string                | One sentence for people, worded when read. Informational ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). |                              |
+| Field           | Type                  | Meaning                                                                                                                                                 | Example                      |
+| --------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `id`            | string                | The notice's id, opaque. Don't order by it.                                                                                                             | `"cn_7k2m9q4x1p"`            |
+| `kind`          | `ApiNoticeKind`       | `new_version`, `sunset_scheduled`, `sunset_passed` or `revoked`.                                                                                        | `"sunset_scheduled"`         |
+| `createdAt`     | instant               | When Stencil wrote it. Not the order: page order is. For `sunset_passed`, when the sweep found the sunset passed.                                       | `"2026-10-04T12:00:00.000Z"` |
+| `template`      | `{ id, name }`        | The template, and the name of the version the notice is about as it was when the notice was written.                                                    |                              |
+| `versionNumber` | integer               | The version the notice is about.                                                                                                                        | `2`                          |
+| `activeVersion` | integer or null       | The Active version when the notice was written: the one to move to. Null when none was Active.                                                          | `3`                          |
+| `sunsetAt`      | instant or null       | Sunset kinds: when renders stop (or stopped).                                                                                                           | `"2027-03-01T05:00:00.000Z"` |
+| `sunsetDay`     | day or null           | Sunset kinds: the sunset's day in `zone`, as recorded.                                                                                                  | `"2027-03-01"`               |
+| `zone`          | IANA zone or null     | Sunset kinds: the zone `sunsetDay` is a day in, as recorded when the notice was written.                                                                | `"America/New_York"`         |
+| `reason`        | string or null        | `revoked` only: the revoker's reason, in their own words, up to 2,000 characters.                                                                       |                              |
+| `changes`       | `ApiContractChange[]` | `new_version` and `sunset_scheduled` (section 12); `[]` for the others.                                                                                 |                              |
+| `message`       | string                | One or two short sentences for people, worded when read. Informational ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). |                              |
 
 ### 6.9 ApiRenderRequest and the render responses
 
@@ -787,13 +801,13 @@ UTF-8, in standard base64 with padding), `newerVersion`.
 
 `ApiSmsResponse`:
 
-| Field          | Type             | Meaning                                                                                                                                  |
-| -------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `text`         | string           | The message exactly as it must be sent: the author's text, a line break, and the version's footer (brand and opt-out, frozen at submit). |
-| `encoding`     | `GSM-7`, `UCS-2` | GSM-7 unless one character is outside it; a value can switch it. A value is never transliterated.                                        |
-| `parts`        | integer          | Segments: 160 GSM-7 or 70 UCS-2 characters in one, 153 or 67 each once split. At most 10.                                                |
-| `characters`   | integer          | Characters as a reader counts them (grapheme clusters).                                                                                  |
-| `newerVersion` | integer or null  | As for email.                                                                                                                            |
+| Field          | Type             | Meaning                                                                                                                                                          |
+| -------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text`         | string           | The message exactly as it must be sent: the author's text and, when the version has a footer, a line break and the footer (brand and opt-out, frozen at submit). |
+| `encoding`     | `GSM-7`, `UCS-2` | GSM-7 unless one character is outside it; a value can switch it. A value is never transliterated.                                                                |
+| `parts`        | integer          | Segments: 160 GSM-7 or 70 UCS-2 characters in one, 153 or 67 each once split. At most 10.                                                                        |
+| `characters`   | integer          | Characters as a reader counts them (grapheme clusters).                                                                                                          |
+| `newerVersion` | integer or null  | As for email.                                                                                                                                                    |
 
 Send `text` as is, and turn off provider rewriting such as Twilio's Smart Encoding: the counts are for this text
 ([0035](../decisions/0035-sms-characters-and-length.md)).
@@ -806,7 +820,7 @@ Decisions [0060](../decisions/0060-template-ids-are-random-and-retried-on-a-coll
 | Id                 | Where                                                                                       | Today                                                                                           | Publish as                                                                                  |
 | ------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `templateId`       | paths, `id`, a notice's `template.id`, `X-Stencil-Template-Id`, the schema's `$id`, the PDF | `UC-` and six Crockford base32 characters, `UC-4F7K2Q` (`newTemplateId` in `src/server/ids.ts`) | An opaque string: a maximum length and examples, no pattern. _Suggestion:_ `maxLength: 64`. |
-| `team.id`          | search results and template reads                                                           | Equal to the team's slug, `coral-offers`                                                        | An opaque string. From wave 2.2 an id like `t_coral`, never a slug.                         |
+| `team.id`          | search results and template reads                                                           | Equal to the team's slug, `coral-offers`                                                        | An opaque string. After the backend seam work (0053), an id like `t_coral`, never a slug.   |
 | `consumerId`       | the notices path, `ApiNoticeList.consumerId`, inside notice cursors                         | `coral`, `deposits-online` (`consumers.id`)                                                     | An opaque string.                                                                           |
 | A notice's `id`    | `ApiNotice.id`                                                                              | `cn_` and ten lower-case Crockford base32 characters                                            | An opaque string. Unique; not an order.                                                     |
 | `contentType.key`  | search results and template reads                                                           | `disclosure`, `alert`                                                                           | A stable, open-ended string.                                                                |
@@ -816,6 +830,10 @@ The template id is random, the primary key, and immutable; a create inserts and 
 new id on a unique violation, at most three times. Consumers keep it, so it never changes. A readable id, if the
 product owner defines one, is a separate field and never `templateId` unless the product owner says so; whether the
 `UC-` prefix stays is the product owner's question too.
+
+**Node today:** `freshTemplateId` (`src/server/templates/create.ts`) reads up to four times for an unused id and then
+inserts, with no retry on a unique violation. That is safe with SQLite's one writer and not with two concurrent
+creates, which is why the Java create retries.
 
 Two details for the port:
 
@@ -892,7 +910,10 @@ Decisions [0006](../decisions/0006-page-notices-by-commit-order.md) and
   ([0062](../decisions/0062-invariants-hold-in-the-database-not-in-one-writer.md)).
 - **The epoch** names a numbering of the outbox. A notice cursor from another epoch is 400 `bad_request`, "after is
   from before the notices were reset. Start again without after.", rather than read against numbers it would skip.
-  It must change whenever the numbering starts again. Node uses `settings.seeded_at`, which a demo reset rewrites.
+  It must change whenever the numbering starts again. Node uses `settings.seeded_at`, which only the seed writes (a
+  demo reset rewrites it); a database that was never seeded has `epoch: null`. What epoch Java sends in production, and
+  how a cursor stored from Node keeps validating (a cursor is refused unless its `epoch` equals the server's), is open
+  ([section 15](#15-open-for-the-handoff)).
 - **Search pages on its sort key** `(rank, name, id)`: the page holds the results after the cursor's key. Pages never
   overlap, and a template leaving the list doesn't shift the pages after it.
 - **Read one more row than `limit`** to learn `hasMore` without a second query (`cutPage`). An empty page's
@@ -955,6 +976,8 @@ Decision [0058](../decisions/0058-render-values-are-strings.md); the grammar is
 - Each value is at most 1,000 characters as sent, counted in Unicode code points before any trimming (Java:
   `codePointCount`, never `length()`), else `invalid_values` with `maxLength: 1000`
   ([0011](../decisions/0011-cap-each-render-value.md)). A value is never cut: it prints exactly as sent, or is refused.
+- The absent check comes before the length check: a string that is blank after trimming is no value at any length, so a
+  whitespace-only value over 1,000 characters is absent, not `invalid_values` (0011; render spec section 5, "Length").
 - Keys the version doesn't have are ignored. When a key repeats in the JSON, the last one counts.
 - Each type's accepted forms, canonical and friendly (`$1,000`, `21.99%`, `3/4/2027`, `New Jersey`), are render spec
   section 5. Decimals are exact strings: never converted to a binary number, never rounded, trailing zeros kept.
@@ -962,9 +985,9 @@ Decision [0058](../decisions/0058-render-values-are-strings.md); the grammar is
   answer a non-string with 422 `invalid_values`. A `Map<String, String>` alone lets Jackson coerce a number to a
   string, or fail the whole body with a 400.
 
-**Node today:** until wave 2.1 (lane I), a JSON number in `values` was read from its exact source text, so
-`{"purchase_apr": 21.90}` rendered `21.90%`. Lane I makes Node refuse it like Java will; the `values-formats` golden
-case changes to strings and an `error-json-number` case pins the refusal.
+**Node today:** a JSON number in `values` is read from its exact source text, so `{"purchase_apr": 21.90}` renders
+`21.90%`. The change 0058 describes makes Node refuse it like Java will; the `values-formats` golden case then changes
+to strings and an `error-json-number` case pins the refusal. `true`, `false`, objects and arrays are refused today.
 
 ## 12. Notices
 
@@ -985,12 +1008,12 @@ template gets nothing. Each event writes one notice per consumer, each with its 
 records the event. After the port the 90-day audience is read from the daily render rollup, with the same rule
 ([0066](../decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)).
 
-| Kind               | Written when                                                                                                                                           | `versionNumber`          | `activeVersion`                                                         | `sunsetAt`, `sunsetDay`, `zone` | `reason`            | `changes`                                                                                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | ----------------------------------------------------------------------- | ------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `new_version`      | A version goes Active (its last approval).                                                                                                             | the new version          | the same number                                                         | null                            | null                | The contract changes the version was submitted with, against what consumers rendered then (the Active version, or with none the newest still rendering); `[]` for a first version.                               |
-| `sunset_scheduled` | A sunset is set or moved: on the Versions tab, or in the approve dialog for the version being replaced. Setting the day it already has writes nothing. | the version being sunset | the Active version                                                      | set                             | null                | The contract changes the Active version was submitted with, worded for it. When the version being sunset is older than the one the Active version replaced, they aren't the whole move: read `?since=` for that. |
-| `sunset_passed`    | Stencil's sunset sweep finds the sunset passed. Once per version and consumer.                                                                         | the version              | the Active version at the sweep, or null                                | set                             | null                | `[]`: the `sunset_scheduled` notice carried them.                                                                                                                                                                |
-| `revoked`          | A revoke is confirmed by a second approver.                                                                                                            | the revoked version      | null if the revoked version was the Active one; else the Active version | null                            | the revoker's words | `[]`                                                                                                                                                                                                             |
+| Kind               | Written when                                                                                                                                                                                                                            | `versionNumber`          | `activeVersion`                                                                                                      | `sunsetAt`, `sunsetDay`, `zone` | `reason`                                                                                                                                                                                                                                                                           | `changes`                                                                                                                                                                                                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `new_version`      | A version goes Active (its last approval).                                                                                                                                                                                              | the new version          | the same number                                                                                                      | null                            | The contract changes the version was submitted with, against what consumers could render then (the Active version, or with none the newest Superseded one still rendering); `[]` when nothing was rendering at submit, which is not only a first version, or when nothing changed. | The contract changes the version was submitted with, against what consumers rendered then (the Active version, or with none the newest still rendering); `[]` for a first version.                                                                                            |
+| `sunset_scheduled` | A sunset is set or moved: on the Versions tab, or in the approve dialog for the version being replaced. Setting the day it already has writes nothing.                                                                                  | the version being sunset | the Active version; null when none is Active (a sunset set on the Versions tab after the Active version was revoked) | set                             | null                                                                                                                                                                                                                                                                               | The contract changes the Active version was submitted with, worded for it; `[]` when none is Active or the Active version brought none. When the version being sunset is older than the one the Active version replaced, they aren't the whole move: read `?since=` for that. |
+| `sunset_passed`    | Stencil's sunset sweep finds the sunset passed. Once per version, to each consumer in the audience. Not written for a version revoked at or before its sunset: the revoke had already ended its renders, so nothing records the sunset. | the version              | the Active version at the sweep, or null                                                                             | set                             | null                                                                                                                                                                                                                                                                               | `[]`: the `sunset_scheduled` notice carried them.                                                                                                                                                                                                                             |
+| `revoked`          | A revoke is confirmed by a second approver.                                                                                                                                                                                             | the revoked version      | null if the revoked version was the Active one; else the Active version, or null when none is                        | null                            | the revoker's words                                                                                                                                                                                                                                                                | `[]`                                                                                                                                                                                                                                                                          |
 
 - **Facts only.** What Stencil stores for a notice is facts: numbers, instants, and names as they were. `message` and
   each change's `text` are worded when read and are informational: consumers branch on `kind`, never on a sentence.
@@ -1006,10 +1029,12 @@ records the event. After the port the 90-day audience is read from the daily ren
 _Suggestion for Java:_ one record with nullable fields serialized with nulls included gives exactly this JSON; a
 sealed hierarchy per kind is fine if it serializes the same way, with every field present.
 
-**Node today:** stored payloads still carry `contractLines`, English that nothing reads, which wave 2.2 (lane F)
-removes; seeded `sunset_scheduled` rows spell the Active version `replacedByVersionNumber` and seeded `revoked` rows
-leave it out, which wave 2.1 (lane K) aligns with the runtime's spelling. `noticeView` reads both today, and neither
-reaches the wire. The full catalogue of stored notice payloads goes in the handoff package (0064).
+**Node today:** stored payloads still carry `contractLines`, English that nothing reads, which the backend seam work
+removes (0055). Seeded rows also differ from the runtime's: a seeded `new_version` row has `previousVersionNumber` and
+no `activeVersion`, a seeded `sunset_scheduled` row spells the Active version `replacedByVersionNumber`, and a seeded
+`revoked` row leaves `activeVersion` out. The seed work aligns them with the runtime's spelling (0064), so that
+difference is temporary. `noticeView` and the notices query read both today, and none of it reaches the wire. The full
+catalogue of stored notice payloads goes in the handoff package (0064).
 
 ## 13. Rendering
 
@@ -1080,14 +1105,22 @@ Each of these needs a decision this brief doesn't make.
 - **The UCOMP error format** and the mapping of every code and its details onto it (0056).
 - **Names for the new codes:** the 401, the 403 for a missing app role, the 429, and an unexpected 500 on the GET
   routes (section 4.2 suggests some).
+- **The order of checks on Java, and the 403 for a missing app role.** 0057 fixes the 401 and the 403 statuses, not
+  an order and not the role-less 403. This brief proposes authentication, the registered consumer and the app role
+  before the body is read (section 4.4).
+- **Request details Node leaves loose.** Render's `Content-Type`: Node never checks it, Spring answers 415; is
+  `application/json` required, and with which code? A repeated query parameter: Node reads the first (section 5.1).
+- **The notice cursor's epoch in production** (section 9): what Java sends, and how a cursor stored from Node keeps
+  validating.
 - **Which app role the two template reads need.** _Suggestion:_ either role, since both consumers that render and
   consumers that read notices need a template's contract.
 - **`templateId`'s maximum length** (_suggestion:_ 64) and whether the path lookup stays case-sensitive (section 7).
 - **A readable template id and the `UC-` prefix**: product owner questions (0060).
 - **The schema and the route accept different sets of values.** 0058 says the route accepts exactly what the
   published schema accepts. For JSON types that holds once Node refuses numbers, but the schema is still stricter in
-  three places the route accepts: the friendly forms of render spec section 5 (`$1,000`, `21.99%`, `March 4, 2027`,
-  `New Jersey`), `null`, and a blank value for an optional currency, percent, number, date or US state. Either the
+  four places the route accepts: the friendly forms of render spec section 5 (`$1,000`, `21.99%`, `March 4, 2027`,
+  `New Jersey`), surrounding whitespace on a value that isn't text (`" 21.99 "`), `null`, and a blank value for an
+  optional currency, percent, number, date or US state. Either the
   route narrows (a render spec change, with golden updates), or the schema stays the stricter subset, which is what
   `json-schema.ts` describes today.
 - **A template with no released version.** The template read answers 404 `template_not_found` so such a template is
