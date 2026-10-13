@@ -3,7 +3,9 @@
 [api-v1.ts](api-v1.ts) holds the TypeScript shapes of Stencil's public consumer API: request and response bodies,
 error codes and error bodies, and the response header names (`API_HEADERS`, its only runtime value). Stencil's route
 handlers and the Coral simulator both compile against it. It stands in for an OpenAPI document; there is no
-machine-readable API description yet (`ApiJsonSchema` covers one version's render `values`, not the endpoints).
+machine-readable API description yet (`ApiJsonSchema` covers one version's render `values`, not the endpoints). The
+Java team writes the OpenAPI document from [docs/reference/openapi-brief.md](../../docs/reference/openapi-brief.md),
+which also says where the decided contract differs from this file.
 
 ## Rules
 
