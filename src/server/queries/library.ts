@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { desc, eq } from "drizzle-orm";
 import { sunsetDay } from "@/domain/business-zone";
-import { getBusinessZone } from "@/server/business-zone";
+import { getBusinessZone } from "@/server/services/local/business-zone";
 import { db } from "@/server/db/client";
 import {
   contentTypes,

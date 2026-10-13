@@ -37,11 +37,11 @@ import {
   type Variable,
   type VersionState,
 } from "@/domain/types";
-import { getBusinessZone } from "@/server/business-zone";
+import { getBusinessZone } from "@/server/services/local/business-zone";
 import { now } from "@/server/clock";
 import { requireSpace } from "./spaces";
 import { pickLatest } from "./library";
-import { anchorIdsOf } from "./review-shared";
+import { anchorIdsOf } from "@/domain/comments";
 import { loadThreads } from "./threads";
 import type { ImportOriginalRef } from "@/domain/import-types";
 import { getImportOriginalRef } from "./import";

@@ -40,11 +40,15 @@ import {
   users,
   versions,
 } from "@/server/db/schema/ucomp";
-import { countPendingSunsets, getBusinessZone } from "@/server/business-zone";
+import {
+  countPendingSunsets,
+  getBusinessZone,
+} from "@/server/services/local/business-zone";
 import { requireRequestContext } from "@/server/context/request";
 import { demoNow } from "./dynamic";
 import { requireCan } from "./require-can";
-import { getPeople, iso, personOf } from "./review-shared";
+import { getPeople, personOf } from "@/server/queries/people";
+import { iso } from "@/server/queries/iso";
 
 // The Platform group of the settings modal (Platform Admin): Teams, Content types, Channel rules,
 // Approval chains and Time zone. Read models: domain/access-types.ts. The consequences the UI shows before a change

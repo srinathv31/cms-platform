@@ -13,14 +13,10 @@ import {
 import { db } from "@/server/db/client";
 import { commentThreads, comments, versions } from "@/server/db/schema/ucomp";
 import { pickLatest } from "./library";
-import {
-  anchorIdsOf,
-  getPeople,
-  iso,
-  isoOrUndefined,
-  personOf,
-  requireTemplate,
-} from "./review-shared";
+import { anchorIdsOf } from "@/domain/comments";
+import { getPeople, personOf } from "@/server/queries/people";
+import { iso, isoOrUndefined } from "@/server/queries/iso";
+import { requireTemplate } from "@/server/queries/template-access";
 
 // Review threads. A thread belongs to the template and anchors to a stable block id (or a channel field's
 // id, "push.title": an alert's threads are on its fields), so a draft made from a version (same block ids)

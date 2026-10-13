@@ -7,7 +7,7 @@ import { sunsetPassed } from "@/domain/lifecycle/sunset";
 import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { compareRounds, headOf } from "@/domain/rounds";
-import { readBusinessZone } from "@/server/business-zone";
+import { readBusinessZone } from "@/server/services/local/business-zone";
 import { db } from "@/server/db/client";
 import {
   approvals,
@@ -17,8 +17,8 @@ import {
   users,
   versions,
 } from "@/server/db/schema/ucomp";
-import { loadConsumerUsage } from "@/server/queries/review-shared";
-import { currentName } from "@/server/queries/template-name";
+import { loadConsumerUsage } from "@/server/services/local/consumer-usage";
+import { currentName } from "@/server/services/local/template-name";
 import { notMoved } from "../not-moved";
 import { refusal } from "../results";
 import type { VersionFacts, VersionService } from "../versions";

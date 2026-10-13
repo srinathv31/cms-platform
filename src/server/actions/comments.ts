@@ -30,11 +30,9 @@ import {
 } from "@/server/db/schema/ucomp";
 import { writeEffects } from "@/server/effects";
 import { newId } from "@/server/ids";
-import {
-  anchorIdsOf,
-  loadChain,
-  stageApproverIds,
-} from "@/server/queries/review-shared";
+import { anchorIdsOf } from "@/domain/comments";
+import { loadChain } from "@/server/services/local/chain";
+import { stageApproverIds } from "@/domain/approval-chain";
 import { permit, refuse, serverAction } from "./kit";
 
 // Review comments: start a thread on a block or a channel field (or on the whole version), reply, resolve, reopen. The rules

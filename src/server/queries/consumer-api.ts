@@ -33,7 +33,7 @@ import {
 } from "@/domain/render";
 import { headOf, isReleased } from "@/domain/rounds";
 import { CHANNELS, type Channel } from "@/domain/types";
-import { readBusinessZone } from "@/server/business-zone";
+import { readBusinessZone } from "@/server/services/local/business-zone";
 import { db } from "@/server/db/client";
 import {
   consumerNotices,

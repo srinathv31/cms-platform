@@ -19,7 +19,7 @@ import type {
   VersionHistory,
 } from "@/server/services/versions";
 import type { SunsetCalendar } from "./review-models";
-import { personOf, type People } from "./review-shared";
+import { personOf, type People } from "@/server/queries/people";
 import { requireSpace } from "./spaces";
 
 // The Versions tab: the template's versions as a timeline, with what the viewer may do on each. A number

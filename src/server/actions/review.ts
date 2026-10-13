@@ -23,7 +23,7 @@ import {
   type ActionResult,
   type LifecycleEffect,
 } from "@/domain/review-types";
-import { readBusinessZone } from "@/server/business-zone";
+import { readBusinessZone } from "@/server/services/local/business-zone";
 import {
   approvals,
   commentThreads,
@@ -36,7 +36,7 @@ import {
   loadChain,
   loadDecisions,
   loadMessageRules,
-} from "@/server/queries/review-shared";
+} from "@/server/services/local/chain";
 import { services } from "@/server/services";
 import {
   activeVersion,

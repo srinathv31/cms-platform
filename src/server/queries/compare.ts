@@ -17,7 +17,7 @@ import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
-import { loadFamily, loadMessageRules } from "./review-shared";
+import { loadFamily, loadMessageRules } from "@/server/services/local/chain";
 
 // What the Compare dialog needs and the Versions read model doesn't carry: the names, bodies, channel
 // fields, SMS footers and variable lists of the two versions being compared (an alert's message shows its

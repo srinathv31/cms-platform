@@ -7,9 +7,9 @@ import {
   type BusinessZone,
 } from "@/domain/business-zone";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
-import { db, type Db } from "./db/client";
-import { settings, versions } from "./db/schema/ucomp";
-import type { Tx } from "./effects";
+import { db, type Db } from "@/server/db/client";
+import { settings, versions } from "@/server/db/schema/ucomp";
+import type { Tx } from "@/server/effects";
 
 // The business time zone sunset dates are read in (decision 0017, rules in domain/business-zone.ts): the
 // `settings.business_zone` row, set from Settings > Platform > Time zone. With no row, or one that isn't

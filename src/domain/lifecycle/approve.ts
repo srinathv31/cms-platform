@@ -11,7 +11,7 @@ import {
 } from "../approval-chain";
 import { describeChanges } from "../contract";
 import { makerCheckerRefusal } from "../permissions";
-import { refuse } from "../refusals";
+import { refuse, type Refusal } from "../refusals";
 import { outputsRefusal, viewedOutputs } from "../review-outputs";
 import { reviewLink } from "../rounds";
 import type { ApprovalStage, LifecycleEffect } from "../review-types";
@@ -46,6 +46,18 @@ export interface Approved {
 }
 
 export type ApproveResult = Outcome<Approved>;
+
+/**
+ * Two stages need two people: someone who approved a stage of this round (`approvedBy`, from
+ * `approvedThisRound`) can't approve another. The approve transition and the decide check (`decideCheck`)
+ * both ask this.
+ */
+export function approvedEarlierStage(
+  actorId: string,
+  approvedBy: readonly string[],
+): Refusal | null {
+  return approvedBy.includes(actorId) ? REFUSALS.approvedEarlierStage : null;
+}
 
 /**
  * Approve the stage the version is waiting on. The version goes through its own stages (recorded at
@@ -106,7 +118,8 @@ export function approve(input: {
   const wrote = makerCheckerRefusal(actorId, version);
   if (wrote) return refuse(wrote);
   const approved = approvedThisRound(input.decisions ?? []);
-  if (approved.includes(actorId)) return refuse(REFUSALS.approvedEarlierStage);
+  const earlier = approvedEarlierStage(actorId, approved);
+  if (earlier) return refuse(earlier);
   const stages = ownStages(version.stages, chain);
   const index = version.currentStage;
   const stage = stageOf(stages, index, chain);

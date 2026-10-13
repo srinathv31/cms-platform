@@ -46,7 +46,7 @@ import {
   type RevokeRecord,
   type VersionState,
 } from "@/domain/types";
-import { getBusinessZone } from "@/server/business-zone";
+import { getBusinessZone } from "@/server/services/local/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import {
@@ -57,9 +57,9 @@ import {
   templates,
   versions,
 } from "@/server/db/schema/ucomp";
-import { requireTemplate } from "./review-shared";
+import { requireTemplate } from "@/server/queries/template-access";
 import { requireSpace } from "./spaces";
-import { currentName } from "./template-name";
+import { currentName } from "@/server/services/local/template-name";
 
 // The Usage read models (slice S2). render_log is ~27k rows: every number is grouped in SQL by
 // day / consumer / template / version / channel, with the windows from `usageWindows(now)` (demo

@@ -96,6 +96,26 @@ export function currentStageOf(
   return stageOf(ownStages(version.stages, chain), version.currentStage, chain);
 }
 
+/** A content type's chain from every content type's (by id), or the default chain when it has none. */
+export function chainFor(
+  chains: ReadonlyMap<string, ApprovalStage[]>,
+  contentTypeId: string,
+): ApprovalStage[] {
+  return (
+    chains.get(contentTypeId) ?? DEFAULT_CHAIN.map((stage) => ({ ...stage }))
+  );
+}
+
+/**
+ * The users a stage names (`{kind:"user"}` rules): they may open, decide and comment on the version
+ * waiting on it, on any team (`PermissionResource.stageApproverIds`). Empty for a team-role stage.
+ */
+export function stageApproverIds(
+  stage: ApprovalStage | null | undefined,
+): string[] {
+  return stage?.rule.kind === "user" ? [stage.rule.userId] : [];
+}
+
 /** A decision as it is read back: the stage it was made at (null: recorded before stage ids, unmatched), who, and what. */
 export interface RecordedDecision {
   stageId: string | null;

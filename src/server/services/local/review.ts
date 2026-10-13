@@ -6,7 +6,7 @@ import {
 } from "@/domain/lifecycle/sunset";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
-import { readBusinessZone } from "@/server/business-zone";
+import { readBusinessZone } from "@/server/services/local/business-zone";
 import { writeEffects } from "@/server/effects";
 import {
   activeVersion,

@@ -12,7 +12,7 @@ import {
   readSearchCursor,
   type SearchKey,
 } from "@/domain/golive/cursor";
-import { BUSINESS_ZONE_KEY } from "@/server/business-zone";
+import { BUSINESS_ZONE_KEY } from "@/server/services/local/business-zone";
 import { takeNoticeSeqs } from "@/server/effects";
 import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import {

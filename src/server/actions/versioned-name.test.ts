@@ -11,7 +11,7 @@ import {
   listNotices,
   searchActiveTemplates,
 } from "@/server/queries/consumer-api";
-import { findRound } from "@/server/queries/find-round";
+import { findRound } from "@/server/services/local/find-round";
 import { getIntegrationPanel } from "@/server/queries/integration";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { getLibraryRows } from "@/server/queries/library";

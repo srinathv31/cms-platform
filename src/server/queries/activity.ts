@@ -5,7 +5,9 @@ import { describeActivity, eventVersionLabel } from "@/domain/activity";
 import type { AuditAction, Person } from "@/domain/review-types";
 import { db } from "@/server/db/client";
 import { auditEvents, versions } from "@/server/db/schema/ucomp";
-import { getPeople, iso, personOf, requireTemplate } from "./review-shared";
+import { getPeople, personOf } from "@/server/queries/people";
+import { iso } from "@/server/queries/iso";
+import { requireTemplate } from "@/server/queries/template-access";
 
 // The template's Activity tab: its audit events, newest first, each as one plain sentence. An event about
 // a version is labelled by its row as it is now, with its round for a review event (`eventVersionLabel`).

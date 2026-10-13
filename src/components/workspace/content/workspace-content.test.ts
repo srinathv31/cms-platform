@@ -9,7 +9,7 @@ const header = vi.hoisted(() => ({ inReview: null as NumberedRound | null }));
 vi.mock("@/server/clock", () => ({
   now: vi.fn(async () => new Date("2026-10-09T15:00:00.000Z")),
 }));
-vi.mock("@/server/queries/review-shared", () => ({
+vi.mock("@/server/queries/people", () => ({
   getPeople: vi.fn(async () => new Map()),
   personOf: vi.fn((_people: unknown, id: string) => ({
     id,
@@ -17,6 +17,8 @@ vi.mock("@/server/queries/review-shared", () => ({
     initials: "MC",
     hue: 0,
   })),
+}));
+vi.mock("@/server/queries/template-access", () => ({
   requireTemplate: vi.fn(async () => ({
     space: { viewer: { userId: "maya" } },
   })),

@@ -12,11 +12,11 @@ import {
   loadPersona,
   seededDatabasePerTest,
 } from "@/server/testing/review-fixtures";
-import { findRound } from "./find-round";
+import { findRound } from "@/server/services/local/find-round";
 import { getViewer } from "@/server/viewer";
 import { getActivity } from "./activity";
 import { getReviewBadgeCount, getReviewQueue, getReviewScreen } from "./review";
-import { anchorIdsOf } from "./review-shared";
+import { anchorIdsOf } from "@/domain/comments";
 import { getThreads, loadThreads } from "./threads";
 import { getWorkspaceDocument } from "./workspace";
 

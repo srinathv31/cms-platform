@@ -33,7 +33,7 @@ import {
   getWorkspaceHeader,
 } from "@/server/queries/workspace";
 import { applyDraftPatch } from "@/server/drafts/apply-patch";
-import { findRound } from "@/server/queries/find-round";
+import { findRound } from "@/server/services/local/find-round";
 import {
   createTemplateWithDraft,
   draftRev,

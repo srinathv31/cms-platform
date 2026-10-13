@@ -13,7 +13,7 @@ import {
   loadPersona,
   seededDatabasePerTest,
 } from "@/server/testing/review-fixtures";
-import { findRound } from "@/server/queries/find-round";
+import { findRound } from "@/server/services/local/find-round";
 import { getViewer } from "@/server/viewer";
 import { addComment, reopenThread, reply, resolveThread } from "./comments";
 

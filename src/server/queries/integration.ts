@@ -18,7 +18,7 @@ import { can } from "@/domain/permissions";
 import { CHANNELS, type Viewer } from "@/domain/types";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { refusal, type ReadResult } from "@/server/api/reads";
-import { getBusinessZone } from "@/server/business-zone";
+import { getBusinessZone } from "@/server/services/local/business-zone";
 import { now } from "@/server/clock";
 import { db } from "@/server/db/client";
 import {

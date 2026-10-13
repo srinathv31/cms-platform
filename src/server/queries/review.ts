@@ -33,7 +33,7 @@ import type {
   Variable,
   VersionState,
 } from "@/domain/types";
-import { getBusinessZone } from "@/server/business-zone";
+import { getBusinessZone } from "@/server/services/local/business-zone";
 import { db } from "@/server/db/client";
 import {
   approvals,
@@ -47,24 +47,23 @@ import type {
   ReviewQueueRow,
   ReviewScreenData,
 } from "./review-models";
+import { anchorIdsOf } from "@/domain/comments";
+import { chainFor, stageApproverIds } from "@/domain/approval-chain";
+import { decideCheck } from "@/domain/lifecycle/decide-check";
 import {
-  anchorIdsOf,
-  chainFor,
-  decideCheck,
   getChains,
-  getPeople,
-  iso,
   loadChain,
-  loadConsumerUsage,
   loadDecisions,
   loadFamily,
   loadMessageRules,
+} from "@/server/services/local/chain";
+import { getPeople, personOf, type People } from "@/server/queries/people";
+import { iso } from "@/server/queries/iso";
+import { loadConsumerUsage } from "@/server/services/local/consumer-usage";
+import {
   opensRound,
-  personOf,
   requireReviewVersion,
-  stageApproverIds,
-  type People,
-} from "./review-shared";
+} from "@/server/queries/template-access";
 import { requireSpace, type SpaceContext } from "./spaces";
 import { loadThreads } from "./threads";
 

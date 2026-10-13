@@ -3,7 +3,7 @@ import { Stream } from "@/components/primitives/stream";
 import { parseRoundParam } from "@/domain/rounds";
 import { now } from "@/server/clock";
 import { getReviewScreen } from "@/server/queries/review";
-import { getPeople, personOf } from "@/server/queries/review-shared";
+import { getPeople, personOf } from "@/server/queries/people";
 import { requireRequestContext } from "@/server/context/request";
 import { RV } from "./review-grid";
 import { ReviewSkeleton } from "./review-skeleton";

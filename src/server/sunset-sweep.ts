@@ -8,7 +8,7 @@ import {
 import { now } from "@/server/clock";
 import { db, type Db } from "@/server/db/client";
 import { auditEvents, templates, versions } from "@/server/db/schema/ucomp";
-import { readBusinessZone } from "./business-zone";
+import { readBusinessZone } from "@/server/services/local/business-zone";
 import { inTransaction, writeEffects, type Tx } from "./effects";
 
 // The clock-driven sunset sweep (domain/lifecycle/sunset.ts `sweepSunsets`): for each sunset the demo clock has

@@ -38,7 +38,13 @@ import {
   versionLabel,
   type RoundRef,
 } from "./rounds";
-import type { Channel, PermissionResult, VersionState, Viewer } from "./types";
+import type {
+  Channel,
+  JSONContent,
+  PermissionResult,
+  VersionState,
+  Viewer,
+} from "./types";
 
 // ── Limits and sentences ──────────────────────────────────────
 
@@ -173,6 +179,26 @@ export function commentAnchors(
   channels: readonly Channel[],
 ): string[] {
   return [...fieldsOfChannels(channels).map((field) => field.id), ...blockIds];
+}
+
+/** Where a thread on this version can anchor, in reading order (`commentAnchors`): its fields, then its blocks. */
+export function anchorIdsOf(version: {
+  body: JSONContent | null | undefined;
+  channels: readonly Channel[];
+}): string[] {
+  return commentAnchors(blockIdsOf(version.body), version.channels);
+}
+
+/** Every block id in a document, in reading order (top-level blocks and any nested ones that carry an id). */
+export function blockIdsOf(doc: JSONContent | null | undefined): string[] {
+  const ids: string[] = [];
+  const walk = (node: JSONContent) => {
+    const id = node.attrs?.id;
+    if (typeof id === "string" && id !== "") ids.push(id);
+    for (const child of node.content ?? []) walk(child);
+  };
+  if (doc) for (const block of doc.content ?? []) walk(block);
+  return ids;
 }
 
 // ── Who may comment ───────────────────────────────────────────

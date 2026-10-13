@@ -1,10 +1,7 @@
 import { reviewPath } from "@/domain/rounds";
 import { now } from "@/server/clock";
-import {
-  getPeople,
-  personOf,
-  requireTemplate,
-} from "@/server/queries/review-shared";
+import { getPeople, personOf } from "@/server/queries/people";
+import { requireTemplate } from "@/server/queries/template-access";
 import {
   getWorkspaceDocument,
   getWorkspaceHeader,

@@ -32,7 +32,7 @@ import {
   BUSINESS_ZONE_KEY,
   countPendingSunsets,
   readBusinessZone,
-} from "@/server/business-zone";
+} from "@/server/services/local/business-zone";
 import {
   approvalStages,
   contentTypes,
@@ -46,7 +46,7 @@ import {
 } from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { loadDecisions } from "@/server/queries/review-shared";
+import { loadDecisions } from "@/server/services/local/chain";
 import { check, refuse, serverAction, type ActionContext } from "./kit";
 
 // Platform settings (Platform Admin, `platform.manage`): teams, content types, channel rules, approval

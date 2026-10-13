@@ -47,10 +47,11 @@ import {
 } from "@/server/db/schema/ucomp";
 import { refusal, type ReadRefusal } from "@/server/api/reads";
 import { formatAgo, formatDateTime, utcDay } from "@/domain/dates";
-import { getPeople, iso, personOf, type People } from "./review-shared";
+import { getPeople, personOf, type People } from "@/server/queries/people";
+import { iso } from "@/server/queries/iso";
 import { requireCan } from "./require-can";
 import { requireSpace } from "./spaces";
-import { currentName } from "./template-name";
+import { currentName } from "@/server/services/local/template-name";
 
 // The Audit page (/{team}/audit) and its CSV export (/{team}/audit/export), from one read.
 //

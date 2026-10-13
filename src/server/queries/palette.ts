@@ -22,7 +22,7 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { pickLatest } from "./library";
-import { currentName } from "./template-name";
+import { currentName } from "@/server/services/local/template-name";
 
 // The ⌘K palette's search, served by GET /api/palette/[space]?q=&template= when the palette opens and
 // as the viewer types. The templates are searched here, not in the browser: no page carries the

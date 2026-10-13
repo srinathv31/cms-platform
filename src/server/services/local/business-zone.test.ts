@@ -10,7 +10,7 @@ import {
   BUSINESS_ZONE_KEY,
   countPendingSunsets,
   readBusinessZone,
-} from "./business-zone";
+} from "@/server/services/local/business-zone";
 
 // The business time zone's setting, and the migration that moved every stored sunset from midnight UTC
 // to 00:00 Eastern on the same day (decision 0017), run on a seeded database.

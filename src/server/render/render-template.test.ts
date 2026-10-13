@@ -4,7 +4,7 @@ import { ResolveError } from "@/domain/render";
 import type { EmailRender } from "@/domain/render/types";
 import type { JSONContent, Variable, Viewer } from "@/domain/types";
 import * as schema from "@/server/db/schema/ucomp";
-import { findRound } from "@/server/queries/find-round";
+import { findRound } from "@/server/services/local/find-round";
 import { standaloneDatabasePerTest } from "@/server/testing/review-fixtures";
 import { renderFailure } from "./engine";
 import { extractPdf } from "./golden/extract-pdf";

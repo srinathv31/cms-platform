@@ -8,8 +8,9 @@ import type { PermissionResource, Viewer } from "@/domain/types";
 import { db } from "@/server/db/client";
 import { templates, versions } from "@/server/db/schema/ucomp";
 import type { EffectContext, Tx } from "@/server/effects";
-import { findRound } from "@/server/queries/find-round";
-import { loadChain, stageApproverIds } from "@/server/queries/review-shared";
+import { findRound } from "@/server/services/local/find-round";
+import { loadChain } from "@/server/services/local/chain";
+import { stageApproverIds } from "@/domain/approval-chain";
 import { refuse } from "@/server/services/refuse";
 import type { TestHooks } from "@/server/services/options";
 
