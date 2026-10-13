@@ -43,6 +43,7 @@ import type { ReviewService, VersionRef } from "../review";
 import type { Changed } from "../types";
 import { readBusinessZone } from "./business-zone";
 import { loadChain, loadDecisions, loadMessageRules } from "./chain";
+import { draftRow } from "./draft-row";
 import { check, refuse, runCommand, type LocalDeps } from "./command";
 import { writeEffects } from "./effects";
 import type { Tx } from "./transaction";
@@ -315,11 +316,12 @@ export function localReview(
             ),
           });
           if (!openDraft)
-            await tx.insert(versions).values({
-              id: newId("v"),
-              templateId: found.templateId,
-              ...outcome.newDraft,
-            });
+            await tx.insert(versions).values(
+              draftRow(outcome.newDraft, {
+                id: newId("v"),
+                templateId: found.templateId,
+              }),
+            );
           else
             await tx
               .update(versions)

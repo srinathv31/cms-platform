@@ -20,7 +20,6 @@ import {
   setSunset as setSunsetTransition,
   sunsetUnchanged,
 } from "@/domain/lifecycle/sunset";
-import type { DraftFields } from "@/domain/lifecycle/types";
 import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS, type Refused } from "@/domain/refusals";
 import {
@@ -37,6 +36,7 @@ import type { ReviewService, VersionRef } from "../review";
 import type { Changed, RequestContext } from "../types";
 import { chainOf, decisionsOf, messageRulesOf } from "./chain";
 import { writeFakeEffects } from "./effects";
+import { fakeDraftRow } from "./draft-row";
 import type { FakeDeps } from "./index";
 import { businessZone } from "./settings";
 import type { FakeState, TemplateRow, VersionRow } from "./state";
@@ -277,7 +277,13 @@ export function fakeReview(deps: FakeDeps): ReviewService {
           (v) => v.templateId === template.id && v.state === "draft",
         );
         if (!openDraft)
-          tx.insert("versions", draftRow(outcome.newDraft, template.id));
+          tx.insert(
+            "versions",
+            fakeDraftRow(outcome.newDraft, {
+              id: newId("v"),
+              templateId: template.id,
+            }),
+          );
         else
           tx.update("versions", openDraft, {
             writers: withWriters(openDraft.writers, outcome.newDraft.writers),
@@ -484,25 +490,5 @@ function effectContext(
     teamId: template.teamId,
     templateId: template.id,
     versionId,
-  };
-}
-
-/** A new draft's row, as the database fills it: the columns a draft doesn't set are null. */
-function draftRow(draft: DraftFields, templateId: string): VersionRow {
-  return {
-    id: newId("v"),
-    templateId,
-    ...draft,
-    smsFooter: null,
-    stages: null,
-    submittedBy: null,
-    submittedAt: null,
-    submitNote: null,
-    activatedAt: null,
-    supersededAt: null,
-    sunsetAt: null,
-    sunsetSetBy: null,
-    revoke: null,
-    importUploadId: null,
   };
 }
