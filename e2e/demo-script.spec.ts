@@ -397,7 +397,10 @@ async function selectPhrase(page: Page, target: Locator, phrase: string) {
   ).toBe(phrase);
 }
 
-/** Creates a variable from the {{ picker's "Create" option, with a type, and saves it with Enter. */
+/**
+ * Creates a variable from the {{ picker's "Create" option, with a type, and saves it with Enter. Returns once the
+ * document has focus again, so the next key lands in it.
+ */
 async function createVariableInline(page: Page, key: string, type: string) {
   const create = page.getByRole("option", { name: /Create/ });
   await expect(create).toBeVisible();
@@ -415,6 +418,7 @@ async function createVariableInline(page: Page, key: string, type: string) {
   await expect(form.getByRole("combobox")).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(form).toBeHidden();
+  await expect(documentEditor(page)).toBeFocused();
 }
 
 /** The simulator's mapping row for a variable (a native select, named by the variable's label). */
