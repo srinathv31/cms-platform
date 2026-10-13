@@ -137,7 +137,7 @@ export interface SpaceContext {
 }
 
 /**
- * Resolves the `[team]` segment for the current viewer. A 404 for an unknown slug, and the same 404 for
+ * Resolves the `[team]` segment for the current viewer. Not found for an unknown slug, and the same page for
  * a team (or "All teams") the viewer can't see: seeing a space is `template.view` there, as
  * `canSeeSpace` answers it for the team switcher and the persona switch.
  */
