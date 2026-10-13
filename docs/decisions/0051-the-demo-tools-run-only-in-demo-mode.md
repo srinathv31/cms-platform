@@ -68,3 +68,12 @@ a build where they work.
 - A database whose clock was advanced keeps its offset when the flag is turned off. Only the reset (a local file) and
   the advance change it, so a deployment's database, never seeded or advanced, has none.
 - The demo flag is the first setting in `src/server/config.ts`, which the backend choice extends.
+- With the flag off nothing records a sign-in. `switchPersona` is the only writer of `users.last_active_at`, and it
+  now refuses, so no one's inactivity clock restarts. About four months after the seed (flag at 90 days, suspension at
+  120), the first access action that runs the access sweep suspends every member a Team Admin hasn't kept, the default
+  persona's included, and the app falls back to Request access. The persona switch was also one of the sweep's three
+  triggers, so a flag-off deployment applies access deadlines and `sunset_passed` notices only when someone runs an
+  access action. This is part of why a flag-off deployment still needs real sign-in
+  ([S2](../handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)) and a scheduled sweep
+  ([S4](../handoff-review.md#s4--high-access-deadlines-only-take-effect-when-a-demo-trigger-runs-the-sweep)): the flag
+  closes the demo tools, it doesn't make a deployment.
