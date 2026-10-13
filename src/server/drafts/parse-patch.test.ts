@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { JSONContent } from "@/domain/types";
+import type { JSONContent, Variable } from "@/domain/types";
+import { createVariableStore } from "@/editor/state/variable-store";
 import {
   MAX_BODY_SIZE,
   docProblem,
@@ -338,6 +339,38 @@ describe("parseDraftPatchText", () => {
       message: "The request body is not valid JSON.",
     });
     expect(parseDraftPatchText("")).toMatchObject({ ok: false });
+  });
+
+  // Handoff review D8: a rename is one change to the contract only if the variable's identity survives autosave.
+  it("keeps the identity the editor's variable store gives a renamed variable, across two sessions", () => {
+    /** One editing session: the store opens on the saved list, edits it, and autosave sends what it reports. */
+    const session = (
+      saved: readonly Variable[],
+      edit: (store: ReturnType<typeof createVariableStore>) => void,
+    ) => {
+      const store = createVariableStore(saved, () => "v-new-0001");
+      edit(store);
+      const result = parseDraftPatchText(
+        JSON.stringify({ ...base, variables: store.getState().variables }),
+      );
+      if (!result.ok) throw new Error(result.message);
+      return result.patch.variables!;
+    };
+    const first = session([variable as Variable], (store) =>
+      store.getState().update("first_name", { key: "given_name" }),
+    );
+    expect(first).toEqual([
+      { ...variable, key: "given_name", id: "first_name" },
+    ]);
+    // After a reload the next rename chains onto the first, and a new variable under the old key is another one.
+    const second = session(first, (store) => {
+      store.getState().update("given_name", { key: "name_on_card" });
+      store.getState().create({ ...(variable as Variable) });
+    });
+    expect(second).toEqual([
+      { ...variable, key: "name_on_card", id: "first_name" },
+      { ...variable, id: "v-new-0001" },
+    ]);
   });
 
   it("refuses text over the size limit before parsing it", () => {

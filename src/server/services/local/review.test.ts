@@ -1,7 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { DOCUMENT_THREAD } from "@/domain/review-types";
-import type { ChannelFields } from "@/domain/channel-fields";
+import { diffChannelFields } from "@/domain/redline/channel-fields";
 import type { JSONContent } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
@@ -13,26 +12,26 @@ import type { RequestContext } from "../types";
 import { findRound } from "./find-round";
 import { localServices } from "./index";
 
-// The review commands of the local implementation, where a case needs a world no moved service can make yet: a
-// two-stage chain (the platform area's `saveApprovalChain`), a draft open beside a round in review, an alert's
-// own content and its content type's message rules, and what the database itself holds (the comment threads a
-// submit resolves, the unique indexes). Each becomes a contract case (src/server/services/contract/review.ts)
-// once the service that makes its world, and a read that shows what it checks, have moved. What the contract
-// suite already pins (the refusals, the effects, the compare-and-set) isn't repeated here.
+// The review commands of the local implementation, where a case needs a world no command makes, written as rows:
+// a draft open beside a round in review (Edit refuses to open one), a content type's message rules changed (no
+// command sets an SMS footer or part budget), and what the database itself holds (the unique indexes). A two-stage
+// chain is written as a stage row here too. Every case the commands can make is the contract suite's
+// (src/server/services/contract/review.ts and review-reads.ts), and what it pins isn't repeated here.
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-local-review-");
 });
 
-const { approvals, approvalStages, commentThreads, contentTypes, versions } =
-  schema;
+const { approvals, approvalStages, contentTypes, versions } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
 
 let db: Db;
 const ids = seededDatabasePerTest({ base: BASE });
 let clock = BASE;
-const { review } = localServices({ clock: async () => clock });
+const { review, drafts, templates } = localServices({
+  clock: async () => clock,
+});
 
 beforeAll(async () => {
   ({ db } = await import("@/server/db/client"));
@@ -181,74 +180,10 @@ describe("a change request", () => {
         ),
     ).toEqual([{ id: "v_test_open", writers: ["priya", "maya"] }]);
   });
-
-  it("opens a draft with the round's content and the same block ids, so every thread keeps its anchor", async () => {
-    const templateId = ids["cash-back"]!;
-    const round2 = (await findRound(db, templateId, 3, 2))!;
-    expect(
-      await review.requestChanges(await as("jordan"), {
-        templateId,
-        versionNumber: 3,
-        round: 2,
-        reason: "Spell out the fee.",
-      }),
-    ).toEqual({ ok: true });
-    expect(await draftOf(templateId)).toMatchObject({
-      basedOnVersionId: round2.id,
-      createdBy: "maya",
-      writers: round2.writers,
-      rev: 0,
-      body: round2.body,
-      variables: round2.variables,
-      channels: round2.channels,
-      channelFields: round2.channelFields,
-    });
-  });
 });
 
-describe("a submit answers the change request that sent the last round back", () => {
-  it("resolves it as the submitter's at the submit, and leaves a block comment open", async () => {
-    const templateId = ids["annual-fee-waiver"]!;
-    const v1 = (await findRound(db, templateId, 1, 1))!;
-    await db.insert(commentThreads).values({
-      id: "th_test_block",
-      templateId,
-      originVersionId: v1.id,
-      blockId: "blk_test",
-      quote: null,
-      status: "open",
-      createdAt: BASE,
-    });
-    const request = (
-      await db
-        .select()
-        .from(commentThreads)
-        .where(
-          and(
-            eq(commentThreads.templateId, templateId),
-            eq(commentThreads.blockId, DOCUMENT_THREAD),
-          ),
-        )
-    ).find((t) => t.status === "open")!;
-
-    expect(await submitNow("maya", templateId)).toMatchObject({ ok: true });
-    const thread = (id: string) =>
-      db.query.commentThreads.findFirst({ where: eq(commentThreads.id, id) });
-    expect(await thread(request.id)).toMatchObject({
-      status: "resolved",
-      resolvedBy: "maya",
-      resolvedAt: clock,
-    });
-    expect(await thread("th_test_block")).toMatchObject({
-      status: "open",
-      resolvedBy: null,
-      resolvedAt: null,
-    });
-  });
-});
-
-// The message rules (decisions 0034 and 0035), read from the alert's content type: the seed's Rate Change Heads-up
-// is Maya's draft of an alert, Push and SMS on.
+// The message rules of the alert's content type (decisions 0034 and 0035). How submit applies them is the contract
+// suite's; these change the rules themselves, which no command does.
 describe("submitting an alert", () => {
   const t = (text: string): JSONContent => ({ type: "text", text });
   const chip = (key: string): JSONContent => ({
@@ -259,59 +194,27 @@ describe("submitting an alert", () => {
     type: "doc",
     content: [{ type: "paragraph", content: inline }],
   });
-
-  /** The alert's draft with this SMS (and a short push), as autosave would have stored it. */
-  async function alertWithSms(sms: JSONContent) {
-    const templateId = ids["rate-change-heads-up"]!;
-    const draft = (await draftOf(templateId))!;
-    const variables = draft.variables.some((v) => v.key === "first_name")
-      ? draft.variables
-      : [
-          ...draft.variables,
-          {
-            key: "first_name",
-            label: "First name",
-            type: "text" as const,
-            required: true,
-            sample: "Maya",
-          },
-        ];
-    const channelFields: ChannelFields = {
-      push: {
-        title: field(t("Your rate changes soon")),
-        body: field(t("Hi "), chip("first_name"), t(", it changes Friday.")),
-      },
-      sms: { text: sms },
-    };
-    await db
-      .update(versions)
-      .set({ channelFields, variables, rev: draft.rev + 1 })
-      .where(eq(versions.id, draft.id));
-    return templateId;
-  }
   const alertType = (set: { smsFooter?: string; smsMaxParts?: number }) =>
     db.update(contentTypes).set(set).where(eq(contentTypes.id, "ct_alert"));
 
-  it("refuses characters the author typed outside GSM-7, and writes nothing", async () => {
-    const templateId = await alertWithSms(
-      field(t("Hi "), chip("first_name"), t(", it’s changing.")),
-    );
-    const before = await draftOf(templateId);
-    expect(await submitNow("maya", templateId)).toMatchObject({
-      ok: false,
-      code: "sms_characters",
-    });
-    expect(await draftOf(templateId)).toEqual(before);
-  });
-
-  it("measures the SMS with the content type's footer and part budget, using the long sample values", async () => {
-    const templateId = await alertWithSms(
-      field(
-        t("Hi "),
-        chip("first_name"),
-        t(". " + "Your rate changes Friday. ".repeat(4)),
-      ),
-    );
+  it("takes the part budget from the content type", async () => {
+    // Rate Change Heads-up is Maya's draft of an alert; she saves an SMS of two parts with the footer.
+    const templateId = ids["rate-change-heads-up"]!;
+    const draft = (await draftOf(templateId))!;
+    expect(
+      await drafts.save(await as("maya"), {
+        versionId: draft.id,
+        patch: {
+          rev: draft.rev,
+          sessionKey: "session-local-review-01",
+          "sms.text": field(
+            t("Hi "),
+            chip("first_name"),
+            t(". " + "Your rate changes Friday. ".repeat(4)),
+          ),
+        },
+      }),
+    ).toMatchObject({ ok: true });
     await alertType({ smsMaxParts: 1 });
     expect(await submitNow("maya", templateId)).toMatchObject({
       ok: false,
@@ -321,26 +224,52 @@ describe("submitting an alert", () => {
     expect(await submitNow("maya", templateId)).toMatchObject({ ok: true });
   });
 
-  it("refuses a public link shortener in the SMS", async () => {
-    const templateId = await alertWithSms(field(t("Details at bit.ly/coral")));
-    expect(await submitNow("maya", templateId)).toMatchObject({
-      ok: false,
-      code: "public_shortener",
-    });
-  });
-
-  it("freezes the content type's footer into the version: a later change to it doesn't reach the submitted round", async () => {
-    const templateId = await alertWithSms(
-      field(t("Hi "), chip("first_name"), t(", your rate changes Friday.")),
-    );
+  it("freezes the content type's footer into each version as it is submitted: a later change reaches neither it nor the live version it is redlined against", async () => {
+    // Card Used Abroad v1, in review, froze the seeded footer. It goes live, and v2 is submitted under a new one.
+    const templateId = ids["card-used-abroad"]!;
+    const seeded = (await findRound(db, templateId, 1))!.smsFooter;
+    expect(seeded).toEqual(expect.any(String));
+    expect(
+      await review.approve(await as("jordan"), {
+        templateId,
+        versionNumber: 1,
+        round: 1,
+        outputsViewed: ["push.ios", "push.android", "sms"],
+        sampleSetsSeen: [],
+      }),
+    ).toMatchObject({ ok: true, wentLive: true });
+    expect(
+      await templates.startDraft(await as("maya"), { templateId }),
+    ).toMatchObject({ ok: true });
     await alertType({ smsFooter: "Coral: Text STOP to end." });
-    const answer = await submitNow("maya", templateId);
-    expect(answer).toMatchObject({ ok: true });
-    const { number, round } = answer as { number: number; round: number };
+    expect(await submitNow("maya", templateId)).toEqual({
+      ok: true,
+      number: 2,
+      round: 1,
+    });
+
     await alertType({ smsFooter: "Coral: Reply STOP to stop." });
-    expect((await findRound(db, templateId, number, round))?.smsFooter).toBe(
+    const screen = await review.screen(await as("jordan"), {
+      teamId: "t_coral",
+      templateId,
+      versionNumber: 2,
+      round: null,
+    });
+    if (!screen.ok) throw new Error(screen.code);
+    expect([
+      screen.version.smsFooter,
+      screen.messageRules.smsFooter,
+      screen.baseline?.smsFooter,
+    ]).toEqual([
       "Coral: Text STOP to end.",
-    );
+      "Coral: Text STOP to end.",
+      seeded,
+    ]);
+    expect(diffChannelFields(screen.baseline, screen.version).footer).toEqual({
+      from: seeded,
+      to: "Coral: Text STOP to end.",
+      status: "changed",
+    });
   });
 });
 

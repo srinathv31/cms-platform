@@ -159,6 +159,55 @@ describe("workspaceHeaderData", () => {
       draft: null,
     });
   });
+
+  it("after the Active version is revoked: the revoked version under its own label with nothing Active, then the corrected draft Based on it", () => {
+    const revoked = workspaceHeaderData(
+      header({
+        shown: {
+          id: "v_2",
+          number: 2,
+          round: 1,
+          state: "revoked",
+          name: "Balance Transfer Intro — Terms",
+          sunsetDay: null,
+          sunsetPassed: false,
+          rev: 2,
+        },
+        numbered: { number: 2, round: 1 },
+        basedOn: null,
+        can: {
+          ...ALL_OK,
+          submit: { ok: false, ...REQUEST_REFUSALS.noDraftToSubmit },
+        },
+      }),
+    );
+    expect(revoked).toMatchObject({
+      status: "revoked",
+      versionLabel: "v2",
+      basedOn: null,
+      activeName: null,
+      activeNumber: null,
+      editable: false,
+      draft: null,
+      can: { startDraft: { ok: true } },
+    });
+
+    const corrected = workspaceHeaderData(
+      header({
+        numbered: { number: 3, round: 1 },
+        basedOn: { number: 2, round: 1, state: "revoked" },
+      }),
+    );
+    expect(corrected).toMatchObject({
+      status: "draft",
+      versionLabel: "Based on v2",
+      basedOn: { label: "v2", active: false },
+      activeNumber: null,
+      versionNumber: 3,
+      round: 1,
+      editable: true,
+    });
+  });
 });
 
 describe("getWorkspaceHeader", () => {

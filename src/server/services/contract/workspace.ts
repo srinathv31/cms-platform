@@ -9,14 +9,18 @@ import type { ContractHarness } from "./harness";
 // A template's workspace, as every implementation must answer it (`TemplateService.workspaceHeader` and
 // `.workspaceDocument` in src/server/services/templates.ts), read from the seed:
 //   - Annual Fee Waiver: v1 sent back by Jordan, and Maya's open draft started from it (with its threads);
-//   - Cash Back: v3 in review on round 2, v2 Active; Balance Transfer: v2 Active, v1 Superseded;
+//   - Cash Back: v3 in review on round 2, v2 Active; Balance Transfer: v2 Active (it adds an optional
+//     `offer_end_date`), v1 Superseded and still rendering until its sunset on October 25;
 //   - Rate Change Notice: v1, decided; Card Used Abroad: an alert, v1 in review.
-// Maya is an Author on Coral Offers, Jordan an Approver, Sam a Viewer; Eli is on Deposits only. Refusals are
-// compared by code.
+// Maya is an Author on Coral Offers, Jordan and Alex Approvers, Sam a Viewer; Eli is on Deposits only. A case
+// that acts (a revoke, Edit, a submit) sets the backend's clock first and compares the reads before and after.
+// Refusals are compared by code.
 
 const CORAL = "t_coral";
 
 export function workspaceContract(h: ContractHarness, base: Date) {
+  const minute = (n: number) => new Date(base.getTime() + n * 60_000);
+
   async function headerOf(userId: string, templateKey: string) {
     const header = await h
       .services()
@@ -35,6 +39,56 @@ export function workspaceContract(h: ContractHarness, base: Date) {
       });
     if (!document.ok) throw new Error(document.code);
     return document;
+  }
+
+  /** A number's head (its released row, else its latest round), as the Versions tab lists it to the Auditor. */
+  async function rowOf(templateId: string, number: number) {
+    const history = await h
+      .services()
+      .versions.history(await h.as("taylor"), { templateId });
+    if (!history.ok) throw new Error(history.code);
+    return history.versions.find((v) => v.number === number && v.head)!;
+  }
+
+  /** A version's name and content, as Compare reads it. */
+  async function contentOf(templateId: string, versionId: string) {
+    const pair = await h.services().versions.compare(await h.as("taylor"), {
+      templateId,
+      from: versionId,
+      to: versionId,
+    });
+    if (!pair.ok) throw new Error(pair.code);
+    const { name, body, variables, channels, channelFields, smsFooter } =
+      pair.to;
+    return { name, body, variables, channels, channelFields, smsFooter };
+  }
+
+  /** Revokes a version at minutes 1 and 2: Jordan starts it, Alex confirms it. */
+  async function revoke(templateId: string, versionNumber: number) {
+    h.setClock(minute(1));
+    expect(
+      await h.services().review.startRevoke(await h.as("jordan"), {
+        templateId,
+        versionNumber,
+        reason: "Wrong APR in the legal notices.",
+      }),
+    ).toEqual({ ok: true });
+    h.setClock(minute(2));
+    expect(
+      await h.services().review.confirmRevoke(await h.as("alex"), {
+        templateId,
+        versionNumber,
+      }),
+    ).toEqual({ ok: true });
+  }
+
+  /** Edit, as Maya: opens a draft of the template; it must open one. */
+  async function edit(templateId: string) {
+    expect(
+      await h
+        .services()
+        .templates.startDraft(await h.as("maya"), { templateId }),
+    ).toMatchObject({ ok: true, changed: true });
   }
 
   describe("templates.workspaceHeader", () => {
@@ -179,9 +233,18 @@ export function workspaceContract(h: ContractHarness, base: Date) {
 
     it("on a draft, gives the variables of the version that still renders; on a submitted version, none", async () => {
       // Balance Transfer has no draft: its latest is v2, Active.
+      const templateId = h.templates["balance-transfer"]!;
       const live = await documentOf("maya", "balance-transfer");
       expect(live.version).toMatchObject({ number: 2, round: 1 });
       expect(live.baseline).toBeNull();
+
+      h.setClock(minute(1));
+      await edit(templateId);
+      const draft = await documentOf("maya", "balance-transfer");
+      expect(draft.version.state).toBe("draft");
+      expect(draft.baseline).toEqual(
+        (await contentOf(templateId, live.version.id)).variables,
+      );
     });
 
     it("lets nobody comment on a template whose latest version has been decided", async () => {
@@ -198,6 +261,97 @@ export function workspaceContract(h: ContractHarness, base: Date) {
       expect(alert.template.family).toBe("message");
       expect(alert.template.allowedChannels.length).toBeGreaterThan(0);
       expect(alert.messageRules.smsFooter).toEqual(expect.any(String));
+    });
+  });
+
+  // Balance Transfer's Active v2 is revoked (handoff review D1): nothing is Active, and v1 still renders.
+  describe("after the Active version is revoked", () => {
+    it("shows the revoked version with nothing Active and offers Edit, whose corrected draft is the revoked text, numbered next; once that is approved it is Active", async () => {
+      const templateId = h.templates["balance-transfer"]!;
+      const v2 = await rowOf(templateId, 2);
+      await revoke(templateId, 2);
+      const revoked = await headerOf("maya", "balance-transfer");
+      expect(revoked.shown).toMatchObject({
+        id: v2.id,
+        number: 2,
+        round: 1,
+        state: "revoked",
+      });
+      expect([revoked.active, revoked.inReview, revoked.basedOn]).toEqual([
+        null,
+        null,
+        null,
+      ]);
+      expect(revoked.can.startDraft).toEqual({ ok: true });
+      expect(
+        (await headerOf("sam", "balance-transfer")).can.startDraft,
+        "a viewer can't edit",
+      ).toMatchObject({ ok: false, code: REASONS.generic.code });
+
+      h.setClock(minute(3));
+      await edit(templateId);
+      const draft = await headerOf("maya", "balance-transfer");
+      expect(draft.shown).toMatchObject({
+        number: null,
+        round: null,
+        state: "draft",
+      });
+      expect(draft.basedOn).toEqual({ number: 2, round: 1, state: "revoked" });
+      expect(draft.numbered).toEqual({ number: 3, round: 1 });
+      expect(draft.active).toBeNull();
+      expect(await contentOf(templateId, draft.shown!.id)).toEqual(
+        await contentOf(templateId, v2.id),
+      );
+      expect((await rowOf(templateId, 2)).state, "it stays revoked").toBe(
+        "revoked",
+      );
+
+      h.setClock(minute(4));
+      expect(
+        await h.services().review.submit(await h.as("maya"), {
+          templateId,
+          rev: draft.shown!.rev,
+        }),
+      ).toEqual({ ok: true, number: 3, round: 1 });
+      h.setClock(minute(5));
+      expect(
+        await h.services().review.approve(await h.as("jordan"), {
+          templateId,
+          versionNumber: 3,
+          round: 1,
+          outputsViewed: ["pdf", "web"],
+          sampleSetsSeen: [],
+        }),
+      ).toMatchObject({ ok: true, wentLive: true });
+      const live = await headerOf("maya", "balance-transfer");
+      expect(live.shown).toMatchObject({ number: 3, state: "active" });
+      expect(live.active).toMatchObject({ number: 3 });
+      expect(live.can.startDraft).toEqual({ ok: true });
+    });
+
+    it("compares the corrected draft's variables with the newest version that still renders, and with nothing once none does", async () => {
+      const templateId = h.templates["balance-transfer"]!;
+      const v1 = await rowOf(templateId, 1);
+      await revoke(templateId, 2);
+      h.setClock(minute(3));
+      await edit(templateId);
+      const document = await documentOf("maya", "balance-transfer");
+      // v1 lacks the optional offer_end_date that v2, and so the draft, has.
+      expect(document.baseline).toEqual(
+        (await contentOf(templateId, v1.id)).variables,
+      );
+      expect(document.baseline!.map((v) => v.key)).not.toContain(
+        "offer_end_date",
+      );
+      expect(document.version.variables.map((v) => v.key)).toContain(
+        "offer_end_date",
+      );
+
+      // At v1's sunset nothing renders: no baseline, as for a first version.
+      h.setClock(new Date(v1.sunsetAt!));
+      expect(
+        (await documentOf("maya", "balance-transfer")).baseline,
+      ).toBeNull();
     });
   });
 }

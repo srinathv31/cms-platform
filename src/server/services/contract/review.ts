@@ -6,6 +6,7 @@ import { REASONS } from "@/domain/permissions";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { OutputKey } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD, type ActionResult } from "@/domain/review-types";
+import type { DraftPatch, JSONContent } from "@/domain/types";
 import type { StoredNotification } from "../notifications";
 import type { ContractHarness } from "./harness";
 
@@ -13,17 +14,20 @@ import type { ContractHarness } from "./harness";
 // src/server/services/review.ts). Cases act through the services, from the seed (all on Coral Offers, one
 // approval stage, "Team approver"):
 //
-//   Balance Transfer   v1 Superseded (submitted by Priya, sunset on October 25) under an Active v2.
-//   Cash Back          v1 Superseded with no sunset, v2 Active, v3 round 1 sent back and round 2 In review
-//                      (submitted by Maya; it adds a required `annual_fee`).
-//   Annual Fee Waiver  v1 sent back (Maya's), its change request still open, and Maya's open draft.
-//   Holiday Points     v1 Revoked, v2 Active.
+//   Balance Transfer     v1 Superseded (submitted by Priya, sunset on October 25) under an Active v2, which adds
+//                        an optional `offer_end_date`.
+//   Cash Back            v1 Superseded with no sunset, v2 Active, v3 round 1 sent back and round 2 In review
+//                        (submitted by Maya; it adds a required `annual_fee`).
+//   Annual Fee Waiver    v1 sent back (Maya's), its change request still open, and Maya's open draft.
+//   Holiday Points       v1 Revoked, v2 Active.
+//   Rate Change Heads-up Maya's draft of an alert (the Alert content type: Push and SMS, its footer, three parts).
 //
 // Coral renders Balance Transfer, Cash Back and Holiday Points. Alex and Jordan approve on Coral Offers; Maya
 // and Priya are authors there, Sam a viewer; Naomi approves and Eli writes on Deposits; Taylor is the Auditor.
 //
-// Each case sets the backend's clock, then compares what the reads show before and after the command. A refusal
-// is checked by its code: the sentence is the BFF's.
+// Each case sets the backend's clock, then compares what the reads show before and after the command: the
+// Versions tab, the Activity tab, the bell, Coral's notices, a template's threads, and a version's content as the
+// workspace and Compare read it. A refusal is checked by its code: the sentence is the BFF's.
 
 const DAY = 86_400_000;
 const EASTERN = "America/New_York";
@@ -33,15 +37,47 @@ const CORAL_OFFERS = "t_coral";
 const PEOPLE = ["maya", "priya", "alex", "jordan"] as const;
 const ALL_OUTPUTS = ["pdf", "web"] as const;
 
+/** The session the cases' autosaves come from. */
+const SESSION = "session-review-0001";
+
 /** YYYY-MM-DD, `days` after `at` in UTC. */
 const dayAfter = (at: Date, days: number) =>
   new Date(at.getTime() + days * DAY).toISOString().slice(0, 10);
+
+/** A stored-form one-line field of a message: text, and variable chips by key. */
+const line = (...inline: (string | { chip: string })[]): JSONContent => ({
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: inline.map((part) =>
+        typeof part === "string"
+          ? { type: "text", text: part }
+          : { type: "variable", attrs: { key: part.chip } },
+      ),
+    },
+  ],
+});
+
+/** The id of the n-th top-level block of a document. */
+const blockAt = (body: JSONContent, n: number) =>
+  String(body.content?.[n]?.attrs?.id);
+
+/** A document with every chip of `from` renamed to `to`, as the editor renames a variable's chips. */
+const rekeyed = (doc: JSONContent, from: string, to: string): JSONContent => ({
+  ...doc,
+  ...(doc.type === "variable" && doc.attrs?.key === from
+    ? { attrs: { ...doc.attrs, key: to } }
+    : {}),
+  ...(doc.content
+    ? { content: doc.content.map((child) => rekeyed(child, from, to)) }
+    : {}),
+});
 
 /** The rows of `after` that `before` didn't have (the reads answer in write order). */
 const added = <T>(before: readonly T[], after: readonly T[]) =>
   after.slice(before.length);
 
-/** A command's answer as its code, or "ok". */
 /** An audit row about a version, as the Activity tab's facts carry it. */
 interface AuditRow {
   action: string;
@@ -52,6 +88,7 @@ interface AuditRow {
   details: Record<string, unknown>;
 }
 
+/** A command's answer as its code, or "ok". */
 const codeOf = async (answer: Promise<ActionResult<object>>) => {
   const result = await answer;
   return result.ok ? "ok" : result.code;
@@ -272,6 +309,90 @@ export function reviewContract(h: ContractHarness, base: Date) {
     before: readonly T[],
     after: readonly T[],
   ) => after.filter((n) => !before.some((b) => b.id === n.id));
+
+  /** The template's workspace document (its open draft, else its latest round), as the Auditor reads it. */
+  async function documentOf(templateId: string) {
+    const document = await h
+      .services()
+      .templates.workspaceDocument(await h.as("taylor"), { templateId });
+    if (!document.ok) throw new Error(document.code);
+    return document;
+  }
+
+  /** A version's name and content, as Compare reads it. */
+  async function contentOf(templateId: string, versionId: string) {
+    const pair = await h.services().versions.compare(await h.as("taylor"), {
+      templateId,
+      from: versionId,
+      to: versionId,
+    });
+    if (!pair.ok) throw new Error(pair.code);
+    return pair.to;
+  }
+
+  /** The template's threads as Jordan reads them against what the workspace shows (its open draft, else its latest round). */
+  async function threadsOf(templateId: string) {
+    const read = await h
+      .services()
+      .comments.threads(await h.as("jordan"), { templateId });
+    if (!read.ok) throw new Error(read.code);
+    return read.threads;
+  }
+
+  /** Jordan's comment on the n-th block of the round in review; the thread's id. */
+  async function commentOnBlock(templateId: string, n: number) {
+    const { version } = await documentOf(templateId);
+    const result = await h.services().comments.add(await h.as("jordan"), {
+      templateId,
+      versionId: version.id,
+      blockId: blockAt(version.body, n),
+      body: "Is this threshold still right?",
+    });
+    if (!result.ok) throw new Error(`the comment was refused: ${result.code}`);
+    return result.threadId;
+  }
+
+  /** Saves the template's open draft as `userId`, from the rev the workspace shows; the save must land. */
+  async function saveDraft(
+    userId: string,
+    templateId: string,
+    patch: Omit<DraftPatch, "rev" | "sessionKey">,
+  ) {
+    const { version } = await documentOf(templateId);
+    if (version.state !== "draft") throw new Error("There is no open draft.");
+    const saved = await h.services().drafts.save(await h.as(userId), {
+      versionId: version.id,
+      patch: { rev: version.rev, sessionKey: SESSION, ...patch },
+    });
+    if (!saved.ok) throw new Error(`the save was refused: ${saved.code}`);
+  }
+
+  /** Opens a draft of the template as `userId` (Edit); it must open. */
+  async function editAs(userId: string, templateId: string) {
+    const opened = await h
+      .services()
+      .templates.startDraft(await h.as(userId), { templateId });
+    if (!opened.ok) throw new Error(`Edit was refused: ${opened.code}`);
+  }
+
+  /** Revokes a version: Jordan starts it, then Alex confirms it, a minute apart from `at`. */
+  async function revoke(templateId: string, versionNumber: number, at: Date) {
+    h.setClock(at);
+    expect(
+      await h.services().review.startRevoke(await h.as("jordan"), {
+        templateId,
+        versionNumber,
+        reason: "Wrong APR in the legal notices.",
+      }),
+    ).toEqual({ ok: true });
+    h.setClock(new Date(at.getTime() + 60_000));
+    expect(
+      await h.services().review.confirmRevoke(await h.as("alex"), {
+        templateId,
+        versionNumber,
+      }),
+    ).toEqual({ ok: true });
+  }
 
   describe("review.setSunset", () => {
     it("moves a Superseded version's sunset to 00:00 in the business time zone, dates it by the backend's clock, and tells Coral and the author", async () => {
@@ -864,6 +985,205 @@ export function reviewContract(h: ContractHarness, base: Date) {
         roundIn((await rowsOf(templateId)).rows, 3, 3).contractChanges,
       ).toBeNull();
     });
+
+    it("resolves the change request that sent the round back as the submitter's, at the submit, and leaves a comment on a block open", async () => {
+      const templateId = h.templates["cash-back"]!;
+      h.setClock(minute(1));
+      const blockThread = await commentOnBlock(templateId, 1);
+      h.setClock(minute(2));
+      expect(await sendBackAs("jordan", templateId, 3, 2)).toEqual({
+        ok: true,
+      });
+      const before = await threadsOf(templateId);
+      const request = before.find(
+        (t) => t.blockId === DOCUMENT_THREAD && t.status === "open",
+      )!;
+      expect(request.origin).toEqual({
+        number: 3,
+        round: 2,
+        state: "changes_requested",
+      });
+
+      h.setClock(minute(3));
+      expect(await submitAs("maya", templateId)).toEqual({
+        ok: true,
+        number: 3,
+        round: 3,
+      });
+      // Only the open change request changed: round 1's, answered by round 2, keeps the moment it was.
+      expect(await threadsOf(templateId)).toEqual(
+        before.map((t) =>
+          t.id === request.id
+            ? {
+                ...t,
+                status: "resolved",
+                resolvedBy: "maya",
+                resolvedAt: minute(3).toISOString(),
+              }
+            : t,
+        ),
+      );
+      expect(before.find((t) => t.id === blockThread)).toMatchObject({
+        status: "open",
+        resolvedBy: null,
+      });
+    });
+  });
+
+  // The message rules of the Alert content type (decisions 0034 and 0035), checked at submit on Rate Change
+  // Heads-up, Maya's draft of an alert.
+  describe("submitting an alert", () => {
+    it("refuses an SMS that breaks a message rule, in the rules' order, and writes nothing", async () => {
+      const templateId = h.templates["rate-change-heads-up"]!;
+      // Over three parts on its own.
+      const long = " Your rate changes Friday.".repeat(20);
+      const rules = [
+        // A typed character outside GSM-7 (a curly apostrophe), before the length and the link.
+        [
+          `Hi, it’s changing. Details at bit.ly/coral.${long}`,
+          "sms_characters",
+        ],
+        [
+          `Hi, it's changing. Details at bit.ly/coral.${long}`,
+          "sms_too_many_parts",
+        ],
+        ["Hi, it's changing. Details at bit.ly/coral.", "public_shortener"],
+      ] as const;
+      for (const [i, [text, code]] of rules.entries()) {
+        h.setClock(minute(i + 1));
+        await saveDraft("maya", templateId, { "sms.text": line(text) });
+        const before = await world(templateId);
+        expect(await codeOf(submitAs("maya", templateId)), code).toBe(code);
+        expect(await world(templateId)).toEqual(before);
+      }
+      h.setClock(minute(9));
+      await saveDraft("maya", templateId, {
+        "sms.text": line(
+          "Hi, it's changing. Details at coral.example/notices.",
+        ),
+      });
+      expect(await submitAs("maya", templateId)).toEqual({
+        ok: true,
+        number: 1,
+        round: 1,
+      });
+    });
+
+    it("measures the SMS with the content type's footer and the long sample values, against its budget of three parts", async () => {
+      const templateId = h.templates["rate-change-heads-up"]!;
+      const { version } = await documentOf(templateId);
+      /** The draft's sample sets, the "long" one's first name set to `firstName`. */
+      const withLongName = (firstName: string) => [
+        ...version.sampleSets.filter((s) => s.id !== "long"),
+        {
+          id: "long",
+          name: "Long name and maximum values",
+          values: {
+            ...version.sampleSets.find((s) => s.id === "long")?.values,
+            first_name: firstName,
+          },
+        },
+      ];
+      // 317 characters of the author's own; with a first name of 120 that is 437, which fit three parts (459), but
+      // not with the footer's line (45 more). With a first name of 60 it all fits.
+      const sms = line(
+        "Hi ",
+        { chip: "first_name" },
+        ". " + "Your rate changes Friday. ".repeat(12),
+      );
+      h.setClock(minute(1));
+      await saveDraft("maya", templateId, {
+        "sms.text": sms,
+        sampleSets: withLongName("A".repeat(120)),
+      });
+      const before = await world(templateId);
+      expect(await codeOf(submitAs("maya", templateId))).toBe(
+        "sms_too_many_parts",
+      );
+      expect(await world(templateId)).toEqual(before);
+
+      h.setClock(minute(2));
+      await saveDraft("maya", templateId, {
+        sampleSets: withLongName("A".repeat(60)),
+      });
+      expect(await submitAs("maya", templateId)).toEqual({
+        ok: true,
+        number: 1,
+        round: 1,
+      });
+    });
+  });
+
+  // A renamed variable keeps the key it had first as its id (handoff review D8): the backend stores it as the save
+  // sends it, and submit diffs by it.
+  describe("a variable renamed in a draft", () => {
+    it("is frozen at submit as one key_renamed, not a removal and an addition, and Coral's notice carries it", async () => {
+      const templateId = h.templates["balance-transfer"]!;
+      h.setClock(minute(1));
+      await editAs("maya", templateId);
+      const { version } = await documentOf(templateId);
+      h.setClock(minute(2));
+      await saveDraft("maya", templateId, {
+        variables: version.variables.map((v) =>
+          v.key === "first_name"
+            ? { ...v, id: "first_name", key: "name_on_card" }
+            : v,
+        ),
+        body: rekeyed(version.body, "first_name", "name_on_card"),
+      });
+      expect(
+        (await documentOf(templateId)).version.variables.find(
+          (v) => v.key === "name_on_card",
+        ),
+        "the save keeps the id",
+      ).toMatchObject({ id: "first_name" });
+      const rename = {
+        kind: "key_renamed",
+        key: "name_on_card",
+        breaking: true,
+        from: "first_name",
+        to: "name_on_card",
+      };
+      const summary = await summaryOf("maya", templateId);
+      expect(
+        diffVariables(summary.baseline!.variables, summary.variables),
+      ).toEqual([rename]);
+
+      const before = await world(templateId);
+      h.setClock(minute(3));
+      expect(await submitAs("maya", templateId)).toEqual({
+        ok: true,
+        number: 3,
+        round: 1,
+      });
+      const after = await world(templateId);
+      expect(roundIn(after.rows, 3).contractChanges).toEqual([rename]);
+      // No change request was open, so the submit's own row is the only one.
+      expect(
+        auditAdded(before, after).map((e) => [e.action, e.details]),
+      ).toEqual([
+        [
+          "version.submitted",
+          expect.objectContaining({ contractChanges: 1, breaking: true }),
+        ],
+      ]);
+
+      h.setClock(minute(4));
+      expect(await approveAs("jordan", templateId, 3, 1)).toMatchObject({
+        ok: true,
+        wentLive: true,
+      });
+      expect(
+        added(after.notices, (await world(templateId)).notices).filter(
+          (n) => n.kind === "new_version",
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          versionNumber: 3,
+          changes: [expect.objectContaining(rename)],
+        }),
+      ]);
+    });
   });
 
   describe("review.requestChanges", () => {
@@ -965,6 +1285,77 @@ export function reviewContract(h: ContractHarness, base: Date) {
           round2.id,
           expect.objectContaining({ resolvedWith: 3, resolvedWithRound: 3 }),
         ],
+      ]);
+    });
+
+    it("opens the author's draft with the round's content and block ids, and the reason as a thread about the whole version; a comment on a block keeps its anchor", async () => {
+      const templateId = h.templates["cash-back"]!;
+      // With no draft open, the workspace shows the round in review.
+      const round2 = (await documentOf(templateId)).version;
+      expect(round2).toMatchObject({ number: 3, round: 2, state: "in_review" });
+      const roundContent = await contentOf(templateId, round2.id);
+      h.setClock(minute(1));
+      const blockThread = await commentOnBlock(templateId, 1);
+      h.setClock(minute(2));
+      expect(
+        await sendBackAs(
+          "jordan",
+          templateId,
+          3,
+          2,
+          "Say when the fee starts.",
+        ),
+      ).toEqual({ ok: true });
+
+      const draft = (await documentOf(templateId)).version;
+      expect(draft.id).not.toBe(round2.id);
+      expect(draft).toEqual({
+        ...round2,
+        id: draft.id,
+        number: null,
+        round: null,
+        state: "draft",
+        rev: draft.rev,
+      });
+      expect(await contentOf(templateId, draft.id)).toEqual({
+        ...roundContent,
+        id: draft.id,
+        number: null,
+        round: null,
+        state: "draft",
+      });
+
+      // Against the draft, the block comment is where it was, and the reason is a change request about the round.
+      const threads = await threadsOf(templateId);
+      expect(threads.find((t) => t.id === blockThread)).toMatchObject({
+        blockId: blockAt(round2.body, 1),
+        status: "open",
+        orphaned: false,
+      });
+      expect(
+        threads.filter(
+          (t) => t.blockId === DOCUMENT_THREAD && t.status === "open",
+        ),
+      ).toEqual([
+        {
+          id: expect.any(String),
+          blockId: DOCUMENT_THREAD,
+          quote: null,
+          status: "open",
+          origin: { number: 3, round: 2, state: "changes_requested" },
+          comments: [
+            {
+              id: expect.any(String),
+              authorId: "jordan",
+              body: "Say when the fee starts.",
+              kind: "change_request",
+              createdAt: minute(2).toISOString(),
+            },
+          ],
+          resolvedBy: null,
+          resolvedAt: null,
+          orphaned: false,
+        },
       ]);
     });
 
@@ -1099,6 +1490,10 @@ export function reviewContract(h: ContractHarness, base: Date) {
         ]),
       );
       expect(auditAdded(before, after)).toHaveLength(3);
+      const [newVersion, sunsetNotice] = added(before.notices, after.notices);
+      expect(sunsetNotice?.changes, "what moving to v3 asks").toEqual(
+        newVersion?.changes,
+      );
       expect(added(before.notices, after.notices)).toEqual([
         expect.objectContaining({
           kind: "new_version",
@@ -1182,7 +1577,7 @@ export function reviewContract(h: ContractHarness, base: Date) {
       expect(await world(templateId)).toEqual(before);
     });
 
-    it("puts a first round live over nothing: nothing is superseded and the sunset day is ignored", async () => {
+    it("puts a first round live over nothing: nothing is superseded and the sunset day is ignored, though it must still be a day after today", async () => {
       const templateId = h.templates["annual-fee-waiver"]!;
       h.setClock(minute(1));
       expect(await submitAs("maya", templateId)).toEqual({
@@ -1192,10 +1587,28 @@ export function reviewContract(h: ContractHarness, base: Date) {
       });
       const before = await world(templateId);
       h.setClock(minute(2));
+      const approving = async (
+        sunsetPrevious: string,
+        outputsViewed: readonly OutputKey[] = ALL_OUTPUTS,
+      ) =>
+        h.services().review.approve(await h.as("alex"), {
+          templateId,
+          versionNumber: 1,
+          round: 2,
+          sampleSetsSeen: [],
+          outputsViewed,
+          sunsetPrevious,
+        });
+      expect(await codeOf(approving("2026-02-30"))).toBe(
+        REQUEST_REFUSALS.invalidDate.code,
+      );
+      expect(await codeOf(approving(dayAfter(minute(2), 0)))).toBe(
+        REFUSALS.sunsetAfterToday.code,
+      );
+      expect(await world(templateId)).toEqual(before);
+      // An output viewed twice is recorded once, in the outputs' order.
       expect(
-        await approveAs("alex", templateId, 1, 2, {
-          sunsetPrevious: dayAfter(minute(2), 14),
-        }),
+        await approving(dayAfter(minute(2), 14), ["web", "pdf", "web"]),
       ).toEqual({ ok: true, wentLive: true, number: 1, round: 2 });
       const after = await world(templateId);
       expect(after.rows.map((v) => [v.number, v.round, v.state])).toEqual([
@@ -1220,6 +1633,74 @@ export function reviewContract(h: ContractHarness, base: Date) {
       expect(
         added(before.notices, after.notices).map((n) => n.kind),
       ).not.toContain("sunset_scheduled");
+    });
+
+    it("after the Active version is revoked, puts the corrected version live over nothing: the revoked one stays Revoked, the one that still renders keeps its sunset, and Coral hears of the new version", async () => {
+      const templateId = h.templates["balance-transfer"]!;
+      await revoke(templateId, 2, minute(1));
+      h.setClock(minute(3));
+      await editAs("maya", templateId);
+      h.setClock(minute(4));
+      expect(await submitAs("maya", templateId)).toEqual({
+        ok: true,
+        number: 3,
+        round: 1,
+      });
+      const before = await world(templateId);
+      const [v1, v2] = [roundIn(before.rows, 1), roundIn(before.rows, 2)];
+      // The corrected draft is v2's content; it is compared with v1, which still renders, not the revoked v2.
+      expect(roundIn(before.rows, 3).contractChanges).toEqual([
+        {
+          kind: "added",
+          key: "offer_end_date",
+          breaking: false,
+          type: "date",
+          required: false,
+        },
+      ]);
+
+      h.setClock(minute(5));
+      expect(
+        await approveAs("jordan", templateId, 3, 1, {
+          sunsetPrevious: dayAfter(minute(5), 14),
+        }),
+      ).toEqual({ ok: true, wentLive: true, number: 3, round: 1 });
+      const after = await world(templateId);
+      expect(roundIn(after.rows, 3)).toMatchObject({
+        state: "active",
+        activatedAt: minute(5).toISOString(),
+      });
+      expect(roundIn(after.rows, 2), "still Revoked").toEqual(v2);
+      expect(roundIn(after.rows, 1), "its sunset as it was").toEqual(v1);
+      expect(v1.sunsetDay).toBe("2026-10-25");
+      expect(
+        auditAdded(before, after).map((e) => [e.action, e.details]),
+      ).toEqual([
+        [
+          "version.activated",
+          {
+            number: 3,
+            round: 1,
+            supersedes: null,
+            stage: "Team approver",
+            outputsViewed: [...ALL_OUTPUTS],
+          },
+        ],
+      ]);
+      expect(added(before.notices, after.notices)).toEqual([
+        expect.objectContaining({
+          kind: "new_version",
+          versionNumber: 3,
+          activeVersion: 3,
+          changes: [
+            expect.objectContaining({
+              kind: "added",
+              key: "offer_end_date",
+              breaking: false,
+            }),
+          ],
+        }),
+      ]);
     });
 
     it("refuses version_changed, and writes nothing, when the round changes between the command's read and its write; then another approver's goes live", async () => {
