@@ -68,16 +68,16 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 - `"use server"` appears only in `src/server/actions/` (and the simulator's `src/simulator/actions.ts`): server
   actions are for mutations. A read a screen loads on demand is a GET route under
   `src/app/api/templates/[templateId]/`.
+- The backend seam ([src/server/services](src/server/services/README.md), "The rules"): only the local implementation
+  (`src/server/services/local`), `src/server/db` and the seed talk to the database; only `services/index.ts`,
+  `/api/v1`, the seed, the reset and tests import an implementation (`services/local`, `services/fake`); only the
+  backend reads the clock (`services/local/clock.ts`); only `src/domain` and the implementations call `can()` and
+  the space rules; and only the backend, the fake, the contract suite and tests import the reset, the seed or
+  `src/server/testing`. The service interfaces import no view model.
 
 Not enforced yet; follow them anyway:
 
 - New business rules go in `src/domain`. Never add one to an action, a query, or a component.
-- Only `src/server` imports the database client: in the end only the local implementation (`src/server/services/local`),
-  `src/server/db` and the seed. Lint errs on any other file, except those still listed in `SEAM_NOT_YET`
-  ([eslint.config.mjs](eslint.config.mjs)), where it warns until their package clears them. Three more seam rules
-  work the same way: only the backend reads the clock (`CLOCK_NOT_YET`), only the domain and the implementations call
-  `can()` (`DECIDES_NOT_YET`), and nothing else imports the reset, the seed or the test support
-  (`INTERNALS_NOT_YET`).
 - Read models return permissions decided (`can: { action: PermissionResult }`). Components render them; they don't
   call `can()` or compare refusal sentences.
 - A team's id is opaque and never its slug (decision 0053). A URL names a team by its slug, `requireSpace` resolves
@@ -88,13 +88,15 @@ Not enforced yet; follow them anyway:
 This isn't the Next.js in your training data. Read the guide in `node_modules/next/dist/docs/` before you use a
 Next.js API; Next's own note about it is at the end of this file.
 
-- **Cache Components is on.** Read request data (cookies, `getViewer()`, `params`, `searchParams`, the database,
-  `now()`) only inside `<Stream fallback={…}>` from `@/components/primitives/stream`. A page's default export stays
+- **Cache Components is on.** Read request data (the request context, `params`, `searchParams`, a service read)
+  only inside `<Stream fallback={…}>` from `@/components/primitives/stream`. A page's default export stays
   synchronous and passes the `params` promise down; the streamed child awaits it. Type pages with
   `PageProps<"/route">`. Never add `loading.tsx`. The fallback has the final geometry: layout shift must be zero.
-- **Time.** The backend owns it: a command is dated by the backend's clock (`now()` from `@/server/clock` in the
-  local implementation), and a read that decides by time answers `asOf`, which the BFF words its dates from. Never
-  `new Date()` or `Date.now()` in server code. Domain functions take `now` as an argument. A database read that runs before any request API needs `await connection()` first.
+- **Time.** The backend owns it: a command is dated by the backend's clock (`now()` in
+  `src/server/services/local/clock.ts`, the demo clock), and a read that decides by time answers `asOf`, which the
+  BFF words its dates from. Never `new Date()` or `Date.now()` in server code. Domain functions take `now` as an
+  argument. In the local implementation, a database read that runs before any request API needs `await connection()`
+  first.
 - **After a mutation**, a server action calls `refresh()` from `next/cache` (and `revalidatePath()` for other routes
   that show the change). Route handlers can't call `refresh()`; they use `revalidatePath()`. `redirect()` comes last.
 - **Typed routes are on.** `<Link href>` takes a known route; a computed string needs `as Route`.
@@ -102,18 +104,21 @@ Next.js API; Next's own note about it is at the end of this file.
 
 ## Server code
 
-- A server action: the request context (the viewer), parse with zod, check permission, `now()` once, then one `inTransaction`. Inside
-  it, re-read, ask the domain, write with a compare-and-set, and write the effects (audit rows, notifications,
-  consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
-  throw only for bugs. Inside a transaction, read and write through `tx`, never `db`. `serverAction` in
-  [src/server/actions/kit.ts](src/server/actions/kit.ts) runs these steps; every action is written on it.
-- The backend seam ([src/server/services](src/server/services/README.md), [decision 0072](docs/decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)):
-  an action that has moved reads the request context (the viewer; no time), parses, and calls `services()` (`call`);
-  the permission check, the clock, the transaction and the effects run behind it, in the local implementation
-  (`runCommand`), and in the in-memory fake its tests use. Service results are facts (no English, no app URLs);
-  reach the backend only through `services()` (lint forbids importing `services/local` or `services/fake`), and put
-  a rule both implementations need in `src/domain`. Move an area as that README says. A page with nobody signed in
-  goes to `signInRequired()`, an action answers `signed_out`, a route 401.
+- The BFF reaches its backend only through the service interfaces, `services().<area>.<method>(ctx, input)`
+  ([src/server/services](src/server/services/README.md), [decision 0072](docs/decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)).
+  A server action runs on `serverAction` ([src/server/actions/kit.ts](src/server/actions/kit.ts)): the request context
+  (the viewer; no time), parse with zod, `call` the service, and `after` (refresh, revalidate, redirect last) only
+  when it answered `ok`. It answers the service's `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
+  throw only for bugs. A read model asks a service for facts and words them with a pure shaping function; a GET
+  route answers a service's `ReadResult`. Nobody signed in: a page goes to `signInRequired()`, an action answers
+  `signed_out`, a route 401. A template, version or team the viewer may not see reads as not there (404).
+- Behind the seam, each command runs on `runCommand` ([services/local/command.ts](src/server/services/local/command.ts)):
+  read what the input names and check the permission, read the backend's clock once, then one `inTransaction`:
+  re-read, ask the domain, write with a compare-and-set (a lost one is `version_changed` or the guard's own code),
+  and write the effects (audit rows, notifications, consumer notices) in the same transaction, through `tx`, never
+  `db`. The in-memory fake (`services/fake`) runs the same domain rules for every command; the contract suite
+  (`services/contract`) holds both to one set of cases. Service results are facts (no English, no app URLs), and a
+  rule both implementations need goes in `src/domain` first.
 - Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts (`src/instrumentation.ts`): `DEMO_MODE` and `STENCIL_BACKEND`. The demo tools (reset, clock
   advance, persona switcher, Demo pill) run only when it is on and are off when it is unset: a new demo path checks it
   too ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).
@@ -156,20 +161,21 @@ Next.js API; Next's own note about it is at the end of this file.
 
 ## Copy these
 
-| To…                                            | Copy                                                                                                                                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Write a server action                          | `serverAction` in [src/server/actions/kit.ts](src/server/actions/kit.ts), as `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) uses it       |
-| Write a domain transition                      | `setSunset` in [src/domain/lifecycle/sunset.ts](src/domain/lifecycle/sunset.ts), `startRevoke` in [src/domain/lifecycle/revoke.ts](src/domain/lifecycle/revoke.ts)     |
-| Build a read model with permissions            | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts)                                                                                      |
-| Stream a page                                  | [versions/page.tsx](<src/app/(product)/[team]/templates/[templateId]/versions/page.tsx>) with [versions-content.tsx](src/components/versions/versions-content.tsx)     |
-| Run an action from a dialog, with validation   | [src/components/review/request-dialog.tsx](src/components/review/request-dialog.tsx) on [action-dialog.tsx](src/components/versions/action-dialog.tsx)                 |
-| Render server-decided actions                  | [src/components/settings/team/members-table.tsx](src/components/settings/team/members-table.tsx)                                                                       |
-| Update optimistically                          | [use-review-threads.ts](src/components/comments/use-review-threads.ts) with [thread-list.tsx](src/components/comments/thread-list.tsx)                                 |
-| Load heavy code on demand                      | [compare-dialog.tsx](src/components/versions/compare-dialog.tsx), [load-pdfjs.ts](src/components/preview/pdf/load-pdfjs.ts)                                            |
-| Add an `/api/v1` route                         | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts)                                                                                                 |
-| Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts)                                                                                                                             |
-| Format a count or a plural                     | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts)                                                                           |
-| Test an action                                 | [review.test.ts](src/server/actions/review.test.ts) on the fake; what its command does: [contract/review.ts](src/server/services/contract/review.ts), on every backend |
+| To…                                            | Copy                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Write a server action                          | `setSunset` in [src/server/actions/review.ts](src/server/actions/review.ts) (`call`), its command in [services/local/review.ts](src/server/services/local/review.ts) (on `runCommand`) and its twin in [services/fake/review.ts](src/server/services/fake/review.ts) |
+| Write a domain transition                      | `setSunset` in [src/domain/lifecycle/sunset.ts](src/domain/lifecycle/sunset.ts), `startRevoke` in [src/domain/lifecycle/revoke.ts](src/domain/lifecycle/revoke.ts)                                                                                                   |
+| Build a read model with permissions            | `getVersions` in [src/server/queries/versions.ts](src/server/queries/versions.ts) over `VersionService.history` ([services/local/versions.ts](src/server/services/local/versions.ts)), shaped by `versionsData`                                                      |
+| Serve a read a screen loads on demand          | [base-version/route.ts](src/app/api/templates/[templateId]/base-version/route.ts) over `VersionService.baseVersion`                                                                                                                                                  |
+| Stream a page                                  | [versions/page.tsx](<src/app/(product)/[team]/templates/[templateId]/versions/page.tsx>) with [versions-content.tsx](src/components/versions/versions-content.tsx)                                                                                                   |
+| Run an action from a dialog, with validation   | [src/components/review/request-dialog.tsx](src/components/review/request-dialog.tsx) on [action-dialog.tsx](src/components/versions/action-dialog.tsx)                                                                                                               |
+| Render server-decided actions                  | [src/components/settings/team/members-table.tsx](src/components/settings/team/members-table.tsx)                                                                                                                                                                     |
+| Update optimistically                          | [use-review-threads.ts](src/components/comments/use-review-threads.ts) with [thread-list.tsx](src/components/comments/thread-list.tsx)                                                                                                                               |
+| Load heavy code on demand                      | [compare-dialog.tsx](src/components/versions/compare-dialog.tsx), [load-pdfjs.ts](src/components/preview/pdf/load-pdfjs.ts)                                                                                                                                          |
+| Add an `/api/v1` route                         | [src/app/api/v1/templates/route.ts](src/app/api/v1/templates/route.ts)                                                                                                                                                                                               |
+| Format a date, count days, or say how long ago | [src/domain/dates.ts](src/domain/dates.ts)                                                                                                                                                                                                                           |
+| Format a count or a plural                     | [src/domain/numbers.ts](src/domain/numbers.ts), [src/domain/plural.ts](src/domain/plural.ts)                                                                                                                                                                         |
+| Test an action                                 | [review.test.ts](src/server/actions/review.test.ts) on the fake; what its command does: [contract/review.ts](src/server/services/contract/review.ts), on every backend; a read model on facts: [queries/versions.test.ts](src/server/queries/versions.test.ts)       |
 
 Each layer README has a longer list, and a "Don't copy" list of the deviations you'll find first. The common one:
 bare `<Suspense>` instead of `<Stream>`. Never copy from `src/app/(dev)`: those are the editor and PDF labs on fixture data.

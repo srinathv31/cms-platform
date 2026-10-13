@@ -16,8 +16,8 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 | ------------ | -------- | ---- | ------ | --- | ----- |
 | Open         | 0        | 1    | 2      | 4   | 7     |
 | Partly fixed | 1        | 4    | 7      | 2   | 14    |
-| Fixed        | 1        | 21   | 31     | 34  | 87    |
-| Deferred     | 0        | 2    | 1      | 0   | 3     |
+| Fixed        | 1        | 22   | 31     | 34  | 88    |
+| Deferred     | 0        | 1    | 1      | 0   | 2     |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), PR #66 (N26 and N27), and PRs #67–#72 (A1, T3, T5, T7 and N20).
 
@@ -826,9 +826,9 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B1 · High: Server actions are the service layer
 
-- **Status:** Partly fixed. Rendering runs through a DB-free engine (`src/server/render/engine.ts`, PR #6). The seam is in place ([decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md), `src/server/services/`): a fail-closed request context, the service interfaces, a local implementation, a fake (loaded from the seed's fixture) and a contract suite, with `setSunset`, the Versions read and identity (who a credential names, a URL's space resolved to its team's opaque id once, the sidebar's spaces) behind them. The other actions and reads move in step 2b of lane F's plan; the lint ratchet in `eslint.config.mjs` (`SEAM_NOT_YET`) lists what is left.
-- **Where:** `src/server/actions/review.ts` line 443
-- **What happens:** `approveVersion` runs `getViewer`, a DB lookup, the permission check, a transaction with five reads, the domain call, writes and effects, then `refresh`. Every action is shaped this way, and 42 production files import the Drizzle client directly. There is nothing to swap for HTTP calls.
+- **Status:** Fixed. Every action and read reaches its data through a service interface ([decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md), `src/server/services/`): a fail-closed request context, the interfaces as facts, a local implementation that holds what the actions held (the Drizzle code, the permission checks, the clock, the effects), a fake loaded from the seed's fixture, and a contract suite both implementations pass and the Java API will run. Lint keeps it so: nothing outside `src/server/db`, the local implementation, the seed and the reset imports Drizzle, `getViewer()` is read only by the request context, the BFF never reads the clock or calls `can()`, and the four ratchets that listed what was left are gone. The HTTP implementation is the port's work.
+- **Where:** `src/server/actions/kit.ts`, `src/server/services/`
+- **What happened:** `approveVersion` ran `getViewer`, a DB lookup, the permission check, a transaction with five reads, the domain call, writes and effects, then `refresh`, and 42 production files imported the Drizzle client directly, so there was nothing to swap for HTTP calls.
 - **Fix:** Request context plus service interfaces (see The backend decision).
 - **Evidence:** verified
 

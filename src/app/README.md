@@ -28,10 +28,9 @@ and every request-bound part streams. Reading request data outside `<Suspense>` 
    `searchParams`, database reads, and `now()`. The page's default export stays synchronous.
 3. `params` and `searchParams` go down as promises. Type the page with `PageProps<"/route">` (or
    `LayoutProps<"/route">`) and `await` inside the streamed component.
-4. Time comes from the backend: a read model that has moved behind the services hands the screen the service's
-   `asOf`; one that hasn't reads `now()` in [server/clock.ts](../server/clock.ts) (real time plus the demo clock's
-   offset). Never `new Date()` or `Date.now()` in server code. `now()` awaits `connection()` and reads the
-   database, so it is request data too.
+4. Time comes from the backend: a read model hands the screen the service's `asOf`, the instant the backend
+   decided at (its demo clock, [server/services/local/clock.ts](../server/services/local/clock.ts): real time plus
+   the offset Advance clock moves). Never `new Date()` or `Date.now()` in server code.
 5. A database read that runs before any request API needs `await connection()` first. libSQL resolves in
    microtasks, so without it the read can land in the prerender. See `getSimCustomers` in
    [ui/lists.ts](../simulator/ui/lists.ts) and the simulator's
@@ -309,13 +308,12 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
 - **Route handlers:** co-located `route.test.ts` files under `api/`, run with `npx vitest run src/app/api`. The
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
   database (`tempDatabase` and `seededDatabasePerTest` in `src/server/testing/review-fixtures.ts`, one copy of the
-  database per test) and mock `@/server/clock`. The template
-  reads that haven't moved behind the service interfaces are tested the same way, one `route.test.ts` beside each
-  route (the helpers they share are in `src/server/testing/read-routes.ts`), with `getViewer` mocked to each
-  persona, and so is the palette's search ([route.test.ts](./api/palette/[space]/route.test.ts)). A moved read's
-  route test checks only the HTTP mapping and the 401, on the in-memory fake
-  ([submit-summary](./api/templates/[templateId]/submit-summary/route.test.ts)) or with the request context and the
-  service mocked (compare, base-version): what the service decides is the contract suite's. The drafts and imports
+  database per test) and mock the backend's clock (`@/server/services/local/clock`): `/api/v1` is the backend's own
+  API. The template reads a screen makes on demand and the palette's search each have one `route.test.ts` beside
+  the route (the helpers they share are in `src/server/testing/read-routes.ts`) that checks only the HTTP mapping
+  and the 401, on the in-memory fake ([submit-summary](./api/templates/[templateId]/submit-summary/route.test.ts))
+  or with the request context and the service mocked (compare, base-version, integration, copilot-prompt, the
+  palette): what the service decides is the contract suite's. The drafts and imports
   tests mock `getViewer` and the
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](<./(product)/[team]/audit/export/route.test.ts>)) mocks the viewer and the
   query the same way; the delivery file route has none.

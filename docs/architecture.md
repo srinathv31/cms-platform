@@ -214,7 +214,8 @@ notice kind's payload and every notification kind's facts.
 
 ## Time, identity, and demo data
 
-- **The demo clock.** `now()` in [clock.ts](../src/server/clock.ts) is real time plus `settings.clock_offset_days`.
+- **The demo clock.** `now()` in [services/local/clock.ts](../src/server/services/local/clock.ts) is real time plus
+  `settings.clock_offset_days`.
   It is the backend's clock and the only reader of the current time on the server: a command dates its writes by
   it, a read that decides by time answers it as `asOf`, and the BFF words its dates from that, reading no clock of
   its own ([decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)). Domain
