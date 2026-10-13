@@ -58,12 +58,13 @@ export function fakeDemo(
   return {
     async reset() {
       const fresh = seededState(await clock()).state;
-      for (const table of Object.keys(fresh) as (keyof FakeState)[])
-        (state[table] as unknown[]).splice(
-          0,
-          state[table].length,
-          ...fresh[table],
-        );
+      // In place: every area holds these arrays. Row by row, since a table can hold more rows than a call takes
+      // arguments.
+      for (const table of Object.keys(fresh) as (keyof FakeState)[]) {
+        const rows = state[table] as unknown[];
+        rows.length = 0;
+        for (const row of fresh[table]) rows.push(row);
+      }
       return { ok: true };
     },
 
