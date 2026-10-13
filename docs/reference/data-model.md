@@ -6,8 +6,7 @@ today's SQLite schema ([src/server/db/schema/ucomp.ts](../../src/server/db/schem
 
 Most differences change on the Java side only: the Node app keeps its SQLite schema behind lane F's service
 interfaces ([0070](../decisions/0070-rules-and-permission-checks-sit-behind-the-service-interfaces.md)). Where the
-Node app changes first, the line names who changes it: lane F (the service seam, to-do item 3) or lane K (the seed, to-do
-item 5).
+Node app changes first, the line names who changes it: lane F (the service seam, to-do item 3).
 
 ## Conventions
 
@@ -128,7 +127,7 @@ not in wave 2.
 | `sms_sender`  | `VARCHAR(16)`   | yes  | The short code the team's SMS come from.                                                                                                       |
 
 Today: `createTeam` and the seed set `id = slug`, and about ten call sites use one for the other. Changed by lane F
-(to-do item 3), with the seed's team ids agreed with lane K.
+(to-do item 3), the seed's team ids included.
 
 #### `memberships`
 
@@ -474,7 +473,7 @@ Index `(consumer_id, seq)`. Who gets a notice: every registered consumer with a 
 the 90 days before the event (`recentConsumers` in `src/server/effects.ts`), read from `render_daily` after the port.
 
 Today: the counter is a `settings` row read and written under SQLite's single writer, and payloads are untyped
-(`Record<string, unknown>`), with other spellings in the seed ([Payloads](#payloads)).
+(`Record<string, unknown>`) ([Payloads](#payloads)).
 
 ### Audit, notifications and access
 
@@ -623,8 +622,8 @@ The audit log and the render log are kept differently
 Each audit action and notice kind gets one shape, which the runtime and the seed both write, holding facts only: ids,
 numbers, instants, codes, and names as they were at the time, never a sentence
 ([0064](../decisions/0064-payloads-are-facts-with-one-shape-per-event.md)). The tables below are the runtime's
-shapes, read from the effect builders on 2026-10-12; where the seed or the runtime still differs from them, a list
-after each table says so. This is the catalogue the Java side's event DTOs (or the JSON columns' validation) are
+shapes, read from the effect builders on 2026-10-12; where the runtime itself still differs from them, a list after
+each table says so. This is the catalogue the Java side's event DTOs (or the JSON columns' validation) are
 generated from; the builder named in each row is the source of truth.
 
 Types: `int`, `boolean`, `string`; `instant` is an ISO string; `day` is `YYYY-MM-DD`; `zone` is an IANA name; a role
@@ -693,19 +692,12 @@ Today's differences:
 
 - `platform.config_changed` also stores `summary`, an English sentence; it goes
   ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). Lane F (to-do item 3).
-- The seed writes other spellings and shapes. Lane K (to-do item 5) makes it write the runtime's:
-  - `src/server/seed/templates/build.ts` writes `version.approved` (`number`, `round`, `stage`, `reason`) where the
-    runtime writes `version.stage_approved` or the approver's `version.activated`; `version.revoke_confirmed` without
-    `wasActive` for `version.revoked`; and `comment.resolved` (`threadId`, `blockId`) for `thread.resolved`. Its
-    `comment.added` rows hold `threadId`, `blockId` and the commenter's name as `author`, without `number` and
-    `round`; `draft.edited` only `saves` and `basedOn`; `version.sunset_set` no `previousSunsetAt`; and
-    `version.activated` has no actor.
-  - `src/server/seed/activity.ts` writes `access.requested` without `userId` and `userName`, and `recert.started`
-    with no actor; `src/server/seed/teams.ts` writes `access.granted` without `role`; and `teams.ts` and
-    `src/server/seed/platform.ts` write `platform.config_changed` with only `area` and `summary`.
-- `canonicalAction` (`src/domain/audit.ts`) files the seed's spellings under the runtime's for the Audit filter, and
-  shows `version.stage_approved` and a person's `version.activated` as one action, "Approved" (its key is
-  `version.approved`). That is how the screen reads them, not a stored spelling.
+- The seed writes each event as the runtime does
+  ([seed README](../../src/server/seed/README.md#events-are-written-as-the-runtime-writes-them)), so the exported
+  fixture's rows have these shapes and nothing seed-specific is left to port.
+- `canonicalAction` (`src/domain/audit.ts`) files `version.stage_approved` and a person's `version.activated` under one
+  key, `version.approved`, so the Audit filter and its labels show one action, "Approved". That is how the screen
+  reads them, not a stored spelling.
 
 ### Consumer notice kinds
 
@@ -728,9 +720,6 @@ Today's differences:
   ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). Lane F (to-do item 3).
 - `setSunset` leaves `contractChanges` out of `sunset_scheduled` when there are none, or when nothing is Active;
   `approve` always writes it. One shape means always present, empty when there are none.
-- Seeded notices carry `previousVersionNumber` (`new_version`) and `replacedByVersionNumber` (`sunset_scheduled`)
-  where the runtime writes `activeVersion`, and seeded `revoked` notices have no `activeVersion`, so `noticeView`
-  reads both shapes (`NoticeRow` in `src/domain/golive-types.ts`). Lane K (to-do item 5).
 
 ### Notification kinds
 
