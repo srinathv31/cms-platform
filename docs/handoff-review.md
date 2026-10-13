@@ -14,8 +14,8 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 1    | 4      | 5   | 10    |
-| Partly fixed | 1        | 4    | 5      | 2   | 12    |
+| Open         | 0        | 1    | 3      | 5   | 9     |
+| Partly fixed | 1        | 4    | 6      | 2   | 13    |
 | Fixed        | 1        | 21   | 31     | 33  | 86    |
 | Deferred     | 0        | 2    | 1      | 0   | 3     |
 
