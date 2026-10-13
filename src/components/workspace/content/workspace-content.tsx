@@ -33,30 +33,37 @@ export async function WorkspaceContent({
       // be edited any more (submitted, or the viewer changed): the key then changes with `editable`,
       // and the new workspace mounts read-only. The header, re-rendered with it, unbinds the session.
       key={`${doc.versionId}:${doc.editable ? "edit" : "view"}`}
-      templateId={doc.templateId}
-      teamName={doc.teamName}
-      versionId={doc.versionId}
-      versionNumber={doc.versionNumber}
-      round={doc.round}
-      rev={doc.rev}
-      body={doc.body}
-      variables={doc.variables}
-      baseline={doc.baseline}
-      channels={doc.channels}
-      allowedChannels={doc.allowedChannels}
-      family={doc.family}
-      channelFields={doc.channelFields}
-      messageRules={doc.messageRules}
-      senders={doc.senders}
-      sampleSets={doc.sampleSets}
-      today={doc.today}
-      editable={doc.editable}
-      threads={doc.threads}
-      canComment={doc.can.comment.ok}
-      viewer={viewer}
-      now={nowIso}
-      importOriginal={doc.importOriginal}
-      reviewHref={reviewHref}
+      version={{
+        templateId: doc.templateId,
+        family: doc.family,
+        versionId: doc.versionId,
+        versionNumber: doc.versionNumber,
+        round: doc.round,
+        rev: doc.rev,
+        editable: doc.editable,
+      }}
+      draft={{
+        body: doc.body,
+        variables: doc.variables,
+        baseline: doc.baseline,
+        channels: doc.channels,
+        allowedChannels: doc.allowedChannels,
+        channelFields: doc.channelFields,
+        sampleSets: doc.sampleSets,
+      }}
+      preview={{
+        teamName: doc.teamName,
+        messageRules: doc.messageRules,
+        senders: doc.senders,
+        today: doc.today,
+      }}
+      comments={{
+        threads: doc.threads,
+        canComment: doc.can.comment.ok,
+        viewer,
+        now: nowIso,
+      }}
+      rail={{ importOriginal: doc.importOriginal, reviewHref }}
     />
   );
 }
