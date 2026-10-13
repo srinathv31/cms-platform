@@ -352,6 +352,7 @@ const ERROR_TEXT: Record<RenderErrorCode, string> = {
   body_too_large: "The request body was too large.",
   unknown_consumer: "The consumer isn't registered.",
   preview_forbidden: "Previews can't be requested by consumers.",
+  signed_out: "Previews need someone signed in.",
   template_not_found: "The template wasn't found.",
   version_not_found: "The version wasn't found.",
   version_not_released: "The version isn't released yet.",

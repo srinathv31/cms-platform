@@ -162,13 +162,14 @@ export function shareContract(h: UsageHarness, base: Date) {
       );
     });
 
-    it("refuses, in order: a template that doesn't exist, someone who may not read the details, a template with nothing Active", async () => {
+    it("refuses, in order: a template that doesn't exist or the viewer may not see, a template with nothing Active", async () => {
       expect(await integration("riley", "UC-ZZZZZZ")).toEqual(
         refused(404, REQUEST_REFUSALS.templateGone),
       );
+      // Morgan, on no team, may not see it: it reads as not there.
       expect(
         await integration("morgan", h.templates["balance-transfer"]!),
-      ).toMatchObject({ ok: false, status: 403, code: expect.any(String) });
+      ).toEqual(refused(404, REQUEST_REFUSALS.templateGone));
       expect(
         await integration("maya", h.templates["annual-fee-waiver"]!),
       ).toEqual(refused(409, REQUEST_REFUSALS.noActiveVersion));

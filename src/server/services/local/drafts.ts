@@ -5,6 +5,7 @@ import {
   DRAFT_EDITED,
   changedFields,
   draftChanged,
+  draftSaveAccess,
   draftSaveChanges,
   draftSaveRefusal,
   mergeDraftEdit,
@@ -24,7 +25,7 @@ import {
 import { newId } from "@/server/ids";
 import type { DraftService } from "../drafts";
 import { answerFor } from "../refuse";
-import { check, refuse, runCommand, type LocalDeps } from "./command";
+import { permit, refuse, runCommand, type LocalDeps } from "./command";
 import type { Tx } from "./transaction";
 
 // Autosave on this app's own database (src/server/services/drafts.ts says what each method promises). A save runs
@@ -47,7 +48,7 @@ class SaveRefused extends Error {
   }
 }
 
-/** The version's team, read only to check the permission: `version_gone` when there is no such version. */
+/** The version's team, read only to check who may save (`draftSaveAccess`). */
 async function authorizeEdit(viewer: Viewer, versionId: string) {
   const found = await db
     .select({ teamId: templates.teamId })
@@ -56,9 +57,8 @@ async function authorizeEdit(viewer: Viewer, versionId: string) {
     .where(eq(versions.id, versionId))
     .limit(1)
     .then((rows) => rows[0]);
-  if (!found) refuse(REQUEST_REFUSALS.versionGone);
-  check(viewer, "draft.edit", { teamId: found.teamId });
-  return found;
+  permit(draftSaveAccess(viewer, found?.teamId ?? null));
+  return found!;
 }
 
 /**

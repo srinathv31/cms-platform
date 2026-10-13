@@ -455,7 +455,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
       }
     });
 
-    it("refuses version_gone for no such version, and the permission refusal for anyone who may not edit the team's drafts, before the state", async () => {
+    it("refuses version_gone for no such version or one the viewer may not see, and the permission refusal for anyone who sees it but may not edit the team's drafts, before the state", async () => {
       const {
         versionId,
         stored: before,
@@ -466,12 +466,24 @@ export function draftsContract(h: ContractHarness, base: Date) {
       expect(
         await save("maya", "v_missing", { rev: 0, body: doc("x") }),
       ).toMatchObject({ ok: false, code: REQUEST_REFUSALS.versionGone.code });
-      for (const userId of ["sam", "jordan", "eli", "morgan", "riley"]) {
+      // Sam views Coral Offers, Jordan approves there, Riley sees every team: none may edit its drafts.
+      for (const userId of ["sam", "jordan", "riley"]) {
         for (const id of [versionId, inReview.id])
           expect(
             await save(userId, id, { rev: before.rev, body: doc("x") }),
             `${userId} on ${id}`,
           ).toMatchObject({ ok: false, code: REASONS.generic.code });
+      }
+      // Eli (Deposits) and Morgan (no team) may not see Coral Offers: its versions read as not there.
+      for (const userId of ["eli", "morgan"]) {
+        for (const id of [versionId, inReview.id])
+          expect(
+            await save(userId, id, { rev: before.rev, body: doc("x") }),
+            `${userId} on ${id}`,
+          ).toMatchObject({
+            ok: false,
+            code: REQUEST_REFUSALS.versionGone.code,
+          });
       }
       expect(await current()).toEqual(before);
     });
@@ -590,10 +602,11 @@ export function draftsContract(h: ContractHarness, base: Date) {
         const access = await h
           .services()
           .drafts.saveAccess(await h.as(userId), { versionId: id });
+        // Eli (Deposits) and Morgan (no team) may not see Coral Offers: its draft reads as not there to them.
         expect(access, `${userId} ${id}`).toMatchObject({
           ok: false,
           code:
-            id === "v_missing"
+            id === "v_missing" || userId === "eli" || userId === "morgan"
               ? REQUEST_REFUSALS.versionGone.code
               : REASONS.generic.code,
         });

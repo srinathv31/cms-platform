@@ -326,12 +326,15 @@ describe("templates.integration", () => {
       });
     });
 
-    it("403 for someone without the team, with the permission's reason", async () => {
+    it("404 for someone without the team: a template they may not see reads as not there", async () => {
       const result = await services.templates.integration(as("morgan"), {
         templateId: id("balance-transfer"),
       });
-      expect(result).toMatchObject({ ok: false, status: 403 });
-      if (!result.ok) expect(result.reason).toMatch(/\S/);
+      expect(result).toMatchObject({
+        ok: false,
+        status: 404,
+        code: "template_gone",
+      });
     });
 
     it("409 no_active_version for a template with nothing Active", async () => {
@@ -369,18 +372,18 @@ describe("templates.integration", () => {
       });
     });
 
-    it("answers in order: no template (404), then who may (403), then nothing Active (409)", async () => {
+    it("answers in order: no template or one the viewer may not see (404), then nothing Active (409)", async () => {
       expect(
         await services.templates.integration(as("morgan"), {
           templateId: "UC-ZZZZZZ",
         }),
       ).toMatchObject({ ok: false, status: 404, code: "template_gone" });
-      // Morgan may not read the integration of a template with nothing Active either: 403, not 409.
+      // Morgan may not see a template with nothing Active either: 404, not 409.
       expect(
         await services.templates.integration(as("morgan"), {
           templateId: id("annual-fee-waiver"),
         }),
-      ).toMatchObject({ ok: false, status: 403 });
+      ).toMatchObject({ ok: false, status: 404 });
     });
   });
 });

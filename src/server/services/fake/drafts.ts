@@ -2,17 +2,17 @@ import {
   DRAFT_EDITED,
   changedFields,
   draftChanged,
+  draftSaveAccess,
   draftSaveChanges,
   draftSaveRefusal,
   mergeDraftEdit,
   recordedRev,
   type DraftSaveRefused,
 } from "@/domain/lifecycle/autosave";
-import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";
 import { newId } from "@/server/ids";
 import type { DraftService } from "../drafts";
-import { answerFor, check, refuse } from "../refuse";
+import { answerFor, permit } from "../refuse";
 import type { FakeDeps } from "./index";
 import type { AuditEventRow, FakeState } from "./state";
 import { templateById } from "./version-rows";
@@ -29,13 +29,12 @@ class SaveRefused extends Error {
   }
 }
 
-/** The version and its template, after the permission check: `version_gone` when there is no such version. */
+/** The version and its template, after the check of who may save (`draftSaveAccess`). */
 function authorizeEdit(state: FakeState, viewer: Viewer, versionId: string) {
   const version = state.versions.find((v) => v.id === versionId);
   const template = version && templateById(state, version.templateId);
-  if (!version || !template) refuse(REQUEST_REFUSALS.versionGone);
-  check(viewer, "draft.edit", { teamId: template.teamId });
-  return { version, template };
+  permit(draftSaveAccess(viewer, template?.teamId ?? null));
+  return { version: version!, template: template! };
 }
 
 /** The last save an editing session made to a draft (`lastSaveOf` in the local implementation): its audit row. */

@@ -57,14 +57,17 @@ const IMPORT_STATUS: Partial<Record<RefusalCode, number>> = {
   [IMPORT_REFUSALS.notWord.code]: 415,
   [LIFECYCLE_REFUSALS.noContentType.code]: 409,
   [REQUEST_REFUSALS.signedOut.code]: 401,
+  // A team that isn't there, or that the viewer may not enter, reads as not there (decision 0052).
+  [REQUEST_REFUSALS.spaceUnavailable.code]: 404,
 };
 const IMPORT_CODES: ReadonlySet<string> = new Set(
   Object.values(IMPORT_REFUSALS).map((entry) => entry.code),
 );
 
 /**
- * The HTTP status for an import's answer: 200 · 400 the file is refused · 401 nobody is signed in · 403 the
- * viewer may not create here (any other refusal) · 409 no content type makes documents · 413 too large · 415 not a
+ * The HTTP status for an import's answer: 200 · 400 the file is refused · 401 nobody is signed in · 404 the team
+ * isn't there or isn't the viewer's to enter · 403 the viewer may not create here (any other refusal) · 409 no
+ * content type makes documents · 413 too large · 415 not a
  * kind we take.
  */
 export function importStatus(response: ImportResponse): number {
@@ -82,7 +85,8 @@ const refused = ({ code, reason }: { code: RefusalCode; reason: string }) =>
 /**
  * The permission half of an import, on its own so the route can ask it before reading the body. The URL's team
  * is resolved to its id once (`identity.space`), then the backend says whether the viewer may create on it. A
- * team that isn't there, one the viewer may not enter, and All teams fail the same way (403).
+ * team that isn't there and one the viewer may not enter read the same (404 `space_unavailable`); All teams, which
+ * is no team to create in, and a team the viewer may enter but not create on are 403.
  */
 export async function importPermission(
   ctx: RequestContext,

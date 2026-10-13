@@ -8,8 +8,9 @@ import type { ActionResult, RequestContext } from "./types";
 
 export interface DraftService {
   /**
-   * May the viewer save to the draft? `version_gone`, then the permission refusal (`generic`), as `save` answers
-   * them; `ok` for an author of the template's team whatever state the version is in (`version_not_draft` is the
+   * May the viewer save to the draft? `version_gone` for a version that isn't there or the viewer may not see
+   * (the two read the same), then the permission refusal (`generic`) for someone who may see it but not edit the
+   * team's drafts, as `save` answers them (`draftSaveAccess`); `ok` for an author of the template's team whatever state the version is in (`version_not_draft` is the
    * save's to answer). Asked before the body is read; an HTTP implementation may answer `ok` and leave the check
    * to `save`, saving a round trip.
    */

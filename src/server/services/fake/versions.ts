@@ -113,9 +113,11 @@ export function fakeVersions({ store, clock }: FakeDeps): VersionService {
         return refusal(400, REQUEST_REFUSALS.templateUnavailable);
       const { state } = store;
       const template = templateById(state, templateId);
-      if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
-      if (!can(ctx.viewer, "template.view", { teamId: template.teamId }).ok)
-        return refusal(403, REQUEST_REFUSALS.templateUnavailable);
+      if (
+        !template ||
+        !can(ctx.viewer, "template.view", { teamId: template.teamId }).ok
+      )
+        return refusal(404, REQUEST_REFUSALS.templateUnavailable);
       const contentType = state.contentTypes.find(
         (c) => c.id === template.contentTypeId,
       );

@@ -2,9 +2,9 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import {
   badRequest,
-  previewForbidden,
   renderFailed,
   renderTarget,
+  signedOut,
 } from "@/domain/render";
 import { correlationIdOf, errorResponse } from "@/server/api/http";
 import {
@@ -27,8 +27,9 @@ import { services } from "@/server/services";
 // reads and checks the body, and answers the result as HTTP.
 //
 // A POST handler always runs at request time, Cache Components or not. The person is resolved first, then the body
-// is read within MAX_BODY_BYTES (render-http.ts). Nobody signed in can preview nothing: 403 `preview_forbidden`,
-// in the render API's error shape, once the body has been checked, and nothing is rendered or logged.
+// is read within MAX_BODY_BYTES (render-http.ts). Nobody signed in previews nothing: 401 `signed_out`, as every
+// other route answers it (in the render API's error shape), once the body has been checked, and nothing is rendered
+// or logged.
 
 /** A preview's round: a whole number from 1. */
 const Round = z.int().min(1);
@@ -63,7 +64,7 @@ export async function POST(
   // A push asks for its platform; nothing else takes one, and push and SMS take no encoding.
   const target = renderTarget(channel, platform, encoding);
   if (!target.ok) return errorResponse(target.error, correlationId);
-  if (!context) return errorResponse(previewForbidden(), correlationId);
+  if (!context) return errorResponse(signedOut(), correlationId);
 
   try {
     const result = await services().render.preview(

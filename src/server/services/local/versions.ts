@@ -188,9 +188,12 @@ export function localVersions(deps: LocalDeps): VersionService {
       if (!isRequestId(templateId) || !isRequestId(from) || !isRequestId(to))
         return refusal(400, REQUEST_REFUSALS.templateUnavailable);
       const template = await findTemplate(templateId);
-      if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
-      if (!can(ctx.viewer, "template.view", { teamId: template.teamId }).ok)
-        return refusal(403, REQUEST_REFUSALS.templateUnavailable);
+      // Not there, and not the viewer's to see, read the same (decision 0052).
+      if (
+        !template ||
+        !can(ctx.viewer, "template.view", { teamId: template.teamId }).ok
+      )
+        return refusal(404, REQUEST_REFUSALS.templateUnavailable);
 
       const [rows, family, rules] = await Promise.all([
         db
@@ -238,7 +241,11 @@ export function localVersions(deps: LocalDeps): VersionService {
       if (!isRequestId(templateId) || !isRequestId(versionId))
         return refusal(400, REQUEST_REFUSALS.templateUnavailable);
       const template = await findTemplate(templateId);
-      if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
+      if (
+        !template ||
+        !can(ctx.viewer, "template.view", { teamId: template.teamId }).ok
+      )
+        return refusal(404, REQUEST_REFUSALS.templateUnavailable);
       const allowed = can(ctx.viewer, "draft.edit", {
         teamId: template.teamId,
       });

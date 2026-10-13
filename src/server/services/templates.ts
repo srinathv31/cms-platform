@@ -224,8 +224,9 @@ export interface TemplateService {
   /**
    * The SHARE panel's facts: the Active version's contract and the older released versions, which the BFF turns
    * into the worded panel (endpoint, curl and fetch examples, the schema, what changed since vN). Refuses, in
-   * order: 404 `template_gone` for a template that doesn't exist, 403 for someone who may not read the
-   * integration details (`integration.view`), 409 `no_active_version`.
+   * order: 404 `template_gone` for a template that doesn't exist or the viewer may not see (the two read the same,
+   * decision 0052), 403 for someone who may see it but not read the integration details (`integration.view`), 409
+   * `no_active_version`.
    */
   integration(
     ctx: RequestContext,
@@ -234,7 +235,8 @@ export interface TemplateService {
 
   /**
    * What the Copilot prompt is written from: the saved draft with its team and content type, for someone who may
-   * edit the draft. Refuses, in order: 404 `template_unavailable`, 403 (`draft.edit`), 409 `no_draft_to_write`
+   * edit the draft. Refuses, in order: 404 `template_unavailable` for a template that doesn't exist or the viewer
+   * may not see, 403 (`draft.edit`) to someone who may see it, 409 `no_draft_to_write`
    * for a template with no open draft, 409 `copilot_documents_only` for an alert (the content type decides, not
    * the draft's channels).
    */

@@ -4,9 +4,9 @@ import { requestContextOrRefusal } from "@/server/context/request";
 import { services } from "@/server/services";
 
 // The Compare dialog's two versions, read when it opens and on each change of pair:
-// GET ?from=<version id>&to=<version id> → { ok: true, family, from, to } | { ok: false, code, reason }, with 400, 401,
-// 403 or 404 (`VersionService.compare` says which). Anyone who can see the template. Request-time only: it reads
-// the persona cookie first.
+// GET ?from=<version id>&to=<version id> → { ok: true, family, from, to } | { ok: false, code, reason }, with 400, 401
+// or 404 (`VersionService.compare` says which). Anyone who can see the template; to anyone else it reads as not there.
+// Request-time only: it reads the persona cookie first.
 
 export async function GET(
   request: NextRequest,

@@ -83,6 +83,7 @@ export const API_ERROR_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   body_too_large: 413,
   unknown_consumer: 403,
   preview_forbidden: 403,
+  signed_out: 401,
   template_not_found: 404,
   version_not_found: 404,
   version_not_released: 409,

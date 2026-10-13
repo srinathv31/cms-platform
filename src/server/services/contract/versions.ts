@@ -300,6 +300,7 @@ export function versionContentContract(h: ContractHarness) {
           to: other.id,
         }),
       ).toMatchObject({ ok: false, status: 404 });
+      // Morgan, on no team, may not see it: it reads as not there.
       expect(
         await h.services().versions.compare(await h.as("morgan"), {
           templateId,
@@ -308,7 +309,7 @@ export function versionContentContract(h: ContractHarness) {
         }),
       ).toMatchObject({
         ok: false,
-        status: 403,
+        status: 404,
         code: REQUEST_REFUSALS.templateUnavailable.code,
       });
       expect(
@@ -372,14 +373,25 @@ export function versionContentContract(h: ContractHarness) {
         status: 404,
         code: REQUEST_REFUSALS.templateUnavailable.code,
       });
-      for (const userId of ["sam", "eli", "morgan"])
+      // Sam sees Coral Offers but may not edit its drafts; Eli and Morgan may not see it, so it reads as not there.
+      expect(
+        await h.services().versions.baseVersion(await h.as("sam"), {
+          templateId,
+          versionId: draft.id,
+        }),
+      ).toMatchObject({ ok: false, status: 403 });
+      for (const userId of ["eli", "morgan"])
         expect(
           await h.services().versions.baseVersion(await h.as(userId), {
             templateId,
             versionId: draft.id,
           }),
           userId,
-        ).toMatchObject({ ok: false, status: 403 });
+        ).toMatchObject({
+          ok: false,
+          status: 404,
+          code: REQUEST_REFUSALS.templateUnavailable.code,
+        });
       expect(
         await h.services().versions.baseVersion(maya, {
           templateId: h.templates["cash-back"]!,

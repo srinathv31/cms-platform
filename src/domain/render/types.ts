@@ -381,6 +381,7 @@ export type RenderErrorCode =
   | "body_too_large"
   | "unknown_consumer"
   | "preview_forbidden"
+  | "signed_out"
   | "template_not_found"
   | "version_not_found"
   | "version_not_released"
@@ -400,6 +401,7 @@ export const RENDER_ERROR_STATUS: Readonly<Record<RenderErrorCode, number>> = {
   body_too_large: 413,
   unknown_consumer: 403,
   preview_forbidden: 403,
+  signed_out: 401,
   template_not_found: 404,
   version_not_found: 404,
   version_not_released: 409,

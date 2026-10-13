@@ -5,7 +5,8 @@ import { services } from "@/server/services";
 
 // "Revert to v3": the content of the version the draft on screen was started from.
 // GET ?draft=<version id> → { ok: true, base } | { ok: false, code, reason }, with 400, 401, 403, 404 or 409
-// (`VersionService.baseVersion` says which). Only someone who may edit the team's drafts. Request-time only: it
+// (`VersionService.baseVersion` says which). Only someone who may edit the team's drafts (403 to anyone else who can
+// see the template; 404 to who can't). Request-time only: it
 // reads the persona cookie first. Nothing is written, audited or refreshed here: the client saves the content
 // through autosave like any other edit.
 

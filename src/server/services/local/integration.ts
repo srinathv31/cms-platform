@@ -67,7 +67,12 @@ export function localIntegration(
         .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
         .where(eq(templates.id, templateId))
         .limit(1);
-      if (!template) return refusal(404, REQUEST_REFUSALS.templateGone);
+      // Not there, and not the viewer's to see, read the same (decision 0052).
+      if (
+        !template ||
+        !can(ctx.viewer, "template.view", { teamId: template.teamId }).ok
+      )
+        return refusal(404, REQUEST_REFUSALS.templateGone);
 
       const permitted = can(ctx.viewer, "integration.view", {
         teamId: template.teamId,
@@ -144,7 +149,11 @@ export function localIntegration(
         .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
         .where(eq(templates.id, templateId))
         .limit(1);
-      if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
+      if (
+        !template ||
+        !can(ctx.viewer, "template.view", { teamId: template.teamId }).ok
+      )
+        return refusal(404, REQUEST_REFUSALS.templateUnavailable);
 
       const allowed = can(ctx.viewer, "draft.edit", {
         teamId: template.teamId,

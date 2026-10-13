@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { REASONS } from "../permissions";
 import { REQUEST_REFUSALS } from "../refusals";
-import type { DraftPatch, JSONContent, VersionState } from "../types";
+import type { DraftPatch, JSONContent, VersionState, Viewer } from "../types";
 import {
   changedFields,
   draftChanged,
+  draftSaveAccess,
   draftSaveChanges,
   draftSaveRefusal,
   mergeDraftEdit,
@@ -19,6 +21,51 @@ const t2 = new Date("2026-10-04T10:00:09.000Z");
 const line = (text: string): JSONContent => ({
   type: "doc",
   content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+
+const member = (
+  userId: string,
+  roles: ("author" | "approver" | "viewer")[],
+): Viewer => ({
+  userId,
+  name: userId,
+  initials: userId.slice(0, 2).toUpperCase(),
+  title: "",
+  platformRole: null,
+  memberships: [
+    {
+      teamId: "t_coral",
+      teamSlug: "coral-offers",
+      teamName: "Coral Offers",
+      roles,
+      status: "active",
+    },
+  ],
+});
+
+describe("draftSaveAccess", () => {
+  it("lets an author of the team save", () => {
+    expect(draftSaveAccess(member("maya", ["author"]), "t_coral")).toEqual({
+      ok: true,
+    });
+  });
+
+  it("refuses someone who sees the team but may not edit its drafts the permission's refusal", () => {
+    expect(draftSaveAccess(member("sam", ["viewer"]), "t_coral")).toMatchObject(
+      { ok: false, code: REASONS.generic.code },
+    );
+    expect(
+      draftSaveAccess(member("jordan", ["approver"]), "t_coral"),
+    ).toMatchObject({ ok: false, code: REASONS.generic.code });
+  });
+
+  it("reads a version that isn't there, and one on a team the viewer may not see, alike: version_gone", () => {
+    const gone = { ok: false, ...REQUEST_REFUSALS.versionGone };
+    expect(draftSaveAccess(member("maya", ["author"]), null)).toEqual(gone);
+    expect(draftSaveAccess(member("maya", ["author"]), "t_deposits")).toEqual(
+      gone,
+    );
+  });
 });
 
 describe("sessionOwnsRev", () => {

@@ -12,20 +12,40 @@ import {
   type ChannelFields,
   type ChannelFieldsPatch,
 } from "../channel-fields";
+import { can } from "../permissions";
 import { REQUEST_REFUSALS, refuse } from "../refusals";
 import type {
   Channel,
   DraftPatch,
   DraftSaveResponse,
   JSONContent,
+  PermissionResult,
   SampleSet,
   Variable,
   VersionState,
+  Viewer,
 } from "../types";
 import { draftChannelsRefusal, withWriter } from "./drafts";
 
 /** A save's refusal: the code and its sentence, and for `draft_changed` the draft's current rev. */
 export type DraftSaveRefused = Extract<DraftSaveResponse, { ok: false }>;
+
+// ── Who may save ───────────────────────────────────────────
+
+/**
+ * Whether `viewer` may save to a draft of team `teamId` (null: there is no such version), answered before anything
+ * else, and before the route reads the body: `version_gone` for a version that isn't there or that the viewer may
+ * not see (the two read the same, decision 0052), then the permission's refusal (`generic`) for someone who may see
+ * it but not edit the team's drafts.
+ */
+export function draftSaveAccess(
+  viewer: Viewer,
+  teamId: string | null,
+): PermissionResult {
+  if (teamId === null || !can(viewer, "template.view", { teamId }).ok)
+    return refuse(REQUEST_REFUSALS.versionGone);
+  return can(viewer, "draft.edit", { teamId });
+}
 
 // ── Whether it lands ───────────────────────────────────────
 

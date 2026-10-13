@@ -247,27 +247,27 @@ describe("importTemplate", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("checks the permission first: no create rights, a team the viewer can't enter, or an unknown or missing team, is 403 with the reason", async () => {
+  it("checks the permission first: a team the viewer can't enter, or an unknown or missing one, is 404; no create rights is 403", async () => {
     const spy = storing();
     const refused = [
       // The auditor sees every team and may create on none; Sam only views Coral Offers.
-      ["taylor", "coral-offers", REASONS.generic.code],
-      ["sam", "coral-offers", REASONS.generic.code],
-      // Maya may not enter Deposits, "nope" is no team, and a missing team arrives empty: all read as no space.
-      ["maya", "deposits", "space_unavailable"],
-      ["maya", "nope", "space_unavailable"],
-      ["maya", "", "space_unavailable"],
+      ["taylor", "coral-offers", REASONS.generic.code, 403],
+      ["sam", "coral-offers", REASONS.generic.code, 403],
+      // Maya may not enter Deposits, "nope" is no team, and a missing team arrives empty: all read as not there.
+      ["maya", "deposits", REQUEST_REFUSALS.spaceUnavailable.code, 404],
+      ["maya", "nope", REQUEST_REFUSALS.spaceUnavailable.code, 404],
+      ["maya", "", REQUEST_REFUSALS.spaceUnavailable.code, 404],
       // Riley may enter All teams, which isn't a team to create in.
-      ["riley", "all", REQUEST_REFUSALS.teamGone.code],
+      ["riley", "all", REQUEST_REFUSALS.teamGone.code, 403],
     ] as const;
-    for (const [who, team, code] of refused) {
+    for (const [who, team, code, status] of refused) {
       const res = await run(
         who,
         { name: "x.doc", bytes: new Uint8Array([0xd0, 0xcf]) },
         team,
       );
       expect(res, `${who} on ${team}`).toMatchObject({ ok: false, code });
-      expect(importStatus(res)).toBe(403);
+      expect(importStatus(res), `${who} on ${team}`).toBe(status);
     }
     expect(spy).not.toHaveBeenCalled();
   });

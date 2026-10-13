@@ -9,7 +9,7 @@ import {
   type ImportResponse,
 } from "@/domain/import-types";
 import { REASONS } from "@/domain/permissions";
-import { refuse } from "@/domain/refusals";
+import { REQUEST_REFUSALS, refuse } from "@/domain/refusals";
 import type { Viewer } from "@/domain/types";
 import { importPermission, importTemplate } from "@/server/import/create";
 import { getViewer } from "@/server/viewer";
@@ -195,6 +195,18 @@ describe("POST /api/imports", () => {
     expect(vi.mocked(importTemplate).mock.calls[0]![1]).toEqual({
       teamSlug: "coral-offers",
       file: null,
+    });
+  });
+
+  it("404 for a team that isn't there or the viewer may not enter: it reads as not there", async () => {
+    vi.mocked(importPermission).mockResolvedValue(
+      refuse(REQUEST_REFUSALS.spaceUnavailable),
+    );
+    const res = await post(formWith(new File(["x"], "x.txt")));
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.spaceUnavailable,
     });
   });
 

@@ -4,6 +4,7 @@ import {
   MAX_BODY_BYTES,
   missingVariables,
   previewForbidden,
+  signedOut,
   type EmailResponseBody,
   type RenderErrorBody,
 } from "@/domain/render";
@@ -146,13 +147,13 @@ describe("POST /api/templates/[templateId]/preview: the request the backend gets
     expect(events).toEqual(["person", "body"]);
   });
 
-  it("answers nobody signed in 403 preview_forbidden, once the body has been checked, without asking the backend", async () => {
+  it("answers nobody signed in 401 signed_out, once the body has been checked, without asking the backend", async () => {
     vi.mocked(findRequestContext).mockResolvedValue(null);
     await expectError(
       await post({ version: 2, channel: "web", values: CUSTOMER }),
-      403,
-      "preview_forbidden",
-      previewForbidden().message,
+      401,
+      "signed_out",
+      signedOut().message,
     );
     await expectError(
       await post({ version: 2, channel: "fax", values: CUSTOMER }),
