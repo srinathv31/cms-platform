@@ -116,7 +116,7 @@ compares names and ids by code point, not by locale. The cursor format, and why 
 [decision 0006](../../docs/decisions/0006-page-notices-by-commit-order.md); the code is
 `src/domain/golive/cursor.ts`. The shared response headers (`Cache-Control: no-store`, `X-Correlation-Id`, `nosniff`), the error response
 and the demo-clock `Date` header come from [server/api/http.ts](../server/api/http.ts). The GET handlers read through
-`src/server/queries/consumer-api.ts` and the pure builders in `src/domain/golive/`.
+`src/server/services/local/consumer-api.ts` and the pure builders in `src/domain/golive/`.
 
 ## Errors
 

@@ -1,11 +1,12 @@
 # 0059. Template search filters, ranks and pages in SQL
 
 Status: Accepted
+Amended 2026-10-13: the ⌘K palette's search lists its matches in this order too: rank (the score of `paletteTemplates`), then name, then id, by code point (`paletteSearch` in `src/domain/palette-search.ts`, which the templates service's `palette` answers with, in the local implementation and the fake alike; the contract suite's `templates.palette` cases pin it). `searchActiveTemplates` is in `src/server/services/local/consumer-api.ts` now: `/api/v1` is the backend's own.
 Date: 2026-10-12
 
 ## Context
 
-`GET /api/v1/templates?q=` runs `searchActiveTemplates` (`src/server/queries/consumer-api.ts`). It loads every Active
+`GET /api/v1/templates?q=` runs `searchActiveTemplates` (`src/server/services/local/consumer-api.ts`). It loads every Active
 version with its template, team, content type and variables, then in JavaScript: matches an exact id (with or
 without `UC-`, any case) or every lower-cased word as a substring of the Active version's name; ranks 0 (the id),
 1 (the name starts with the whole query) or 2 (the rest); sorts by `(rank, name, id)` by Unicode code point

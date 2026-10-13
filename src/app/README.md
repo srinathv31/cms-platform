@@ -186,7 +186,7 @@ cookie), the request headers, or `connection()` before the database. A handler t
 [contracts/api-v1.ts](../contracts/api-v1.ts) (a file with no imports, lint-enforced); the render contract is
 [domain/render/types.ts](../domain/render/types.ts).
 
-- Wrap the handler in `withDemoDate`, which sets the HTTP `Date` header to the demo clock. Coral stamps what it
+- Wrap the handler in `withDemoDate` ([server/services/local/consumer-api.ts](../server/services/local/consumer-api.ts)), which sets the HTTP `Date` header to the demo clock. Coral stamps what it
   receives with that header.
 - `correlationIdOf(request)` echoes `X-Correlation-Id` when it is 1 to 128 visible ASCII characters, else makes
   a `req_…` id. Every response carries it, `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
@@ -194,7 +194,7 @@ cookie), the request headers, or `connection()` before the database. A handler t
   `API_ERROR_STATUS` in [golive-types.ts](../domain/golive-types.ts) gives the code. Query parsers and error
   builders live in [golive/api-errors.ts](../domain/golive/api-errors.ts).
 - `X-Consumer-Id` must name a registered consumer. The GET routes check it first with `requireConsumer` in
-  [consumer-api.ts](../server/queries/consumer-api.ts); the notices route also requires it to match the path.
+  [consumer-api.ts](../server/services/local/consumer-api.ts); the notices route also requires it to match the path.
   Render requires it too, and checks it in [render-template.ts](../server/render/render-template.ts). `/api/v1`
   reads no cookie and no session: Stencil's own previews are `POST /api/templates/[templateId]/preview`.
 - Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
@@ -244,7 +244,7 @@ errors as the consumer render route, through [server/api/render-http.ts](../serv
 ([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 
 **The palette's search** (`/api/palette/[space]?q=&template=`) is a read of the same kind: the route passes the
-viewer and the raw values to `searchPalette` in [queries/palette.ts](../server/queries/palette.ts) and answers with
+request context and the raw values to `searchPalette` in [queries/palette.ts](../server/queries/palette.ts) and answers with
 `readResponse()`, 400 for a `q` or `template` that doesn't parse and 404 for a space the viewer can't see. No page
 carries templates; the palette asks this route when it opens and as the viewer types
 ([decision 0024](../../docs/decisions/0024-the-palette-searches-on-the-server.md)).

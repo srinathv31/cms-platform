@@ -409,7 +409,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### S5 · High: Consumer identity is a self-asserted header
 
 - **Status:** Partly fixed. A caller that isn't a registered consumer (`unknown_consumer`) writes no `render_log` row, so anonymous calls queue no writes, and the notices route answers 403 `consumer_mismatch` for any path but the caller's own, so no answer says which consumer ids exist. Credentials and rate limits wait for the gateway.
-- **Where:** `src/server/queries/consumer-api.ts` line 62; `src/app/api/v1/consumers/[consumerId]/notices/route.ts` line 27
+- **Where:** `src/server/services/local/consumer-api.ts` line 62; `src/app/api/v1/consumers/[consumerId]/notices/route.ts` line 27
 - **What happens:** `X-Consumer-Id` has no secret. The notices check (header must equal the path) looks like authorization, but the caller sets both. Every anonymous render of an existing template writes a `render_log` row through the process-wide write lock, so flooding the endpoint makes autosaves and approvals wait up to 15 seconds and then fail. None of this is documented as a prototype limit.
 - **Fix:** Client credentials (OAuth client-credentials or mTLS) at the gateway or BFF, rate limits, and no log rows for unauthenticated callers. State it in the contract.
 - **Evidence:** traced
@@ -761,7 +761,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### A2 · High: Consumers polling notices can silently miss a revoke
 
 - **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`, never reused; the cursor carries a reset epoch) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0006](decisions/0006-page-notices-by-commit-order.md)).
-- **Where:** `src/server/queries/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
+- **Where:** `src/server/services/local/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
 - **What happens:** Notices come newest-first with `since` and `limit` and no cursor or `hasMore`. A consumer polling with `since=lastSeen` that has more than `limit` new notices loses the oldest, which could be a revoke. Search is capped at 50 with no paging.
 - **Fix:** Oldest-first opaque cursor (`after`), `nextCursor` and `hasMore`; paging for search.
 - **Evidence:** traced
@@ -801,7 +801,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### A7 · Medium: The HTTP Date header carries the demo clock
 
 - **Status:** Deferred. Goes away with the demo clock.
-- **Where:** `src/server/api/http.ts` line 44
+- **Where:** `withDemoDate` in `src/server/services/local/consumer-api.ts` (it was `src/server/api/http.ts` line 44)
 - **What happens:** `withDemoDate` overwrites `Date`. The simulator stamps deliveries with it and orders batches by it at one-second resolution, so two sends in the same second can show the wrong latest batch. Any proxy that sets `Date` breaks it.
 - **Fix:** A separate `X-Stencil-Clock` header in demo mode, and a sequence column for ordering.
 - **Evidence:** traced
@@ -835,7 +835,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### B2 · High: About a third of the business rules live outside src/domain
 
 - **Status:** Partly fixed. The document rules (normalization, the content check, markers, links) are now single shared modules under `src/editor/model/` (PR #6). The comment policy has moved to `src/domain/comments.ts` ([S7](#s7--medium-comments-are-accepted-on-any-version-state)). Who may be named on an approval stage is one domain `validateChain` ([D4](#d4--high-the-chain-editor-saves-chains-nobody-can-approve), PR #14), and the settings screens' checks are domain functions their actions also run ([H2](#h2--medium-client-components-re-implement-domain-rules), PR #28); [N16](#n16--low-two-refusal-rules-still-live-outside-the-domain) lists two rules still outside. The lifecycle rules listed here are unchanged. `decideCheck` is a domain function now (`src/domain/lifecycle/decide-check.ts`), sharing the approve transition's earlier-stage rule (`approvedEarlierStage`).
-- **Where:** `src/server/actions/review.ts` line 312; `src/server/queries/consumer-api.ts` line 32
+- **Where:** `src/server/actions/review.ts` line 312; `src/server/services/local/consumer-api.ts` line 32
 - **What happens:** Submit auto-resolves threads; request-changes reuses an open draft; the comment policy; who may be named approver or Team Admin; channel defaults; which versions count as released and how search ranks; Auditor rules. Several are duplicated and drifting: `decideCheck` re-implements `approvedEarlierStage`, two copies of "who may see a version in review", the submit summary re-derives refusal sentences, and three components call `can()` themselves.
 - **Fix:** One domain function per rule; read models return capability flags.
 - **Evidence:** traced
