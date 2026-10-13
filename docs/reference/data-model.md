@@ -6,8 +6,8 @@ today's SQLite schema ([src/server/db/schema/ucomp.ts](../../src/server/db/schem
 
 Most differences change on the Java side only: the Node app keeps its SQLite schema behind lane F's service
 interfaces ([0070](../decisions/0070-rules-and-permission-checks-sit-behind-the-service-interfaces.md)). Where the
-Node app changes first, the line names who changes it: lane F (the service seam, wave 2.2) or lane K (the seed, wave
-2.1).
+Node app changes first, the line names who changes it: lane F (the service seam, to-do item 3) or lane K (the seed, to-do
+item 5).
 
 ## Conventions
 
@@ -128,7 +128,7 @@ not in wave 2.
 | `sms_sender`  | `VARCHAR(16)`   | yes  | The short code the team's SMS come from.                                                                                                       |
 
 Today: `createTeam` and the seed set `id = slug`, and about ten call sites use one for the other. Changed by lane F
-(wave 2.2), with the seed's team ids agreed with lane K.
+(to-do item 3), with the seed's team ids agreed with lane K.
 
 #### `memberships`
 
@@ -231,43 +231,43 @@ the same number ([0033](../decisions/0033-a-resubmission-is-the-next-round-of-th
 one row per round and loses its three relational JSON columns
 ([0061](../decisions/0061-documents-stay-json-and-references-become-rows.md)).
 
-| Column                | Type            | Null | Notes                                                                                                                                                                                                                                                    |
-| --------------------- | --------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                  | `VARCHAR(64)`   | no   | PK.                                                                                                                                                                                                                                                      |
-| `template_id`         | `VARCHAR(64)`   | no   | FK → `templates`. Index.                                                                                                                                                                                                                                 |
-| `number`              | `INT`           | yes  | Null while a draft; set at submit, then frozen.                                                                                                                                                                                                          |
-| `round`               | `INT`           | yes  | Null while a draft; set at submit with `number`.                                                                                                                                                                                                         |
-| `state`               | `VARCHAR(20)`   | no   | CHECK `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked`.                                                                                                                                                                      |
-| `name`                | `NVARCHAR(120)` | no   | The template's name as this version has it. `MAX_NAME_LENGTH` (autosave and import). Search compares it under a binary collation.                                                                                                                        |
-| `based_on_version_id` | `VARCHAR(64)`   | yes  | No FK. The version a draft was copied from.                                                                                                                                                                                                              |
-| `body`                | JSON            | no   | Stays JSON: the TipTap document (`JSONContent`); variable nodes hold only their key. Validated against the generated document JSON Schema on write and at render ([0065](../decisions/0065-documents-are-validated-against-a-generated-json-schema.md)). |
-| `channel_fields`      | JSON            | no   | Stays JSON: `ChannelFields` (`src/domain/channel-fields.ts`), by channel then field key. Default `{}`.                                                                                                                                                   |
-| `channels`            | JSON            | no   | `Channel[]`. JSON with a CHECK on the values, or a child table `version_channels(version_id, channel)`: the Java team's choice.                                                                                                                          |
-| `sms_footer`          | `NVARCHAR(500)` | yes  | The content type's SMS footer frozen at submit ([0035](../decisions/0035-sms-characters-and-length.md)); null on a draft.                                                                                                                                |
-| `variables`           | JSON            | no   | Stays JSON: `Variable[]` (`src/editor/model/types.ts`).                                                                                                                                                                                                  |
-| `sample_sets`         | JSON            | no   | Stays JSON: `SampleSet[]`.                                                                                                                                                                                                                               |
-| `contract_changes`    | JSON            | yes  | Stays JSON: `ContractChange[]`, worked out at submit; null while a draft.                                                                                                                                                                                |
-| `current_stage`       | `INT`           | no   | A position in `version_stages`: the stage it waits on, or the one that decided it last. Default 0.                                                                                                                                                       |
-| `rev`                 | `INT`           | no   | JPA `@Version`. Autosave's compare-and-set counter. Default 0.                                                                                                                                                                                           |
-| `last_save_session`   | `VARCHAR(64)`   | yes  | New. The editing session whose save produced the current `rev`.                                                                                                                                                                                          |
-| `last_save_by`        | `VARCHAR(64)`   | yes  | New. FK → `users`. Who made that save.                                                                                                                                                                                                                   |
-| `created_by`          | `VARCHAR(64)`   | no   | FK → `users`.                                                                                                                                                                                                                                            |
-| `created_at`          | `DATETIME2(3)`  | no   |                                                                                                                                                                                                                                                          |
-| `updated_at`          | `DATETIME2(3)`  | no   |                                                                                                                                                                                                                                                          |
-| `submitted_by`        | `VARCHAR(64)`   | yes  | FK → `users`.                                                                                                                                                                                                                                            |
-| `submitted_at`        | `DATETIME2(3)`  | yes  |                                                                                                                                                                                                                                                          |
-| `submit_note`         | `NVARCHAR(MAX)` | yes  |                                                                                                                                                                                                                                                          |
-| `activated_at`        | `DATETIME2(3)`  | yes  |                                                                                                                                                                                                                                                          |
-| `superseded_at`       | `DATETIME2(3)`  | yes  |                                                                                                                                                                                                                                                          |
-| `sunset_at`           | `DATETIME2(3)`  | yes  | The instant renders stop: 00:00 on the sunset day in the business time zone.                                                                                                                                                                             |
-| `sunset_set_by`       | `VARCHAR(64)`   | yes  | FK → `users`.                                                                                                                                                                                                                                            |
-| `sunset_recorded_at`  | `DATETIME2(3)`  | yes  | New. When the sunset sweep recorded the passed sunset; set once ([0066](../decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)).                                                                                                    |
-| `revoke_reason`       | `NVARCHAR(MAX)` | yes  | New, from `revoke`.                                                                                                                                                                                                                                      |
-| `revoke_started_by`   | `VARCHAR(64)`   | yes  | New, from `revoke`. FK → `users`.                                                                                                                                                                                                                        |
-| `revoke_started_at`   | `DATETIME2(3)`  | yes  | New, from `revoke`.                                                                                                                                                                                                                                      |
-| `revoke_confirmed_by` | `VARCHAR(64)`   | yes  | New, from `revoke`. FK → `users`.                                                                                                                                                                                                                        |
-| `revoke_confirmed_at` | `DATETIME2(3)`  | yes  | New, from `revoke`.                                                                                                                                                                                                                                      |
-| `import_upload_id`    | `VARCHAR(64)`   | yes  | No FK. The upload an imported template's first draft came from.                                                                                                                                                                                          |
+| Column                | Type             | Null | Notes                                                                                                                                                                                                                                                    |
+| --------------------- | ---------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                  | `VARCHAR(64)`    | no   | PK.                                                                                                                                                                                                                                                      |
+| `template_id`         | `VARCHAR(64)`    | no   | FK → `templates`. Index.                                                                                                                                                                                                                                 |
+| `number`              | `INT`            | yes  | Null while a draft; set at submit, then frozen.                                                                                                                                                                                                          |
+| `round`               | `INT`            | yes  | Null while a draft; set at submit with `number`.                                                                                                                                                                                                         |
+| `state`               | `VARCHAR(20)`    | no   | CHECK `draft`, `in_review`, `changes_requested`, `active`, `superseded`, `revoked`.                                                                                                                                                                      |
+| `name`                | `NVARCHAR(120)`  | no   | The template's name as this version has it. `MAX_NAME_LENGTH` (autosave and import). Search compares it under a binary collation.                                                                                                                        |
+| `based_on_version_id` | `VARCHAR(64)`    | yes  | No FK. The version a draft was copied from.                                                                                                                                                                                                              |
+| `body`                | JSON             | no   | Stays JSON: the TipTap document (`JSONContent`); variable nodes hold only their key. Validated against the generated document JSON Schema on write and at render ([0065](../decisions/0065-documents-are-validated-against-a-generated-json-schema.md)). |
+| `channel_fields`      | JSON             | no   | Stays JSON: `ChannelFields` (`src/domain/channel-fields.ts`), by channel then field key. Default `{}`.                                                                                                                                                   |
+| `channels`            | JSON             | no   | `Channel[]`. JSON with a CHECK on the values, or a child table `version_channels(version_id, channel)`: the Java team's choice.                                                                                                                          |
+| `sms_footer`          | `NVARCHAR(500)`  | yes  | The content type's SMS footer frozen at submit ([0035](../decisions/0035-sms-characters-and-length.md)); null on a draft.                                                                                                                                |
+| `variables`           | JSON             | no   | Stays JSON: `Variable[]` (`src/editor/model/types.ts`).                                                                                                                                                                                                  |
+| `sample_sets`         | JSON             | no   | Stays JSON: `SampleSet[]`.                                                                                                                                                                                                                               |
+| `contract_changes`    | JSON             | yes  | Stays JSON: `ContractChange[]`, worked out at submit; null while a draft.                                                                                                                                                                                |
+| `current_stage`       | `INT`            | no   | A position in `version_stages`: the stage it waits on, or the one that decided it last. Default 0.                                                                                                                                                       |
+| `rev`                 | `INT`            | no   | JPA `@Version`. Autosave's compare-and-set counter. Default 0.                                                                                                                                                                                           |
+| `last_save_session`   | `VARCHAR(64)`    | yes  | New. The editing session whose save produced the current `rev`.                                                                                                                                                                                          |
+| `last_save_by`        | `VARCHAR(64)`    | yes  | New. FK → `users`. Who made that save.                                                                                                                                                                                                                   |
+| `created_by`          | `VARCHAR(64)`    | no   | FK → `users`.                                                                                                                                                                                                                                            |
+| `created_at`          | `DATETIME2(3)`   | no   |                                                                                                                                                                                                                                                          |
+| `updated_at`          | `DATETIME2(3)`   | no   |                                                                                                                                                                                                                                                          |
+| `submitted_by`        | `VARCHAR(64)`    | yes  | FK → `users`.                                                                                                                                                                                                                                            |
+| `submitted_at`        | `DATETIME2(3)`   | yes  |                                                                                                                                                                                                                                                          |
+| `submit_note`         | `NVARCHAR(2000)` | yes  | At most 2,000 characters, trimmed (`NOTE_MAX` in `src/server/actions/review.ts`).                                                                                                                                                                        |
+| `activated_at`        | `DATETIME2(3)`   | yes  |                                                                                                                                                                                                                                                          |
+| `superseded_at`       | `DATETIME2(3)`   | yes  |                                                                                                                                                                                                                                                          |
+| `sunset_at`           | `DATETIME2(3)`   | yes  | The instant renders stop: 00:00 on the sunset day in the business time zone.                                                                                                                                                                             |
+| `sunset_set_by`       | `VARCHAR(64)`    | yes  | FK → `users`.                                                                                                                                                                                                                                            |
+| `sunset_recorded_at`  | `DATETIME2(3)`   | yes  | New. When the sunset sweep recorded the passed sunset; set once ([0066](../decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)).                                                                                                    |
+| `revoke_reason`       | `NVARCHAR(2000)` | yes  | New, from `revoke`. At most 2,000 characters, trimmed (`REASON_MAX` in `src/server/actions/review.ts`).                                                                                                                                                  |
+| `revoke_started_by`   | `VARCHAR(64)`    | yes  | New, from `revoke`. FK → `users`.                                                                                                                                                                                                                        |
+| `revoke_started_at`   | `DATETIME2(3)`   | yes  | New, from `revoke`.                                                                                                                                                                                                                                      |
+| `revoke_confirmed_by` | `VARCHAR(64)`    | yes  | New, from `revoke`. FK → `users`.                                                                                                                                                                                                                        |
+| `revoke_confirmed_at` | `DATETIME2(3)`   | yes  | New, from `revoke`.                                                                                                                                                                                                                                      |
+| `import_upload_id`    | `VARCHAR(64)`    | yes  | No FK. The upload an imported template's first draft came from.                                                                                                                                                                                          |
 
 Indexes, all but the first as Flyway SQL:
 
@@ -323,18 +323,18 @@ draft.
 
 One decision on one stage of one round.
 
-| Column             | Type            | Null | Notes                                                                                                                                                               |
-| ------------------ | --------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`               | `VARCHAR(64)`   | no   | PK.                                                                                                                                                                 |
-| `version_id`       | `VARCHAR(64)`   | no   | FK → `versions`. Index, new: four queries filter on it.                                                                                                             |
-| `stage_id`         | `VARCHAR(64)`   | yes  | No FK, as `version_stages.stage_id`. Every writer sets it today, so `NOT NULL` is safe on a fresh schema.                                                           |
-| `stage_position`   | `INT`           | no   | The stage's position in the version's own stages.                                                                                                                   |
-| `stage_name`       | `NVARCHAR(40)`  | no   | Its name there.                                                                                                                                                     |
-| `actor_id`         | `VARCHAR(64)`   | no   | FK → `users`.                                                                                                                                                       |
-| `decision`         | `VARCHAR(20)`   | no   | CHECK `approved`, `changes_requested`.                                                                                                                              |
-| `reason`           | `NVARCHAR(MAX)` | yes  | A change request's reason.                                                                                                                                          |
-| `sample_sets_seen` | JSON            | yes  | The sample set ids the approver viewed; null on a change request. JSON, or a table `approval_sample_sets_seen(approval_id, sample_set_id)`: the Java team's choice. |
-| `decided_at`       | `DATETIME2(3)`  | no   |                                                                                                                                                                     |
+| Column             | Type             | Null | Notes                                                                                                                                                               |
+| ------------------ | ---------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | `VARCHAR(64)`    | no   | PK.                                                                                                                                                                 |
+| `version_id`       | `VARCHAR(64)`    | no   | FK → `versions`. Index, new: five queries filter on it.                                                                                                             |
+| `stage_id`         | `VARCHAR(64)`    | yes  | No FK, as `version_stages.stage_id`. Every writer sets it today, so `NOT NULL` is safe on a fresh schema.                                                           |
+| `stage_position`   | `INT`            | no   | The stage's position in the version's own stages.                                                                                                                   |
+| `stage_name`       | `NVARCHAR(40)`   | no   | Its name there.                                                                                                                                                     |
+| `actor_id`         | `VARCHAR(64)`    | no   | FK → `users`.                                                                                                                                                       |
+| `decision`         | `VARCHAR(20)`    | no   | CHECK `approved`, `changes_requested`.                                                                                                                              |
+| `reason`           | `NVARCHAR(2000)` | yes  | A change request's reason: at most 2,000 characters, trimmed (`REASON_MAX`).                                                                                        |
+| `sample_sets_seen` | JSON             | yes  | The sample set ids the approver viewed; null on a change request. JSON, or a table `approval_sample_sets_seen(approval_id, sample_set_id)`: the Java team's choice. |
+| `decided_at`       | `DATETIME2(3)`   | no   |                                                                                                                                                                     |
 
 Today: no index at all.
 
@@ -358,14 +358,14 @@ Today: the same, without the CHECK.
 
 #### `comments`
 
-| Column       | Type            | Null | Notes                                                                                           |
-| ------------ | --------------- | ---- | ----------------------------------------------------------------------------------------------- |
-| `id`         | `VARCHAR(64)`   | no   | PK.                                                                                             |
-| `thread_id`  | `VARCHAR(64)`   | no   | FK → `comment_threads` `ON DELETE CASCADE`. Index, new.                                         |
-| `author_id`  | `VARCHAR(64)`   | no   | FK → `users`.                                                                                   |
-| `body`       | `NVARCHAR(MAX)` | no   | A comment is at most `COMMENT_MAX`; a change request's reason, kept as a comment, has no limit. |
-| `kind`       | `VARCHAR(16)`   | no   | CHECK `comment`, `change_request`. Default `comment`.                                           |
-| `created_at` | `DATETIME2(3)`  | no   |                                                                                                 |
+| Column       | Type             | Null | Notes                                                                                                                                          |
+| ------------ | ---------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | `VARCHAR(64)`    | no   | PK.                                                                                                                                            |
+| `thread_id`  | `VARCHAR(64)`    | no   | FK → `comment_threads` `ON DELETE CASCADE`. Index, new.                                                                                        |
+| `author_id`  | `VARCHAR(64)`    | no   | FK → `users`.                                                                                                                                  |
+| `body`       | `NVARCHAR(4000)` | no   | A comment is at most `COMMENT_MAX`; a change request's reason, kept as a comment, is at most `REASON_MAX` (2,000) by the action that takes it. |
+| `kind`       | `VARCHAR(16)`    | no   | CHECK `comment`, `change_request`. Default `comment`.                                                                                          |
+| `created_at` | `DATETIME2(3)`   | no   |                                                                                                                                                |
 
 Today: no index on `thread_id`.
 
@@ -387,7 +387,9 @@ An imported file's metadata. The bytes live in blob storage.
 | `created_at`  | `DATETIME2(3)`  | no   |                                                                                                         |
 
 Today: `path` is relative to `data/uploads` (`src/server/import/store.ts`, which is the one file to swap for a blob
-client), and the file's kind is read back from its extension.
+client), and the file's kind is read back from its extension. The upload's folder also holds `compare.html` (a docx's
+Compare view) and `report.json` (the import report) beside `original.*`; no column names them, so the blob client
+keeps them with the original.
 
 ### Consumers, renders and notices
 
@@ -518,7 +520,7 @@ One row per recipient. Stores what happened, not a sentence: the BFF words it an
 | `read_at`    | `DATETIME2(3)`  | yes  |                                                                                                    |
 
 The bell orders by `created_at DESC, seq DESC`. Today: `title` holds an English sentence and `href` a route under
-the team's slug, and some bodies are English too. Changed by lane F (wave 2.2).
+the team's slug, and some bodies are English too. Changed by lane F (to-do item 3).
 
 #### `access_requests`
 
@@ -606,7 +608,7 @@ The audit log and the render log are kept differently
     session's `draft.edited` row for the `rev` it produced; it becomes `versions.last_save_session` and
     `last_save_by` beside `rev` ([B5](../handoff-review.md#b5--medium-autosave-conflict-recovery-reads-the-audit-log)).
 
-  Lane F (wave 2.2) puts both reads behind named service methods, so the Java implementation answers them from
+  Lane F (to-do item 3) puts both reads behind named service methods, so the Java implementation answers them from
   columns.
 
 - **`render_log` keeps raw events for a window**, about 13 months, deleted by a retention job, and sends them to the
@@ -690,8 +692,8 @@ platform-wide change.
 Today's differences:
 
 - `platform.config_changed` also stores `summary`, an English sentence; it goes
-  ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). Lane F (wave 2.2).
-- The seed writes other spellings and shapes. Lane K (wave 2.1) makes it write the runtime's:
+  ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). Lane F (to-do item 3).
+- The seed writes other spellings and shapes. Lane K (to-do item 5) makes it write the runtime's:
   - `src/server/seed/templates/build.ts` writes `version.approved` (`number`, `round`, `stage`, `reason`) where the
     runtime writes `version.stage_approved` or the approver's `version.activated`; `version.revoke_confirmed` without
     `wasActive` for `version.revoked`; and `comment.resolved` (`threadId`, `blockId`) for `thread.resolved`. Its
@@ -723,18 +725,18 @@ change, with variable keys and types, never a value.
 Today's differences:
 
 - `new_version` and `sunset_scheduled` also carry `contractLines`, English sentences nothing reads; they go
-  ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). Lane F (wave 2.2).
+  ([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). Lane F (to-do item 3).
 - `setSunset` leaves `contractChanges` out of `sunset_scheduled` when there are none, or when nothing is Active;
   `approve` always writes it. One shape means always present, empty when there are none.
 - Seeded notices carry `previousVersionNumber` (`new_version`) and `replacedByVersionNumber` (`sunset_scheduled`)
   where the runtime writes `activeVersion`, and seeded `revoked` notices have no `activeVersion`, so `noticeView`
-  reads both shapes (`NoticeRow` in `src/domain/golive-types.ts`). Lane K (wave 2.1).
+  reads both shapes (`NoticeRow` in `src/domain/golive-types.ts`). Lane K (to-do item 5).
 
 ### Notification kinds
 
 The facts each kind stores are designed with `describeNotification`, which words them on read
-([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)); lane F adds them to this page in
-wave 2.2. Who gets each kind today, and where it links:
+([0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md)); lane F adds them to this page
+with the seam work (to-do item 3). Who gets each kind today, and where it links:
 
 | Kind                   | Sent to                                                                                                                                                                                                                         | Link                                                                                                                                                                         | `body`                                                |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -783,14 +785,16 @@ seed's notifications (`src/server/seed/activity.ts`) carry English bodies of the
 
 - **Deletion and cascades.** What can be deleted (a template, a team, a user) and what outlives what. Nothing is
   deleted today. The "no FK" references above are `versions.based_on_version_id` and `import_upload_id`,
-  `approvals.stage_id`, `version_stages.stage_id`, every reference in `render_log`, `render_daily`, `audit_events`
-  and `consumer_notices`, and `notifications.team_id`.
+  `approvals.stage_id`, `version_stages.stage_id`, every reference in `render_log` and `render_daily`, `audit_events`
+  except `actor_id`, `consumer_notices` except `consumer_id`, and `notifications.team_id`.
 - **Better Auth's tables in the same database.** How its `user`, `account`, `session` and `verification` tables map
   onto `users`, and whether its Microsoft account id is `sub` (per app) or `oid` (per tenant)
   ([0054](../decisions/0054-users-are-better-auth-users-linked-to-entra-by-oid.md)).
 - **People named before they sign in.** An approval stage can name a person who has no `users` row yet: a Graph
   lookup or provisioning creates it.
-- **Lengths with no limit in the code.** Names, titles, notes and reasons: agree on each, and enforce it in the domain.
+- **Lengths with no limit in the code.** The columns above that name no constant (user names, titles and emails,
+  content type and consumer names, the SMS footer, a team's app name and sender, a recertification's label): agree on
+  each, and enforce it in the domain.
 - **CHECKs on `audit_events.action` and `notifications.kind`.** Record 0062 lists the other enum columns, not these;
   a CHECK there makes every new event kind a migration.
 - **Chain edits against a concurrent submit.** A chain edit refuses to remove a stage that versions wait on, by
