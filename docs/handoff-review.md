@@ -784,7 +784,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A5 · Medium: The contract is TypeScript only, and the simulator tests against a fake
 
-- **Status:** Partly fixed. Rendering has a full spec (`docs/render-spec.md`) and golden files for a Java port (PR #6, #7). The rest of `/api/v1` still has no OpenAPI or JSON Schema.
+- **Status:** Partly fixed. Rendering has a full spec (`docs/render-spec.md`) and golden files for a Java port (PR #6, #7). The rest of `/api/v1` still has no OpenAPI or JSON Schema; the Java team writes the OpenAPI document from [the OpenAPI brief](reference/openapi-brief.md), which sets out every endpoint, field and error as decided.
 - **Where:** `src/contracts/api-v1.ts` line 1; `src/simulator/actions.test.ts` line 118
 - **What happens:** No OpenAPI or JSON Schema for a Java team to generate from. The status-code table lives in `domain/golive-types.ts`. The simulator's tests use a hand-written fake UCOMP whose messages already differ from the real routes.
 - **Fix:** Generate OpenAPI (or zod schemas) from one source; run the simulator client against the real handlers with a seeded temp DB.
