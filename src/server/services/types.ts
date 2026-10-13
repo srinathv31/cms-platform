@@ -13,8 +13,7 @@
 // that decides anything by time says when (`asOf`). What crosses the seam is facts that survive JSON: ids, ISO
 // instants, YYYY-MM-DD days, codes, decided `PermissionResult`s, `Person` lists for the ids a screen names.
 // Nothing is English and nothing is an app URL, except a refusal's `reason`, which the HTTP implementation will
-// word from the code as the BFF words everything else. A method whose facts aren't settled yet says so with
-// `Unsettled`, and lint keeps the BFF's worded view models out of these files.
+// word from the code as the BFF words everything else. Lint keeps the BFF's worded view models out of these files.
 //
 // A thrown error is a bug or an outage, never a refusal: the BFF lets it propagate to the screen's own
 // failure sentence.
@@ -70,14 +69,4 @@ export interface Services {
 /** A command that may find nothing to change (a double click): `changed` says whether it wrote. */
 export interface Changed {
   changed: boolean;
-}
-
-/**
- * A result (or an input) whose facts aren't settled yet. The package named in `Owner` (plan.md) moves the method
- * behind the seam and replaces this with a facts type. Nothing can produce one, so a method typed with it can't
- * be implemented, or called with real data, until then.
- */
-export interface Unsettled<Owner extends string> {
-  readonly unsettled: Owner;
-  readonly never: never;
 }

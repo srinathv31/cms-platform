@@ -72,7 +72,7 @@ const noViewModels = {
     "@/domain/import-types",
   ],
   message:
-    "The service interfaces carry facts: not the BFF's view models (worded, with app URLs) or its modules. Declare a facts type beside the interface, or Unsettled<…> until its package settles it (decision 0072).",
+    "The service interfaces carry facts: not the BFF's view models (worded, with app URLs) or its modules. Declare a facts type beside the interface (decision 0072).",
 };
 // Who reads the clock (N1 in the seam's review): the backend does, and the request context never. A read that
 // decides by time answers the instant it decided at (`asOf`), and the BFF words its dates from it. The clock is

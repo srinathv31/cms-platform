@@ -1,5 +1,4 @@
 import "server-only";
-import { cache } from "react";
 import { and, eq, isNotNull } from "drizzle-orm";
 import {
   DEFAULT_BUSINESS_ZONE,
@@ -7,7 +6,7 @@ import {
   type BusinessZone,
 } from "@/domain/business-zone";
 import { sunsetPassed } from "@/domain/lifecycle/sunset";
-import { db, type Db } from "@/server/db/client";
+import type { Db } from "@/server/db/client";
 import { settings, versions } from "@/server/db/schema/ucomp";
 import type { Tx } from "@/server/services/local/transaction";
 
@@ -19,7 +18,7 @@ export const BUSINESS_ZONE_KEY = "business_zone";
 
 type Reader = Pick<Db, "select"> | Pick<Tx, "select">;
 
-/** The zone, read through `reader`: an action reads it in the transaction that uses it. */
+/** The zone, read through `reader`: a command reads it in the transaction that uses it, a read through `db`. */
 export async function readBusinessZone(reader: Reader): Promise<BusinessZone> {
   const [row] = await reader
     .select({ value: settings.value })
@@ -28,14 +27,6 @@ export async function readBusinessZone(reader: Reader): Promise<BusinessZone> {
     .limit(1);
   return isBusinessZone(row?.value) ? row.value : DEFAULT_BUSINESS_ZONE;
 }
-
-/**
- * The zone for a read model, once per request. Like every database read in a read model, call it after
- * a request API (`demoNow()`, `getViewer()`), so Cache Components treats it as request-time.
- */
-export const getBusinessZone = cache(async (): Promise<BusinessZone> =>
-  readBusinessZone(db),
-);
 
 /** Superseded versions whose sunset is set and hasn't passed (`sunsetPassed`): what a change of zone leaves in place. */
 export async function countPendingSunsets(
