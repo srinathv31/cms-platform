@@ -2,6 +2,7 @@
 
 Status: Accepted
 Amended 2026-10-12: `consumer_notices` clusters on the `seq` it already has, which the notice counter assigns in commit order ([0062](0062-invariants-hold-in-the-database-not-in-one-writer.md)), not on an IDENTITY: an IDENTITY isn't commit-ordered. The other three log tables get the IDENTITY ([porting the data model](../reference/data-model.md)).
+Amended 2026-10-13: built (backend seam). The template id is the backend's: `templates.create` and `createImported` draw one from an id source (an option of `localServices` and `fakeServices`), insert with `ON CONFLICT DO NOTHING`, and write the whole command again with another id when the insert finds it taken, three attempts in all; a third collision throws (`withNewTemplateId` in `src/server/services/template-id.ts`, [0073](0073-the-bff-builds-a-new-templates-draft-and-the-backend-draws-its-id.md)). `freshTemplateId` and its reads are gone.
 Date: 2026-10-12
 
 ## Context

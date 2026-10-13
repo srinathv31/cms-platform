@@ -1,6 +1,12 @@
 import type { JSONContent, Variable } from "@/domain/types";
-import { callout, disclosure, inlineDoc, p, table } from "../seed/content";
-import type { VariableKit } from "../seed/variables";
+import {
+  callout,
+  disclosure,
+  inlineDoc,
+  p,
+  table,
+} from "@/server/documents/build";
+import type { VariableKit } from "@/server/documents/variables";
 
 // Rate change notice: the change-in-terms letter. Every declared variable is used. Like the seeded
 // Rate Change Notice, it is also an email, so it ships with a subject and preheader.

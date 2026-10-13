@@ -97,7 +97,7 @@ async function deleteOwned(
 async function removeUploadFolders(uploadIds: readonly string[]) {
   for (const id of uploadIds)
     if (/^[\w-]{8,}$/.test(id))
-      // A few retries, as in `removeUpload` (src/server/import/store.ts): on Windows a virus scanner can still
+      // A few retries, as in `removeUpload` (src/server/services/local/uploads.ts): on Windows a virus scanner can still
       // hold a file it was just handed.
       await rm(path.join(E2E_UPLOADS_DIR, id), {
         recursive: true,

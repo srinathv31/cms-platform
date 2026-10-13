@@ -12,7 +12,7 @@ import {
   removeUpload,
   resolveUploadsRoot,
   writeUpload,
-} from "./store";
+} from "./uploads";
 
 // The store keeps an upload's files under <root>/<uploadId>/. Two things must hold on Windows as on a Mac:
 // the root resolves from either spelling of a path, and the id and the stored key (which the database

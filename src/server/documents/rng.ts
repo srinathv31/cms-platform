@@ -1,5 +1,5 @@
-// Deterministic randomness for the seed. A sequence is named (`SeedCtx.random`), and its name is its seed:
-// the same name gives the same numbers on every run.
+// Deterministic randomness for the seed, and for the block ids its documents and the starters' share (./build.ts). A
+// sequence is named (`SeedCtx.random`), and its name is its seed: the same name gives the same numbers on every run.
 
 import type { Random01 } from "@/server/ids";
 

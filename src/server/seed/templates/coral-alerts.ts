@@ -1,5 +1,5 @@
 import type { SeedCtx } from "../context";
-import { emptyBody, inlineDoc, linesDoc } from "../content";
+import { emptyBody, inlineDoc, linesDoc } from "@/server/documents/build";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 

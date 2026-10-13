@@ -20,9 +20,9 @@ import { DOCUMENT_THREAD } from "@/domain/review-types";
 import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
 import { DRAFT_FIELDS, type DraftField } from "@/domain/lifecycle/autosave";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
-import { blockId, blockText } from "../content";
+import { blockId, blockText } from "@/server/documents/build";
 import { SEED_CONTENT_TYPES } from "../platform";
-import { int, type Rng } from "../rng";
+import { int, type Rng } from "@/server/documents/rng";
 import {
   checkApprovals,
   checkIds,

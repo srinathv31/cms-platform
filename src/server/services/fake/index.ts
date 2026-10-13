@@ -1,13 +1,18 @@
 import type { AuditService } from "../audit";
-import type { CommentService } from "../comments";
 
 import { notMovedArea } from "../not-moved";
-import type { Clock, ImplementationOptions, TestHooks } from "../options";
+import type {
+  Clock,
+  IdSource,
+  ImplementationOptions,
+  TestHooks,
+} from "../options";
 import type { RenderService } from "../render";
-import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
+import { newTemplateId } from "@/server/ids";
 import { fakeAccess } from "./access";
+import { fakeComments } from "./comments";
 import { fakeDemo } from "./demo";
 import { fakeDrafts } from "./drafts";
 import { fakeIdentity } from "./identity";
@@ -16,6 +21,7 @@ import { fakePlatform } from "./platform";
 import { fakeReview } from "./review";
 import type { FakeState } from "./state";
 import { FakeStore } from "./store";
+import { fakeTemplates } from "./templates";
 import { fakeVersions } from "./versions";
 
 // The in-memory fake of the service interfaces (decision 0068): the real domain rules over arrays instead of a
@@ -34,6 +40,7 @@ import { fakeVersions } from "./versions";
 export interface FakeDeps {
   store: FakeStore;
   clock: Clock;
+  ids: IdSource;
   hooks: TestHooks;
 }
 
@@ -45,6 +52,7 @@ export function fakeServices(
   const deps: FakeDeps = {
     store: new FakeStore(state),
     clock: options.clock ?? (async () => new Date()),
+    ids: options.ids ?? { templateId: newTemplateId },
     hooks: options.hooks ?? {},
   };
   const identity = fakeIdentity(state);
@@ -52,9 +60,9 @@ export function fakeServices(
     identity,
     review: fakeReview(deps),
     versions: fakeVersions(deps),
-    templates: notMovedArea<TemplateService>("templates"),
+    templates: fakeTemplates(deps),
     drafts: fakeDrafts(deps),
-    comments: notMovedArea<CommentService>("comments"),
+    comments: fakeComments(deps),
     access: fakeAccess(deps),
     platform: fakePlatform(deps),
     notifications: fakeNotifications(deps),

@@ -4,6 +4,7 @@ import {
   DEFAULT_CHANNELS,
   UNTITLED_TEMPLATE_NAME,
   createDraft,
+  createTemplateFrom,
   draftChannelsRefusal,
   editLatest,
   initialTemplateName,
@@ -11,13 +12,16 @@ import {
   newTemplateChannels,
   newTemplateContentType,
   withWriters,
+  newTemplateRefusal,
 } from "./drafts";
 import {
   LifecycleError,
+  type DraftContent,
   type StarterContent,
   type VersionSnapshot,
 } from "./types";
 import { REFUSALS } from "./refusals";
+import { REQUEST_REFUSALS } from "../refusals";
 import type { JSONContent, VersionState } from "../types";
 import { NOW, heading, BODY, VARIABLES, SAMPLE_SETS } from "./fixtures";
 
@@ -249,6 +253,125 @@ describe("createDraft", () => {
     expect(VARIABLES[0]!.label).toBe("First name");
     expect(SAMPLE_SETS[0]!.values.first_name).toBe("Maya");
     expect(BODY.content![0]!.attrs!.id).toBe("b_one");
+  });
+});
+
+// A new template from a draft the BFF built (New template, Import): both backends make it with this.
+describe("createTemplateFrom", () => {
+  const draft: DraftContent = {
+    name: "Fee schedule",
+    body: BODY,
+    channelFields: {},
+    channels: ["pdf", "web"],
+    variables: VARIABLES,
+    sampleSets: SAMPLE_SETS,
+    starterKey: "fee_schedule",
+  };
+
+  it("makes the draft as the BFF built it: a rev 0 draft by its maker, who is its only writer", () => {
+    const { changes } = createTemplateFrom({
+      draft,
+      createdBy: "maya",
+      now: NOW,
+    });
+    expect(changes.template).toEqual({
+      starterKey: "fee_schedule",
+      createdBy: "maya",
+      createdAt: NOW,
+    });
+    expect(changes.draft).toMatchObject({
+      state: "draft",
+      number: null,
+      round: null,
+      basedOnVersionId: null,
+      name: "Fee schedule",
+      body: BODY,
+      channels: ["pdf", "web"],
+      variables: VARIABLES,
+      sampleSets: SAMPLE_SETS,
+      rev: 0,
+      createdBy: "maya",
+      writers: ["maya"],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+  });
+
+  it("is what createDraft makes of a starter", () => {
+    expect(
+      createTemplateFrom({
+        draft: {
+          ...draft,
+          name: "Card offer terms",
+          starterKey: "card_offer_terms",
+        },
+        createdBy: "maya",
+        now: NOW,
+      }),
+    ).toEqual(createDraft({ starter: EXAMPLE, createdBy: "maya", now: NOW }));
+  });
+
+  it("names a template with no starter key Blank in the audit row, and an import by its file", () => {
+    expect(
+      createTemplateFrom({
+        draft: { ...draft, starterKey: null },
+        createdBy: "maya",
+        now: NOW,
+      }).effects,
+    ).toEqual([
+      {
+        kind: "audit",
+        action: "template.created",
+        details: { name: "Fee schedule", source: "blank" },
+      },
+    ]);
+    const imported = createTemplateFrom({
+      draft: { ...draft, starterKey: null },
+      createdBy: "maya",
+      now: NOW,
+      imported: { kind: "docx", filename: "Fee schedule.docx" },
+    });
+    expect(imported.changes.template.starterKey).toBeNull();
+    expect(imported.effects).toEqual([
+      {
+        kind: "audit",
+        action: "template.created",
+        details: {
+          name: "Fee schedule",
+          source: "import:docx",
+          filename: "Fee schedule.docx",
+        },
+      },
+    ]);
+  });
+
+  it("copies, so editing the draft never changes what the BFF handed over", () => {
+    const { changes } = createTemplateFrom({
+      draft,
+      createdBy: "maya",
+      now: NOW,
+    });
+    changes.draft.variables[0]!.label = "Changed";
+    changes.draft.body.content![0]!.attrs!.id = "changed";
+    expect(VARIABLES[0]!.label).toBe("First name");
+    expect(BODY.content![0]!.attrs!.id).toBe("b_one");
+  });
+});
+
+describe("newTemplateRefusal", () => {
+  it("refuses a content type that is gone, then channels the type doesn't allow", () => {
+    expect(newTemplateRefusal(undefined, ["pdf"])).toEqual(
+      REQUEST_REFUSALS.contentTypeGone,
+    );
+    expect(newTemplateRefusal({ allowedChannels: ["pdf", "web"] }, [])).toBe(
+      REFUSALS.noChannels,
+    );
+    expect(
+      newTemplateRefusal({ allowedChannels: ["push", "sms"] }, ["pdf"]),
+    ).toBe(REFUSALS.channelNotAllowed);
+    expect(
+      newTemplateRefusal({ allowedChannels: ["pdf", "web"] }, ["pdf"]),
+    ).toBeNull();
   });
 });
 

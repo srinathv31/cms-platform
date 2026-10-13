@@ -7,7 +7,8 @@ import {
   type ImportReport,
 } from "@/domain/import-types";
 
-// Where an import's files live (./data/uploads stands in for Azure Blob):
+// The local implementation's blob storage for an import's files (`TemplateService.createImported`; the Java API
+// keeps them in Azure Blob). Where they live (./data/uploads stands in for it):
 //
 //   <root>/<uploadId>/original.<docx|pdf|txt>   the file exactly as uploaded
 //   <root>/<uploadId>/compare.html              docx only: the allowlisted Compare view

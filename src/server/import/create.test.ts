@@ -1,80 +1,43 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
 import JSZip from "jszip";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   IMPORT_LIMITS,
+  IMPORT_MIME,
   IMPORT_REFUSALS,
   type ImportResponse,
 } from "@/domain/import-types";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import { DOCUMENT_MESSAGES } from "@/editor/model/document-check";
 import { prepareBody } from "@/server/documents/prepare";
-import type { Viewer } from "@/domain/types";
-import type { Db } from "@/server/db/client";
-import * as schema from "@/server/db/schema/ucomp";
-import {
-  getImportOriginalFile,
-  getImportOriginalRef,
-  getImportOriginalView,
-} from "@/server/queries/import";
-import {
-  loadPersona,
-  seededDatabasePerTest,
-} from "@/server/testing/review-fixtures";
+import { services } from "@/server/services";
+import { fakeBackendPerTest } from "@/server/services/fake/testing";
+import { refusal } from "@/server/services/results";
+import { getImportOriginalView } from "@/server/queries/import";
 import { importStatus, importTemplate } from "./create";
 
-// importTemplate and the import queries end to end against a temporary database filled by the real
-// seed, with uploads written to a temporary folder. Only the database handle and the clock are swapped.
+// Import as the BFF runs it, against the in-memory fake (decision 0068), with real files: the file is sniffed and
+// converted, the draft built and prepared for the content type the backend names, and the backend stores it
+// (`templates.createImported`). The order of the refusals is the contract's (src/domain/import-types.ts). What the
+// backend decides is the contract suite's (src/server/services/contract/templates.ts); what it keeps on disk is
+// tested against the local implementation in src/server/services/local/templates.test.ts. The BFF reads no clock:
+// this file fails if it does.
 
-const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
+vi.mock("@/server/services", () => import("@/server/services/fake/testing"));
+vi.mock(
+  "@/server/context/request",
+  () => import("@/server/services/fake/testing"),
+);
+vi.mock("@/server/clock", () => ({
+  now: () => {
+    throw new Error("The BFF read the clock.");
+  },
+}));
 
-vi.mock("@/server/db/client", async () => {
-  const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  return tempDatabase("ucomp-import-");
-});
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
-
-const { auditEvents, contentTypes, templates, uploads, versions } = schema;
-
-let db: Db;
-let root: string;
-const people: Record<string, Viewer> = {};
-
-seededDatabasePerTest({ base: env.now });
-
-beforeAll(async () => {
-  ({ db } = await import("@/server/db/client"));
-  for (const id of ["maya", "taylor", "morgan", "sam"])
-    people[id] = await loadPersona(db, id);
-});
-
-// Each test's uploads go to a folder of its own, like its database.
-beforeEach(() => {
-  env.now = new Date("2026-10-04T12:00:00.000Z");
-  root = mkdtempSync(join(tmpdir(), "ucomp-uploads-"));
-});
-
-afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
-});
+const BASE = new Date("2026-10-04T12:00:00.000Z");
+const backend = fakeBackendPerTest({ base: BASE });
 
 const fixture = (name: string) =>
   new Uint8Array(readFileSync(`e2e/fixtures/import/${name}`));
@@ -96,43 +59,50 @@ async function docx(bodyXml: string): Promise<Uint8Array> {
   );
   return new Uint8Array(await zip.generateAsync({ type: "uint8array" }));
 }
+
 const run = (
   who: string,
   file: { name: string; bytes: Uint8Array } | null,
   teamSlug = "coral-offers",
-) => importTemplate(people[who]!, { teamSlug, file }, { uploadsRoot: root });
+) => importTemplate(backend.as(who), { teamSlug, file });
 
 function ok(response: ImportResponse) {
   if (!response.ok) throw new Error(`refused: ${response.code}`);
   return response;
 }
 
+/** What the BFF handed the backend to store, for the call just made. */
+const storing = () => vi.spyOn(services().templates, "createImported");
+const sent = (spy: ReturnType<typeof storing>) => spy.mock.calls.at(-1)![1];
+
 describe("importTemplate", () => {
-  it("imports a .docx: the template, its draft, the upload row, the files and the audit event, in one go", async () => {
-    const res = ok(
-      await run("maya", {
-        name: "../Spring offer.docx",
-        bytes: fixture("spring-offer.docx"),
-      }),
-    );
-    expect(res.href).toBe(`/coral-offers/templates/${res.templateId}`);
+  it("imports a .docx: the converted draft, the original, the report and the Compare HTML go to the backend in one call", async () => {
+    const spy = storing();
+    const bytes = fixture("spring-offer.docx");
+    const res = ok(await run("maya", { name: "../Spring offer.docx", bytes }));
     expect(importStatus(res)).toBe(200);
+    expect(res.href).toBe(`/coral-offers/templates/${res.templateId}`);
 
-    const tpl = await db.query.templates.findFirst({
-      where: eq(templates.id, res.templateId),
-    });
-    expect(tpl).toMatchObject({
+    const call = sent(spy);
+    expect(call).toMatchObject({
       teamId: "t_coral",
+      contentTypeId: "ct_disclosure",
+      original: {
+        filename: "Spring offer.docx",
+        mime: IMPORT_MIME.docx,
+        bytes,
+      },
+      report: { kind: "docx", filename: "Spring offer.docx" },
+    });
+    expect(
+      call.compareHtml?.startsWith("<h1>Spring Balance Transfer Offer</h1>"),
+    ).toBe(true);
+    const { draft } = call;
+    expect(draft).toMatchObject({
+      name: "Spring Balance Transfer Offer",
       starterKey: null,
-      createdBy: "maya",
     });
-
-    const draft = await db.query.versions.findFirst({
-      where: eq(versions.templateId, res.templateId),
-    });
-    expect(draft?.state).toBe("draft");
-    expect(draft?.name).toBe("Spring Balance Transfer Offer");
-    expect(draft?.variables).toEqual([
+    expect(draft.variables).toEqual([
       {
         key: "first_name",
         label: "First name",
@@ -162,138 +132,150 @@ describe("importTemplate", () => {
         sample: "",
       },
     ]);
-    expect(draft?.sampleSets).toHaveLength(3);
-    expect(Object.keys(draft!.sampleSets[0]!.values)).toEqual([
+    expect(draft.sampleSets).toHaveLength(3);
+    expect(Object.keys(draft.sampleSets[0]!.values)).toEqual([
       "first_name",
       "purchase_apr",
       "offer_end_date",
       "annual_fee",
     ]);
-    const ids = draft!.body.content!.map((b) => b.attrs?.id);
+    const ids = draft.body.content!.map((b) => b.attrs?.id);
     expect(ids.every((id) => typeof id === "string" && id.length > 0)).toBe(
       true,
     );
     expect(new Set(ids).size).toBe(ids.length);
 
-    const upload = await db.query.uploads.findFirst({
-      where: eq(uploads.templateId, res.templateId),
-    });
-    expect(upload).toMatchObject({
-      filename: "Spring offer.docx",
-      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      size: fixture("spring-offer.docx").length,
-      createdBy: "maya",
-    });
-    expect(upload!.id).toMatch(/^up_[0-9a-z]{10}$/);
-    expect(upload!.path).toBe(`${upload!.id}/original.docx`);
-    expect(draft?.importUploadId).toBe(upload!.id);
-    expect(readdirSync(join(root, upload!.id)).sort()).toEqual([
-      "compare.html",
-      "original.docx",
-      "report.json",
-    ]);
-
-    const audit = await db.query.auditEvents.findFirst({
-      where: eq(auditEvents.templateId, res.templateId),
-    });
-    expect(audit).toMatchObject({
-      action: "template.created",
-      actorId: "maya",
-      details: {
-        name: "Spring Balance Transfer Offer",
-        source: "import:docx",
-        filename: "Spring offer.docx",
+    // And the backend has it: the original comes back as it went in, and the Original tab reads.
+    const maya = backend.as("maya");
+    expect(
+      await services().templates.importOriginal(maya, {
+        uploadId: (await spy.mock.results.at(-1)!.value).uploadId,
+      }),
+    ).toMatchObject({ ok: true, filename: "Spring offer.docx", bytes });
+    const view = await getImportOriginalView(
+      maya,
+      (await spy.mock.results.at(-1)!.value).uploadId,
+    );
+    expect(view).toMatchObject({
+      ok: true,
+      view: {
+        ref: {
+          filename: "Spring offer.docx",
+          kind: "docx",
+          uploadedByName: "Maya Chen",
+        },
+        source: { kind: "docx" },
       },
     });
   });
 
   it("imports a .pdf and a .txt", async () => {
+    const spy = storing();
     const pdf = ok(
       await run("maya", {
         name: "rate-change-notice.pdf",
         bytes: fixture("rate-change-notice.pdf"),
       }),
     );
+    expect(sent(spy)).toMatchObject({
+      draft: { name: "Rate Change Notice" },
+      original: { mime: IMPORT_MIME.pdf },
+      report: { kind: "pdf", pages: 2 },
+      compareHtml: null,
+    });
     const txt = ok(
       await run("maya", {
         name: "spring_offer_notes.txt",
         bytes: fixture("spring_offer_notes.txt"),
       }),
     );
-    const names = await Promise.all(
-      [pdf, txt].map((r) =>
-        db.query.versions
-          .findFirst({ where: eq(versions.templateId, r.templateId) })
-          .then((v) => v?.name),
-      ),
-    );
-    expect(names).toEqual(["Rate Change Notice", "Spring offer notes"]);
+    expect(sent(spy)).toMatchObject({
+      draft: { name: "Spring offer notes" },
+      original: { mime: IMPORT_MIME.txt },
+      report: { kind: "txt" },
+      compareHtml: null,
+    });
+    expect(pdf.templateId).not.toBe(txt.templateId);
   });
 
   it("takes only the channels the content type allows (as New template does)", async () => {
-    const disclosure = await db.query.contentTypes.findFirst({
-      where: eq(contentTypes.key, "disclosure"),
+    vi.spyOn(services().templates, "newTemplateType").mockResolvedValue({
+      ok: true,
+      asOf: BASE.toISOString(),
+      contentTypeId: "ct_disclosure",
+      requiredSections: [
+        { key: "offer_details", title: "Offer details" },
+        { key: "rates_and_fees", title: "Rates and fees" },
+        { key: "legal_notices", title: "Legal notices" },
+      ],
+      allowedChannels: ["web", "email"],
     });
-    await db
-      .update(contentTypes)
-      .set({ allowedChannels: ["web", "email"] })
-      .where(eq(contentTypes.id, disclosure!.id));
-    try {
-      const res = ok(
-        await run("maya", {
-          name: "spring_offer_notes.txt",
-          bytes: fixture("spring_offer_notes.txt"),
-        }),
-      );
-      const draft = await db.query.versions.findFirst({
-        where: eq(versions.templateId, res.templateId),
-      });
-      expect(draft?.channels).toEqual(["web"]);
-    } finally {
-      await db
-        .update(contentTypes)
-        .set({ allowedChannels: disclosure!.allowedChannels })
-        .where(eq(contentTypes.id, disclosure!.id));
-    }
+    const spy = storing();
+    ok(
+      await run("maya", {
+        name: "spring_offer_notes.txt",
+        bytes: fixture("spring_offer_notes.txt"),
+      }),
+    );
+    expect(sent(spy).draft.channels).toEqual(["web"]);
   });
 
-  it("refuses, rather than fails, when no content type makes documents: 409 no_content_type, nothing written", async () => {
-    // Every content type makes alerts only, so there is no document type to import into.
-    await db.update(contentTypes).set({ allowedChannels: ["push", "sms"] });
-    const rows = async () => ({
-      templates: await db.select({ id: templates.id }).from(templates),
-      uploads: await db.select({ id: uploads.id }).from(uploads),
-    });
-    const before = await rows();
+  it("stores the body exactly as an autosave of it would store it", async () => {
+    const spy = storing();
+    ok(
+      await run("maya", {
+        name: "Spring offer.docx",
+        bytes: fixture("spring-offer.docx"),
+      }),
+    );
+    const { body } = sent(spy).draft;
+    expect(prepareBody(body)).toEqual({ ok: true, doc: body });
+    expect(JSON.stringify(body)).not.toMatch(/"(?:align|colwidth|type)":null/);
+  });
+
+  it("refuses, rather than fails, when no content type makes documents: 409 no_content_type, nothing sent", async () => {
+    vi.spyOn(services().templates, "newTemplateType").mockResolvedValue(
+      refusal(409, REFUSALS.noContentType("document")),
+    );
+    const spy = storing();
     const res = await run("maya", {
       name: "notes.txt",
       bytes: fixture("spring_offer_notes.txt"),
     });
     expect(res).toEqual({ ok: false, ...REFUSALS.noContentType("document") });
     expect(importStatus(res)).toBe(409);
-    expect(await rows()).toEqual(before);
-    expect(readdirSync(root)).toEqual([]);
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it("checks the permission first: no create rights, or an unknown team, is 403 with the reason", async () => {
-    for (const [who, team] of [
-      ["taylor", "coral-offers"],
-      ["sam", "coral-offers"],
-      ["maya", "nope"],
-      ["maya", ""],
-    ] as const) {
+  it("checks the permission first: no create rights, a team the viewer can't enter, or an unknown or missing team, is 403 with the reason", async () => {
+    const spy = storing();
+    const refused = [
+      // The auditor sees every team and may create on none; Sam only views Coral Offers.
+      ["taylor", "coral-offers", REASONS.generic.code],
+      ["sam", "coral-offers", REASONS.generic.code],
+      // Maya may not enter Deposits, "nope" is no team, and a missing team arrives empty: all read as no space.
+      ["maya", "deposits", "space_unavailable"],
+      ["maya", "nope", "space_unavailable"],
+      ["maya", "", "space_unavailable"],
+      // Riley may enter All teams, which isn't a team to create in.
+      ["riley", "all", REQUEST_REFUSALS.teamGone.code],
+    ] as const;
+    for (const [who, team, code] of refused) {
       const res = await run(
         who,
         { name: "x.doc", bytes: new Uint8Array([0xd0, 0xcf]) },
         team,
       );
-      expect(res).toEqual({
-        ok: false,
-        code: "generic",
-        reason: REASONS.generic.reason,
-      });
+      expect(res, `${who} on ${team}`).toMatchObject({ ok: false, code });
       expect(importStatus(res)).toBe(403);
     }
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("maps nobody signed in to 401: the route answers it before the import runs", () => {
+    expect(importStatus({ ok: false, ...REQUEST_REFUSALS.signedOut })).toBe(
+      401,
+    );
   });
 
   it.each([
@@ -348,10 +330,9 @@ describe("importTemplate", () => {
       400,
     ],
   ] as const)(
-    "refuses %s with its code, sentence and status, writing nothing",
+    "refuses %s with its code, sentence and status, sending nothing",
     async (name, file, status) => {
-      const before = await db.select().from(templates);
-      const folders = readdirSync(root).length;
+      const spy = storing();
       const res = await run("maya", file);
       expect(res).toEqual({
         ok: false,
@@ -359,12 +340,11 @@ describe("importTemplate", () => {
         reason: IMPORT_REFUSALS[name].reason,
       });
       expect(importStatus(res)).toBe(status);
-      expect(await db.select().from(templates)).toHaveLength(before.length);
-      expect(readdirSync(root)).toHaveLength(folders);
+      expect(spy).not.toHaveBeenCalled();
     },
   );
 
-  it("refuses a document the check refuses (merged cells that overlap), with the check's sentence, writing nothing", async () => {
+  it("refuses a document the check refuses (merged cells that overlap), with the check's sentence, sending nothing", async () => {
     // Row 3's two vertically merged cells continue C (row 2, two columns wide) and B (row 1): B then
     // spans rows 1 and 2, over C's second column. Normalization can't fix that without guessing.
     const cell = (text: string, props = "") =>
@@ -377,8 +357,7 @@ describe("importTemplate", () => {
     const bytes = await docx(
       `<w:p><w:r><w:t>Fees</w:t></w:r></w:p><w:tbl>${rows.map((r) => `<w:tr>${r}</w:tr>`).join("")}</w:tbl>`,
     );
-    const before = await db.select().from(templates);
-    const folders = readdirSync(root).length;
+    const spy = storing();
     const res = await run("maya", { name: "merged.docx", bytes });
     expect(res).toEqual({
       ok: false,
@@ -386,152 +365,19 @@ describe("importTemplate", () => {
       reason: `This file can't be imported as it is. ${DOCUMENT_MESSAGES.tableShape}`,
     });
     expect(importStatus(res)).toBe(400);
-    expect(await db.select().from(templates)).toHaveLength(before.length);
-    expect(readdirSync(root)).toHaveLength(folders);
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it("stores the body exactly as an autosave of it would store it", async () => {
-    const res = ok(
-      await run("maya", {
-        name: "Spring offer.docx",
-        bytes: fixture("spring-offer.docx"),
-      }),
-    );
-    const draft = await db.query.versions.findFirst({
-      where: eq(versions.templateId, res.templateId),
+  it("answers the backend's refusal as the import's own: its code, its sentence, nothing of the read's status", async () => {
+    vi.spyOn(services().templates, "createImported").mockResolvedValue({
+      ok: false,
+      ...REQUEST_REFUSALS.contentTypeGone,
     });
-    expect(prepareBody(draft!.body)).toEqual({ ok: true, doc: draft!.body });
-    expect(JSON.stringify(draft!.body)).not.toMatch(
-      /"(?:align|colwidth|type)":null/,
-    );
-  });
-
-  it("removes the upload's folder when the transaction fails", async () => {
-    const folders = readdirSync(root).sort();
-    const spy = vi
-      .spyOn(db, "transaction")
-      .mockRejectedValueOnce(new Error("disk full"));
-    await expect(
-      run("maya", { name: "a.txt", bytes: fixture("spring_offer_notes.txt") }),
-    ).rejects.toThrow("disk full");
-    spy.mockRestore();
-    expect(readdirSync(root).sort()).toEqual(folders);
-  });
-});
-
-describe("import queries", () => {
-  const uploadOf = async (templateId: string) =>
-    (await getImportOriginalRef(templateId))!.uploadId;
-  // Maya imports a file an hour after the seed; each test imports the files it reads.
-  const importDocx = async () => {
-    env.now = new Date("2026-10-04T13:00:00.000Z");
-    return ok(
-      await run("maya", {
-        name: "Spring offer.docx",
-        bytes: fixture("spring-offer.docx"),
-      }),
-    ).templateId;
-  };
-  const importPdf = async () => {
-    env.now = new Date("2026-10-04T13:00:00.000Z");
-    return ok(
-      await run("maya", {
-        name: "rate-change-notice.pdf",
-        bytes: fixture("rate-change-notice.pdf"),
-      }),
-    ).templateId;
-  };
-  const importTxt = async () => {
-    env.now = new Date("2026-10-04T13:00:00.000Z");
-    return ok(
-      await run("maya", {
-        name: "notes.txt",
-        bytes: fixture("spring_offer_notes.txt"),
-      }),
-    ).templateId;
-  };
-
-  it("getImportOriginalRef: the cheap ref for the workspace, null for a template that wasn't imported", async () => {
-    const docx = await importDocx();
-    expect(await getImportOriginalRef(docx)).toEqual({
-      uploadId: expect.stringMatching(/^up_/),
-      filename: "Spring offer.docx",
-      kind: "docx",
-      size: fixture("spring-offer.docx").length,
-      uploadedAt: "2026-10-04T13:00:00.000Z",
-      uploadedByName: "Maya Chen",
+    const res = await run("maya", {
+      name: "notes.txt",
+      bytes: fixture("spring_offer_notes.txt"),
     });
-    const seeded = await db.query.templates.findFirst();
-    expect(await getImportOriginalRef(seeded!.id)).toBeNull();
-  });
-
-  it("getImportOriginalView: the source for each kind, the report and its lines", async () => {
-    const maya = people.maya!;
-    const [docx, pdf, txt] = [
-      await importDocx(),
-      await importPdf(),
-      await importTxt(),
-    ];
-    const d = await getImportOriginalView(maya, await uploadOf(docx), root);
-    expect(d?.source.kind).toBe("docx");
-    expect(
-      d?.source.kind === "docx" &&
-        d.source.html.startsWith("<h1>Spring Balance Transfer Offer</h1>"),
-    ).toBe(true);
-    expect(d?.lines.detected[0]).toBe(
-      "4 variables, all Text and required: First name, Purchase APR, Offer end date, Annual fee",
-    );
-
-    const pId = await uploadOf(pdf);
-    expect((await getImportOriginalView(maya, pId, root))?.source).toEqual({
-      kind: "pdf",
-      fileUrl: `/api/imports/${pId}/file`,
-      pages: 2,
-    });
-
-    const t = await getImportOriginalView(maya, await uploadOf(txt), root);
-    expect(t?.source).toEqual({
-      kind: "txt",
-      text: readFileSync("e2e/fixtures/import/spring_offer_notes.txt", "utf8"),
-    });
-    expect(t?.report.nameFrom).toBe("filename");
-  });
-
-  it("getImportOriginalFile: the bytes as uploaded", async () => {
-    const pdf = await importPdf();
-    const file = await getImportOriginalFile(
-      people.maya!,
-      await uploadOf(pdf),
-      root,
-    );
-    expect(file?.ref.kind).toBe("pdf");
-    expect(
-      Buffer.from(file!.bytes).equals(
-        Buffer.from(fixture("rate-change-notice.pdf")),
-      ),
-    ).toBe(true);
-  });
-
-  it("nothing for a viewer who can't see the team, an unknown id, or a malformed one", async () => {
-    const id = await uploadOf(await importDocx());
-    expect(await getImportOriginalView(people.morgan!, id, root)).toBeNull();
-    expect(await getImportOriginalFile(people.morgan!, id, root)).toBeNull();
-    expect(
-      await getImportOriginalView(people.taylor!, id, root),
-    ).not.toBeNull(); // the auditor sees every team
-    expect(
-      await getImportOriginalView(people.maya!, "up_0000000000", root),
-    ).toBeNull();
-    expect(
-      await getImportOriginalFile(people.maya!, "../../etc", root),
-    ).toBeNull();
-  });
-
-  it("an upload whose files are gone reads as missing, not as an error", async () => {
-    const id = await uploadOf(await importTxt());
-    rmSync(join(root, id), { recursive: true });
-    expect(existsSync(join(root, id))).toBe(false);
-    expect(await getImportOriginalView(people.maya!, id, root)).toBeNull();
-    expect(await getImportOriginalFile(people.maya!, id, root)).toBeNull();
+    expect(res).toEqual({ ok: false, ...REQUEST_REFUSALS.contentTypeGone });
+    expect(importStatus(res)).toBe(403);
   });
 });

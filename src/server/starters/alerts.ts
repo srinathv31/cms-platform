@@ -1,7 +1,7 @@
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { Channel, JSONContent, Variable } from "@/domain/types";
-import { emptyBody, inlineDoc, linesDoc } from "../seed/content";
-import type { VarKey, VariableKit } from "../seed/variables";
+import { emptyBody, inlineDoc, linesDoc } from "@/server/documents/build";
+import type { VarKey, VariableKit } from "@/server/documents/variables";
 
 // The Alert starters: a push and an SMS, with no body (decision 0034). Each passes submit's message
 // rules as it comes (starters.test.ts): its SMS text is GSM-7 and within the Alert's 3 parts with the

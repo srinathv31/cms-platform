@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // The server's configuration: every setting the deployment chooses, read from the environment in this one
 // file, once, typed and validated. Nothing else in the app reads a setting from `process.env`
-// (`db/client.ts` and `import/store.ts` still read their own, `DATABASE_URL` and `UPLOADS_DIR`, and move
+// (`db/client.ts` and `services/local/uploads.ts` still read their own, `DATABASE_URL` and `UPLOADS_DIR`, and move
 // here when they are next touched). A setting that is not valid throws when this module loads, naming the
 // variable, rather than falling back to a value nobody chose. `src/instrumentation.ts` loads this module
 // when the server starts, so a bad value stops the server at boot instead of failing the first request.

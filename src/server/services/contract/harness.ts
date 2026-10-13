@@ -7,7 +7,7 @@ import type {
   Variable,
   VersionState,
 } from "@/domain/types";
-import type { TestHooks } from "../options";
+import type { IdSource, TestHooks } from "../options";
 import type { RequestContext, Services } from "../types";
 
 // What the contract suite needs from an implementation to run its cases (decision 0068). Each implementation
@@ -36,6 +36,11 @@ export interface ContractHarness {
   as(userId: string): Promise<RequestContext>;
   /** Sets (or clears) the hooks the next commands run with (`TestHooks`), e.g. a competing compare-and-set write. */
   hooks(hooks: TestHooks): void;
+  /**
+   * Sets (or clears, for random ids) the source the backend draws a new template's id from, so a case can force a
+   * collision (decision 0060). For Java a test hook; a run that can't force one skips those cases.
+   */
+  ids(source: IdSource | undefined): void;
   /**
    * Runs the backend's scheduled jobs at `at`: the access sweep (recertification lapses, the inactivity flag and
    * suspension), then the sunset sweep. Locally and in the fake a direct call; for Java a test endpoint, since
@@ -90,6 +95,65 @@ export interface ContractProbe {
    * P4a); its writers until a moved read shows them (approve's maker-checker, plan P1). Null when there is none.
    */
   version(filter: { versionId: string }): Promise<ProbeVersion | null>;
+  /**
+   * A template as stored, with its version rows and every audit row that names it (`template.created` names no
+   * version). Null when there is none. The rows' facts until a moved read serves them (plan P4a).
+   */
+  template(filter: { templateId: string }): Promise<ProbeTemplate | null>;
+  /** Every template's id: what a refused create must leave as it was. */
+  templateIds(): Promise<string[]>;
+  /** A template's comment threads with their comments, in the order they were written, until `comments.threads` moves (plan P4a). */
+  threads(filter: { templateId: string }): Promise<ProbeThread[]>;
+}
+
+/** A template row, its version rows and the audit rows that name it, as facts. */
+export interface ProbeTemplate {
+  teamId: string;
+  contentTypeId: string;
+  starterKey: string | null;
+  createdBy: string;
+  /** ISO. */
+  createdAt: string;
+  /** In the order they were written. */
+  versions: ProbeVersionRow[];
+  /** In the order they were written. */
+  audit: ProbeAuditEvent[];
+}
+
+/** A version row's content and bookkeeping, as facts. */
+export interface ProbeVersionRow {
+  id: string;
+  state: VersionState;
+  rev: number;
+  name: string;
+  body: JSONContent;
+  variables: Variable[];
+  channels: Channel[];
+  channelFields: ChannelFields;
+  sampleSets: SampleSet[];
+  /** Who wrote it (maker-checker), in the order they first did. */
+  writers: string[];
+  basedOnVersionId: string | null;
+  importUploadId: string | null;
+  createdBy: string;
+  /** ISO. */
+  createdAt: string;
+}
+
+/** A comment thread and what was said in it, as facts. */
+export interface ProbeThread {
+  id: string;
+  /** The version it began on. */
+  originVersionId: string;
+  blockId: string;
+  quote: string | null;
+  status: "open" | "resolved";
+  resolvedBy: string | null;
+  /** ISO. */
+  resolvedAt: string | null;
+  /** ISO. */
+  createdAt: string;
+  comments: { authorId: string; body: string; kind: string; at: string }[];
 }
 
 /** A version row as the probe answers it: the facts a case compares, never its instants. */
@@ -104,5 +168,27 @@ export function probeVersion(v: ProbeVersion): ProbeVersion {
     channelFields: v.channelFields,
     sampleSets: v.sampleSets,
     writers: v.writers,
+  };
+}
+
+/** A version row as the probe answers it: the facts a case compares, with its instant as ISO. */
+export function probeVersionRow(
+  v: Omit<ProbeVersionRow, "createdAt"> & { createdAt: Date },
+): ProbeVersionRow {
+  return {
+    id: v.id,
+    state: v.state,
+    rev: v.rev,
+    name: v.name,
+    body: v.body,
+    variables: v.variables,
+    channels: v.channels,
+    channelFields: v.channelFields,
+    sampleSets: v.sampleSets,
+    writers: v.writers,
+    basedOnVersionId: v.basedOnVersionId,
+    importUploadId: v.importUploadId,
+    createdBy: v.createdBy,
+    createdAt: v.createdAt.toISOString(),
   };
 }

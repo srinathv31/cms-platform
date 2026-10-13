@@ -830,9 +830,9 @@ new id on a unique violation, at most three times. Consumers keep it, so it neve
 product owner defines one, is a separate field and never `templateId` unless the product owner says so; whether the
 `UC-` prefix stays is the product owner's question too.
 
-**Node today:** `freshTemplateId` (`src/server/templates/create.ts`) reads up to four times for an unused id and then
-inserts, with no retry on a unique violation. That is safe with SQLite's one writer and not with two concurrent
-creates, which is why the Java create retries.
+**Node today:** the local implementation's create draws an id, inserts, and writes again with another id when the
+insert finds it taken, three attempts in all (`src/server/services/template-id.ts`, decision 0060); the Java create
+does the same around its transaction.
 
 Two details for the port:
 

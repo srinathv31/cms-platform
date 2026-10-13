@@ -4,7 +4,7 @@ import { configChanged } from "@/domain/platform-config/effects";
 import { DEFAULT_SMS_MAX_PARTS } from "@/domain/platform-config/limits";
 import type { Channel } from "@/domain/types";
 import type { SeedCtx } from "./context";
-import { REQUIRED_SECTIONS } from "./content";
+import { REQUIRED_SECTIONS } from "@/server/documents/build";
 
 export const CONTENT_TYPE_ID = "ct_disclosure";
 export const CHANNELS_ALL: Channel[] = ["pdf", "web", "email"];

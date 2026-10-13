@@ -1,6 +1,6 @@
 import type { JSONContent, Variable } from "@/domain/types";
-import { callout, disclosure, p, table, ul } from "../seed/content";
-import type { VariableKit } from "../seed/variables";
+import { callout, disclosure, p, table, ul } from "@/server/documents/build";
+import type { VariableKit } from "@/server/documents/variables";
 
 // Card offer terms: a rewards offer written the way the Coral Offers templates are.
 //

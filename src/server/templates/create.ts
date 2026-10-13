@@ -1,89 +1,26 @@
 import "server-only";
-import { eq } from "drizzle-orm";
 import {
+  ALL_CHANNEL_FIELDS,
+  channelFieldValues,
+  channelFieldsFrom,
+  type ChannelFieldsPatch,
+} from "@/domain/channel-fields";
+import {
+  BLANK_STARTER_KEY,
+  DEFAULT_CHANNELS,
+  initialTemplateName,
   newTemplateChannels,
-  newTemplateContentType,
-  type NewTemplateChanges,
 } from "@/domain/lifecycle/drafts";
-import type {
-  DraftFields,
-  LifecycleResult,
-  StarterContent,
-} from "@/domain/lifecycle/types";
+import type { DraftContent, StarterContent } from "@/domain/lifecycle/types";
 import { conformToSections } from "@/domain/platform-config/sections";
-import type { Channel, ChannelFamily, RequiredSection } from "@/domain/types";
-import { db, type Db } from "@/server/db/client";
-import { templates, versions } from "@/server/db/schema/ucomp";
-import { writeEffects } from "@/server/services/local/effects";
-import type { Tx } from "@/server/services/local/transaction";
-import { newId, newTemplateId } from "@/server/ids";
+import type { Channel, RequiredSection } from "@/domain/types";
+import { prepareBody, prepareField } from "@/server/documents/prepare";
+import { newId } from "@/server/ids";
 
-// The write side of "a new template and its first draft", shared by New template (a starter,
-// src/server/actions/create-template.ts) and Import a file (src/server/import/create.ts). The
-// callers check permissions and build the lifecycle result; this inserts it in their transaction.
-
-/** A draft's row in `versions`. */
-export function draftRow(
-  draft: DraftFields,
-  ids: { id: string; templateId: string },
-) {
-  return {
-    id: ids.id,
-    templateId: ids.templateId,
-    number: draft.number,
-    round: draft.round,
-    state: draft.state,
-    name: draft.name,
-    basedOnVersionId: draft.basedOnVersionId,
-    body: draft.body,
-    channelFields: draft.channelFields,
-    channels: draft.channels,
-    variables: draft.variables,
-    sampleSets: draft.sampleSets,
-    contractChanges: draft.contractChanges,
-    currentStage: draft.currentStage,
-    rev: draft.rev,
-    createdBy: draft.createdBy,
-    writers: draft.writers,
-    createdAt: draft.createdAt,
-    updatedAt: draft.updatedAt,
-  };
-}
-
-/** `db`, or the caller's transaction (`tx`) when it reads inside one. */
-type Reader = Pick<Db, "query">;
-
-/** A template id nobody has. A collision on 6 Crockford characters is one in a billion; check anyway. */
-export async function freshTemplateId(reader: Reader = db): Promise<string> {
-  let templateId = newTemplateId();
-  for (
-    let i = 0;
-    i < 4 &&
-    (await reader.query.templates.findFirst({
-      where: eq(templates.id, templateId),
-    }));
-    i++
-  ) {
-    templateId = newTemplateId();
-  }
-  return templateId;
-}
-
-/**
- * The content type a new template of `family` is made on, and keeps for life: the domain chooses it
- * from the platform's content types (`newTemplateContentType`). A document (New template's Document,
- * and every import) gets Disclosure as seeded, an alert gets Alert. Refused when no content type is of
- * that family.
- */
-export async function newTemplateType(
-  family: ChannelFamily,
-  reader: Reader = db,
-) {
-  return newTemplateContentType(
-    family,
-    await reader.query.contentTypes.findMany(),
-  );
-}
+// The BFF's half of "a new template and its first draft", shared by New template (a starter,
+// src/server/actions/create-template.ts) and Import a file (src/server/import/create.ts). The BFF builds the
+// draft and makes its documents ready for storage (decision 0065); the backend stores it
+// (`TemplateService.create`, `createImported`). Nothing here reads a database or a clock.
 
 /**
  * A first draft shaped to the content type as it is now (Platform settings), for every way a template
@@ -109,41 +46,54 @@ export function conformToContentType(
   };
 }
 
-export interface NewTemplateRows {
-  templateId: string;
-  teamId: string;
-  contentTypeId: string;
-  versionId: string;
-  created: LifecycleResult<NewTemplateChanges>;
-  at: Date;
-  actorId: string;
-  /** The upload an imported draft came from (`versions.import_upload_id`). */
-  importUploadId?: string | null;
+/**
+ * The draft a template starts with, from a starter already fitted to its content type: Blank is untitled and
+ * keeps no starter key, an example keeps its own name and key. An import has no starter key either.
+ */
+export function draftContentOf(
+  starter: StarterContent,
+  options: { imported?: boolean } = {},
+): DraftContent {
+  return {
+    name: initialTemplateName(starter),
+    body: starter.body,
+    channelFields: starter.channelFields ?? {},
+    channels: [...(starter.channels ?? DEFAULT_CHANNELS.document)],
+    variables: [...starter.variables],
+    sampleSets: [...starter.sampleSets],
+    starterKey:
+      options.imported || starter.key === BLANK_STARTER_KEY
+        ? null
+        : starter.key,
+  };
 }
 
-/** Inserts the template, its first draft and the effects (the audit event) in the caller's transaction. */
-export async function insertNewTemplate(
-  tx: Tx,
-  rows: NewTemplateRows,
-): Promise<void> {
-  const { template, draft } = rows.created.changes;
-  await tx.insert(templates).values({
-    id: rows.templateId,
-    teamId: rows.teamId,
-    contentTypeId: rows.contentTypeId,
-    createdBy: template.createdBy,
-    createdAt: template.createdAt,
-    starterKey: template.starterKey,
-  });
-  await tx.insert(versions).values({
-    ...draftRow(draft, { id: rows.versionId, templateId: rows.templateId }),
-    ...(rows.importUploadId ? { importUploadId: rows.importUploadId } : {}),
-  });
-  await writeEffects(tx, rows.created.effects, {
-    at: rows.at,
-    actorId: rows.actorId,
-    teamId: rows.teamId,
-    templateId: rows.templateId,
-    versionId: rows.versionId,
-  });
+export type PreparedDraft =
+  { ok: true; draft: DraftContent } | { ok: false; message: string };
+
+/**
+ * The draft with its documents ready for storage, as an autosave of them would store them
+ * (`prepareBody`, and `prepareField` for each channel field that has a value): normalized, checked, with block
+ * ids. A document the check refuses is `{ ok: false, message }` with the check's sentence, and nothing is stored.
+ */
+export function prepareDraftContent(draft: DraftContent): PreparedDraft {
+  const body = prepareBody(draft.body);
+  if (!body.ok) return body;
+  const fields: ChannelFieldsPatch = {};
+  const values = channelFieldValues(draft.channelFields);
+  for (const field of ALL_CHANNEL_FIELDS) {
+    const value = values[field.id];
+    if (value === null) continue;
+    const prepared = prepareField(value, field);
+    if (!prepared.ok) return prepared;
+    fields[field.id] = prepared.doc;
+  }
+  return {
+    ok: true,
+    draft: {
+      ...draft,
+      body: body.doc,
+      channelFields: channelFieldsFrom(fields),
+    },
+  };
 }
