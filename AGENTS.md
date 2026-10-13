@@ -67,7 +67,8 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 Not enforced yet; follow them anyway:
 
 - New business rules go in `src/domain`. Never add one to an action, a query, or a component.
-- Only `src/server` imports the database client.
+- Only `src/server` imports the database client: in the end only the local implementation (`src/server/services/local`),
+  `src/server/db` and the seed (lint warns on the rest).
 - Read models return permissions decided (`can: { action: PermissionResult }`). Components render them; they don't
   call `can()` or compare refusal sentences.
 
@@ -94,7 +95,11 @@ Next.js API; Next's own note about it is at the end of this file.
   consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
   throw only for bugs. Inside a transaction, read and write through `tx`, never `db`. `serverAction` in
   [src/server/actions/kit.ts](src/server/actions/kit.ts) runs these steps; every action is written on it.
-- Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts (`src/instrumentation.ts`): `DEMO_MODE` today. The demo tools (reset, clock
+- The backend seam ([src/server/services](src/server/services/README.md)) is being put in place: an action that has
+  moved reads the request context, parses, and calls `services()` (`call`); the permission check, the transaction and
+  the effects run behind it, in the local implementation (`runCommand`), and in the in-memory fake its tests use.
+  Move an area as that README says; don't add new code that reads `getViewer()`, `now()` or the database outside it.
+- Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts (`src/instrumentation.ts`): `DEMO_MODE` and `STENCIL_BACKEND`. The demo tools (reset, clock
   advance, persona switcher, Demo pill) run only when it is on and are off when it is unset: a new demo path checks it
   too ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).
 - A domain rule takes facts and `now`, writes nothing, and returns a refusal (a stable `code` and the sentence people

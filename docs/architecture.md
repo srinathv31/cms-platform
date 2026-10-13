@@ -73,9 +73,11 @@ Conventions that nothing enforces yet, and where the code already breaks them:
    renders the header and tab bar.
 3. [versions-content.tsx](../src/components/versions/versions-content.tsx), a server component, awaits `params` and
    calls `getVersions()` from [queries/versions.ts](../src/server/queries/versions.ts).
-4. The read model checks access (`requireTemplate`), reads the demo time, queries the tables, and returns
-   `VersionsData`: plain, serializable, dates as ISO strings, one entry per version number with its review rounds
-   folded into it, and `can` results decided per version.
+4. The read model reads the request context ([context/request.ts](../src/server/context/request.ts): the viewer and
+   the demo time, once per request), checks the space, and asks the backend through the service interfaces
+   (`services().versions.history`, [services/](../src/server/services/README.md)). The backend checks access, queries
+   the tables and decides `can` per version; the read model words and lays out the facts and returns `VersionsData`:
+   plain, serializable, dates as ISO strings, one entry per version number with its review rounds folded into it.
 5. Client components (`version-actions.tsx`, `sunset-dialog.tsx`) receive it as props.
 
 Request data (cookies, `params`, database reads, the clock) is read only inside `<Stream>`. With Cache Components,
@@ -89,12 +91,15 @@ load." in the tab's place, under the header and the tab bar ([Errors](../src/app
    `useActionRun` ([use-action-run.ts](../src/components/primitives/use-action-run.ts)): one request at a time,
    closes on `ok`, shows `reason` otherwise.
 2. `setSunset` in [actions/review.ts](../src/server/actions/review.ts) runs on the server action kit, `serverAction`
-   in [actions/kit.ts](../src/server/actions/kit.ts): `getViewer()`, zod parse, permission check, `now()` once,
-   then one transaction. Inside it: re-read the version, call the domain transition, write the changes with a
-   compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row, notifications, consumer
-   notices) with `writeEffects`. A refusal anywhere rolls the transaction back and is the answer. On success,
-   `revalidatePath()` and `refresh()`.
-3. The transition (`setSunset` in [lifecycle/sunset.ts](../src/domain/lifecycle/sunset.ts)) decides; the action only writes. A
+   in [actions/kit.ts](../src/server/actions/kit.ts): the request context (the viewer and `now`, once; `signed_out`
+   without a viewer), zod parse, then the service, `services().review.setSunset`. On success, `revalidatePath()` and
+   `refresh()`.
+3. Behind the service, the local implementation ([services/local/review.ts](../src/server/services/local/review.ts))
+   checks the permission, then runs one transaction: re-read the version, call the domain transition, write the
+   changes with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row,
+   notifications, consumer notices) with `writeEffects`. A refusal anywhere rolls the transaction back and is the
+   answer. After the port, the Java API does this step.
+4. The transition (`setSunset` in [lifecycle/sunset.ts](../src/domain/lifecycle/sunset.ts)) decides; the command only writes. A
    refusal is a value with a stable `code`, which code branches on, and a `reason`, the sentence the person reads
    ([refusals.ts](../src/domain/refusals.ts)).
 

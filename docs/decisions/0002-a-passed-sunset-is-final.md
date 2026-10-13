@@ -4,6 +4,8 @@ Status: Accepted
 Amended 2026-10-11: the Consequences line below that says five other places still test "sunset passed" themselves no
 longer holds: `sunsetPassed` is the one test now ([0026](0026-a-passed-sunset-is-recorded-by-a-sweep.md), handoff
 review D7, PR #36).
+Amended 2026-10-12: `versionActions` moved to `src/domain/lifecycle/version-actions.ts`; the service decides it
+and the Versions read model carries its answer ([0070](0070-rules-and-permission-checks-sit-behind-the-service-interfaces.md)).
 Date: 2026-10-08
 
 ## Context
