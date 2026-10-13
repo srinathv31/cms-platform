@@ -14,8 +14,8 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 1    | 3      | 4   | 8     |
-| Partly fixed | 1        | 4    | 6      | 2   | 13    |
+| Open         | 0        | 1    | 2      | 4   | 7     |
+| Partly fixed | 1        | 4    | 7      | 2   | 14    |
 | Fixed        | 1        | 21   | 31     | 34  | 87    |
 | Deferred     | 0        | 2    | 1      | 0   | 3     |
 
@@ -279,7 +279,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 #### N23 · Low: The render log doesn't record which platform a push was for
 
 - **Status:** Fixed. `render_log.platform` (migration 0013, null for every channel but push and for older rows) is set by `runRender` and copied by `writeRenderLog`; the seed names a phone on every push, a template's Usage splits Push by iPhone and Android, and "Recent failures" names the phone. The team Overview's channel mix still shows Push as one share ([decision 0039](decisions/0039-the-render-log-keeps-a-pushs-platform.md)).
-- **Where:** `src/server/db/schema/ucomp.ts` (`renderLog`); `src/domain/render/types.ts` (`RenderLogEntry`); `src/server/render/log.ts` (`writeRenderLog`); `src/server/queries/usage.ts`
+- **Where:** `src/server/db/schema/ucomp.ts` (`renderLog`); `src/domain/render/types.ts` (`RenderLogEntry`); `src/server/services/local/render/log.ts` (`writeRenderLog`); `src/server/queries/usage.ts`
 - **What happens:** A push is rendered for one platform, which the request names (`platform`, `ios` or `android`, `ApiPushPlatform` in `src/contracts/api-v1.ts`): iPhone shows a subtitle and Android never does, and the 4,096-byte limit is checked per platform (`push_payload_too_large` carries the platform). The log row keeps only `channel: "push"`, so Usage can't split pushes by iPhone and Android, and a failed push can't be traced to the platform it failed on. Rows already written can't gain it later. The platform is a setting, not a variable value, so the log's keys-only rule allows it. Noticed while building push and SMS (PR #46).
 - **Fix:** Add a nullable `platform` column to `render_log` (a migration; null for every channel but push) and `platform` to `RenderLogEntry`, set it where the render route builds the entry, and copy it by name in `writeRenderLog` like the other fields. Seed the push history with both platforms. Then show it wherever the channel split is drawn (the Push share, by iPhone and Android, with the split in N22) and in "Recent failures".
 - **Evidence:** traced
@@ -581,7 +581,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### I5 · High: A draft rename goes live without review
 
 - **Status:** Fixed. The name is a version field (`versions.name`; `templates.name` is gone), so a rename changes only the draft, shows in the submit dialog, the review rail and Compare, and reaches the render titles, the API and notices only when its version goes live ([decision 0016](decisions/0016-the-name-is-versioned.md)).
-- **Where:** `src/server/drafts/apply-patch.ts` line 165; `src/server/render/channels/web.ts` line 79
+- **Where:** `src/server/services/local/drafts.ts` (autosave's write, `server/drafts/apply-patch.ts` then); `src/server/render/channels/web.ts` line 79
 - **What happens:** Autosave writes `templates.name` directly. The name isn't versioned, so the Active version's web ``, PDF title metadata, API `name` and notice payloads change the moment an author types. The RenderDoc documents the name as internal-only, yet browsers show both titles to customers.
 - **Fix:** Make the name a version field, and give customer output its own title (the first heading or a dedicated field).
 - **Evidence:** verified
@@ -858,8 +858,8 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B5 · Medium: Autosave conflict recovery reads the audit log
 
-- **Status:** Open
-- **Where:** `src/server/drafts/apply-patch.ts` line 122
+- **Status:** Partly fixed. Autosave runs behind the seam (`DraftService.save`, lane F's step 2b-1), and the recovery's one read of the audit log is `lastSaveOf` in the local implementation, beside the save; the rule itself is the domain's `sessionOwnsRev`, given only the rev the session's last save produced, so the Java API answers it from the version row's session columns instead ([decision 0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and the contract suite pins the behaviour, not the audit row. The prototype still reads the session's `draft.edited` row.
+- **Where:** `src/server/services/local/drafts.ts` (`lastSaveOf`)
 - **What happens:** Recovering from a lost save response reads `rev` from the `draft.edited` audit row's JSON. If audit moves to Spring or an event stream, autosave conflict handling breaks.
 - **Fix:** Store `lastSaveSession` and `rev` on the version row.
 - **Evidence:** traced

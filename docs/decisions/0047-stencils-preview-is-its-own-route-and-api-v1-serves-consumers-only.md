@@ -2,6 +2,7 @@
 
 Status: Accepted
 Amended 2026-10-12: the render engine moves to Java ([0067](0067-java-renders-every-channel.md)), so after the port the preview route calls Java's render endpoint with the viewer's identity, as the first Consequences line foresaw, and its error body moves with `/api/v1`'s to the UCOMP API's format ([0056](0056-api-v1-errors-follow-the-ucomp-api-error-format.md)).
+Amended 2026-10-13: the preview route asks the backend to render through the service interfaces (`services().render.preview`, with the request's context and its correlation id), which on this app's database runs the consumer route's pipeline (`runRender` in `src/server/services/local/render/render-template.ts`, where `previewAllowed` is). Nobody signed in is refused `preview_forbidden` by the route, without asking the backend.
 Date: 2026-10-11
 
 ## Context

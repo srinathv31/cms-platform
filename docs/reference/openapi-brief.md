@@ -517,7 +517,7 @@ before the notices were reset. Start again without after." or "limit must be a n
 
 `POST /api/v1/templates/{templateId}/render` with an `ApiRenderRequest` body. Code:
 [the route](../../src/app/api/v1/templates/[templateId]/render/route.ts), `readRenderRequest` and
-`renderSuccessResponse` in `src/server/api/render-http.ts`, and the pipeline in `src/server/render/render-template.ts`.
+`renderSuccessResponse` in `src/server/api/render-http.ts`, and the pipeline in `src/server/services/local/render/render-template.ts`.
 
 The body is JSON, at most 1,000,000 bytes: refused from a declared `Content-Length` before anything is read, and
 otherwise as soon as the bytes read pass the limit (a chunked body has no length). Nothing past the limit is buffered.
@@ -1133,20 +1133,20 @@ Each of these needs a decision this brief doesn't make.
 
 ## 16. Where each rule lives in the code
 
-| What                                                                          | Where                                                                                                                                        |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| The wire shapes                                                               | `src/contracts/api-v1.ts`, [src/contracts/README.md](../../src/contracts/README.md)                                                          |
-| The status table and the drift checks between the domain's types and the wire | `src/domain/golive-types.ts`                                                                                                                 |
-| The four handlers                                                             | [src/app/api/v1](../../src/app/api/v1/templates/route.ts) and its siblings                                                                   |
-| Shared headers and the error response                                         | `src/server/api/http.ts`                                                                                                                     |
-| The render body and the render responses                                      | `src/server/api/render-http.ts`                                                                                                              |
-| The GET routes' reads                                                         | `src/server/queries/consumer-api.ts`                                                                                                         |
-| Cursors                                                                       | `src/domain/golive/cursor.ts`                                                                                                                |
-| The GET routes' parameters and sentences                                      | `src/domain/golive/api-errors.ts`                                                                                                            |
-| Notices on the wire                                                           | `src/domain/golive/notices.ts`                                                                                                               |
-| Contract changes and the JSON Schema                                          | `src/domain/golive/contract-diff.ts`, `src/domain/golive/json-schema.ts`, `src/editor/model/contract.ts`                                     |
-| The render pipeline, version rules, values and errors                         | `src/server/render/render-template.ts`, `src/domain/render/version-rules.ts`, `src/domain/render/validate.ts`, `src/domain/render/errors.ts` |
-| Who gets a notice, and `seq`                                                  | `src/server/services/local/effects.ts`                                                                                                       |
-| Sunset days and zones                                                         | `src/domain/business-zone.ts`                                                                                                                |
-| A consumer's client (Coral)                                                   | `src/simulator/ucomp-api.ts`                                                                                                                 |
-| Executable examples                                                           | the `route.test.ts` beside each handler, `e2e/api/consumer.spec.ts`, `e2e/api/render.spec.ts`, and the golden cases                          |
+| What                                                                          | Where                                                                                                                                                       |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The wire shapes                                                               | `src/contracts/api-v1.ts`, [src/contracts/README.md](../../src/contracts/README.md)                                                                         |
+| The status table and the drift checks between the domain's types and the wire | `src/domain/golive-types.ts`                                                                                                                                |
+| The four handlers                                                             | [src/app/api/v1](../../src/app/api/v1/templates/route.ts) and its siblings                                                                                  |
+| Shared headers and the error response                                         | `src/server/api/http.ts`                                                                                                                                    |
+| The render body and the render responses                                      | `src/server/api/render-http.ts`                                                                                                                             |
+| The GET routes' reads                                                         | `src/server/queries/consumer-api.ts`                                                                                                                        |
+| Cursors                                                                       | `src/domain/golive/cursor.ts`                                                                                                                               |
+| The GET routes' parameters and sentences                                      | `src/domain/golive/api-errors.ts`                                                                                                                           |
+| Notices on the wire                                                           | `src/domain/golive/notices.ts`                                                                                                                              |
+| Contract changes and the JSON Schema                                          | `src/domain/golive/contract-diff.ts`, `src/domain/golive/json-schema.ts`, `src/editor/model/contract.ts`                                                    |
+| The render pipeline, version rules, values and errors                         | `src/server/services/local/render/render-template.ts`, `src/domain/render/version-rules.ts`, `src/domain/render/validate.ts`, `src/domain/render/errors.ts` |
+| Who gets a notice, and `seq`                                                  | `src/server/services/local/effects.ts`                                                                                                                      |
+| Sunset days and zones                                                         | `src/domain/business-zone.ts`                                                                                                                               |
+| A consumer's client (Coral)                                                   | `src/simulator/ucomp-api.ts`                                                                                                                                |
+| Executable examples                                                           | the `route.test.ts` beside each handler, `e2e/api/consumer.spec.ts`, `e2e/api/render.spec.ts`, and the golden cases                                         |

@@ -118,22 +118,24 @@ variations to avoid.
    refusal retrying can't fix (a conflict) stops it for good: the page turns read-only and offers Reload
    ([decision 0020](decisions/0020-autosave-never-drops-edits-silently.md)).
 2. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
-   client. It checks that the viewer may edit the draft before reading a byte of the body, reads the body with a
-   byte counter that stops at 2 MB (413 past it), parses the patch, and calls `saveDraft`.
-3. [apply-patch.ts](../src/server/drafts/apply-patch.ts) prepares the body and the channel fields (each by its id,
-   such as `"email.subject"`) with [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against
-   the document limits and the editor schema, block ids added. Import stores documents through the same function.
-   Then, in one transaction, it checks permission, the `draft` state, and `rev` (tolerating a lost response from the
-   same session), writes with a compare-and-set (the channel fields laid over the stored ones), adds the saver to
-   the version's `writers` (nobody decides a version they wrote), and keeps one `draft.edited` audit row per editing
-   session. Nothing is refreshed; the client already has the content.
+   client. It asks the backend whether the viewer may edit the draft (`drafts.saveAccess`) before reading a byte of
+   the body, reads the body with a byte counter that stops at 2 MB (413 past it), and parses the patch.
+3. The route prepares the body and the channel fields (each by its id, such as `"email.subject"`) with
+   [prepare-patch.ts](../src/server/drafts/prepare-patch.ts), over [prepare.ts](../src/server/documents/prepare.ts):
+   normalized, checked against the document limits and the editor schema, block ids added. Import stores documents
+   through the same function. Then it calls `drafts.save` ([local/drafts.ts](../src/server/services/local/drafts.ts)
+   on this app's database, deciding with [autosave.ts](../src/domain/lifecycle/autosave.ts)): in one transaction it
+   checks permission, the `draft` state, and `rev` (tolerating a lost response from the same session), writes with a
+   compare-and-set (the channel fields laid over the stored ones), adds the saver to the version's `writers` (nobody
+   decides a version they wrote), and keeps one `draft.edited` audit row per editing session. Nothing is refreshed;
+   the client already has the content.
 
 ### A consumer render, and the preview that shares it
 
 `POST /api/v1/templates/{id}/render`
 ([route.ts](../src/app/api/v1/templates/[templateId]/render/route.ts)) runs
-[render-template.ts](../src/server/render/render-template.ts), whose header lists every step and the error each
-returns. The rules are specified in [render-spec.md](render-spec.md). The one behind all of them: every channel
+[render-template.ts](../src/server/services/local/render/render-template.ts), the local implementation's render
+pipeline, whose header lists every step and the error each returns. The rules are specified in [render-spec.md](render-spec.md). The one behind all of them: every channel
 prints exactly what the author typed and saw, with no rounding, dropping, renumbering, or rewording.
 
 1. Find the template and version (404). A version number means its released version, else its latest round.
@@ -156,8 +158,8 @@ The golden files run the same engine on frozen inputs, so a golden file is exact
 The CMS preview is a separate route, `POST /api/templates/{id}/preview`
 ([route.ts](../src/app/api/templates/[templateId]/preview/route.ts)): it takes the person from the session, not an
 `X-Consumer-Id`, may name the review `round`, renders a draft or any state, skips the version rules and is logged as
-a preview. It runs the same `renderTemplate` and answers with the same bodies, so what an approver sees is what a
-consumer gets ([decision 0047](decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
+a preview. It asks the backend (`services().render.preview`), which runs the same pipeline, and answers with the
+same bodies, so what an approver sees is what a consumer gets ([decision 0047](decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 `/api/v1` serves consumers only and reads no session, so another backend can take it over without the browser's
 cookie. Coral calls the consumer URL over HTTP from the server, as a real consumer would.
 

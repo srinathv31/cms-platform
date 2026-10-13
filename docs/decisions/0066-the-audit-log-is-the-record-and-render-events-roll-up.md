@@ -16,7 +16,7 @@ consumer (`integration.ts`), and for the notice audience, the consumers with a r
 sweep writes its row once by checking whether a `version.sunset_passed` row exists (`src/server/sunset-sweep.ts`,
 [0026](0026-a-passed-sunset-is-recorded-by-a-sweep.md)), and autosave recovers a lost response from the `draft.edited`
 row's `rev` ([B5](../handoff-review.md#b5--medium-autosave-conflict-recovery-reads-the-audit-log)). Autosave also
-updates that row in place, merging every save of an editing session (`src/server/drafts/apply-patch.ts`). A regulated
+updates that row in place, merging every save of an editing session (`server/drafts/apply-patch.ts` then; `src/server/services/local/drafts.ts` now). A regulated
 audit trail is usually kept for years and must not change.
 
 ## Decision

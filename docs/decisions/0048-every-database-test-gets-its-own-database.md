@@ -51,6 +51,6 @@ a shuffled run failed dozens of tests, a single `-t` run failed too, and an agen
 - A test must not leave work in flight (an un-awaited write) for the next test's copy to race with. The previous
   copy is closed when the next test starts.
 - Test files that only read use the fixture too, so adding a write to one can't make it order-dependent. Three keep
-  their own setup: [apply-patch.test.ts](../../src/server/drafts/apply-patch.test.ts) refills its tables before each
+  their own setup: `apply-patch.test.ts` (in `server/drafts/` then) refills its tables before each
   test, [serialized-writes.test.ts](../../src/lib/serialized-writes.test.ts) makes a file per test, and
   [seed.test.ts](../../src/server/seed/seed.test.ts) seeds a database for each scenario it checks.

@@ -195,7 +195,7 @@ cookie), the request headers, or `connection()` before the database. A handler t
   builders live in [golive/api-errors.ts](../domain/golive/api-errors.ts).
 - `X-Consumer-Id` must name a registered consumer. The GET routes check it first with `requireConsumer` in
   [consumer-api.ts](../server/queries/consumer-api.ts); the notices route also requires it to match the path.
-  Render requires it too, and checks it in [render-template.ts](../server/render/render-template.ts). `/api/v1`
+  Render requires it too, and checks it in [render-template.ts](../server/services/local/render/render-template.ts). `/api/v1`
   reads no cookie and no session: Stencil's own previews are `POST /api/templates/[templateId]/preview`.
 - Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
   `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
@@ -236,9 +236,9 @@ without a persona cookie is signed out unless the demo tools are on, where it ac
 ([S2](../../docs/handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)).
 
 **The preview** (`POST /api/templates/[templateId]/preview`) is the one POST among them, because it carries the sample
-values. It reads the person from the request context (nobody signed in is refused `preview_forbidden`), renders
-through `renderTemplate` with `preview: true`,
-and answers with the same bodies, headers (plus `X-Stencil-Preview: true`) and `{ error: { code, message, details? } }`
+values. It reads the person from the request context (nobody signed in is refused `preview_forbidden` without asking
+the backend), checks the body, and asks the backend to render (`services().render.preview`, under the request's
+correlation id), and answers with the same bodies, headers (plus `X-Stencil-Preview: true`) and `{ error: { code, message, details? } }`
 errors as the consumer render route, through [server/api/render-http.ts](../server/api/render-http.ts) and
 `errorResponse`. It takes `version` as `"draft"` or a number, an optional `round`, and any state previews
 ([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
@@ -254,7 +254,7 @@ carries templates; the palette asks this route when it opens and as the viewer t
 `body_too_large`. Imports: `IMPORT_LIMITS.maxBytes` (10 MiB) plus 64 KiB of multipart room, 413 `import_too_large`. Every one
 refuses a declared `Content-Length` over its cap before reading, then reads with `readBodyCapped`, which counts bytes
 and stops at the cap, because a declared length is only a hint and a chunked body has none. Drafts and imports
-check permission before any byte is read: drafts from the version id in the path (`draftAccessRefusal`), imports from
+check permission before any byte is read: drafts from the version id in the path (`drafts.saveAccess`), imports from
 the team in the query. Render is anonymous, so the cap is all that stands before its read. Drafts and imports are
 route handlers, not server actions, because actions run one at a time per client and cap bodies at 1 MB.
 

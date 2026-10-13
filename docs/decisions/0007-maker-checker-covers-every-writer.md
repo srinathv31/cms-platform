@@ -28,7 +28,7 @@ How the code holds it:
 - **The writers live on the version**, in `versions.writers`, a JSON array of user ids
   ([ucomp.ts](../../src/server/db/schema/ucomp.ts)). A new draft starts with whoever started it
   (`createDraft`, `editActive`). Each autosave adds its saver inside the save's transaction
-  ([apply-patch.ts](../../src/server/drafts/apply-patch.ts)), and `submit` adds the submitter. Request changes copies
+  ([autosave.ts](../../src/domain/lifecycle/autosave.ts)), and `submit` adds the submitter. Request changes copies
   the in-review version's writers into the new draft, or merges them into a draft that is already open. The
   approver who asked for changes isn't a writer unless they later edit it. A draft started from the Active version
   starts a fresh set, so having written an earlier released version bars nobody.
