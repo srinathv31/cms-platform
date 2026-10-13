@@ -1,4 +1,12 @@
+import type { ChannelFields } from "@/domain/channel-fields";
 import type { ApiNotice } from "@/domain/golive-types";
+import type {
+  Channel,
+  JSONContent,
+  SampleSet,
+  Variable,
+  VersionState,
+} from "@/domain/types";
 import type { TestHooks } from "../options";
 import type { RequestContext, Services } from "../types";
 
@@ -54,12 +62,46 @@ export interface ProbeAuditEvent {
   details: Record<string, unknown> | null;
 }
 
+/** A version's content, rev and writers, as facts. */
+export interface ProbeVersion {
+  state: VersionState;
+  rev: number;
+  name: string;
+  body: JSONContent;
+  variables: Variable[];
+  channels: Channel[];
+  channelFields: ChannelFields;
+  sampleSets: SampleSet[];
+  /** Who wrote it (maker-checker), in the order they first did. */
+  writers: string[];
+}
+
 /**
  * Reads what a command wrote that no service read serves yet: SQL for the local implementation, the arrays for
- * the fake, test endpoints for Java. Replaced by `audit.activity` when it moves (plan P4a). Notifications are read
- * through `notifications.list`.
+ * the fake, test endpoints for Java. `auditEvents` is replaced by `audit.activity` when it moves (plan P4a).
+ * Notifications are read through `notifications.list`.
  */
 export interface ContractProbe {
   /** The audit rows about a version, in the order they were written. */
   auditEvents(filter: { versionId: string }): Promise<ProbeAuditEvent[]>;
+  /**
+   * A version as stored: what an autosave wrote. Its content until `templates.workspaceDocument` serves it (plan
+   * P4a); its writers until a moved read shows them (approve's maker-checker, plan P1). Null when there is none.
+   */
+  version(filter: { versionId: string }): Promise<ProbeVersion | null>;
+}
+
+/** A version row as the probe answers it: the facts a case compares, never its instants. */
+export function probeVersion(v: ProbeVersion): ProbeVersion {
+  return {
+    state: v.state,
+    rev: v.rev,
+    name: v.name,
+    body: v.body,
+    variables: v.variables,
+    channels: v.channels,
+    channelFields: v.channelFields,
+    sampleSets: v.sampleSets,
+    writers: v.writers,
+  };
 }

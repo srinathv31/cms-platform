@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach } from "vitest";
-import type { ContractHarness } from "../contract/harness";
+import { probeVersion, type ContractHarness } from "../contract/harness";
 import type { TestHooks } from "../options";
 import type { Services } from "../types";
 import { fakeConsumerNotices } from "./consumer-api";
@@ -82,6 +82,10 @@ export function fakeContractHarness(opts: { base: Date }): ContractHarness {
             versionId: e.versionId,
             details: e.details,
           }));
+      },
+      async version({ versionId }) {
+        const v = state!.versions.find((row) => row.id === versionId);
+        return v ? probeVersion(structuredClone(v)) : null;
       },
     },
   };

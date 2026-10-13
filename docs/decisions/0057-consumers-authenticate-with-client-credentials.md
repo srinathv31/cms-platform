@@ -7,7 +7,7 @@ Date: 2026-10-12
 
 A consumer names itself in `X-Consumer-Id: coral` and proves nothing
 ([S5](../handoff-review.md#s5--high-consumer-identity-is-a-self-asserted-header)): `requireConsumer` in
-`src/server/queries/consumer-api.ts` and the render pipeline in `src/server/render/render-template.ts` look the id up
+`src/server/queries/consumer-api.ts` and the render pipeline in `src/server/services/local/render/render-template.ts` look the id up
 in `consumers`, whose `client_name` column (`coral-offers-svc` in `src/server/seed/platform.ts`) nothing reads.
 Consumers exist only in the seed. Wave 1 already stopped two leaks: a caller that isn't a registered consumer writes no
 `render_log` row, and a notices path naming any consumer but the caller answers 403. There is no rate limit.

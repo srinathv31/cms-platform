@@ -6,14 +6,17 @@ import type { JSONContent, Variable, Viewer } from "@/domain/types";
 import * as schema from "@/server/db/schema/ucomp";
 import { findRound } from "@/server/services/local/find-round";
 import { standaloneDatabasePerTest } from "@/server/testing/review-fixtures";
-import { renderFailure } from "./engine";
-import { extractPdf } from "./golden/extract-pdf";
+import { renderFailure } from "@/server/render/engine";
+import { extractPdf } from "@/server/render/golden/extract-pdf";
 import {
   runRender,
   type RenderInput,
   type RenderResult,
 } from "./render-template";
-import { checkDocument, type RenderDocumentError } from "./schema-check";
+import {
+  checkDocument,
+  type RenderDocumentError,
+} from "@/server/render/schema-check";
 
 // The pipeline end to end against a temporary database filled by the real seed (every lifecycle
 // state is in it). runRender takes the database and the time, the way applyDraftPatch does.
@@ -22,8 +25,9 @@ import { checkDocument, type RenderDocumentError } from "./schema-check";
 vi.mock("@/server/db/client", () => ({ db: null }));
 vi.mock("@/server/clock", () => ({ now: vi.fn() }));
 // Spy on the web adapter so one test can make it throw.
-vi.mock("./channels/web", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./channels/web")>();
+vi.mock("@/server/render/channels/web", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/server/render/channels/web")>();
   return { renderWeb: vi.fn(actual.renderWeb) };
 });
 
@@ -857,7 +861,7 @@ describe("runRender: consumer, channel and value errors are logged", () => {
 
 describe("runRender: render failures", () => {
   it("an adapter that throws is render_failed (500), logged, and the server log leaves the message out", async () => {
-    const { renderWeb: web } = await import("./channels/web");
+    const { renderWeb: web } = await import("@/server/render/channels/web");
     vi.mocked(web).mockImplementationOnce(() => {
       throw new Error("could not lay out Maya Chen");
     });

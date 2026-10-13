@@ -18,7 +18,7 @@ import { QUOTE_MAX } from "@/domain/comments";
 import { requiredOutputs } from "@/domain/review-outputs";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
-import { DRAFT_FIELDS, type DraftField } from "@/server/drafts/audit-merge";
+import { DRAFT_FIELDS, type DraftField } from "@/domain/lifecycle/autosave";
 import type { SeedCtx, TemplateRef, VersionRef } from "../context";
 import { blockId, blockText } from "../content";
 import { SEED_CONTENT_TYPES } from "../platform";

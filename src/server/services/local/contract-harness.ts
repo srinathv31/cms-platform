@@ -1,14 +1,14 @@
 import { eq, sql } from "drizzle-orm";
 import { beforeAll, beforeEach } from "vitest";
 import type { Db } from "@/server/db/client";
-import { auditEvents } from "@/server/db/schema/ucomp";
+import { auditEvents, versions } from "@/server/db/schema/ucomp";
 import { listNotices } from "@/server/queries/consumer-api";
 import { runSunsetSweep } from "@/server/sunset-sweep";
 import {
   loadPersona,
   seededDatabasePerTest,
 } from "@/server/testing/review-fixtures";
-import type { ContractHarness } from "../contract/harness";
+import { probeVersion, type ContractHarness } from "../contract/harness";
 import type { TestHooks } from "../options";
 import { localServices } from "./index";
 
@@ -82,6 +82,12 @@ export function localContractHarness(opts: { base: Date }): ContractHarness {
           versionId: e.versionId,
           details: e.details,
         }));
+      },
+      async version({ versionId }) {
+        const v = await db!.query.versions.findFirst({
+          where: eq(versions.id, versionId),
+        });
+        return v ? probeVersion(v) : null;
       },
     },
   };
