@@ -467,80 +467,125 @@ export function activeFilterCount(filters: AuditFilters): number {
   );
 }
 
-/** Does the row pass every filter (but `skip`, for that facet's own counts)? */
-export function matchesAuditFilters(
-  row: AuditRow,
-  filters: AuditFilters,
-  skip?: AuditFacet,
-): boolean {
-  if (skip !== "team") {
-    const teams = filterValues(filters, "team");
-    if (teams.length && !(row.team && teams.includes(row.team.slug)))
-      return false;
-  }
-  if (skip !== "person") {
-    const people = filterValues(filters, "person");
-    if (people.length && !personKeysOf(row).some((p) => people.includes(p)))
-      return false;
-  }
-  if (skip !== "action") {
-    const actions = filterValues(filters, "action");
-    if (
-      actions.length &&
-      !actions.includes(row.category) &&
-      !actions.includes(actionKeyOf(row))
-    )
-      return false;
-  }
-  if (skip !== "template") {
-    const templates = filterValues(filters, "template");
-    if (
-      templates.length &&
-      !(row.template && templates.includes(row.template.id))
-    )
-      return false;
-  }
-  const day = utcDay(row.at);
-  if (filters.from && day < filters.from) return false;
-  if (filters.to && day > filters.to) return false;
-  return true;
+// ── Searching the log (the backend's side of the filters) ───────────────────
+
+/**
+ * The filters as the backend takes them: lists of ids (a team by its id, never its slug: decision 0053), each
+ * list's values ORed, the fields ANDed. The URL's `AuditFilters` (slugs, comma lists) are the BFF's; it resolves
+ * them to this.
+ */
+export interface AuditSearch {
+  teamIds: string[];
+  /** User ids, or `SYSTEM_PERSON` for the clock-driven events. Matches who acted OR whom the event is about. */
+  personIds: string[];
+  /** Categories or canonical actions (`actionKeyOf`). */
+  actions: string[];
+  /** Template ids (UC-XXXXXX). */
+  templateIds: string[];
+  /** YYYY-MM-DD, UTC days, inclusive. */
+  from?: string;
+  to?: string;
 }
 
-export function filterAuditRows(
-  rows: readonly AuditRow[],
-  filters: AuditFilters,
-): AuditRow[] {
-  return rows.filter((r) => matchesAuditFilters(r, filters));
+/** No filter at all. */
+export const NO_AUDIT_SEARCH: Readonly<AuditSearch> = Object.freeze({
+  teamIds: [],
+  personIds: [],
+  actions: [],
+  templateIds: [],
+});
+
+/** What a filter looks at on one event of the log: an audit row, as facts. */
+export interface AuditEventKeys {
+  /** ISO. */
+  at: string;
+  action: string;
+  /** null: the system (a clock-driven event). */
+  actorId: string | null;
+  /** null: a platform-wide event. */
+  teamId: string | null;
+  templateId: string | null;
+  details: Record<string, unknown> | null;
 }
 
-/** The canonical action a row files under (what the Action filter compares). */
-export function actionKeyOf(row: Pick<AuditRow, "action" | "actor">): string {
-  return canonicalAction(row.action, row.actor !== null);
+/** The canonical action an event files under (what the Action filter compares). */
+export function actionKeyOf(
+  e: Pick<AuditEventKeys, "action" | "actorId">,
+): string {
+  return canonicalAction(e.action, e.actorId !== null);
 }
 
-/** Who the Person filter matches on a row: who acted (or "system") and whom it's about. */
+/** Who the Person filter matches on an event: who acted (or "system") and whom it's about. */
 export function personKeysOf(
-  row: Pick<AuditRow, "actor" | "subject">,
+  e: Pick<AuditEventKeys, "action" | "actorId" | "details">,
 ): string[] {
-  const keys = [row.actor?.id ?? SYSTEM_PERSON];
-  if (row.subject && row.subject.id !== keys[0]) keys.push(row.subject.id);
+  const keys = [e.actorId ?? SYSTEM_PERSON];
+  const subject = subjectIdOf(e.action, e.details);
+  if (subject && subject !== keys[0]) keys.push(subject);
   return keys;
 }
 
-export interface AuditFacetCounts {
+/** Does the event pass every filter (but `skip`, for that facet's own counts)? */
+export function matchesAuditSearch(
+  e: AuditEventKeys,
+  search: AuditSearch,
+  skip?: AuditFacet,
+): boolean {
+  if (
+    skip !== "team" &&
+    search.teamIds.length &&
+    !(e.teamId && search.teamIds.includes(e.teamId))
+  )
+    return false;
+  if (
+    skip !== "person" &&
+    search.personIds.length &&
+    !personKeysOf(e).some((p) => search.personIds.includes(p))
+  )
+    return false;
+  if (
+    skip !== "action" &&
+    search.actions.length &&
+    !search.actions.includes(categoryOf(e.action)) &&
+    !search.actions.includes(actionKeyOf(e))
+  )
+    return false;
+  if (
+    skip !== "template" &&
+    search.templateIds.length &&
+    !(e.templateId && search.templateIds.includes(e.templateId))
+  )
+    return false;
+  const day = utcDay(e.at);
+  if (search.from && day < search.from) return false;
+  if (search.to && day > search.to) return false;
+  return true;
+}
+
+export function filterAuditEvents<E extends AuditEventKeys>(
+  events: readonly E[],
+  search: AuditSearch,
+): E[] {
+  return events.filter((e) => matchesAuditSearch(e, search));
+}
+
+export interface AuditSearchCounts {
+  /** By team id. */
   team: Record<string, number>;
+  /** By user id, or `SYSTEM_PERSON`. */
   person: Record<string, number>;
   /** Canonical actions AND categories. */
   action: Record<string, number>;
+  /** By template id. */
   template: Record<string, number>;
 }
 
-/** For each menu: how many rows each value would match with every OTHER filter applied. */
-export function auditFacetCounts(
-  rows: readonly AuditRow[],
-  filters: AuditFilters,
-): AuditFacetCounts {
-  const counts: AuditFacetCounts = {
+/** For each menu: how many events each value would match with every OTHER filter applied. */
+export function auditSearchCounts(
+  events: readonly AuditEventKeys[],
+  search: AuditSearch,
+): AuditSearchCounts {
+  const counts: AuditSearchCounts = {
     team: {},
     person: {},
     action: {},
@@ -548,20 +593,52 @@ export function auditFacetCounts(
   };
   const bump = (bag: Record<string, number>, key: string) =>
     (bag[key] = (bag[key] ?? 0) + 1);
-  for (const row of rows) {
-    if (row.team && matchesAuditFilters(row, filters, "team"))
-      bump(counts.team, row.team.slug);
-    if (matchesAuditFilters(row, filters, "person"))
-      for (const p of personKeysOf(row)) bump(counts.person, p);
-    if (matchesAuditFilters(row, filters, "action")) {
-      bump(counts.action, actionKeyOf(row));
-      bump(counts.action, row.category);
+  for (const e of events) {
+    if (e.teamId && matchesAuditSearch(e, search, "team"))
+      bump(counts.team, e.teamId);
+    if (matchesAuditSearch(e, search, "person"))
+      for (const p of personKeysOf(e)) bump(counts.person, p);
+    if (matchesAuditSearch(e, search, "action")) {
+      bump(counts.action, actionKeyOf(e));
+      bump(counts.action, categoryOf(e.action));
     }
-    if (row.template && matchesAuditFilters(row, filters, "template"))
-      bump(counts.template, row.template.id);
+    if (e.templateId && matchesAuditSearch(e, search, "template"))
+      bump(counts.template, e.templateId);
   }
   return counts;
 }
+
+/**
+ * The search narrowed to what the space knows, so a chip never matches nothing: a team space is pinned to its
+ * own team (the Team filter is for All teams, which keeps only the teams there are), and a person or template
+ * the space's events never name is dropped. Values are unique, in the order asked.
+ */
+export function sanitizeAuditSearch(
+  requested: AuditSearch,
+  space: { isAll: boolean; teamIds: readonly string[] },
+  universe: readonly AuditEventKeys[],
+): AuditSearch {
+  const known = (values: readonly string[], allowed: Set<string>) =>
+    [...new Set(values)].filter((v) => allowed.has(v));
+  return {
+    ...requested,
+    teamIds: space.isAll
+      ? known(requested.teamIds, new Set(space.teamIds))
+      : [],
+    personIds: known(
+      requested.personIds,
+      new Set(universe.flatMap(personKeysOf)),
+    ),
+    actions: [...new Set(requested.actions)],
+    templateIds: known(
+      requested.templateIds,
+      new Set(universe.flatMap((e) => (e.templateId ? [e.templateId] : []))),
+    ),
+  };
+}
+
+/** The Audit page shows at most this many events, newest first; the export has no limit. */
+export const AUDIT_PAGE_LIMIT = 500;
 
 // ── Dates ───────────────────────────────────────────────────────────────────
 

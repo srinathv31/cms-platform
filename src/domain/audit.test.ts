@@ -5,21 +5,25 @@ import {
   actionOptions,
   activeFilterCount,
   auditDomain,
-  auditFacetCounts,
   auditQuery,
+  auditSearchCounts,
   canonicalAction,
   categoryOf,
   csvField,
   datePresets,
   dateRangeLabel,
   describeAuditEvent,
-  filterAuditRows,
+  filterAuditEvents,
   filterValues,
   isDay,
+  NO_AUDIT_SEARCH,
   parseAuditFilters,
   parseCsv,
+  sanitizeAuditSearch,
   toCsv,
   toggleFilterValue,
+  type AuditEventKeys,
+  type AuditSearch,
 } from "./audit";
 import type { AuditAction, Person } from "./review-types";
 import type { NumberedRound } from "./rounds";
@@ -677,81 +681,73 @@ describe("filter helpers", () => {
   });
 });
 
-describe("filtering rows", () => {
-  const deposits = { slug: "deposits", name: "Deposits" };
-  const cashBack = { id: "UC-4F7K2Q", name: "Cash Back" };
-  const rows: AuditRow[] = [
-    row({
-      id: "1",
-      at: "2026-10-05T09:00:00.000Z",
-      action: "version.submitted",
-      actor: maya,
-      template: cashBack,
-      versionLabel: "v3",
+describe("searching the log", () => {
+  const TEAMS = { coral: "t_coral", deposits: "t_deposits" };
+  const cashBack = "UC-4F7K2Q";
+  /** An event as the backend's filters see it. */
+  function event(
+    id: string,
+    at: string,
+    action: string,
+    over: Partial<AuditEventKeys> = {},
+  ): AuditEventKeys & { id: string } {
+    return {
+      id,
+      at,
+      action,
+      actorId: "alex",
+      teamId: TEAMS.coral,
+      templateId: null,
+      details: null,
+      ...over,
+    };
+  }
+  const events = [
+    event("1", "2026-10-05T09:00:00.000Z", "version.submitted", {
+      actorId: "maya",
+      templateId: cashBack,
     }),
-    row({
-      id: "2",
-      at: "2026-10-04T23:59:59.000Z",
-      action: "version.activated",
-      actor: alex,
-      template: cashBack,
-      versionLabel: "v2",
+    event("2", "2026-10-04T23:59:59.000Z", "version.activated", {
+      templateId: cashBack,
     }),
-    row({
-      id: "3",
-      at: "2026-10-03T00:00:00.000Z",
-      action: "version.sunset_passed",
-      actor: null,
-      template: cashBack,
-      versionLabel: "v1",
+    event("3", "2026-10-03T00:00:00.000Z", "version.sunset_passed", {
+      actorId: null,
+      templateId: cashBack,
     }),
-    row({
-      id: "4",
-      at: "2026-10-02T12:00:00.000Z",
-      action: "access.granted",
-      actor: alex,
-      subject: sam,
+    event("4", "2026-10-02T12:00:00.000Z", "access.granted", {
+      details: { userId: "sam" },
     }),
-    row({
-      id: "5",
-      at: "2026-10-01T12:00:00.000Z",
-      action: "access.lapsed",
-      actor: null,
-      subject: sam,
+    event("5", "2026-10-01T12:00:00.000Z", "access.lapsed", {
+      actorId: null,
+      details: { userId: "sam" },
     }),
-    row({
-      id: "6",
-      at: "2026-09-20T12:00:00.000Z",
-      action: "access.granted",
-      actor: riley,
-      subject: alex,
-      team: deposits,
+    event("6", "2026-09-20T12:00:00.000Z", "access.granted", {
+      actorId: "riley",
+      teamId: TEAMS.deposits,
+      details: { userId: "alex" },
     }),
-    row({
-      id: "7",
-      at: "2026-09-10T12:00:00.000Z",
-      action: "platform.config_changed",
-      actor: riley,
-      team: null,
+    event("7", "2026-09-10T12:00:00.000Z", "platform.config_changed", {
+      actorId: "riley",
+      teamId: null,
     }),
-    row({
-      id: "8",
-      at: "2026-09-01T12:00:00.000Z",
-      action: "version.revoked",
-      actor: alex,
-      template: cashBack,
-      versionLabel: "v1",
+    event("8", "2026-09-01T12:00:00.000Z", "version.revoked", {
+      templateId: cashBack,
     }),
   ];
-  const ids = (f: AuditFilters) => filterAuditRows(rows, f).map((r) => r.id);
+  const search = (over: Partial<AuditSearch>): AuditSearch => ({
+    ...NO_AUDIT_SEARCH,
+    ...over,
+  });
+  const ids = (over: Partial<AuditSearch>) =>
+    filterAuditEvents(events, search(over)).map((e) => e.id);
 
   it("passes everything with no filters", () => {
     expect(ids({})).toEqual(["1", "2", "3", "4", "5", "6", "7", "8"]);
   });
 
-  it("filters by team (a list, ORed); platform-wide events have no team", () => {
-    expect(ids({ team: "deposits" })).toEqual(["6"]);
-    expect(ids({ team: "coral-offers,deposits" })).toEqual([
+  it("filters by team id (a list, ORed); platform-wide events have no team", () => {
+    expect(ids({ teamIds: [TEAMS.deposits] })).toEqual(["6"]);
+    expect(ids({ teamIds: [TEAMS.coral, TEAMS.deposits] })).toEqual([
       "1",
       "2",
       "3",
@@ -763,26 +759,29 @@ describe("filtering rows", () => {
   });
 
   it("filters by person: who acted or whom it is about; system for nobody", () => {
-    expect(ids({ person: "sam" })).toEqual(["4", "5"]);
-    expect(ids({ person: "alex" })).toEqual(["2", "4", "6", "8"]);
-    expect(ids({ person: "system" })).toEqual(["3", "5"]);
-    expect(ids({ person: "maya,riley" })).toEqual(["1", "6", "7"]);
+    expect(ids({ personIds: ["sam"] })).toEqual(["4", "5"]);
+    expect(ids({ personIds: ["alex"] })).toEqual(["2", "4", "6", "8"]);
+    expect(ids({ personIds: ["system"] })).toEqual(["3", "5"]);
+    expect(ids({ personIds: ["maya", "riley"] })).toEqual(["1", "6", "7"]);
   });
 
   it("filters by category or canonical action, final approvals included", () => {
-    expect(ids({ action: "access" })).toEqual(["4", "5", "6"]);
-    expect(ids({ action: "platform" })).toEqual(["7"]);
-    expect(ids({ action: "version.approved" })).toEqual(["2"]);
-    expect(ids({ action: "version.sunset_passed" })).toEqual(["3"]);
-    expect(ids({ action: "version.revoked" })).toEqual(["8"]);
-    expect(ids({ action: "platform,version.submitted" })).toEqual(["1", "7"]);
+    expect(ids({ actions: ["access"] })).toEqual(["4", "5", "6"]);
+    expect(ids({ actions: ["platform"] })).toEqual(["7"]);
+    expect(ids({ actions: ["version.approved"] })).toEqual(["2"]);
+    expect(ids({ actions: ["version.sunset_passed"] })).toEqual(["3"]);
+    expect(ids({ actions: ["version.revoked"] })).toEqual(["8"]);
+    expect(ids({ actions: ["platform", "version.submitted"] })).toEqual([
+      "1",
+      "7",
+    ]);
   });
 
   it("filters by template", () => {
-    expect(ids({ template: "UC-4F7K2Q" })).toEqual(["1", "2", "3", "8"]);
+    expect(ids({ templateIds: [cashBack] })).toEqual(["1", "2", "3", "8"]);
   });
 
-  it("filters by demo-clock day, both ends inclusive", () => {
+  it("filters by UTC day, both ends inclusive", () => {
     expect(ids({ from: "2026-10-04" })).toEqual(["1", "2"]);
     expect(ids({ to: "2026-10-03" })).toEqual(["3", "4", "5", "6", "7", "8"]);
     expect(ids({ from: "2026-10-03", to: "2026-10-04" })).toEqual(["2", "3"]);
@@ -791,16 +790,22 @@ describe("filtering rows", () => {
 
   it("ANDs the fields together", () => {
     expect(
-      ids({ team: "coral-offers", person: "alex", action: "templates" }),
+      ids({
+        teamIds: [TEAMS.coral],
+        personIds: ["alex"],
+        actions: ["templates"],
+      }),
     ).toEqual(["2", "8"]);
     expect(
-      ids({ person: "sam", action: "access", from: "2026-10-02" }),
+      ids({ personIds: ["sam"], actions: ["access"], from: "2026-10-02" }),
     ).toEqual(["4"]);
-    expect(ids({ team: "deposits", template: "UC-4F7K2Q" })).toEqual([]);
+    expect(ids({ teamIds: [TEAMS.deposits], templateIds: [cashBack] })).toEqual(
+      [],
+    );
     expect(
       ids({
-        person: "system",
-        action: "templates",
+        personIds: ["system"],
+        actions: ["templates"],
         from: "2026-10-01",
         to: "2026-10-31",
       }),
@@ -808,12 +813,12 @@ describe("filtering rows", () => {
   });
 
   it("counts each menu under every OTHER filter", () => {
-    const counts = auditFacetCounts(rows, {
-      team: "coral-offers",
-      action: "access",
-    });
+    const counts = auditSearchCounts(
+      events,
+      search({ teamIds: [TEAMS.coral], actions: ["access"] }),
+    );
     // Team counts ignore the team filter (Deposits still shows its access event).
-    expect(counts.team).toEqual({ "coral-offers": 2, deposits: 1 });
+    expect(counts.team).toEqual({ [TEAMS.coral]: 2, [TEAMS.deposits]: 1 });
     // Action counts ignore the action filter but keep the team filter.
     expect(counts.action).toMatchObject({
       templates: 4,
@@ -826,6 +831,37 @@ describe("filtering rows", () => {
     // Person counts keep both: Alex granted, Sam was granted and lapsed, the system lapsed him.
     expect(counts.person).toEqual({ alex: 1, sam: 2, system: 1 });
     expect(counts.template).toEqual({});
+  });
+
+  it("keeps in a search only what the space knows", () => {
+    const requested = search({
+      teamIds: [TEAMS.deposits, "t_nowhere", TEAMS.deposits],
+      personIds: ["nobody", "alex"],
+      templateIds: ["UC-ZZZZZZ", cashBack],
+      actions: ["access", "access"],
+      from: "2026-10-01",
+    });
+    expect(
+      sanitizeAuditSearch(
+        requested,
+        { isAll: true, teamIds: Object.values(TEAMS) },
+        events,
+      ),
+    ).toEqual({
+      teamIds: [TEAMS.deposits],
+      personIds: ["alex"],
+      templateIds: [cashBack],
+      actions: ["access"],
+      from: "2026-10-01",
+    });
+    // A team space is pinned to itself: the Team filter is dropped.
+    expect(
+      sanitizeAuditSearch(
+        requested,
+        { isAll: false, teamIds: [TEAMS.coral] },
+        events,
+      ).teamIds,
+    ).toEqual([]);
   });
 });
 

@@ -43,6 +43,8 @@ export const REQUESTABLE_ROLES = [
   "approver",
 ] as const satisfies readonly TeamRole[];
 export type RequestableRole = (typeof REQUESTABLE_ROLES)[number];
+/** The Access requests section lists the requests decided in this many days, newest first. */
+export const DECIDED_REQUESTS_WINDOW_DAYS = 30;
 export const ACCESS_REASON_MAX = 500;
 export const DECISION_NOTE_MAX = 500;
 
@@ -348,8 +350,6 @@ export interface RecertProgress {
   kept: number;
   removed: number;
   pending: number;
-  /** "4 of 6 confirmed" */
-  label: string;
 }
 
 export type RecertPhase = "upcoming" | "open" | "closed";
