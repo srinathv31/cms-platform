@@ -30,7 +30,6 @@ import {
   newId,
   newTemplateId,
   seededId,
-  seededTemplateId,
 } from "@/server/ids";
 import { trySubmit } from "@/server/testing/submit-check";
 import { createContext } from "./context";
@@ -173,7 +172,6 @@ afterAll(() => {
 describe("ids", () => {
   it("makes copy-friendly template ids", () => {
     expect(newTemplateId()).toMatch(TEMPLATE_ID_PATTERN);
-    expect(seededTemplateId(mulberry32(1))).toMatch(TEMPLATE_ID_PATTERN);
     expect(newId("th")).toMatch(/^th_[0-9a-hjkmnp-tv-z]{10}$/);
     expect(seededId(mulberry32(7), "v")).toBe(seededId(mulberry32(7), "v"));
   });
