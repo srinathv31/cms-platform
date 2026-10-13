@@ -15,7 +15,7 @@ import { seedCoralAlerts } from "./templates/coral-alerts";
 import { seedDepositsTemplates } from "./templates/deposits";
 
 /** Bump when the shape of the seed changes in a way other code may care about. */
-export const SEED_VERSION = "2";
+export const SEED_VERSION = "3";
 
 export interface SeedResult {
   /** Template ids by seed key, e.g. result.templates["cash-back"]. */
@@ -24,15 +24,27 @@ export interface SeedResult {
   counts: Record<string, number>;
 }
 
-async function insertRows<T extends SQLiteTable>(
-  db: Db,
+/** One table's rows, built in memory, and how to write them. */
+export interface SeedTable {
+  table: SQLiteTable;
+  rows: readonly object[];
+  insert(db: Db): Promise<void>;
+}
+
+function seedTable<T extends SQLiteTable>(
   table: T,
   rows: T["$inferInsert"][],
   chunk = 400,
-) {
-  for (let i = 0; i < rows.length; i += chunk) {
-    await db.insert(table).values(rows.slice(i, i + chunk));
-  }
+): SeedTable {
+  return {
+    table,
+    rows,
+    async insert(db) {
+      for (let i = 0; i < rows.length; i += chunk) {
+        await db.insert(table).values(rows.slice(i, i + chunk));
+      }
+    },
+  };
 }
 
 /** `seq` 1, 2, 3, … oldest first (then by id), as if each notice had been written live at its time. */
@@ -46,43 +58,47 @@ function numberNotices(rows: Sink["consumerNotices"]) {
     .map((row, i) => ({ ...row, seq: i + 1 }));
 }
 
-// Insert order follows the foreign keys: parents before children.
-async function insertAll(db: Db, s: Sink) {
-  await insertRows(db, ucomp.users, s.users);
-  await insertRows(db, ucomp.teams, s.teams);
-  await insertRows(db, ucomp.memberships, s.memberships);
-  await insertRows(db, ucomp.membershipRoles, s.membershipRoles);
-  await insertRows(db, ucomp.contentTypes, s.contentTypes);
-  await insertRows(db, ucomp.approvalStages, s.approvalStages);
-  await insertRows(db, ucomp.consumers, s.consumers);
-  await insertRows(db, ucomp.templates, s.templates);
-  await insertRows(db, ucomp.versions, s.versions, 25);
-  await insertRows(db, ucomp.approvals, s.approvals);
-  await insertRows(db, ucomp.commentThreads, s.commentThreads);
-  await insertRows(db, ucomp.comments, s.comments);
-  await insertRows(db, ucomp.consumerNotices, numberNotices(s.consumerNotices));
-  await insertRows(db, ucomp.auditEvents, s.auditEvents);
-  await insertRows(db, ucomp.notifications, s.notifications);
-  await insertRows(db, ucomp.accessRequests, s.accessRequests);
-  await insertRows(db, ucomp.recertifications, s.recertifications);
-  await insertRows(db, ucomp.recertItems, s.recertItems);
-  await insertRows(db, ucomp.renderLog, s.renderLog);
-  await insertRows(db, sim.simOffers, s.simOffers);
-  await insertRows(db, sim.simCustomers, s.simCustomers);
-  await insertRows(db, sim.simLinks, s.simLinks);
-  await insertRows(db, sim.simNoticeReads, s.simNoticeReads);
-  await insertRows(db, ucomp.settings, s.settings);
+/** The tables in foreign-key order: parents before children. */
+function tablesOf(s: Sink): SeedTable[] {
+  return [
+    seedTable(ucomp.users, s.users),
+    seedTable(ucomp.teams, s.teams),
+    seedTable(ucomp.memberships, s.memberships),
+    seedTable(ucomp.membershipRoles, s.membershipRoles),
+    seedTable(ucomp.contentTypes, s.contentTypes),
+    seedTable(ucomp.approvalStages, s.approvalStages),
+    seedTable(ucomp.consumers, s.consumers),
+    seedTable(ucomp.templates, s.templates),
+    seedTable(ucomp.versions, s.versions, 25),
+    seedTable(ucomp.approvals, s.approvals),
+    seedTable(ucomp.commentThreads, s.commentThreads),
+    seedTable(ucomp.comments, s.comments),
+    seedTable(ucomp.consumerNotices, numberNotices(s.consumerNotices)),
+    seedTable(ucomp.auditEvents, s.auditEvents),
+    seedTable(ucomp.notifications, s.notifications),
+    seedTable(ucomp.accessRequests, s.accessRequests),
+    seedTable(ucomp.recertifications, s.recertifications),
+    seedTable(ucomp.recertItems, s.recertItems),
+    seedTable(ucomp.renderLog, s.renderLog),
+    seedTable(sim.simOffers, s.simOffers),
+    seedTable(sim.simCustomers, s.simCustomers),
+    seedTable(sim.simLinks, s.simLinks),
+    seedTable(sim.simNoticeReads, s.simNoticeReads),
+    seedTable(ucomp.settings, s.settings),
+  ];
 }
 
 /**
- * Fills an empty, migrated database. Every timestamp is relative to `base` (the real current time
- * at reset; clock offset 0). Structure is deterministic: same ids, names and states every time.
+ * Builds every row of the seed in memory, deterministically, with timestamps relative to `base` (the real
+ * current time at reset; clock offset 0). Structure is deterministic: same ids, names and states every time.
+ * Nothing touches a database; `seedDatabase` writes the tables and `buildFixture` exports them.
  */
-export async function seedDatabase(
-  db: Db,
-  opts: { base: Date },
-): Promise<SeedResult> {
-  const ctx = createContext(opts.base.getTime());
+export function buildSeed(base: Date): {
+  tables: SeedTable[];
+  templates: Record<string, string>;
+  counts: Record<string, number>;
+} {
+  const ctx = createContext(base.getTime());
 
   seedPeople(ctx);
   seedTeams(ctx);
@@ -99,14 +115,13 @@ export async function seedDatabase(
     { key: "clock_offset_days", value: 0 },
     { key: "seed_version", value: SEED_VERSION },
     // The notice cursor's epoch: a reset writes a new one, so cursors from before it are refused.
-    { key: "seeded_at", value: opts.base.toISOString() },
+    { key: "seeded_at", value: base.toISOString() },
     // The last consumer_notices.seq handed out (numberNotices gives 1…n); takeNoticeSeqs carries on from it.
     { key: "consumer_notice_seq", value: ctx.sink.consumerNotices.length },
   );
 
-  await insertAll(db, ctx.sink);
-
   return {
+    tables: tablesOf(ctx.sink),
     templates: Object.fromEntries(
       [...ctx.templates].map(([key, t]) => [key, t.id]),
     ),
@@ -114,4 +129,14 @@ export async function seedDatabase(
       Object.entries(ctx.sink).map(([k, rows]) => [k, rows.length]),
     ),
   };
+}
+
+/** Fills an empty, migrated database. Every timestamp is relative to `base`. */
+export async function seedDatabase(
+  db: Db,
+  opts: { base: Date },
+): Promise<SeedResult> {
+  const { tables, templates, counts } = buildSeed(opts.base);
+  for (const t of tables) await t.insert(db);
+  return { templates, counts };
 }

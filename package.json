@@ -19,6 +19,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --conditions=react-server scripts/db-migrate.ts",
     "db:reset": "tsx --conditions=react-server scripts/db-reset.ts",
+    "seed:export": "tsx scripts/seed-export.ts",
     "docs:check": "tsx scripts/docs-check.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
