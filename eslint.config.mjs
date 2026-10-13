@@ -338,11 +338,18 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // Inside the helper, only db.ts opens the database; the other modules read and write through it.
+    // Inside the helper, only db.ts opens the database; the other modules read and write through it. They hold
+    // to the editor's public API like every other e2e file: this block replaces the one above for these files.
     files: ["e2e/helpers/state/**/*.ts"],
     ignores: ["e2e/helpers/state/db.ts"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [noDatabase] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [editorSchemaNames],
+          patterns: [editorInternals, noDatabase],
+        },
+      ],
     },
   },
 
