@@ -205,7 +205,7 @@ const ERRORS: {
   count: number;
   code: RenderErrorCode;
   channel: Channel;
-  /** A push failure names the phone it was for; left out, it takes the one its row number gives. */
+  /** A push failure names the phone it was for; left out, it is drawn as for any push. */
   platform?: PushPlatform;
 }[] = [
   {
@@ -262,7 +262,6 @@ const ERRORS: {
     code: "missing_variables",
     channel: "sms",
   },
-  // Last, so every random draw of the history before it is the same as without it.
   {
     tpl: "payment-due-reminder",
     ver: "v1",
@@ -311,13 +310,8 @@ function pickChannel(rng: Rng, channels: Channel[]): Channel {
 /** About this share of pushes are for an iPhone, the rest for an Android phone. */
 const IOS_SHARE = 0.58;
 
-/**
- * Which phone a seeded push was for. It comes from the row's number, not the random stream, so adding the
- * platform left every other draw of the history (and with it the rest of the seed) as it was. A
- * multiplicative hash read from its high bits, so neighbouring rows don't alternate.
- */
-function pushPlatformOf(n: number): PushPlatform {
-  return ((n * 2654435761) >>> 0) / 2 ** 32 < IOS_SHARE ? "ios" : "android";
+function pickPlatform(rng: Rng): PushPlatform {
+  return rng() < IOS_SHARE ? "ios" : "android";
 }
 
 /** How long a render takes, in ms: at least `min`, plus up to `spread`. */
@@ -370,21 +364,26 @@ function timeIn(rng: Rng, from: number, to: number, base: number): number {
 }
 
 export function seedHistory(ctx: SeedCtx) {
-  const { rng, base, sink } = ctx;
+  const { base, sink } = ctx;
   let counter = 0;
 
-  const row = (o: {
-    tpl: string;
-    ver: string;
-    at: number;
-    consumer: ConsumerId | null;
-    channel: Channel;
-    preview?: boolean;
-    outcome?: "ok" | "error";
-    code?: string;
-    durationMs?: number;
-    platform?: PushPlatform;
-  }) => {
+  // Each part of the history draws from a sequence of its own, so changing one (another failure, a new
+  // preview) moves none of the others' rows.
+  const row = (
+    rng: Rng,
+    o: {
+      tpl: string;
+      ver: string;
+      at: number;
+      consumer: ConsumerId | null;
+      channel: Channel;
+      preview?: boolean;
+      outcome?: "ok" | "error";
+      code?: string;
+      durationMs?: number;
+      platform?: PushPlatform;
+    },
+  ) => {
     const t = ctx.template(o.tpl);
     const v: VersionRef | undefined = t.versions[o.ver];
     if (!v)
@@ -405,8 +404,7 @@ export function seedHistory(ctx: SeedCtx) {
       versionNumber: numbered ? v.number : null,
       consumerId: o.consumer,
       channel: o.channel,
-      platform:
-        o.channel === "push" ? (o.platform ?? pushPlatformOf(counter)) : null,
+      platform: o.channel === "push" ? (o.platform ?? pickPlatform(rng)) : null,
       isPreview: o.preview ?? false,
       correlationId: `req_${Math.floor(rng() * 36 ** 6)
         .toString(36)
@@ -419,6 +417,7 @@ export function seedHistory(ctx: SeedCtx) {
     });
   };
 
+  const streams = ctx.random("history:streams");
   for (const s of STREAMS) {
     const channels = ctx.template(s.tpl).versions[s.ver]?.channels;
     if (!channels)
@@ -438,59 +437,62 @@ export function seedHistory(ctx: SeedCtx) {
       const mean = s.perDay * ramp * weekdayFactor(mid) * (hi - lo);
       const count = Math.max(
         0,
-        Math.round(mean + (rng() - 0.5) * 2 * Math.sqrt(mean) * 0.8),
+        Math.round(mean + (streams() - 0.5) * 2 * Math.sqrt(mean) * 0.8),
       );
       for (let i = 0; i < count; i++) {
-        row({
+        row(streams, {
           tpl: s.tpl,
           ver: s.ver,
-          at: timeIn(rng, hi, lo, base),
+          at: timeIn(streams, hi, lo, base),
           consumer: s.consumer,
-          channel: pickChannel(rng, channels),
+          channel: pickChannel(streams, channels),
         });
       }
     }
   }
 
+  const latest = ctx.random("history:latest");
   for (const l of LATEST) {
     const channels = ctx.template(l.tpl).versions[l.ver].channels;
-    row({
+    row(latest, {
       tpl: l.tpl,
       ver: l.ver,
       at: base - l.minutesAgo * 60_000,
       consumer: l.consumer,
-      channel: pickChannel(rng, channels),
+      channel: pickChannel(latest, channels),
     });
   }
 
+  const previews = ctx.random("history:previews");
   for (const pv of PREVIEWS) {
     const all = ctx.template(pv.tpl).versions[pv.ver].channels;
     const channels = all.filter((c) => c !== "email");
     for (let i = 0; i < pv.count; i++) {
-      row({
+      row(previews, {
         tpl: pv.tpl,
         ver: pv.ver,
-        at: timeIn(rng, pv.from, pv.to, base),
+        at: timeIn(previews, pv.from, pv.to, base),
         consumer: null,
-        channel: pickChannel(rng, channels.length ? channels : all),
+        channel: pickChannel(previews, channels.length ? channels : all),
         preview: true,
       });
     }
   }
 
+  const errors = ctx.random("history:errors");
   for (const e of ERRORS) {
     for (let i = 0; i < e.count; i++) {
-      row({
+      row(errors, {
         tpl: e.tpl,
         ver: e.ver,
         // Errors cluster: a consumer bug shows up as a burst, not a trickle.
-        at: base - e.at * DAY + int(rng, 0, 50) * 60_000 - (i * HOUR) / 20,
+        at: base - e.at * DAY + int(errors, 0, 50) * 60_000 - (i * HOUR) / 20,
         consumer: e.consumer,
         channel: e.channel,
         outcome: "error",
         platform: e.platform,
         code: e.code,
-        durationMs: e.code === "render_failed" ? 30_000 : int(rng, 6, 24),
+        durationMs: e.code === "render_failed" ? 30_000 : int(errors, 6, 24),
       });
     }
   }

@@ -12,6 +12,10 @@ import type { TeamId } from "../teams";
 // Declarative description of a seeded template. `build.ts` turns it into rows: the template, its
 // versions, approvals, comment threads, audit events and consumer notices, all derived from this
 // one description so they cannot disagree. Times are "days before the reset" (positive = past).
+//
+// A template and each of its versions carries its id as a literal (decision 0069). E2E specs, golden files and
+// screenshots name them, and a Java fixture loader reads the same ones, so an id never depends on what else is in
+// the seed. Every other row's id is drawn from a sequence of its own template (`SeedCtx.id`).
 
 export interface SeedApproval {
   actor: string;
@@ -41,15 +45,11 @@ export interface SeedThread {
   quote?: string;
   comments: SeedComment[];
   resolved?: { by: string; at: number };
-  /**
-   * Draw the thread's ids (the thread, its comments, its audit rows) from a sequence keyed by the
-   * template, origin and block (`ctx.keyedId`) instead of the shared one. Set on a thread added after
-   * the seed's ids were in use, so adding it moves no other template's or version's id.
-   */
-  keyedIds?: boolean;
 }
 
 export interface SeedVersion {
+  /** The version's id, e.g. `v_wmjrge009b`: `v_` and ten lowercase Crockford characters. Unique in the seed. */
+  id: string;
   /** Local label, e.g. "v1". Unique within the template. */
   ref: string;
   /** Null for a draft. */
@@ -93,6 +93,8 @@ export interface SeedVersion {
 }
 
 export interface SeedTemplate {
+  /** The template's id, e.g. `UC-D6KSGY` (`TEMPLATE_ID_PATTERN`). Unique in the seed. */
+  id: string;
   /** Local key, e.g. "balance-transfer". Also the scope for block ids. */
   key: string;
   teamId: TeamId;

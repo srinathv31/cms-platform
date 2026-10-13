@@ -139,14 +139,13 @@ export const HISTORY_DAYS = 90;
 //   errorText(code: RenderErrorCode): string    // render_log keeps codes only: "Missing required variables." etc.
 
 /**
- * A consumer_notices row as stored. Seeded rows and runtime rows (server/effects.ts) carry slightly
- * different payloads; `noticeView` reads either:
- *   new_version       seed { templateName, versionNumber, previousVersionNumber, contractChanges }
- *                     live { templateName, versionNumber, activeVersion, contractChanges, contractLines }
- *   sunset_scheduled  seed { templateName, versionNumber, sunsetAt, sunsetDay, zone, replacedByVersionNumber, contractChanges }
- *                     live { templateName, versionNumber, activeVersion, sunsetAt, sunsetDay, zone, contractChanges?, contractLines? }
- *   sunset_passed     live { templateName, versionNumber, activeVersion, sunsetAt, sunsetDay, zone } (the sunset sweep)
- *   revoked           both { templateName, versionNumber, reason, activeVersion? }
+ * A consumer_notices row as stored. The rows server/effects.ts writes and the seed's carry the same
+ * payloads, one shape per kind (decision 0064):
+ *   new_version       { templateName, versionNumber, activeVersion, contractChanges, contractLines }
+ *   sunset_scheduled  { templateName, versionNumber, activeVersion, sunsetAt, sunsetDay, zone, contractChanges?, contractLines? }
+ *   sunset_passed     { templateName, versionNumber, activeVersion, sunsetAt, sunsetDay, zone } (the sunset sweep)
+ *   revoked           { templateName, versionNumber, activeVersion, reason }
+ * (`contractLines` is written by the transitions, not the seed, and read by nothing.)
  */
 export interface NoticeRow {
   id: string;

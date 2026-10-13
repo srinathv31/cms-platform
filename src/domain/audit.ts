@@ -65,8 +65,8 @@ const ACTIONS = {
     label: "Changes requested",
     category: "templates",
   },
+  // Stored by nothing: the key an approval files under, whichever event it is (`canonicalAction`).
   "version.approved": { label: "Approved", category: "templates" },
-  "version.activated": { label: "Became Active", category: "templates" },
   "version.superseded": { label: "Superseded", category: "templates" },
   "version.sunset_set": { label: "Sunset set", category: "templates" },
   "version.sunset_passed": { label: "Sunset passed", category: "templates" },
@@ -104,27 +104,25 @@ const ACTIONS = {
 
 export type CanonicalAuditAction = keyof typeof ACTIONS;
 
-/** Other spellings that mean the same thing (the seed's, and one stage of a multi-stage chain). */
-const ALIASES: Record<string, CanonicalAuditAction> = {
-  "version.stage_approved": "version.approved",
-  "version.revoke_confirmed": "version.revoked",
-  "comment.resolved": "thread.resolved",
-};
-
 const ACTION_INFO: Readonly<Record<string, ActionInfo>> = ACTIONS;
 
+/** The catalog entry for an action, or undefined: an action is data, so "toString" is not one. */
+const infoOf = (action: string): ActionInfo | undefined =>
+  Object.hasOwn(ACTION_INFO, action) ? ACTION_INFO[action] : undefined;
+
 /**
- * The action an event files under. An approver's final approval is written as `version.activated`
- * with the approver as actor: it reads as "Approved". The same action with no actor is the system
- * making a version Active (the seed's activations): "Became Active".
+ * The action an event files under. Every approval reads as "Approved" (`version.approved`, the Action
+ * filter's key for it): one stage of a longer chain is written as `version.stage_approved`, and the last
+ * stage, which also makes the version Active, as `version.activated` by the approver.
  */
 export function canonicalAction(action: string, byPerson = false): string {
+  if (action === "version.stage_approved") return "version.approved";
   if (action === "version.activated" && byPerson) return "version.approved";
-  return ALIASES[action] ?? action;
+  return action;
 }
 
 export function categoryOf(action: string): AuditCategory {
-  const known = ACTION_INFO[canonicalAction(action)];
+  const known = infoOf(canonicalAction(action));
   if (known) return known.category;
   if (action.startsWith("access.") || action.startsWith("recert."))
     return "access";
@@ -133,7 +131,7 @@ export function categoryOf(action: string): AuditCategory {
 }
 
 export function actionLabel(action: string, byPerson = false): string {
-  const known = ACTION_INFO[canonicalAction(action, byPerson)];
+  const known = infoOf(canonicalAction(action, byPerson));
   if (known) return known.label;
   // An action this catalog doesn't know yet: "version.fancy_thing" → "Fancy thing".
   const last = action.split(".").pop() ?? action;
@@ -182,8 +180,8 @@ export function describeAuditEvent(
 
   const d = e.details ?? {};
   const who = actor?.name ?? SYSTEM_ACTOR;
-  // Whom the event is about. The seed's requests carry no userName: the requester is the actor.
-  const subject = text(d.userName) || (actor?.name ?? "A member");
+  // Whom the event is about, by the name it had when the event was written.
+  const subject = text(d.userName) || "A member";
   const role = roleText(d.role);
   const roles = rolesText(d.roles);
   const label = text(d.label);
@@ -334,7 +332,7 @@ export function subjectIdOf(
 
 // ── Filters ─────────────────────────────────────────────────────────────────
 
-/** The Person filter's value for events nobody did (the clock-driven sweep, the seed's activations). */
+/** The Person filter's value for events nobody did (the clock-driven sweeps). */
 export const SYSTEM_PERSON = "system";
 
 export type AuditListKey = "team" | "person" | "action" | "template";
@@ -431,7 +429,7 @@ export function parseAuditFilters(
   const action = listParam(params.action, (v) => {
     if (isAuditCategory(v)) return v;
     const canonical = canonicalAction(v);
-    return canonical in ACTIONS ? canonical : null;
+    return Object.hasOwn(ACTIONS, canonical) ? canonical : null;
   });
   const template = listParam(params.template, (v) =>
     TEMPLATE_RE.test(v.toUpperCase()) ? v.toUpperCase() : null,

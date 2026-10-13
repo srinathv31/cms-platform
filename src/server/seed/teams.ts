@@ -1,6 +1,7 @@
 import type { TeamRole } from "@/domain/types";
 import type { SeedCtx } from "./context";
 import { userName } from "./people";
+import { platformConfigDetails } from "./platform";
 
 export const TEAM_IDS = [
   "coral-offers",
@@ -167,18 +168,32 @@ export function seedTeams(ctx: SeedCtx) {
       appName: t.appName,
       smsSender: t.smsSender,
     });
+    // As `createTeam` writes it: the team, and the person made its Team Admin.
+    const admin = MEMBERS.find(
+      (m) => m.team === t.id && m.roles.includes("team_admin"),
+    );
+    if (!admin) throw new Error(`Seed: ${t.id} has no Team Admin`);
     ctx.sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: ctx.id(`team:${t.id}`, "ae"),
       at: ctx.at(t.createdDaysAgo),
       actorId: "riley",
       teamId: t.id,
       action: "platform.config_changed",
-      details: { area: "teams", summary: `Created team ${t.name}` },
+      details: platformConfigDetails(
+        "teams",
+        `Created team ${t.name} with ${userName(admin.user)} as Team Admin`,
+        {
+          teamName: t.name,
+          slug: t.id,
+          userId: admin.user,
+          userName: userName(admin.user),
+        },
+      ),
     });
   }
 
   for (const m of MEMBERS) {
-    const id = ctx.id("m");
+    const id = ctx.id(`team:${m.team}`, "m");
     ctx.sink.memberships.push({
       id,
       userId: m.user,
@@ -195,12 +210,19 @@ export function seedTeams(ctx: SeedCtx) {
     for (const role of m.roles)
       ctx.sink.membershipRoles.push({ membershipId: id, role });
     ctx.sink.auditEvents.push({
-      id: ctx.id("ae"),
+      id: ctx.id(`team:${m.team}`, "ae"),
       at: ctx.at(m.addedDaysAgo),
       actorId: m.addedBy,
       teamId: m.team,
       action: "access.granted",
-      details: { userId: m.user, userName: userName(m.user), roles: m.roles },
+      details: {
+        userId: m.user,
+        userName: userName(m.user),
+        role: m.roles[0],
+        roles: m.roles,
+        // A team's first Team Admin is appointed when the team is created.
+        ...(m.roles.includes("team_admin") ? { appointed: true } : {}),
+      },
     });
   }
 }

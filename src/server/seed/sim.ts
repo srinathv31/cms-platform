@@ -296,7 +296,7 @@ export function seedSimulator(ctx: SeedCtx) {
     const t = ctx.template(l.tpl);
     const v = t.versions[l.ver];
     sink.simLinks.push({
-      id: ctx.id("lnk"),
+      id: ctx.id("sim", "lnk"),
       offerId: l.offer,
       templateId: t.id,
       templateName: t.name,
@@ -313,7 +313,7 @@ export function seedSimulator(ctx: SeedCtx) {
   // The payment alert, linked when its template went live, on both of its channels.
   const payment = ctx.template("payment-due-reminder");
   sink.simLinks.push({
-    id: ctx.id("lnk"),
+    id: ctx.id("sim", "lnk"),
     offerId: "alert_payment_due",
     templateId: payment.id,
     templateName: payment.name,
