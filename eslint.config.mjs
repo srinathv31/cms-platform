@@ -66,6 +66,71 @@ const noViewModels = {
   message:
     "The service interfaces carry facts: not the BFF's view models (worded, with app URLs) or its modules. Declare a facts type beside the interface, or Unsettled<…> until its package settles it (decision 0072).",
 };
+// Who reads the clock (N1 in the seam's review): the backend does, and the request context never. A read that
+// decides by time answers the instant it decided at (`asOf`), and the BFF words its dates from it.
+const noClock = {
+  group: [
+    "@/server/clock",
+    "**/server/clock",
+    "../clock",
+    "@/server/queries/dynamic",
+    "**/queries/dynamic",
+    "./dynamic",
+  ],
+  message:
+    "Only the backend reads the clock (the local implementation, /api/v1, the sweeps). A read that decides by time answers `asOf`: word dates from it (decision 0072).",
+};
+// Who decides (N2): the permission check runs behind the service interfaces (decision 0070). Read models and
+// components render the decided `can` the services answer; only the domain and the implementations call it.
+const decisionsMessage =
+  "Permission checks run behind the service interfaces (decision 0070): render the decided `can` a service answers. Only src/domain and the implementations call can() or canSeeSpace().";
+const noDecisions = {
+  paths: [
+    {
+      name: "@/domain/permissions",
+      importNames: ["can", "canSeeSpace"],
+      message: decisionsMessage,
+    },
+    // `check` and `permit` are can() for a command: the legacy branch of the action kit still decides in the BFF.
+    ...["@/server/services/refuse", "@/server/actions/kit", "./kit"].map(
+      (name) => ({
+        name,
+        importNames: ["check", "permit"],
+        message: decisionsMessage,
+      }),
+    ),
+  ],
+  patterns: [{ group: ["**/require-can"], message: decisionsMessage }],
+};
+// The backend's own machinery (H4): the reset and the seed belong to the local backend (the demo tools reach them
+// through services().demo), and src/server/testing is test support. The BFF imports none of them.
+const noBackendInternals = {
+  group: [
+    "@/server/reset",
+    "**/server/reset",
+    "../reset",
+    "@/server/seed",
+    "@/server/seed/**",
+    "**/seed/**",
+    "@/server/testing/**",
+    "**/server/testing/**",
+  ],
+  message:
+    "The BFF doesn't import the backend's own machinery: the reset and the seed are the local backend's (reach the demo tools through services().demo), and src/server/testing is test support.",
+};
+// The three rules above reuse typescript-eslint's no-restricted-imports under names of their own, so each has its
+// own severity per file (flat config keeps one per rule) and its own ratchet below.
+const restrictedImports = nextTs.find(
+  (config) => config.plugins?.["@typescript-eslint"],
+).plugins["@typescript-eslint"].rules["no-restricted-imports"];
+const seamPlugin = {
+  rules: {
+    "no-clock": restrictedImports,
+    "no-decisions": restrictedImports,
+    "no-backend-internals": restrictedImports,
+  },
+};
+
 // Not checked by the seam rules: the local implementation and the database itself, the seed and the reset, the
 // shared database test support, the simulator (its own app and database), and tests.
 const SEAM_EXEMPT = [
@@ -112,9 +177,9 @@ const SEAM_NOT_YET = [
   "src/server/queries/library.ts",
   "src/server/queries/notifications.ts",
   "src/server/queries/palette.ts",
+  "src/server/queries/people.ts",
   "src/server/queries/personas.ts",
   "src/server/queries/platform.ts",
-  "src/server/queries/people.ts",
   "src/server/queries/review.ts",
   "src/server/queries/submit-summary.ts",
   "src/server/queries/template-access.ts",
@@ -126,6 +191,81 @@ const SEAM_NOT_YET = [
   "src/server/sunset-sweep.ts",
   "src/server/templates/create.ts",
   "src/server/version-rows.ts",
+];
+
+// The BFF files that still read the clock (N1), still decide with can() (N2), and still import the backend's own
+// machinery (H4): the packages that own them (plan.md) clear them, and delete their lines. Integration empties all
+// three, with SEAM_NOT_YET.
+/** A ratchet's block: its rule as a warning for the files still listed, and nothing once the list is empty. */
+const ratchet = (files, rules) => (files.length > 0 ? [{ files, rules }] : []);
+const CLOCK_NOT_YET = [
+  "src/components/activity/activity-content.tsx",
+  "src/components/library/library-view.tsx",
+  "src/components/review-queue/review-queue-view.tsx",
+  "src/components/review/review-screen.tsx",
+  "src/components/settings/team/bodies.tsx",
+  "src/components/usage/template-usage.tsx",
+  "src/components/usage/usage-dashboard.tsx",
+  "src/components/workspace/content/workspace-content.tsx",
+  "src/components/workspace/workspace-header.tsx",
+  "src/server/access-sweep.ts",
+  "src/server/actions/demo.ts",
+  "src/server/actions/kit.ts",
+  "src/server/actions/persona.ts",
+  "src/server/api/http.ts",
+  "src/server/drafts/save-draft.ts",
+  "src/server/import/create.ts",
+  "src/server/queries/access.ts",
+  "src/server/queries/audit.ts",
+  "src/server/queries/clock.ts",
+  "src/server/queries/dynamic.ts",
+  "src/server/queries/integration.ts",
+  "src/server/queries/library.ts",
+  "src/server/queries/notifications.ts",
+  "src/server/queries/platform.ts",
+  "src/server/queries/review.ts",
+  "src/server/queries/submit-summary.ts",
+  "src/server/queries/usage.ts",
+  "src/server/queries/workspace.ts",
+  "src/server/render/render-template.ts",
+  "src/server/sunset-sweep.ts",
+];
+const DECIDES_NOT_YET = [
+  "src/components/library/library-view.tsx",
+  "src/server/actions/access.ts",
+  "src/server/actions/comments.ts",
+  "src/server/actions/create-template.ts",
+  "src/server/actions/kit.ts",
+  "src/server/actions/platform.ts",
+  "src/server/actions/review.ts",
+  "src/server/actions/templates.ts",
+  "src/server/drafts/apply-patch.ts",
+  "src/server/import/create.ts",
+  "src/server/queries/access.ts",
+  "src/server/queries/audit.ts",
+  "src/server/queries/base-version.ts",
+  "src/server/queries/compare.ts",
+  "src/server/queries/copilot.ts",
+  "src/server/queries/import.ts",
+  "src/server/queries/integration.ts",
+  "src/server/queries/palette.ts",
+  "src/server/queries/platform.ts",
+  "src/server/queries/require-can.ts",
+  "src/server/queries/review.ts",
+  "src/server/queries/submit-summary.ts",
+  "src/server/queries/template-access.ts",
+  "src/server/queries/usage.ts",
+  "src/server/queries/workspace.ts",
+  "src/server/render/render-template.ts",
+];
+const INTERNALS_NOT_YET = [
+  "src/server/actions/demo.ts",
+  "src/server/starters/alerts.ts",
+  "src/server/starters/blank.ts",
+  "src/server/starters/card-offer-terms.ts",
+  "src/server/starters/fee-schedule.ts",
+  "src/server/starters/index.ts",
+  "src/server/starters/rate-change-notice.ts",
 ];
 
 // The editor's public modules: the table under "Public API" in src/editor/README.md. Code outside src/editor
@@ -368,6 +508,7 @@ const eslintConfig = defineConfig([
     },
   },
   // ── The backend seam (src/server/services/README.md, decision 0072) ──────────
+  { plugins: { seam: seamPlugin } },
   // A separate rule from the core no-restricted-imports above (typescript-eslint's, which can let type imports
   // through), so the blocks there keep their own options. Flat config keeps one set of options per rule per file:
   // each block below lists every seam pattern that applies to its files.
@@ -420,6 +561,52 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Only the backend reads the clock. Exempt like the rules above (the local implementation, /api/v1, the
+    // reset, the seed, test support and tests are the backend's own); CLOCK_NOT_YET is the ratchet.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: SEAM_EXEMPT,
+    rules: { "seam/no-clock": ["error", { patterns: [noClock] }] },
+  },
+  ...ratchet(CLOCK_NOT_YET, {
+    "seam/no-clock": ["warn", { patterns: [noClock] }],
+  }),
+  {
+    // Only the domain and the implementations decide; `refuse.ts` is the implementations' shared command helper.
+    // DECIDES_NOT_YET is the ratchet.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      "src/domain/**",
+      "src/server/services/local/**",
+      "src/server/services/fake/**",
+      "src/server/services/refuse.ts",
+      "src/simulator/**",
+      "**/*.test.{ts,tsx}",
+    ],
+    rules: { "seam/no-decisions": ["error", noDecisions] },
+  },
+  ...ratchet(DECIDES_NOT_YET, {
+    "seam/no-decisions": ["warn", noDecisions],
+  }),
+  {
+    // The reset, the seed and the test support are the backend's and the tests'. The fake and the contract suite
+    // are test support too. INTERNALS_NOT_YET is the ratchet.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      ...SEAM_EXEMPT,
+      "src/server/services/fake/**",
+      "src/server/services/contract/**",
+    ],
+    rules: {
+      "seam/no-backend-internals": [
+        "error",
+        { patterns: [noBackendInternals] },
+      ],
+    },
+  },
+  ...ratchet(INTERNALS_NOT_YET, {
+    "seam/no-backend-internals": ["warn", { patterns: [noBackendInternals] }],
+  }),
   {
     // The published /api/v1 wire contract: self-contained types both UCOMP and the simulator compile against.
     files: ["src/contracts/**/*.ts"],
