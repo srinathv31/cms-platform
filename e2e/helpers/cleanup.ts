@@ -58,9 +58,13 @@ export async function removeTemplate(db: Client, id: string) {
   for (const upload of uploads) {
     const folder = String(upload.id);
     if (/^[\w-]{8,}$/.test(folder))
+      // A few retries, as in `removeUpload` (src/server/import/store.ts): on Windows a virus scanner can
+      // still hold a file it was just handed.
       await rm(path.join(E2E_UPLOADS_DIR, folder), {
         recursive: true,
         force: true,
+        maxRetries: 3,
+        retryDelay: 50,
       });
   }
 }
