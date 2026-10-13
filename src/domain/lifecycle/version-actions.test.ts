@@ -8,7 +8,7 @@ import { versionActions } from "./version-actions";
 // What a viewer may do on a released version: the Versions tab's four controls, decided once for the local
 // implementation, the fake and (ported) the Java API.
 
-const TEAM = "coral-offers";
+const TEAM = "t_coral";
 const member = (
   userId: string,
   roles: Viewer["memberships"][number]["roles"],
@@ -21,7 +21,8 @@ const member = (
   memberships: [
     {
       teamId: TEAM,
-      teamSlug: TEAM,
+      // Never the id (decision 0053): a rule handed the slug finds nothing.
+      teamSlug: "coral-offers",
       teamName: "Coral Offers",
       roles,
       status: "active",

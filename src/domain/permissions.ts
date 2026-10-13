@@ -240,12 +240,12 @@ export interface Space {
 }
 
 /** The "All teams" space, for the platform roles. */
-export const ALL_TEAMS_SPACE: Space = {
+export const ALL_TEAMS_SPACE: Space = Object.freeze({
   teamId: null,
   slug: ALL_SPACE,
   name: "All teams",
   kind: "all",
-};
+});
 
 /**
  * The team switcher list: "All teams" first for cross-team viewers, then the viewer's active

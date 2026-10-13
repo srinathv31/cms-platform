@@ -198,6 +198,15 @@ describe("GET /api/palette/[space]", () => {
       status: 404,
       body: NOT_YOURS,
     });
+
+    // A slug no team has reads the same as a team the viewer can't see, for a platform role too (decision 0052);
+    // and a team's id is not its slug (decision 0053).
+    as("taylor");
+    for (const space of ["nope", "t_coral"])
+      expect(await search(space), space).toEqual({
+        status: 404,
+        body: NOT_YOURS,
+      });
   });
 
   it("the cross-team space searches every team, for the people who have it", async () => {

@@ -108,7 +108,7 @@ which the HTTP implementation will word from the code (and the facts the Java AP
   | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
   | the database, and an implementation | talk to the database: the local implementation, `src/server/db`, the seed; import `services/local` or `fake`: [index.ts](index.ts), `/api/v1`, the seed, the reset, tests | `SEAM_NOT_YET`      |
   | `seam/no-clock`                     | read the clock (`@/server/clock`, `queries/dynamic`): the backend (the local implementation, `/api/v1`, the reset, the seed) and tests                                    | `CLOCK_NOT_YET`     |
-  | `seam/no-decisions`                 | decide (`can`, `canSeeSpace`, `requireCan`, the kit's `check`/`permit`): `src/domain`, `services/local`, `services/fake`, [refuse.ts](refuse.ts)                          | `DECIDES_NOT_YET`   |
+  | `seam/no-decisions`                 | decide (`can`, `canSeeSpace` and the space rules, `requireCan`, the kit's `check`/`permit`): `src/domain`, `services/local`, `services/fake`, [refuse.ts](refuse.ts)      | `DECIDES_NOT_YET`   |
   | `seam/no-backend-internals`         | import the reset, the seed or `src/server/testing`: the backend's own code, the fake, the contract suite and tests                                                        | `INTERNALS_NOT_YET` |
 
 - **A rule both implementations need lives in `src/domain`.** An `if` that would appear in both `local/` and `fake/`

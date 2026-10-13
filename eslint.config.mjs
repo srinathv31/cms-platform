@@ -52,6 +52,14 @@ const noImplementations = {
   message:
     "Reach the backend through services() (src/server/services/index.ts), never an implementation: with another backend configured, the local one isn't there.",
 };
+// What the domain's audit wording builds for the Audit page (`AuditRow`, worded) and reads from its URL
+// (`AuditFilters`, by team slug): view models, though they live in the domain beside the rules that build them.
+const noAuditViewModels = {
+  name: "@/domain/access-types",
+  importNames: ["AuditRow", "AuditFilters"],
+  message:
+    "The service interfaces carry facts: the Audit page's rows and URL filters are the BFF's (filters cross the seam by team id).",
+};
 const noViewModels = {
   group: [
     "@/server/queries/**",
@@ -78,17 +86,26 @@ const noClock = {
     "./dynamic",
   ],
   message:
-    "Only the backend reads the clock (the local implementation, /api/v1, the sweeps). A read that decides by time answers `asOf`: word dates from it (decision 0072).",
+    "Only the backend reads the clock (the local implementation and /api/v1; the sweeps once they move into it). A read that decides by time answers `asOf`: word dates from it (decision 0072).",
 };
 // Who decides (N2): the permission check runs behind the service interfaces (decision 0070). Read models and
 // components render the decided `can` the services answer; only the domain and the implementations call it.
 const decisionsMessage =
   "Permission checks run behind the service interfaces (decision 0070): render the decided `can` a service answers. Only src/domain and the implementations call can() or canSeeSpace().";
+// The permission check and the space rules built on it (who sees which space, where a viewer lands).
+const decidingNames = [
+  "can",
+  "canSeeSpace",
+  "defaultSpace",
+  "isCrossTeam",
+  "rolesOn",
+  "spacesFor",
+];
 const noDecisions = {
   paths: [
     {
       name: "@/domain/permissions",
-      importNames: ["can", "canSeeSpace"],
+      importNames: decidingNames,
       message: decisionsMessage,
     },
     // `check` and `permit` are can() for a command: the legacy branch of the action kit still decides in the BFF.
@@ -100,7 +117,20 @@ const noDecisions = {
       }),
     ),
   ],
-  patterns: [{ group: ["**/require-can"], message: decisionsMessage }],
+  patterns: [
+    { group: ["**/require-can"], message: decisionsMessage },
+    // The same, imported by a relative path.
+    {
+      group: ["**/domain/permissions"],
+      importNames: decidingNames,
+      message: decisionsMessage,
+    },
+    {
+      group: ["**/services/refuse", "**/actions/kit"],
+      importNames: ["check", "permit"],
+      message: decisionsMessage,
+    },
+  ],
 };
 // The backend's own machinery (H4): the reset and the seed belong to the local backend (the demo tools reach them
 // through services().demo), and src/server/testing is test support. The BFF imports none of them.
@@ -112,8 +142,12 @@ const noBackendInternals = {
     "@/server/seed",
     "@/server/seed/**",
     "**/seed/**",
+    "../seed",
+    "./seed",
     "@/server/testing/**",
     "**/server/testing/**",
+    "../testing/**",
+    "./testing/**",
   ],
   message:
     "The BFF doesn't import the backend's own machinery: the reset and the seed are the local backend's (reach the demo tools through services().demo), and src/server/testing is test support.",
@@ -237,6 +271,7 @@ const DECIDES_NOT_YET = [
   "src/server/actions/comments.ts",
   "src/server/actions/create-template.ts",
   "src/server/actions/kit.ts",
+  "src/server/actions/persona.ts",
   "src/server/actions/platform.ts",
   "src/server/actions/review.ts",
   "src/server/actions/templates.ts",
@@ -534,7 +569,10 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
-        { patterns: [noDatabase, noImplementations, noViewModels] },
+        {
+          paths: [noAuditViewModels],
+          patterns: [noDatabase, noImplementations, noViewModels],
+        },
       ],
     },
   },
