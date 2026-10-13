@@ -14,13 +14,9 @@ import { requireSpace } from "./spaces";
 // shown by, the status, the sunset, the order, `can.create`); this words the rows (how long ago, from the read's
 // `asOf`). It decides nothing.
 
-// The version a template is shown by, picked everywhere in the CMS (the workspace header, the review screen's
-// threads), is decided in the domain. Re-exported here until those read models import it from there.
-export { pickLatest } from "@/domain/library";
-
 export interface LibraryRow {
   id: string;
-  /** The latest version's name (`pickLatest`): the open draft's, otherwise the newest version's. */
+  /** The latest version's name (`latestVersion`): the open draft's, otherwise the newest version's. */
   name: string;
   /**
    * Document or Alert: the template's kind, from its content type's channels (`contentTypeFamily`). It is

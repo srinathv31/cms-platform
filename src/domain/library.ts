@@ -3,15 +3,16 @@
 // functions in the local implementation and in the fake alike; the BFF words the rows (how long ago, the
 // status badge).
 //
-//   pickLatest    the version a template is shown by everywhere in the CMS
 //   libraryOf     a space's rows and whether the viewer may create there, or null when they can't enter it
+//
+// Each row is shown by the version the CMS shows a template by everywhere: `latestVersion` (rounds.ts).
 
 import { sunsetDay } from "./business-zone";
 import { compareCodePoints } from "./golive/cursor";
 import { sunsetPassed } from "./lifecycle/sunset";
 import { can, canSeeSpace } from "./permissions";
 import type { Person } from "./review-types";
-import { compareRounds, type RoundRow } from "./rounds";
+import { latestVersion, type RoundRow } from "./rounds";
 import {
   contentTypeFamily,
   type Channel,
@@ -20,20 +21,6 @@ import {
   type VersionState,
   type Viewer,
 } from "./types";
-
-/**
- * Latest = the open draft if there is one, otherwise the highest version number, and of its rounds the
- * latest (`compareRounds`). The CMS shows a template by this version's name (`currentName` in
- * services/local/template-name.ts is the same pick in SQL).
- */
-export function pickLatest<T extends RoundRow>(list: T[]): T | undefined {
-  const draft = list.find((v) => v.state === "draft");
-  if (draft) return draft;
-  return list.reduce<T | undefined>(
-    (best, v) => (best === undefined || compareRounds(v, best) > 0 ? v : best),
-    undefined,
-  );
-}
 
 /** A template the Library may list, with its team and who made it. */
 export interface LibraryTemplate {
@@ -60,7 +47,7 @@ export interface LibraryRowFacts {
   teamId: string;
   teamSlug: string;
   teamName: string;
-  /** The latest version's name (`pickLatest`): the open draft's, otherwise the newest version's; the id for none. */
+  /** The latest version's name (`latestVersion`): the open draft's, otherwise the newest version's; the id for none. */
   name: string;
   /**
    * Document or Alert: the template's kind, from its content type's channels (`contentTypeFamily`). It is
@@ -130,7 +117,7 @@ export function libraryOf(input: {
     )
     .map((t): LibraryRowFacts => {
       const list = byTemplate.get(t.id) ?? [];
-      const latest = pickLatest(list);
+      const latest = latestVersion(list);
       const active = list.find((v) => v.state === "active");
       const edited = list.reduce<Date | null>(
         (max, v) => (max === null || v.updatedAt > max ? v.updatedAt : max),

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   libraryOf,
-  pickLatest,
   type LibraryTemplate,
   type LibraryVersion,
 } from "./library";
@@ -136,61 +135,6 @@ function rowOf(
 }
 
 const ids = (facts: ReturnType<typeof library>) => facts!.rows.map((r) => r.id);
-
-// ── pickLatest ───────────────────────────────────────────────────────────────
-
-describe("pickLatest", () => {
-  const row = (
-    label: string,
-    number: number | null,
-    round: number | null,
-    state: VersionState,
-  ) => ({ label, number, round, state });
-
-  it("is nothing for a template with no versions", () => {
-    expect(pickLatest([])).toBeUndefined();
-  });
-
-  it("is the open draft, however high the other numbers are", () => {
-    const rows = [
-      row("v3", 3, 1, "active"),
-      row("draft", null, null, "draft"),
-      row("v2", 2, 1, "superseded"),
-    ];
-    expect(pickLatest(rows)!.label).toBe("draft");
-  });
-
-  it("otherwise the highest number, whatever order the rows come in", () => {
-    const rows = [
-      row("v2", 2, 1, "active"),
-      row("v3", 3, 1, "in_review"),
-      row("v1", 1, 1, "superseded"),
-    ];
-    expect(pickLatest(rows)!.label).toBe("v3");
-    expect(pickLatest([...rows].reverse())!.label).toBe("v3");
-  });
-
-  it("and of that number's rounds, the latest", () => {
-    const rows = [
-      row("v2 round 2", 2, 2, "in_review"),
-      row("v1", 1, 1, "active"),
-      row("v2 round 1", 2, 1, "changes_requested"),
-    ];
-    expect(pickLatest(rows)!.label).toBe("v2 round 2");
-    expect(pickLatest([...rows].reverse())!.label).toBe("v2 round 2");
-  });
-
-  it("a number sent back stays ahead of the version it would replace", () => {
-    const rows = [
-      row("v1", 1, 1, "active"),
-      row("v2 round 1", 2, 1, "changes_requested"),
-    ];
-    expect(pickLatest(rows)).toMatchObject({
-      label: "v2 round 1",
-      state: "changes_requested",
-    });
-  });
-});
 
 // ── libraryOf: a row ─────────────────────────────────────────────────────────
 

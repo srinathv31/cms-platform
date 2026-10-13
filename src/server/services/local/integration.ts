@@ -24,8 +24,11 @@ import { published } from "./consumer-api";
 // The SHARE panel's facts and the Copilot prompt's, on this app's own database (src/server/services/
 // templates.ts says what each read promises). The BFF words both: the examples, the schema and the prompt.
 
-/** The consumer the examples name: the template's latest non-preview renderer, else the first registered one. */
-async function sampleConsumer(templateId: string): Promise<string> {
+/**
+ * The consumer the examples name: the template's latest non-preview renderer, else the first registered one; null
+ * when no consumer is registered.
+ */
+async function sampleConsumer(templateId: string): Promise<string | null> {
   const [recent] = await db
     .select({ id: renderLog.consumerId })
     .from(renderLog)
@@ -46,7 +49,7 @@ async function sampleConsumer(templateId: string): Promise<string> {
     .from(consumers)
     .orderBy(asc(consumers.id))
     .limit(1);
-  return first?.id ?? "coral";
+  return first?.id ?? null;
 }
 
 export function localIntegration(

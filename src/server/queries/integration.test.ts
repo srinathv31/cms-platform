@@ -5,7 +5,11 @@ import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { Variable } from "@/domain/types";
 import type { RequestContext } from "@/server/context/request";
 import type { IntegrationFacts } from "@/server/services/templates";
-import { integrationPanel, loadIntegrationPanel } from "./integration";
+import {
+  SAMPLE_CONSUMER_PLACEHOLDER,
+  integrationPanel,
+  loadIntegrationPanel,
+} from "./integration";
 
 // The SHARE panel as the BFF builds it: facts in (IntegrationFacts, what the templates service answers), the
 // worded panel out. `integrationPanel` is pure, so its tests hand it facts directly; what the service decides
@@ -193,6 +197,14 @@ describe("integrationPanel", () => {
     expect(reordered.samples[0]!.curl).toContain(
       "-H 'X-Consumer-Id: deposits-online'",
     );
+  });
+
+  it("writes the samples for a placeholder consumer when none is registered", () => {
+    const panel = integrationPanel(facts({ sampleConsumerId: null }), ORIGIN);
+    for (const sample of panel.samples)
+      expect(sample.curl).toContain(
+        `-H 'X-Consumer-Id: ${SAMPLE_CONSUMER_PLACEHOLDER}'`,
+      );
   });
 
   it("a channel the facts leave out has no sample", () => {

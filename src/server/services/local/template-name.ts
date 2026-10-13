@@ -12,7 +12,7 @@ const named = alias(versions, NAMED);
 
 /**
  * The name the CMS shows for a template, as a column: its open draft's, otherwise its newest
- * version's (by number, then round). The same version `pickLatest` (library.ts) picks, so a list
+ * version's (by number, then round). The same version `latestVersion` (src/domain/rounds.ts) picks, so a list
  * agrees with the workspace header. A template with no version at all (never the case through the app)
  * shows its id, as the Library and the header do. Screens about one version (review, notifications)
  * use that version's name instead.

@@ -17,6 +17,9 @@ import type { RequestContext } from "@/server/context/request";
 import { services } from "@/server/services";
 import type { IntegrationFacts } from "@/server/services/templates";
 
+/** The consumer id the examples are written for when no consumer is registered yet. */
+export const SAMPLE_CONSUMER_PLACEHOLDER = "your-consumer-id";
+
 // The integration panel (the sheet behind the template's "Share" ring): what a consumer needs to
 // call the render API for the Active version. `loadIntegrationPanel` serves
 // GET /api/templates/[templateId]/integration, which the panel calls when it opens and on hover or
@@ -98,7 +101,7 @@ export function integrationPanel(
         versionNumber: active.number,
         channel,
         variables: active.variables,
-        consumerId: facts.sampleConsumerId,
+        consumerId: facts.sampleConsumerId ?? SAMPLE_CONSUMER_PLACEHOLDER,
       }),
     })),
     responses: [...RESPONSE_FORMATS],

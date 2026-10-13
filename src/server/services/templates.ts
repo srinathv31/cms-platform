@@ -90,8 +90,11 @@ export interface IntegrationFacts {
     channels: Channel[];
     variables: Variable[];
   };
-  /** The consumer the examples name: the template's latest non-preview renderer, else the first registered one. */
-  sampleConsumerId: string;
+  /**
+   * The consumer the examples name: the template's latest non-preview renderer, else the first registered one;
+   * null when no consumer is registered (the BFF writes the examples for a placeholder).
+   */
+  sampleConsumerId: string | null;
   /** Older released versions (Superseded or Revoked), newest first. Empty for a v1. */
   older: {
     number: number;

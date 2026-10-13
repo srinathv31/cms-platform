@@ -7,7 +7,7 @@ import { compareCodePoints } from "./golive/cursor";
 import type { PaletteTemplateRow } from "./import-types";
 import { normalizePaletteQuery, paletteTemplates } from "./palette";
 import { can, canSeeSpace } from "./permissions";
-import { pickLatest } from "./library";
+import { latestVersion } from "./rounds";
 import type { RoundRow } from "./rounds";
 import type { PermissionResult, Viewer } from "./types";
 
@@ -61,7 +61,7 @@ export interface PaletteFacts {
 /**
  * The palette's answer for a viewer in a space (a team by id; null, every team), or null when they may not
  * enter it. `templates` are candidates of any team; the space's own that the viewer may see are listed, each by
- * its latest version's name and state (`pickLatest`, as the Library shows it), in name order then id by code
+ * its latest version's name and state (`latestVersion`, as the Library shows it), in name order then id by code
  * point (decision 0059's order) before `paletteTemplates` ranks them, so what ties keeps a stable order.
  * `recentIds` are the viewer's templates, newest first (`recentTemplateIds`).
  */
@@ -91,7 +91,7 @@ export function paletteSearch(input: {
         canSeeSpace(viewer, t.teamId),
     )
     .map((t): PaletteTemplateRow => {
-      const latest = pickLatest(byTemplate.get(t.id) ?? []);
+      const latest = latestVersion(byTemplate.get(t.id) ?? []);
       return {
         id: t.id,
         name: latest?.name ?? t.id,

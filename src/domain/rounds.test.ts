@@ -336,3 +336,56 @@ describe("review links", () => {
     expect(parseRoundParam(["1", "2"])).toBe("invalid");
   });
 });
+
+describe("latestVersion, whatever order the rows come in", () => {
+  const row = (
+    label: string,
+    number: number | null,
+    round: number | null,
+    state: VersionState,
+  ) => ({ label, number, round, state });
+
+  it("is nothing for a template with no versions", () => {
+    expect(latestVersion([])).toBeUndefined();
+  });
+
+  it("is the open draft, however high the other numbers are", () => {
+    const rows = [
+      row("v3", 3, 1, "active"),
+      row("draft", null, null, "draft"),
+      row("v2", 2, 1, "superseded"),
+    ];
+    expect(latestVersion(rows)!.label).toBe("draft");
+  });
+
+  it("otherwise the highest number, whatever order the rows come in", () => {
+    const rows = [
+      row("v2", 2, 1, "active"),
+      row("v3", 3, 1, "in_review"),
+      row("v1", 1, 1, "superseded"),
+    ];
+    expect(latestVersion(rows)!.label).toBe("v3");
+    expect(latestVersion([...rows].reverse())!.label).toBe("v3");
+  });
+
+  it("and of that number's rounds, the latest", () => {
+    const rows = [
+      row("v2 round 2", 2, 2, "in_review"),
+      row("v1", 1, 1, "active"),
+      row("v2 round 1", 2, 1, "changes_requested"),
+    ];
+    expect(latestVersion(rows)!.label).toBe("v2 round 2");
+    expect(latestVersion([...rows].reverse())!.label).toBe("v2 round 2");
+  });
+
+  it("a number sent back stays ahead of the version it would replace", () => {
+    const rows = [
+      row("v1", 1, 1, "active"),
+      row("v2 round 1", 2, 1, "changes_requested"),
+    ];
+    expect(latestVersion(rows)).toMatchObject({
+      label: "v2 round 1",
+      state: "changes_requested",
+    });
+  });
+});

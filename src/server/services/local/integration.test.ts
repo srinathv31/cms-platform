@@ -222,6 +222,16 @@ describe("templates.integration", () => {
         "coral",
       );
     });
+
+    it("with no consumer registered at all, names none (the BFF writes the examples for a placeholder)", async () => {
+      const templateId = id("balance-transfer");
+      await db.delete(renderLog);
+      await db.delete(schema.consumerNotices);
+      await db.delete(schema.consumers);
+      expect(
+        (await integration("maya", templateId)).sampleConsumerId,
+      ).toBeNull();
+    });
   });
 
   it("a channel Channel rules turned off is not in the Active version's channels", async () => {
