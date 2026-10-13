@@ -384,7 +384,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S2 · High: Identity fails open to the default persona
 
-- **Status:** Deferred. Replaced when real login lands. Whatever replaces `getViewer()` must refuse, not default to a person.
+- **Status:** Partly fixed. The request context fails closed (`src/server/context/request.ts`, [decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)): with `DEMO_MODE` off, a missing or unknown persona cookie is signed out, and a page goes to the sign-in hook (`signInRequired()`), an action answers `signed_out`, a read route 401. With the demo tools on, it still falls back to Maya, and a hand-set cookie still acts as its persona until real login lands.
 - **Where:** `src/server/viewer.ts` line 58; `src/app/api/templates/[templateId]/preview/route.ts` line 57
 - **What happens:** With no cookie or an unknown id, `getViewer()` returns Maya. Stencil's preview route uses it, so an anonymous `POST {version: "draft"}` to it renders Coral Offers' unreleased drafts (it is no longer on the public `/api/v1` URL). Whatever replaces the persona cookie will inherit this contract unless it changes now.
 - **Fix:** Return no viewer (401 or redirect to sign-in) when there's no identity. Make the persona switcher a dev-only provider behind the same function.
@@ -826,7 +826,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B1 · High: Server actions are the service layer
 
-- **Status:** Partly fixed. Rendering now runs through a DB-free engine (`src/server/render/engine.ts`, PR #6). Every other action is still the service layer.
+- **Status:** Partly fixed. Rendering runs through a DB-free engine (`src/server/render/engine.ts`, PR #6). The seam is in place ([decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md), `src/server/services/`): a fail-closed request context, the service interfaces, a local implementation, a fake and a contract suite, with `setSunset` and the Versions read behind them. The other actions and reads move in step 2b of lane F's plan; the lint ratchet in `eslint.config.mjs` (`SEAM_NOT_YET`) lists what is left.
 - **Where:** `src/server/actions/review.ts` line 443
 - **What happens:** `approveVersion` runs `getViewer`, a DB lookup, the permission check, a transaction with five reads, the domain call, writes and effects, then `refresh`. Every action is shaped this way, and 42 production files import the Drizzle client directly. There is nothing to swap for HTTP calls.
 - **Fix:** Request context plus service interfaces (see The backend decision).

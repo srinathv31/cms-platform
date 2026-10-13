@@ -91,11 +91,12 @@ load." in the tab's place, under the header and the tab bar ([Errors](../src/app
    `useActionRun` ([use-action-run.ts](../src/components/primitives/use-action-run.ts)): one request at a time,
    closes on `ok`, shows `reason` otherwise.
 2. `setSunset` in [actions/review.ts](../src/server/actions/review.ts) runs on the server action kit, `serverAction`
-   in [actions/kit.ts](../src/server/actions/kit.ts): the request context (the viewer and `now`, once; `signed_out`
-   without a viewer), zod parse, then the service, `services().review.setSunset`. On success, `revalidatePath()` and
-   `refresh()`.
+   in [actions/kit.ts](../src/server/actions/kit.ts): the request context (the viewer, once; `signed_out` without a
+   viewer), zod parse, then the service, `services().review.setSunset`. On success, `revalidatePath()` and
+   `refresh()`. The BFF supplies no time.
 3. Behind the service, the local implementation ([services/local/review.ts](../src/server/services/local/review.ts))
-   checks the permission, then runs one transaction: re-read the version, call the domain transition, write the
+   checks the permission, reads its own clock once, then runs one transaction: re-read the version, call the
+   domain transition, write the
    changes with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row,
    notifications, consumer notices) with `writeEffects`. A refusal anywhere rolls the transaction back and is the
    answer. After the port, the Java API does this step.
@@ -208,7 +209,10 @@ What the Java API's MSSQL schema does instead: team and user ids
 ## Time, identity, and demo data
 
 - **The demo clock.** `now()` in [clock.ts](../src/server/clock.ts) is real time plus `settings.clock_offset_days`.
-  It is the only reader of the current time on the server; domain functions take `now` as an argument. The Demo
+  It is the backend's clock and the only reader of the current time on the server: a command dates its writes by
+  it, a read that decides by time answers it as `asOf`, and the BFF words its dates from that, reading no clock of
+  its own ([decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)). Domain
+  functions take `now` as an argument. The Demo
   pill's "Advance clock" moves the offset, and `/api/v1` responses carry it in their `Date` header.
 - **The business time zone.** A sunset date ends at 00:00 on that day in one platform time zone, a Platform
   setting that is `America/New_York` by default
@@ -216,8 +220,9 @@ What the Java API's MSSQL schema does instead: team and user ids
   the UI shows is UTC, and "today", "yesterday" and "3 days ago" count UTC calendar days, the same on every screen
   ([decision 0028](decisions/0028-today-and-yesterday-are-utc-calendar-days.md)). Dates, counts and plurals have
   one module each in `src/domain`: `dates.ts`, `numbers.ts`, `plural.ts`.
-- **Identity.** There is no login. `getViewer()` reads the `ucomp_persona` cookie. A missing or unknown cookie acts
-  as Maya.
+- **Identity.** There is no login. The request context ([context/request.ts](../src/server/context/request.ts))
+  reads the `ucomp_persona` cookie through `getViewer()`. A missing or unknown cookie is signed out, and a page goes
+  to `/sign-in`; with the demo tools on (`DEMO_MODE`), it acts as Maya.
 - **Seed** ([src/server/seed](../src/server/seed/index.ts)), deterministic, rebuilt by `npm run db:reset`:
 
   |                     |                                                                                                                                                                                                                             |

@@ -68,7 +68,8 @@ Not enforced yet; follow them anyway:
 
 - New business rules go in `src/domain`. Never add one to an action, a query, or a component.
 - Only `src/server` imports the database client: in the end only the local implementation (`src/server/services/local`),
-  `src/server/db` and the seed (lint warns on the rest).
+  `src/server/db` and the seed. Lint errs on any other file, except those still listed in `SEAM_NOT_YET`
+  ([eslint.config.mjs](eslint.config.mjs)), where it warns until their package clears them.
 - Read models return permissions decided (`can: { action: PermissionResult }`). Components render them; they don't
   call `can()` or compare refusal sentences.
 
@@ -81,8 +82,9 @@ Next.js API; Next's own note about it is at the end of this file.
   `now()`) only inside `<Stream fallback={…}>` from `@/components/primitives/stream`. A page's default export stays
   synchronous and passes the `params` promise down; the streamed child awaits it. Type pages with
   `PageProps<"/route">`. Never add `loading.tsx`. The fallback has the final geometry: layout shift must be zero.
-- **Time.** Use `now()` from `@/server/clock`, never `new Date()` or `Date.now()` in server code. Domain functions
-  take `now` as an argument. A database read that runs before any request API needs `await connection()` first.
+- **Time.** The backend owns it: a command is dated by the backend's clock (`now()` from `@/server/clock` in the
+  local implementation), and a read that decides by time answers `asOf`, which the BFF words its dates from. Never
+  `new Date()` or `Date.now()` in server code. Domain functions take `now` as an argument. A database read that runs before any request API needs `await connection()` first.
 - **After a mutation**, a server action calls `refresh()` from `next/cache` (and `revalidatePath()` for other routes
   that show the change). Route handlers can't call `refresh()`; they use `revalidatePath()`. `redirect()` comes last.
 - **Typed routes are on.** `<Link href>` takes a known route; a computed string needs `as Route`.
@@ -90,15 +92,18 @@ Next.js API; Next's own note about it is at the end of this file.
 
 ## Server code
 
-- A server action: `getViewer()`, parse with zod, check permission, `now()` once, then one `inTransaction`. Inside
+- A server action: the request context (the viewer), parse with zod, check permission, `now()` once, then one `inTransaction`. Inside
   it, re-read, ask the domain, write with a compare-and-set, and write the effects (audit rows, notifications,
   consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
   throw only for bugs. Inside a transaction, read and write through `tx`, never `db`. `serverAction` in
   [src/server/actions/kit.ts](src/server/actions/kit.ts) runs these steps; every action is written on it.
-- The backend seam ([src/server/services](src/server/services/README.md)) is being put in place: an action that has
-  moved reads the request context, parses, and calls `services()` (`call`); the permission check, the transaction and
-  the effects run behind it, in the local implementation (`runCommand`), and in the in-memory fake its tests use.
-  Move an area as that README says; don't add new code that reads `getViewer()`, `now()` or the database outside it.
+- The backend seam ([src/server/services](src/server/services/README.md), [decision 0072](docs/decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)):
+  an action that has moved reads the request context (the viewer; no time), parses, and calls `services()` (`call`);
+  the permission check, the clock, the transaction and the effects run behind it, in the local implementation
+  (`runCommand`), and in the in-memory fake its tests use. Service results are facts (no English, no app URLs);
+  reach the backend only through `services()` (lint forbids importing `services/local` or `services/fake`), and put
+  a rule both implementations need in `src/domain`. Move an area as that README says. A page with nobody signed in
+  goes to `signInRequired()`, an action answers `signed_out`, a route 401.
 - Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts (`src/instrumentation.ts`): `DEMO_MODE` and `STENCIL_BACKEND`. The demo tools (reset, clock
   advance, persona switcher, Demo pill) run only when it is on and are off when it is unset: a new demo path checks it
   too ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).

@@ -9,11 +9,12 @@ Amended 2026-10-12: the demo tools check the demo flag (`demo_mode_off`) and `re
 Amended 2026-10-12: `inTransaction` no longer retries a busy database. The database client is the one place a write
 waits (5 s for its turn), and a write that still can't go fails the action (`src/lib/serialized-writes.ts`, M-1 of
 the October 12 review).
-Amended 2026-10-12: an action behind the service interfaces declares `call` instead of `authorize` and
+Amended 2026-10-13: an action behind the service interfaces declares `call` instead of `authorize` and
 `transaction`: the kit reads the request context (refusing `signed_out` without a viewer), parses, calls the
-service and runs `after` on `ok`; the permission check, the transaction and the effects run in the local
-implementation's command kit (`runCommand` in `src/server/services/local/command.ts`). `setSunset` is the first;
-the rest move in step 2b of the seam (`src/server/services/README.md`).
+service and runs `after` on `ok`; it reads no clock. The permission check, the backend's clock and the
+transaction run in the local implementation's command kit (`runCommand` in `src/server/services/local/command.ts`,
+[0072](0072-the-bff-reaches-its-backend-through-service-interfaces.md)). `setSunset` is the first; the rest move in
+step 2b of the seam.
 Date: 2026-10-09
 
 ## Context
