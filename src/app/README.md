@@ -282,8 +282,9 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
   a co-located `route.test.ts`, and a case in `e2e/api/consumer.spec.ts`.
 - **Browser only, a read.** Data a page shows comes from a server component's props. Data loaded on demand (a
   dialog, a menu) is a GET route: copy
-  [api/templates/[templateId]/base-version/route.ts](./api/templates/[templateId]/base-version/route.ts) with its
-  query, and add the read to `TemplateRead` in `src/lib/template-reads.ts`. Never a server action.
+  [api/templates/[templateId]/base-version/route.ts](./api/templates/[templateId]/base-version/route.ts), which reads
+  the request context (401 without one) and answers its service read's `ReadResult` with `readResponse()`, and add the
+  read to `TemplateRead` in `src/lib/template-reads.ts`. Never a server action.
 - **Browser only, a write.** A server action in `src/server/actions/`. Use a route handler when the body can pass
   1 MB or requests must not queue: copy [api/drafts/[versionId]/route.ts](./api/drafts/[versionId]/route.ts) for
   a capped write. Read the request context before the database (`requestContextOrRefusal()`, 401 without a viewer)
@@ -309,9 +310,11 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
   database (`tempDatabase` and `seededDatabasePerTest` in `src/server/testing/review-fixtures.ts`, one copy of the
   database per test) and mock `@/server/clock`. The template
-  reads are tested the same way, one `route.test.ts` beside each route (the helpers they share are in
-  `src/server/testing/read-routes.ts`), with `getViewer` mocked to each persona, and so is the palette's search
-  ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
+  reads that haven't moved behind the service interfaces are tested the same way, one `route.test.ts` beside each
+  route (the helpers they share are in `src/server/testing/read-routes.ts`), with `getViewer` mocked to each
+  persona, and so is the palette's search ([route.test.ts](./api/palette/[space]/route.test.ts)). A moved read's
+  route test (compare, base-version) mocks the request context and the service and checks only the HTTP mapping and
+  the 401: what the service decides is the contract suite's. The drafts and imports tests mock `getViewer` and the
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](<./(product)/[team]/audit/export/route.test.ts>)) mocks the viewer and the
   query the same way; the delivery file route has none.
 - **Pages:** no unit tests; Playwright covers them. Spec files run in parallel against the production build, one
