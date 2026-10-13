@@ -19,7 +19,9 @@ a build where they work.
 - **One flag, `DEMO_MODE`, off unless it is set.** `src/server/config.ts` reads the environment once, typed and
   validated (`1` or `true` is on, unset, empty, `0` or `false` is off, anything else throws and names the variable),
   and exports `DEMO_MODE`. A production build with no environment set has no demo tools. The module is the one place a
-  setting is read; the backend choice joins it.
+  setting is read; the backend choice joins it. `src/instrumentation.ts` loads it when the server starts, so a bad value
+  stops the server at boot (it prints the message and exits with code 1) instead of failing every page at its first
+  request.
 - **With the flag off, the three actions refuse and their controls are not there.** `resetDemoAction`,
   `advanceClockAction` and `switchPersona` answer `demo_mode_off` (`DEMO_REFUSALS` in `src/domain/demo.ts`, returned as
   an `ActionResult`) before they read their input or touch anything. The Demo pill is not rendered, in the product's

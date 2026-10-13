@@ -5,7 +5,8 @@ import { z } from "zod";
 // file, once, typed and validated. Nothing else in the app reads a setting from `process.env`
 // (`db/client.ts` and `import/store.ts` still read their own, `DATABASE_URL` and `UPLOADS_DIR`, and move
 // here when they are next touched). A setting that is not valid throws when this module loads, naming the
-// variable, rather than falling back to a value nobody chose.
+// variable, rather than falling back to a value nobody chose. `src/instrumentation.ts` loads this module
+// when the server starts, so a bad value stops the server at boot instead of failing the first request.
 //
 // To add a setting: give it a field in `Schema` that reads its variable, then export it below.
 //

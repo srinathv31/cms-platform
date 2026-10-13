@@ -94,7 +94,7 @@ Next.js API; Next's own note about it is at the end of this file.
   consumer notices) in the same transaction. Return `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
   throw only for bugs. Inside a transaction, read and write through `tx`, never `db`. `serverAction` in
   [src/server/actions/kit.ts](src/server/actions/kit.ts) runs these steps; every action is written on it.
-- Settings come from `src/server/config.ts`, read once and validated (`DEMO_MODE` today). The demo tools (reset, clock
+- Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts (`src/instrumentation.ts`): `DEMO_MODE` today. The demo tools (reset, clock
   advance, persona switcher, Demo pill) run only when it is on and are off when it is unset: a new demo path checks it
   too ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).
 - A domain rule takes facts and `now`, writes nothing, and returns a refusal (a stable `code` and the sentence people

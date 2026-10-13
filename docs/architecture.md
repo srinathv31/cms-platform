@@ -222,7 +222,7 @@ the one place a write waits (5 s for its turn); a write that still can't go fail
   there: a header set in `headers()` replaces a route's own, and the rendered HTML keeps its scriptless one.
   `e2e/security-headers.spec.ts` checks them.
 - Environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`; `DEMO_MODE` (the demo tools: reset, clock advance,
-  persona switcher and the Demo pill; off unless set, read when the server starts,
+  persona switcher and the Demo pill; off unless set, read when the server starts, and a value that isn't valid stops the server at boot,
   [decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md), parsed in [config.ts](../src/server/config.ts)); `UCOMP_API_ORIGIN` (where Coral sends requests;
   default this server over loopback) and `PORT`. E2E reads `E2E_PORT` and `E2E_GATE_PORT`.
 - Uploaded originals are stored under `data/uploads/`. PDF fonts are read from `node_modules` at render time.
