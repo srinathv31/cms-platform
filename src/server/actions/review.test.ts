@@ -1312,184 +1312,22 @@ describe("maker-checker: nobody decides a version they wrote", () => {
 
 // ── Sunset ────────────────────────────────────────────────────
 
+// setSunset's behaviour is the contract suite's (src/server/services/contract/review.ts), on the fake and on
+// this database alike, and its action is tested on the fake (review.fake.test.ts). This case stays here until
+// the Platform settings move behind the services: it sets the zone in the database.
 describe("setSunset", () => {
-  it("moves a Superseded version's sunset and tells Coral", async () => {
+  it("stores 00:00 in the zone Platform settings name", async () => {
     const templateId = ids["balance-transfer"]!;
-    const at = as("alex");
-    const day = new Date(at.getTime() + 30 * DAY).toISOString().slice(0, 10);
+    await db
+      .insert(settings)
+      .values({ key: "business_zone", value: "America/Los_Angeles" });
+    as("alex");
     expect(
-      await setSunset({ templateId, versionNumber: 1, sunsetAt: day }),
+      await setSunset({ templateId, versionNumber: 1, sunsetAt: "2027-03-01" }),
     ).toEqual({ ok: true });
-    expect(await version(templateId, 1)).toMatchObject({
-      sunsetAt: sunsetInstant(day, "America/New_York"),
-      sunsetSetBy: "alex",
-    });
-    expect((await auditAt(at)).map((r) => r.action)).toEqual([
-      "version.sunset_set",
-    ]);
-    expect((await noticesAt(at)).map((n) => [n.consumerId, n.kind])).toEqual([
-      ["coral", "sunset_scheduled"],
-    ]);
-    expect(refresh).toHaveBeenCalledTimes(1);
-
-    // The same date again (a double click) writes nothing.
-    const again = as("alex");
-    expect(
-      await setSunset({ templateId, versionNumber: 1, sunsetAt: day }),
-    ).toEqual({ ok: true });
-    expect(await auditAt(again)).toEqual([]);
-    expect(await noticesAt(again)).toEqual([]);
-  });
-
-  // A sunset date ends at 00:00 on that day in the business time zone (decision 0017), Eastern until a
-  // Platform Admin picks another: "Sunset on March 1" must not stop renders at 7 PM Eastern on February 28.
-  describe("in the business time zone", () => {
-    const templateId = () => ids["balance-transfer"]!;
-
-    it("stores 00:00 Eastern on the day picked, and records the day and the zone", async () => {
-      const at = as("alex");
-      expect(
-        await setSunset({
-          templateId: templateId(),
-          versionNumber: 1,
-          sunsetAt: "2027-03-01",
-        }),
-      ).toEqual({ ok: true });
-      // 00:00 EST is 05:00 UTC; midnight UTC would be 7 PM Eastern on February 28.
-      expect((await version(templateId(), 1))!.sunsetAt).toEqual(
-        new Date("2027-03-01T05:00:00.000Z"),
-      );
-      const [audit] = await auditAt(at);
-      expect(audit!.details).toMatchObject({
-        sunsetAt: "2027-03-01T05:00:00.000Z",
-        sunsetDay: "2027-03-01",
-        zone: "America/New_York",
-      });
-      const [notice] = await noticesAt(at);
-      expect(notice!.payload).toMatchObject({
-        sunsetAt: "2027-03-01T05:00:00.000Z",
-        sunsetDay: "2027-03-01",
-      });
-    });
-
-    it("stores 00:00 in the zone Platform settings name", async () => {
-      await db
-        .insert(settings)
-        .values({ key: "business_zone", value: "America/Los_Angeles" });
-      as("alex");
-      expect(
-        await setSunset({
-          templateId: templateId(),
-          versionNumber: 1,
-          sunsetAt: "2027-03-01",
-        }),
-      ).toEqual({ ok: true });
-      expect((await version(templateId(), 1))!.sunsetAt).toEqual(
-        new Date("2027-03-01T08:00:00.000Z"),
-      ); // 00:00 PST
-    });
-
-    it("reads 'after today' there: at 23:30 Eastern, the next day is still after today", async () => {
-      as("alex");
-      env.now = new Date("2026-10-05T03:30:00.000Z"); // 23:30 EDT on October 4; already the 5th in UTC
-      expect(
-        await setSunset({
-          templateId: templateId(),
-          versionNumber: 1,
-          sunsetAt: "2026-10-04",
-        }),
-      ).toEqual({
-        ok: false,
-        ...REFUSALS.sunsetAfterToday,
-      });
-      expect(
-        await setSunset({
-          templateId: templateId(),
-          versionNumber: 1,
-          sunsetAt: "2026-10-05",
-        }),
-      ).toEqual({ ok: true });
-      expect((await version(templateId(), 1))!.sunsetAt).toEqual(
-        new Date("2026-10-05T04:00:00.000Z"),
-      ); // in half an hour
-    });
-  });
-
-  it("refuses an Active version, a past date, a bad date and a non-approver", async () => {
-    const templateId = ids["balance-transfer"]!;
-    const at = as("jordan");
-    const later = new Date(at.getTime() + 40 * DAY).toISOString().slice(0, 10);
-    expect(
-      await setSunset({ templateId, versionNumber: 2, sunsetAt: later }),
-    ).toEqual({
-      ok: false,
-      ...REFUSALS.sunsetNotSuperseded,
-    });
-    expect(
-      await setSunset({ templateId, versionNumber: 1, sunsetAt: "2026-01-01" }),
-    ).toEqual({
-      ok: false,
-      ...REFUSALS.sunsetAfterToday,
-    });
-    expect(
-      await setSunset({ templateId, versionNumber: 1, sunsetAt: "soon" }),
-    ).toEqual({
-      ok: false,
-      code: "invalid_date",
-      reason: "Pick a valid date.",
-    });
-    as("maya");
-    expect(
-      await setSunset({ templateId, versionNumber: 1, sunsetAt: later }),
-    ).toEqual({
-      ok: false,
-      ...REASONS.generic,
-    });
-  });
-
-  it("refuses a new date once the sunset has passed, and writes nothing", async () => {
-    const templateId = ids["balance-transfer"]!;
-    const where = and(
-      eq(versions.templateId, templateId),
-      eq(versions.number, 1),
-    );
-    const before = (await version(templateId, 1))!;
-    const at = as("jordan");
-    // Yesterday's midnight in the business time zone, as a date picked in the dialog is stored.
-    const passed = sunsetInstant(
-      new Date(at.getTime() - DAY).toISOString().slice(0, 10),
-      "America/New_York",
-    );
-    await db.update(versions).set({ sunsetAt: passed }).where(where);
-    try {
-      const { rev } = (await version(templateId, 1))!;
-      // Any date, the one it already has included (that is no double click: the date is final).
-      for (const day of [1, 40]
-        .map((n) => new Date(at.getTime() + n * DAY))
-        .concat(passed)) {
-        expect(
-          await setSunset({
-            templateId,
-            versionNumber: 1,
-            sunsetAt: day.toISOString().slice(0, 10),
-          }),
-        ).toEqual({
-          ok: false,
-          ...REFUSALS.sunsetPassed,
-        });
-      }
-      expect(await version(templateId, 1)).toMatchObject({
-        state: "superseded",
-        sunsetAt: passed,
-        rev,
-      });
-      expect(await auditAt(at)).toEqual([]);
-      expect(await noticesAt(at)).toEqual([]);
-      expect(await notificationsAt(at)).toEqual([]);
-      expect(refresh).not.toHaveBeenCalled();
-    } finally {
-      await db.update(versions).set({ sunsetAt: before.sunsetAt }).where(where);
-    }
+    expect((await version(templateId, 1))!.sunsetAt).toEqual(
+      new Date("2027-03-01T08:00:00.000Z"),
+    ); // 00:00 PST
   });
 });
 

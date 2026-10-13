@@ -3,8 +3,6 @@
 import { refresh, revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { canActOnStage, currentStageOf } from "@/domain/approval-chain";
-import { sunsetInstant } from "@/domain/business-zone";
 import { isCalendarDay } from "@/domain/dates";
 import { approve } from "@/domain/lifecycle/approve";
 import {
@@ -14,53 +12,55 @@ import {
 } from "@/domain/lifecycle/revoke";
 import { contractBaseline } from "@/domain/lifecycle/baselines";
 import { requestChanges as requestChangesTransition } from "@/domain/lifecycle/request-changes";
-import {
-  setSunset as setSunsetTransition,
-  sunsetPassed,
-} from "@/domain/lifecycle/sunset";
 import { submit } from "@/domain/lifecycle/submit";
 import { withWriter } from "@/domain/lifecycle/drafts";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import type { ReviewVersion } from "@/domain/lifecycle/types";
-import {
-  REQUEST_REFUSALS,
-  type Refusal,
-  type Refused,
-} from "@/domain/refusals";
+import { REQUEST_REFUSALS, type Refused } from "@/domain/refusals";
 import { OUTPUT_KEYS, type OutputKey } from "@/domain/review-outputs";
 import {
   DOCUMENT_THREAD,
   type ActionResult,
-  type ApprovalStage,
   type LifecycleEffect,
 } from "@/domain/review-types";
-import type { PermissionResource, Viewer } from "@/domain/types";
 import { readBusinessZone } from "@/server/business-zone";
-import { db } from "@/server/db/client";
 import {
   approvals,
   commentThreads,
   comments,
-  templates,
   versions,
 } from "@/server/db/schema/ucomp";
 import { writeEffects, type Tx } from "@/server/effects";
 import { newId } from "@/server/ids";
-import { findRound } from "@/server/queries/find-round";
 import {
   loadChain,
   loadDecisions,
   loadMessageRules,
-  stageApproverIds,
 } from "@/server/queries/review-shared";
+import { services } from "@/server/services";
+import {
+  activeVersion,
+  assertStage,
+  decideResource,
+  effectContext,
+  findTemplate,
+  findVersion,
+  loadVersion,
+  updateVersion,
+  type FoundVersion,
+} from "@/server/services/local/version-rows";
+import type { Changed } from "@/server/services/types";
 import { draftRow } from "@/server/templates/create";
 import { check, refuse, serverAction, type CommitContext } from "./kit";
 
 // The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke. A version is
 // named by its number and, to decide it, its round (domain/rounds.ts): approve and request changes act on
 // exactly the round the approver was shown; sunset and revoke act on the number's head (`findRound`),
-// its released row, and the transition refuses any other state. Each one runs the server action kit
-// (kit.ts):
+// its released row, and the transition refuses any other state.
+//
+// `setSunset` runs behind the service interfaces: it parses its input and calls `services().review`, which
+// does the rest (src/server/services/local/review.ts). The others still run here on the server action kit
+// (kit.ts), with the version helpers the local implementation shares (services/local/version-rows.ts):
 //   1. `authorize`: the version (or the template), read only to learn its team and its people, and
 //      `check` on that team. An unknown one is refused like a forbidden one, and then as gone;
 //   2. ONE transaction that re-reads the version, asks the domain transition (domain/lifecycle/),
@@ -91,151 +91,6 @@ const VersionRef = TemplateRef.extend({
 });
 /** A decision names the round it decides: the one on the approver's screen, never whichever is newest. */
 const RoundRefInput = VersionRef.extend({ round: z.number().int().positive() });
-
-/** The template, read only to learn its team (and the version's people) for the permission check. */
-async function findTemplate(templateId: string) {
-  return db
-    .select({
-      id: templates.id,
-      teamId: templates.teamId,
-      contentTypeId: templates.contentTypeId,
-    })
-    .from(templates)
-    .where(eq(templates.id, templateId))
-    .limit(1)
-    .then((rows) => rows[0]);
-}
-
-/**
- * The version's template and people, read only for the permission check: the round given, or without
- * one the number's head (`findRound`). The transaction reads it again (`loadVersion`).
- */
-async function findVersion(templateId: string, number: number, round?: number) {
-  const [template, version] = await Promise.all([
-    findTemplate(templateId),
-    findRound(db, templateId, number, round),
-  ]);
-  if (!template || !version) return undefined;
-  return {
-    templateId: template.id,
-    teamId: template.teamId,
-    contentTypeId: template.contentTypeId,
-    submittedBy: version.submittedBy,
-    writers: version.writers,
-    revoke: version.revoke,
-    state: version.state,
-    stages: version.stages,
-    currentStage: version.currentStage,
-  };
-}
-
-/**
- * The decide check's resource: the team, who submitted and wrote the version (maker-checker), and the
- * users the stage the version waits on names (they decide it on any team). The stage is read again in the
- * transaction.
- */
-async function decideResource(
-  found: FoundVersion | undefined,
-): Promise<PermissionResource> {
-  if (!found) return { teamId: null };
-  const named =
-    found.state === "in_review"
-      ? stageApproverIds(
-          currentStageOf(found, await loadChain(db, found.contentTypeId)),
-        )
-      : [];
-  return {
-    teamId: found.teamId,
-    submittedBy: found.submittedBy,
-    writers: found.writers,
-    stageApproverIds: named,
-  };
-}
-
-type FoundVersion = NonNullable<Awaited<ReturnType<typeof findVersion>>>;
-
-/** The version as the transitions read it (a whole row), fresh inside the transaction: as `findVersion` found it. */
-async function loadVersion(
-  tx: Tx,
-  found: FoundVersion,
-  number: number,
-  round?: number,
-) {
-  const row = await findRound(tx, found.templateId, number, round);
-  if (!row) refuse(REQUEST_REFUSALS.versionGone);
-  return row satisfies ReviewVersion;
-}
-
-async function activeVersion(tx: Tx, templateId: string) {
-  return tx.query.versions.findFirst({
-    columns: { id: true, number: true, contractChanges: true },
-    where: and(
-      eq(versions.templateId, templateId),
-      eq(versions.state, "active"),
-    ),
-  });
-}
-
-/** The stage's own rule (who it names now), asked of the stage of its own the version waits on. */
-function assertStage(
-  viewer: Viewer,
-  chain: readonly ApprovalStage[],
-  version: ReviewVersion,
-  teamId: string,
-) {
-  if (version.state !== "in_review") return; // the transition refuses with its own sentence
-  const stage = currentStageOf(version, chain);
-  if (!stage) return;
-  const result = canActOnStage(viewer, stage, teamId);
-  if (!result.ok) refuse(result);
-}
-
-/**
- * Compare-and-set: the update lands only if the row still has the state, rev and stage it was read
- * with. Inside the transaction nothing can interleave, so a miss means the caller's read was wrong;
- * it is refused rather than written over.
- */
-async function updateVersion(
-  tx: Tx,
-  version: {
-    id: string;
-    state: ReviewVersion["state"];
-    rev: number;
-    currentStage: number;
-  },
-  set: Partial<typeof versions.$inferInsert>,
-  at: Date,
-  whenMissed: Refusal,
-) {
-  const [saved] = await tx
-    .update(versions)
-    .set({ ...set, rev: sql`${versions.rev} + 1`, updatedAt: at })
-    .where(
-      and(
-        eq(versions.id, version.id),
-        eq(versions.state, version.state),
-        eq(versions.rev, version.rev),
-        eq(versions.currentStage, version.currentStage),
-      ),
-    )
-    .returning({ id: versions.id });
-  if (!saved) refuse(whenMissed);
-}
-
-function effectContext(
-  viewer: Viewer,
-  found: { teamId: string; templateId: string },
-  versionId: string,
-  at: Date,
-) {
-  return {
-    at,
-    actorId: viewer.userId,
-    teamId: found.teamId,
-    templateId: found.templateId,
-    versionId,
-  };
-}
 
 // ── Submit for review ─────────────────────────────────────────
 
@@ -663,75 +518,33 @@ export async function approveVersion(input: {
 const SunsetInput = VersionRef.extend({ sunsetAt: z.string() });
 
 /**
- * Sets, or moves, the date a Superseded version stops rendering (YYYY-MM-DD, after today in the business
- * time zone on the demo clock). It stops at 00:00 on that day there: the zone is read in the transaction
- * and the transition stores that instant (decision 0017). Consumers still rendering the template get a
- * notice with the instant and the contract changes the Active version brought. Setting the date it
- * already has writes nothing (a double click). Once the sunset has passed, the transition refuses any
- * date: the version is read again in the transaction, so a sunset that passed while the dialog was open
- * is refused too.
+ * "Set sunset" on the Versions tab: the day (YYYY-MM-DD, `sunsetAt`) a Superseded version stops rendering,
+ * at 00:00 in the business time zone (decision 0017). The service decides and writes it
+ * (`ReviewService.setSunset`, which lists its refusals); the pages refresh only when it wrote something, so a
+ * double click with the same day changes nothing on screen either.
  */
 export async function setSunset(input: {
   templateId: string;
   versionNumber: number;
   sunsetAt: string;
 }): Promise<ActionResult> {
-  let wrote = false;
   return serverAction(input, {
     input: SunsetInput,
-    authorize: async ({ viewer, input }) => {
-      const found = await findVersion(input.templateId, input.versionNumber);
-      check(viewer, "version.setSunset", { teamId: found?.teamId ?? null });
-      if (!found) refuse(REQUEST_REFUSALS.versionGone);
-      if (!isCalendarDay(input.sunsetAt)) refuse(REQUEST_REFUSALS.invalidDate);
-      return found;
+    call: (ctx, { templateId, versionNumber, sunsetAt }) =>
+      services().review.setSunset(ctx, {
+        templateId,
+        versionNumber,
+        sunsetDay: sunsetAt,
+      }),
+    after: ({ changed }) => {
+      if (changed) refreshAfter();
     },
-    transaction: async (tx, { viewer, input, found, now: at }) => {
-      const sunsetDay = input.sunsetAt;
-      const version = await loadVersion(tx, found, input.versionNumber);
-      const zone = await readBusinessZone(tx);
-      const unchanged =
-        version.sunsetAt?.getTime() ===
-        sunsetInstant(sunsetDay, zone).getTime();
-      if (
-        version.state === "superseded" &&
-        unchanged &&
-        !sunsetPassed(version, at)
-      )
-        return { ok: true };
-      const active = await activeVersion(tx, found.templateId);
+  }).then(withoutChanged);
+}
 
-      const outcome = setSunsetTransition({
-        version,
-        actorId: viewer.userId,
-        now: at,
-        sunsetDay,
-        zone,
-        activeNumber: active?.number ?? null,
-        templateName: version.name,
-        contractChanges: active?.contractChanges ?? null,
-      });
-      if (!outcome.ok) refuse(outcome);
-
-      await updateVersion(
-        tx,
-        version,
-        outcome.changes,
-        at,
-        REFUSALS.sunsetNotSuperseded,
-      );
-      await writeEffects(
-        tx,
-        outcome.effects,
-        effectContext(viewer, found, version.id, at),
-      );
-      wrote = true;
-      return { ok: true };
-    },
-    after: () => {
-      if (wrote) refreshAfter();
-    },
-  });
+/** The action answers `{ ok: true }`: whether the service wrote is the kit's business (`after`), not the page's. */
+function withoutChanged(result: ActionResult<Changed>): ActionResult {
+  return result.ok ? { ok: true } : result;
 }
 
 // ── Revoke (two people) ───────────────────────────────────────

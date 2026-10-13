@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { WS } from "@/components/workspace/workspace-grid";
-import { now } from "@/server/clock";
 import { getVersions } from "@/server/queries/versions";
 import { CompareVersions } from "./compare-dialog";
 import type { VersionContext } from "./version-actions";
@@ -20,7 +19,7 @@ export async function VersionsContent({
 }) {
   const { team, templateId } = await params;
   const data = await getVersions(team, templateId);
-  const nowDate = await now();
+  const nowDate = new Date(data.now);
 
   const ctx: VersionContext = {
     templateId: data.template.id,

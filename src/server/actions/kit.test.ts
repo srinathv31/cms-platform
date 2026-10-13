@@ -133,7 +133,8 @@ describe("serverAction", () => {
       ...REQUEST_REFUSALS.invalidInput(),
     });
     expect(authorize).not.toHaveBeenCalled();
-    expect(now).not.toHaveBeenCalled();
+    // The request context reads the clock once, with the viewer, before the input is parsed.
+    expect(now).toHaveBeenCalledTimes(2);
   });
 
   it("answers input that doesn't parse with the action's own refusal, fixed or from the parser's problem", async () => {
@@ -163,7 +164,6 @@ describe("serverAction", () => {
     ).toEqual({ ok: false, ...REASONS.generic });
     expect(await stored("kit_forbidden")).toBeUndefined();
     expect(after).not.toHaveBeenCalled();
-    expect(now).not.toHaveBeenCalled();
   });
 
   it("returns a domain rule's refusal through `permit`", async () => {
@@ -288,5 +288,85 @@ describe("serverAction", () => {
       ),
     ).rejects.toBe(redirect);
     expect(await stored("kit_redirect")).toBe("x");
+  });
+
+  it("refuses when nobody is signed in, before the input is read", async () => {
+    vi.mocked(getViewer).mockResolvedValue(null as unknown as Viewer);
+    const authorize = vi.fn();
+    expect(
+      await write({ key: "kit_signed_out", value: "x" }, { authorize }),
+    ).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.signedOut,
+    });
+    expect(authorize).not.toHaveBeenCalled();
+  });
+});
+
+describe("serverAction with a service call", () => {
+  it("calls the service with the request context and the parsed input, then runs `after` on ok", async () => {
+    const after = vi.fn();
+    const call = vi.fn(async () => ({ ok: true as const, key: "done" }));
+    expect(
+      await serverAction(
+        { key: "k", value: "v", extra: 1 },
+        {
+          input: Input,
+          call,
+          after,
+        },
+      ),
+    ).toEqual({ ok: true, key: "done" });
+    expect(call).toHaveBeenCalledWith(
+      expect.objectContaining({ viewer: admin, now: env.now }),
+      { key: "k", value: "v" },
+    );
+    expect(after).toHaveBeenCalledWith(
+      { ok: true, key: "done" },
+      expect.objectContaining({ input: { key: "k", value: "v" } }),
+    );
+  });
+
+  it("answers the service's refusal as it is, without `after`", async () => {
+    const after = vi.fn();
+    expect(
+      await serverAction(
+        { key: "k", value: "v" },
+        {
+          input: Input,
+          call: async () => ({ ok: false, ...REFUSALS.notInReview }),
+          after,
+        },
+      ),
+    ).toEqual({ ok: false, ...REFUSALS.notInReview });
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it("refuses input that doesn't parse, and when nobody is signed in, without calling the service", async () => {
+    const call = vi.fn();
+    expect(await serverAction({ key: "" }, { input: Input, call })).toEqual({
+      ok: false,
+      ...REQUEST_REFUSALS.invalidInput(),
+    });
+    vi.mocked(getViewer).mockResolvedValue(null as unknown as Viewer);
+    expect(
+      await serverAction({ key: "k", value: "v" }, { input: Input, call }),
+    ).toEqual({ ok: false, ...REQUEST_REFUSALS.signedOut });
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("lets a thrown error through: a bug or an outage, not a refusal", async () => {
+    const outage = new Error("backend unreachable");
+    await expect(
+      serverAction(
+        { key: "k", value: "v" },
+        {
+          input: Input,
+          call: async () => {
+            throw outage;
+          },
+        },
+      ),
+    ).rejects.toBe(outage);
   });
 });

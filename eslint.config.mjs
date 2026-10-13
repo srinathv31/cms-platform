@@ -244,6 +244,47 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // The backend seam (src/server/services/README.md): only the local implementation talks to the database.
+    // Everything else (the BFF's actions, read models and routes, the fake, the components) reaches data through
+    // `services()`. Row types from the schema may be imported as types (the fake keeps its rows in that shape).
+    // A warning while the areas move behind the services: the warnings are the list of what is left to move.
+    // A separate rule from the core no-restricted-imports above, so the blocks there keep their own options.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      "src/server/services/local/**",
+      "src/server/db/**",
+      "src/server/seed/**",
+      "src/server/reset.ts",
+      "src/server/testing/**",
+      "src/lib/fresh-database.ts",
+      "src/lib/serialized-writes.ts",
+      "src/simulator/**",
+      "src/app/(simulator)/**",
+      "**/*.test.{ts,tsx}",
+    ],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            {
+              group: [
+                "drizzle-orm",
+                "drizzle-orm/*",
+                "@libsql/*",
+                "**/db/client",
+                "**/db/schema/*",
+              ],
+              allowTypeImports: true,
+              message:
+                "Only the local implementation (src/server/services/local) talks to the database. Reach data through services() (src/server/services/README.md).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // The published /api/v1 wire contract: self-contained types both UCOMP and the simulator compile against.
     files: ["src/contracts/**/*.ts"],
     rules: {

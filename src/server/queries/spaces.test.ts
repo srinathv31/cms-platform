@@ -17,6 +17,10 @@ vi.mock("@/server/db/client", async () => {
   return tempDatabase("ucomp-spaces-queries-");
 });
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
+// The request context reads the clock with the viewer.
+vi.mock("@/server/clock", () => ({
+  now: vi.fn(async () => new Date("2026-10-04T12:00:00.000Z")),
+}));
 
 const NOT_FOUND = /NEXT_HTTP_ERROR_FALLBACK;404/;
 

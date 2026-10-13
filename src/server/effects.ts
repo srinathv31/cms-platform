@@ -1,6 +1,6 @@
 import "server-only";
 import { and, eq, gte, inArray, max } from "drizzle-orm";
-import { DAY_MS } from "@/domain/dates";
+import { noticeAudienceSince } from "@/domain/golive/audience";
 import type {
   LifecycleEffect,
   NotificationLink,
@@ -22,6 +22,7 @@ import {
   versions,
 } from "@/server/db/schema/ucomp";
 import { newId } from "@/server/ids";
+import { notificationHref } from "@/server/notification-href";
 
 // The write side every lifecycle action shares: the transaction (`inTransaction`, run once) and the
 // effects writer. A domain transition says WHAT happened as `effects` (audit rows, notifications,
@@ -31,8 +32,8 @@ import { newId } from "@/server/ids";
 /** The transaction handle drizzle passes to `db.transaction`. */
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
-/** Consumers that rendered the template (not as a preview) this recently get its notices. */
-export const CONSUMER_NOTICE_WINDOW_DAYS = 90;
+export { CONSUMER_NOTICE_WINDOW_DAYS } from "@/domain/golive/audience";
+export { notificationHref } from "@/server/notification-href";
 
 export interface EffectContext {
   /**
@@ -290,27 +291,6 @@ export async function resolveRecipients(
     .sort();
 }
 
-/**
- * `/{team}/review/{templateId}/{n}` (plus `?round=N` when the link names its round), `/{team}/templates/{id}`
- * or `/{team}/templates/{id}/versions`.
- */
-export function notificationHref(
-  teamSlug: string,
-  link: NotificationLink,
-): string {
-  switch (link.to) {
-    case "review": {
-      // A link names its round only when the round's label shows it (`reviewLink`); bare, it is the number's head.
-      const path = `/${teamSlug}/review/${link.templateId}/${link.versionNumber}`;
-      return link.round === undefined ? path : `${path}?round=${link.round}`;
-    }
-    case "template":
-      return `/${teamSlug}/templates/${link.templateId}`;
-    case "versions":
-      return `/${teamSlug}/templates/${link.templateId}/versions`;
-  }
-}
-
 /** The settings row that holds the last `consumer_notices.seq` handed out. */
 export const NOTICE_SEQ_KEY = "consumer_notice_seq";
 
@@ -348,9 +328,7 @@ export async function takeNoticeSeqs(tx: Tx, count: number): Promise<number> {
 
 /** Registered consumers with a non-preview render of the template from the notice window before `ctx.at` on. */
 async function recentConsumers(tx: Tx, ctx: EffectContext): Promise<string[]> {
-  const since = new Date(
-    ctx.at.getTime() - CONSUMER_NOTICE_WINDOW_DAYS * DAY_MS,
-  );
+  const since = noticeAudienceSince(ctx.at);
   const rows = await tx
     .selectDistinct({ consumerId: consumers.id })
     .from(renderLog)
