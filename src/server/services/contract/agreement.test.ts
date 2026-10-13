@@ -2,10 +2,10 @@ import { expect, it, vi } from "vitest";
 import { fakeContractHarness } from "../fake/contract-harness";
 import { localContractHarness } from "../local/contract-harness";
 
-// The fake and the local implementation read the whole seeded world alike: every template's history, for a
-// person on each team and a platform role, and everyone's notifications, field for field. Where the contract
-// cases pick examples, this compares everything the seed holds, so a difference in a read the cases don't name
-// still fails.
+// The fake and the local implementation read the whole seeded world alike: every template's history, activity and
+// threads, for a person on each team and a platform role, and everyone's notifications, field for field. Where the
+// contract cases pick examples, this compares everything the seed holds, so a difference in a read the cases don't
+// name still fails.
 
 vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
@@ -81,3 +81,34 @@ it("lists everyone's notifications alike: the same facts, links and read times",
     expect(fromFake, userId).toEqual(fromLocal);
   }
 });
+
+it.each(["maya", "jordan", "eli", "riley"])(
+  "answers every template's activity, and its threads against each of its versions, alike for %s",
+  async (userId) => {
+    fake.setClock(BASE);
+    local.setClock(BASE);
+    const [asFake, asLocal] = [await fake.as(userId), await local.as(userId)];
+    for (const templateId of Object.values(local.templates)) {
+      expect(
+        await fake.services().audit.activity(asFake, { templateId }),
+        `${templateId}'s activity`,
+      ).toEqual(await local.services().audit.activity(asLocal, { templateId }));
+      const history = await local
+        .services()
+        .versions.history(asLocal, { templateId });
+      const versionIds = history.ok ? history.versions.map((v) => v.id) : [];
+      for (const versionId of [undefined, ...versionIds])
+        expect(
+          await fake.services().comments.threads(asFake, {
+            templateId,
+            versionId,
+          }),
+          `${templateId}'s threads on ${versionId ?? "the workspace's"}`,
+        ).toEqual(
+          await local
+            .services()
+            .comments.threads(asLocal, { templateId, versionId }),
+        );
+    }
+  },
+);
