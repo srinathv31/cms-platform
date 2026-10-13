@@ -309,8 +309,8 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
   database (`tempDatabase` and `seededDatabasePerTest` in `src/server/testing/review-fixtures.ts`, one copy of the
   database per test) and mock `@/server/clock`. The template
-  reads are tested the same way, all five in one file ([reads.test.ts](./api/templates/[templateId]/reads.test.ts)),
-  with `getViewer` mocked to each persona, and so is the palette's search
+  reads are tested the same way, one `route.test.ts` beside each route (the helpers they share are in
+  `src/server/testing/read-routes.ts`), with `getViewer` mocked to each persona, and so is the palette's search
   ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](<./(product)/[team]/audit/export/route.test.ts>)) mocks the viewer and the
   query the same way; the delivery file route has none.
