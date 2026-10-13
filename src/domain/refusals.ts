@@ -80,6 +80,11 @@ export function refuse({ code, reason }: Refusal): Refused {
  * someone else made first. Server actions and the on-demand reads (`src/server/api/reads.ts`) return them.
  */
 export const REQUEST_REFUSALS = {
+  /**
+   * Nobody is signed in: the request context found no viewer (src/server/context/request.ts). An action
+   * answers it; a read route answers it with 401.
+   */
+  signedOut: refusal("signed_out", "Sign in to continue."),
   /** The input doesn't parse. The sentence is the first problem the parser found, when it has one. */
   invalidInput: refusal(
     "invalid_input",

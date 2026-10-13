@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseConfig } from "./config";
 
-// The server's configuration, read from an environment once. `DEMO_MODE` is the only setting so far.
+// The server's configuration, read from an environment once: `DEMO_MODE` and `STENCIL_BACKEND`.
 
 describe("DEMO_MODE", () => {
   it("is off when unset, so a deployment with no environment has no demo tools", () => {
@@ -25,4 +25,27 @@ describe("DEMO_MODE", () => {
       );
     },
   );
+});
+
+describe("STENCIL_BACKEND", () => {
+  it("is local when unset or empty", () => {
+    expect(parseConfig({}).backend).toBe("local");
+    expect(parseConfig({ STENCIL_BACKEND: " " }).backend).toBe("local");
+    expect(parseConfig({ STENCIL_BACKEND: "Local" }).backend).toBe("local");
+  });
+
+  it.each(["http", "java", "fake"])(
+    "refuses %j: no other backend is built",
+    (value) => {
+      expect(() => parseConfig({ STENCIL_BACKEND: value })).toThrow(
+        "STENCIL_BACKEND must be local, or left unset (the HTTP backend isn't built yet).",
+      );
+    },
+  );
+
+  it("names every variable that is wrong in one error", () => {
+    expect(() =>
+      parseConfig({ DEMO_MODE: "yes", STENCIL_BACKEND: "http" }),
+    ).toThrow(/DEMO_MODE must be .* STENCIL_BACKEND must be local/);
+  });
 });

@@ -21,6 +21,11 @@ import { z } from "zod";
 //   e2e                `webServer.env` in playwright.config.ts sets it for each worker's server.
 //   unit tests         the test says which: `vi.mock("@/server/config", …)`.
 //   deployment         never set.
+//
+// STENCIL_BACKEND picks the implementation behind the service interfaces (src/server/services/README.md):
+// `local`, this app's own Drizzle code over SQLite, and the default. It is the only working value until the
+// HTTP implementation for the Java API exists; anything else stops the server at boot rather than run a
+// backend nobody built.
 
 const FLAG_VALUES = ["", "0", "false", "1", "true"] as const;
 
@@ -37,8 +42,24 @@ const flag = (variable: string) =>
     )
     .transform((value) => value === "1" || value === "true");
 
+/** The implementations of the service interfaces this build can run on. `http` (the Java API) joins later. */
+export const BACKENDS = ["local"] as const;
+export type Backend = (typeof BACKENDS)[number];
+
+const backend = z
+  .string()
+  .optional()
+  .transform((value) => (value ?? "").trim().toLowerCase() || "local")
+  .pipe(
+    z.enum(BACKENDS, {
+      error: () =>
+        `STENCIL_BACKEND must be local, or left unset (the HTTP backend isn't built yet).`,
+    }),
+  );
+
 const Schema = z.object({
   demoMode: flag("DEMO_MODE"),
+  backend,
 });
 
 export type Config = z.output<typeof Schema>;
@@ -47,6 +68,7 @@ export type Config = z.output<typeof Schema>;
 export function parseConfig(env: Record<string, string | undefined>): Config {
   const parsed = Schema.safeParse({
     demoMode: env.DEMO_MODE,
+    backend: env.STENCIL_BACKEND,
   });
   if (!parsed.success)
     throw new Error(
@@ -59,3 +81,6 @@ const config = parseConfig(process.env);
 
 /** The demo tools are on. Off unless `DEMO_MODE` is set. */
 export const DEMO_MODE = config.demoMode;
+
+/** Which implementation the service interfaces run on (`services()` in src/server/services). */
+export const BACKEND: Backend = config.backend;
