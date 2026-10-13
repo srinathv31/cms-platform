@@ -5,7 +5,7 @@ import { seededDatabasePerTest } from "@/server/testing/review-fixtures";
 import { GET } from "./route";
 
 // GET /api/v1/templates/{templateId} end to end against a temporary seeded database. The detail's
-// semantics are covered in src/server/queries/consumer-api.test.ts; this file covers the HTTP
+// semantics are covered in src/server/services/local/consumer-api.test.ts; this file covers the HTTP
 // contract and every error row api-v1.ts lists for it.
 
 const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));

@@ -14,7 +14,8 @@ export async function GET(
 ) {
   const context = await requestContextOrRefusal();
   if (!context.ok) return signedOutResponse();
-  const { viewer } = context.context;
   const { templateId } = await ctx.params;
-  return readResponse(await loadIntegrationPanel(viewer, { templateId }));
+  return readResponse(
+    await loadIntegrationPanel(context.context, { templateId }),
+  );
 }

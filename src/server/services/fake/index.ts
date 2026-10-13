@@ -4,7 +4,7 @@ import type { CommentService } from "../comments";
 import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
 
-import { notMovedArea } from "../not-moved";
+import { movedArea, notMovedArea } from "../not-moved";
 import type { Clock, ImplementationOptions, TestHooks } from "../options";
 import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
@@ -12,6 +12,7 @@ import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
 import { fakeIdentity } from "./identity";
+import { fakeLibrary } from "./library";
 import { fakeNotifications } from "./notifications";
 import { fakeReview } from "./review";
 import type { FakeState } from "./state";
@@ -51,7 +52,10 @@ export function fakeServices(
     identity: fakeIdentity(state),
     review: fakeReview(deps),
     versions: fakeVersions(deps),
-    templates: notMovedArea<TemplateService>("templates"),
+    // The methods that have moved, each package's in a file of its own; the others answer `notMoved`. The fake
+    // reads the Library and the palette (a case watches a command move a template there), not the SHARE panel
+    // or the Copilot prompt, which no command changes.
+    templates: movedArea<TemplateService>("templates", fakeLibrary(deps)),
     drafts: notMovedArea<DraftService>("drafts"),
     comments: notMovedArea<CommentService>("comments"),
     access: notMovedArea<AccessService>("access"),

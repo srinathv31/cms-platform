@@ -6,7 +6,7 @@ import { GET } from "./route";
 
 // GET /api/v1/templates end to end: HTTP in, the real query against a temporary seeded database, HTTP
 // out. Only the database handle and the demo clock are swapped. Search semantics are covered in
-// src/server/queries/consumer-api.test.ts; this file covers the HTTP contract and every error row.
+// src/server/services/local/consumer-api.test.ts; this file covers the HTTP contract and every error row.
 
 const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 

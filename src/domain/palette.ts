@@ -2,9 +2,11 @@ import type { PaletteTemplateRow } from "./import-types";
 import { statusLabel } from "./status";
 
 // The ⌘K palette's search: one way to match what was typed, for everything the palette lists. The
-// server lists templates with `paletteTemplates` (GET /api/palette/{space}), so no page carries the
-// catalog. The browser ranks the palette's own rows (pages, settings, teams, actions) with
-// `rankByQuery`, and narrows the last answer with it while the next one is on its way.
+// backend lists templates with `paletteTemplates` (via `paletteSearch` in palette-search.ts, the templates
+// service's `palette`, behind GET /api/palette/{space}), so no page carries the catalog. The browser ranks
+// the palette's own rows (pages, settings, teams, actions) with `rankByQuery`, and narrows the last answer
+// with it while the next one is on its way. This module is shared with client components: it imports no
+// permission rules.
 
 /** The longest search the palette sends. Its field stops there; the route refuses a longer one. */
 export const PALETTE_QUERY_MAX = 200;

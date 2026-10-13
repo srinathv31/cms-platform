@@ -3,7 +3,7 @@ import { noticeView } from "@/domain/golive/notices";
 import type { ConsumerNoticeRow, FakeState } from "./state";
 
 // The one `/api/v1` read the contract suite observes commands through: a consumer's notices, in the order they
-// were committed (decision 0006), as `listNotices` (src/server/queries/consumer-api.ts) serves them. `/api/v1`
+// were committed (decision 0006), as `listNotices` (src/server/services/local/consumer-api.ts) serves them. `/api/v1`
 // is the backend's own API, not a service interface; the Java API serves it, and its contract run reads it there.
 
 /** A consumer's notices, oldest first in commit order, as the notices API words them. */

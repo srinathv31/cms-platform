@@ -1,9 +1,7 @@
 import { Stream } from "@/components/primitives/stream";
 import { PageHeader } from "@/components/primitives/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { can } from "@/domain/permissions";
-import { now } from "@/server/clock";
-import { getLibraryRows } from "@/server/queries/library";
+import { getLibrary } from "@/server/queries/library";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { cn } from "@/lib/utils";
 import {
@@ -24,33 +22,26 @@ async function SpaceEyebrow({ params }: { params: TeamParams }) {
   return <>{space.name}</>;
 }
 
-/** Whether the viewer may create templates here. "All teams" has no team to create in. */
-async function canCreateIn(params: TeamParams) {
-  const space = await requireSpaceFromParams(params);
-  const ok =
-    !space.isAll &&
-    space.teamId !== null &&
-    can(space.viewer, "template.create", { teamId: space.teamId }).ok;
-  return { space, ok };
-}
-
-/** The screen's one primary button. */
+/**
+ * The screen's one primary button. Whether the viewer may create here is the Library read's to say ("All teams"
+ * has no team to create in); the read is cached, so the list below shares it.
+ */
 async function NewTemplateAction({ params }: { params: TeamParams }) {
-  const { space, ok } = await canCreateIn(params);
-  return ok ? <NewTemplate teamSlug={space.slug} /> : null;
+  const space = await requireSpaceFromParams(params);
+  const { canCreate } = await getLibrary(space.slug);
+  return canCreate ? <NewTemplate teamSlug={space.slug} /> : null;
 }
 
 async function LibraryList({ params }: { params: TeamParams }) {
-  const { space, ok } = await canCreateIn(params);
-  const rows = await getLibraryRows(space.slug);
-  const nowIso = (await now()).toISOString();
+  const space = await requireSpaceFromParams(params);
+  const { rows, canCreate, asOf } = await getLibrary(space.slug);
   return (
     <LibraryBrowser
       rows={rows}
       spaceSlug={space.slug}
       showTeam={space.isAll}
-      canCreate={ok}
-      nowIso={nowIso}
+      canCreate={canCreate}
+      nowIso={asOf}
     />
   );
 }
