@@ -78,8 +78,9 @@ the merge of each wave, and wave 4.
 
 ### Item 1. Prettier, default configuration
 
-- [ ] Add Prettier as a dev dependency, run it with the default configuration (`--config=empty`, no project
+- [x] Add Prettier as a dev dependency, run it with the default configuration (`--config=empty`, no project
       overrides), commit the result as one formatting-only PR, and add `prettier --check` to the checks in AGENTS.md.
+      (wave 0, PR #76)
 - Why: there is no formatter today, and formatting consistency comes from one author. With a team it drifts in a week
   and every PR carries whitespace diffs.
 - Start at: `package.json` scripts; AGENTS.md "Commands" table; expect a large diff in `e2e/` and `src/components/`
