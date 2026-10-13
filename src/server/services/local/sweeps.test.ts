@@ -1,5 +1,4 @@
 import { and, eq } from "drizzle-orm";
-import { refresh } from "next/cache";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { describeActivity } from "@/domain/activity";
 import { sunsetDay } from "@/domain/business-zone";
@@ -8,16 +7,16 @@ import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
 import { freshDatabasePerTest } from "@/server/testing/review-fixtures";
 import { seedDatabase } from "@/server/seed";
-import { advanceClockAction } from "./actions/demo";
-import { NOTICE_SEQ_KEY } from "@/server/services/local/effects";
-import { runSunsetSweep } from "./sunset-sweep";
+import { NOTICE_SEQ_KEY } from "./effects";
+import { runSunsetSweep } from "./sweeps";
 
-// The sunset sweep against a temporary database filled by the real seed, with the demo clock moved by
-// hand. Seed facts it relies on: Balance Transfer v1 is Superseded with a sunset 21 days after the seed,
-// at 00:00 Eastern on that day, and it's the seed's only sunset; v2 is Active. Coral renders it (not as a
-// preview) up to the seed's day. No business zone is set (Eastern). The database every test starts from adds renders that shape the
-// notice audience: Deposits Online within 90 days before the sunset (told), a third consumer only longer
-// ago than that or as a preview (not told).
+// The sunset sweep on this app's own database, beyond what the contract suite sees (./contract/sweeps.ts and the
+// review contract run it through `runScheduledJobs` on both implementations): the audit row's details, the notice
+// audience drawn from the render log, and the notice counter. Seed facts it relies on: Balance Transfer v1 is
+// Superseded with a sunset 21 days after the seed, at 00:00 Eastern on that day, and it's the seed's only sunset; v2
+// is Active. Coral renders it (not as a preview) up to the seed's day. No business zone is set (Eastern). The
+// database every test starts from adds renders that shape the notice audience: Deposits Online within 90 days
+// before the sunset (told), a third consumer only longer ago than that or as a preview (not told).
 
 const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
@@ -25,15 +24,6 @@ vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-sunset-sweep-");
 });
-vi.mock("@/server/clock", () => ({
-  now: vi.fn(async () => env.now),
-  advanceClock: vi.fn(async (days: number) => {
-    env.now = new Date(env.now.getTime() + days * 86_400_000);
-  }),
-}));
-vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
-// Advance clock is a demo tool, which refuses unless the server runs in demo mode.
-vi.mock("@/server/config", () => ({ DEMO_MODE: true }));
 
 const {
   auditEvents,
@@ -68,7 +58,7 @@ const lastSeq = async () =>
 /** The sweep as it runs `n` days after the seed. */
 async function sweepAt(n: number) {
   env.now = day(n);
-  return runSunsetSweep();
+  return runSunsetSweep(env.now);
 }
 
 freshDatabasePerTest(async (built) => {
@@ -125,9 +115,9 @@ describe("runSunsetSweep across the seed's sunset", () => {
     expect(v1).toMatchObject({ state: "superseded" });
     expect(v1.sunsetAt).not.toBeNull();
     env.now = BASE;
-    expect(await runSunsetSweep()).toEqual([]);
+    expect(await runSunsetSweep(env.now)).toEqual([]);
     env.now = new Date(v1.sunsetAt!.getTime() - 1);
-    expect(await runSunsetSweep()).toEqual([]);
+    expect(await runSunsetSweep(env.now)).toEqual([]);
     expect(await passedRows()).toEqual([]);
   });
 
@@ -206,7 +196,7 @@ describe("runSunsetSweep across the seed's sunset", () => {
     const audit = (await db.select().from(auditEvents)).length;
     const notices = (await db.select().from(consumerNotices)).length;
     const seq = await lastSeq();
-    expect(await runSunsetSweep()).toEqual([]);
+    expect(await runSunsetSweep(env.now)).toEqual([]);
     expect(await sweepAt(60)).toEqual([]);
     expect((await db.select().from(auditEvents)).length).toBe(audit);
     expect((await db.select().from(consumerNotices)).length).toBe(notices);
@@ -248,27 +238,15 @@ describe("a sweep that runs long after the sunset", () => {
 describe("two sweeps at once", () => {
   it("write the row, and each consumer's notice, once", async () => {
     env.now = day(22);
-    const [a, b] = await Promise.all([runSunsetSweep(), runSunsetSweep()]);
+    const [a, b] = await Promise.all([
+      runSunsetSweep(env.now),
+      runSunsetSweep(env.now),
+    ]);
     expect([...a, ...b].map((p) => p.versionId)).toEqual([v1.id]);
     expect(await passedRows()).toHaveLength(1);
     expect((await passedNotices()).map((n) => n.consumerId)).toEqual([
       "coral",
       "deposits-online",
     ]);
-  });
-});
-
-describe("Advance clock", () => {
-  it("runs the sweep after moving the clock", async () => {
-    await advanceClockAction(22);
-    expect(env.now).toEqual(day(22));
-    expect((await passedRows()).map((r) => r.versionId)).toEqual([v1.id]);
-    expect(
-      (await passedNotices()).map((n) => [n.consumerId, n.createdAt]),
-    ).toEqual([
-      ["coral", day(22)],
-      ["deposits-online", day(22)],
-    ]);
-    expect(refresh).toHaveBeenCalled();
   });
 });

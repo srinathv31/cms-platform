@@ -186,13 +186,9 @@ const ratchet = (files, rules) => (files.length > 0 ? [{ files, rules }] : []);
 
 // The files the seam rules still warn on, until their package moves them (plan.md). Delete a line as you clear it.
 const SEAM_NOT_YET = [
-  "src/server/access-sweep.ts",
-  "src/server/actions/access.ts",
   "src/server/actions/comments.ts",
   "src/server/actions/create-template.ts",
   "src/server/actions/kit.ts",
-  "src/server/actions/persona.ts",
-  "src/server/actions/platform.ts",
   "src/server/actions/review.ts",
   "src/server/actions/templates.ts",
   "src/server/clock.ts",
@@ -211,7 +207,6 @@ const SEAM_NOT_YET = [
   "src/server/queries/library.ts",
   "src/server/queries/palette.ts",
   "src/server/queries/people.ts",
-  "src/server/queries/personas.ts",
   "src/server/queries/platform.ts",
   "src/server/queries/review.ts",
   "src/server/queries/submit-summary.ts",
@@ -221,7 +216,6 @@ const SEAM_NOT_YET = [
   "src/server/queries/workspace.ts",
   "src/server/render/log.ts",
   "src/server/render/render-template.ts",
-  "src/server/sunset-sweep.ts",
   "src/server/templates/create.ts",
   "src/server/version-rows.ts",
 ];
@@ -239,16 +233,12 @@ const CLOCK_NOT_YET = [
   "src/components/usage/usage-dashboard.tsx",
   "src/components/workspace/content/workspace-content.tsx",
   "src/components/workspace/workspace-header.tsx",
-  "src/server/access-sweep.ts",
-  "src/server/actions/demo.ts",
   "src/server/actions/kit.ts",
-  "src/server/actions/persona.ts",
   "src/server/api/http.ts",
   "src/server/drafts/save-draft.ts",
   "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/audit.ts",
-  "src/server/queries/clock.ts",
   "src/server/queries/dynamic.ts",
   "src/server/queries/integration.ts",
   "src/server/queries/library.ts",
@@ -258,16 +248,12 @@ const CLOCK_NOT_YET = [
   "src/server/queries/usage.ts",
   "src/server/queries/workspace.ts",
   "src/server/render/render-template.ts",
-  "src/server/sunset-sweep.ts",
 ];
 const DECIDES_NOT_YET = [
   "src/components/library/library-view.tsx",
-  "src/server/actions/access.ts",
   "src/server/actions/comments.ts",
   "src/server/actions/create-template.ts",
   "src/server/actions/kit.ts",
-  "src/server/actions/persona.ts",
-  "src/server/actions/platform.ts",
   "src/server/actions/review.ts",
   "src/server/actions/templates.ts",
   "src/server/drafts/apply-patch.ts",
@@ -290,7 +276,6 @@ const DECIDES_NOT_YET = [
   "src/server/render/render-template.ts",
 ];
 const INTERNALS_NOT_YET = [
-  "src/server/actions/demo.ts",
   "src/server/starters/alerts.ts",
   "src/server/starters/blank.ts",
   "src/server/starters/card-offer-terms.ts",

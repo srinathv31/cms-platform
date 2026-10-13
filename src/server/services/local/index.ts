@@ -1,21 +1,21 @@
 import "server-only";
-import type { AccessService } from "../access";
 import type { AuditService } from "../audit";
 import type { CommentService } from "../comments";
-import type { DemoService } from "../demo";
 import type { DraftService } from "../drafts";
 
 import { notMovedArea } from "../not-moved";
 import type { ImplementationOptions } from "../options";
-import type { PlatformService } from "../platform";
 import type { RenderService } from "../render";
 import type { TemplateService } from "../templates";
 import type { Services } from "../types";
 import type { UsageService } from "../usage";
 import { now } from "@/server/clock";
+import { localAccess } from "./access";
 import type { LocalDeps } from "./command";
+import { localDemo } from "./demo";
 import { localIdentity } from "./identity";
 import { localNotifications } from "./notifications";
+import { localPlatform } from "./platform";
 import { localReview } from "./review";
 import { localVersions } from "./versions";
 
@@ -29,19 +29,20 @@ export function localServices(options: ImplementationOptions = {}): Services {
     clock: options.clock ?? now,
     hooks: options.hooks ?? {},
   };
+  const identity = localIdentity();
   return {
-    identity: localIdentity(),
+    identity,
     review: localReview(deps),
     versions: localVersions(deps),
     templates: notMovedArea<TemplateService>("templates"),
     drafts: notMovedArea<DraftService>("drafts"),
     comments: notMovedArea<CommentService>("comments"),
-    access: notMovedArea<AccessService>("access"),
-    platform: notMovedArea<PlatformService>("platform"),
+    access: localAccess(deps),
+    platform: localPlatform(deps),
     notifications: localNotifications(deps),
     audit: notMovedArea<AuditService>("audit"),
     usage: notMovedArea<UsageService>("usage"),
     render: notMovedArea<RenderService>("render"),
-    demo: notMovedArea<DemoService>("demo"),
+    demo: localDemo(deps, identity),
   };
 }

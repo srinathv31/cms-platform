@@ -40,6 +40,15 @@ export class FakeTx {
     Object.assign(target, patch);
     this.undo.push(() => Object.assign(target, before));
   }
+
+  /** Removes a row that is in the table. */
+  delete<T extends Table>(table: T, row: RowOf<T>): void {
+    const rows = this.state[table] as RowOf<T>[];
+    const at = rows.indexOf(row);
+    if (at < 0) throw new Error(`The row to delete isn't in ${table}.`);
+    rows.splice(at, 1);
+    this.undo.push(() => rows.splice(at, 0, row));
+  }
 }
 
 /** The fake's data, and the one way to change it. */

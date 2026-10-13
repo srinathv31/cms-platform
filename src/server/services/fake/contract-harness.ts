@@ -12,7 +12,7 @@ import {
   type SeededState,
 } from "./state";
 import { FakeStore } from "./store";
-import { runFakeSunsetSweep } from "./sweeps";
+import { runFakeScheduledJobs } from "./sweeps";
 
 // The fake as the contract suite runs it (src/server/services/README.md, "The contract suite"). Test support,
 // not a test file: a fresh copy of the seed for every test, built in memory once per file, with a clock the case
@@ -64,7 +64,7 @@ export function fakeContractHarness(opts: { base: Date }): ContractHarness {
       hooks = next;
     },
     async runScheduledJobs(at) {
-      runFakeSunsetSweep(new FakeStore(state!), at);
+      runFakeScheduledJobs(new FakeStore(state!), at);
     },
     async consumerNotices(consumerId, templateId) {
       return fakeConsumerNotices(state!, consumerId, templateId);

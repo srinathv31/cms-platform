@@ -3,13 +3,11 @@ import type { Client } from "@libsql/client";
 import { and, asc, eq, gte } from "drizzle-orm";
 import { refresh, revalidatePath } from "next/cache";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PlatformActions } from "@/server/queries/access-models";
 import { REFUSALS } from "@/domain/lifecycle/refusals";
 import { REASONS } from "@/domain/permissions";
 import { OUTPUT_KEYS } from "@/domain/review-outputs";
 import { PLATFORM_REFUSALS } from "@/domain/platform-config/refusals";
 import { describeConfigChange } from "@/domain/platform-config/effects";
-import { describeZoneChange } from "@/domain/platform-config/time-zone";
 import { validateChain } from "@/domain/platform-config/approval-chains";
 import type { ApproverRule, Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
@@ -17,8 +15,6 @@ import * as schema from "@/server/db/schema/ucomp";
 import {
   getApprovalChainsSection,
   getBusinessZoneSection,
-  getChannelRulesSection,
-  getContentTypesSection,
   getTeamsSection,
 } from "@/server/queries/platform";
 import {
@@ -33,21 +29,18 @@ import {
   loadPersona,
   seededDatabasePerTest,
 } from "@/server/testing/review-fixtures";
-import { TEAM_SLUGS } from "@/server/seed/teams";
 import { getViewer } from "@/server/viewer";
 import { addComment } from "./comments";
-import {
-  createTeam,
-  saveApprovalChain,
-  setBusinessZone,
-  setChannelRule,
-  updateContentType,
-} from "./platform";
+import { saveApprovalChain } from "./platform";
 import { approveVersion, requestChanges, submitVersion } from "./review";
 
-// Platform settings and the two-stage approval they enable, end to end against a temporary database
-// filled by the real seed. Only the database handle, the demo clock, the persona and Next's cache
-// calls are swapped.
+// The approval chain and the two-stage approval it enables, end to end against a temporary database filled by the
+// real seed. Only the database handle, the demo clock, the persona and Next's cache calls are swapped. What the
+// platform commands do on their own is the platform contract's (src/server/services/contract/platform.ts, on both
+// implementations); these cases cross areas that haven't all moved behind the services: the chain is saved through
+// the action and `services().platform`, versions are submitted and decided by the review actions still on the
+// legacy kit (plan P1), and the settings sections are read by their read models (plan P4b). They move to the
+// contract suite with those.
 
 const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
 
@@ -59,25 +52,13 @@ vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 
-// The contract (`PlatformActions` in queries/access-models.ts): the actions have exactly these signatures.
-const _contract: PlatformActions = {
-  createTeam,
-  updateContentType,
-  setChannelRule,
-  saveApprovalChain,
-  setBusinessZone,
-};
-void _contract;
-
 const {
   approvals,
   approvalStages,
   auditEvents,
-  contentTypes,
   membershipRoles,
   memberships,
   notifications,
-  teams,
   versions,
 } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
@@ -188,434 +169,9 @@ async function submitted(teamId: string, author: string) {
   return templateId;
 }
 
-// ── Permission ────────────────────────────────────────────────
+// ── The business time zone's section ──────────────────────────
 
-describe("only a Platform Admin", () => {
-  it("refuses everyone else, and writes nothing", async () => {
-    for (const id of ["alex", "maya", "dana"]) {
-      const at = as(id);
-      expect(
-        await createTeam({
-          name: "Home Loans",
-          description: "",
-          icon: "home",
-          adminUserId: "alex",
-        }),
-      ).toEqual({
-        ok: false,
-        ...REASONS.generic,
-      });
-      expect(
-        await setChannelRule({
-          contentTypeId: CT,
-          channel: "email",
-          allowed: false,
-        }),
-      ).toEqual({ ok: false, ...REASONS.generic });
-      expect(
-        await updateContentType({ contentTypeId: CT, requiredSections: [] }),
-      ).toEqual({ ok: false, ...REASONS.generic });
-      expect(
-        await saveApprovalChain({ contentTypeId: CT, stages: [] }),
-      ).toEqual({ ok: false, ...REASONS.generic });
-      expect(await setBusinessZone({ zone: "America/Chicago" })).toEqual({
-        ok: false,
-        ...REASONS.generic,
-      });
-      expect(await auditAt(at)).toEqual([]);
-    }
-    await expect(getTeamsSection()).rejects.toThrow(
-      /NEXT_HTTP_ERROR_FALLBACK;404/,
-    );
-    await expect(getBusinessZoneSection()).rejects.toThrow(
-      /NEXT_HTTP_ERROR_FALLBACK;404/,
-    );
-  });
-});
-
-// ── Teams ─────────────────────────────────────────────────────
-
-describe("createTeam", () => {
-  it("creates Home Loans with Alex as its first Team Admin, records it and tells Alex", async () => {
-    const at = as("riley");
-    expect(
-      await createTeam({
-        name: "Home Loans",
-        description: "Mortgage disclosures.",
-        icon: "home",
-        adminUserId: "alex",
-      }),
-    ).toEqual({
-      ok: true,
-      slug: "home-loans",
-    });
-    const team = await db.query.teams.findFirst({
-      where: eq(teams.slug, "home-loans"),
-    });
-    expect(team).toMatchObject({
-      id: expect.stringMatching(/^t_/),
-      name: "Home Loans",
-      icon: "home",
-      createdAt: at,
-    });
-    // An opaque id, never the slug (decision 0053).
-    expect(team!.id).not.toBe("home-loans");
-    const membership = await db.query.memberships.findFirst({
-      where: and(
-        eq(memberships.teamId, team!.id),
-        eq(memberships.userId, "alex"),
-      ),
-    });
-    expect(membership).toMatchObject({ status: "active", addedBy: "riley" });
-    expect(
-      (
-        await db
-          .select()
-          .from(membershipRoles)
-          .where(eq(membershipRoles.membershipId, membership!.id))
-      ).map((r) => r.role),
-    ).toEqual(["team_admin"]);
-    expect(
-      (await auditAt(at)).map((r) => [r.action, r.teamId, r.actorId]).sort(),
-    ).toEqual([
-      ["access.granted", team!.id, "riley"],
-      ["platform.config_changed", team!.id, "riley"],
-    ]);
-    // The new team isn't in the seed's slugs; the row names it by id and the BFF finds its slug.
-    const slugs = { ...TEAM_SLUGS, [team!.id]: "home-loans" };
-    expect(
-      (await notificationsAt(at, slugs)).map((n) => [n.userId, n.kind, n.href]),
-    ).toEqual([
-      ["alex", "team_admin_appointed", "/home-loans/settings/members"],
-    ]);
-    expect(
-      (await notificationsAt(at, slugs)).map((n) => [n.facts, n.link]),
-    ).toEqual([
-      [
-        { actorName: "Riley Brooks", teamName: "Home Loans" },
-        { to: "settings", teamId: team!.id, section: "members" },
-      ],
-    ]);
-    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
-    expect(refresh).toHaveBeenCalledTimes(1);
-
-    const teamsSection = await getTeamsSection();
-    expect(
-      teamsSection.teams.find((t) => t.slug === "home-loans"),
-    ).toMatchObject({
-      admins: [expect.objectContaining({ id: "alex" })],
-      members: 1,
-      templates: 0,
-    });
-    expect(teamsSection.people.some((p) => p.id === "morgan")).toBe(true);
-  });
-
-  it("refuses a taken name and an unknown person", async () => {
-    as("riley");
-    expect(
-      await createTeam({
-        name: "coral offers",
-        description: "",
-        icon: "home",
-        adminUserId: "alex",
-      }),
-    ).toEqual({
-      ok: false,
-      code: "team_name_taken",
-      reason: "A team called Coral Offers already exists.",
-    });
-    expect(
-      await createTeam({
-        name: "Auto Loans",
-        description: "",
-        icon: "car",
-        adminUserId: "nobody",
-      }),
-    ).toEqual({
-      ok: false,
-      ...PLATFORM_REFUSALS.pickPerson,
-    });
-    expect(refresh).not.toHaveBeenCalled();
-  });
-
-  it("refuses an Auditor as the first Team Admin; the choices leave them out", async () => {
-    const at = as("riley");
-    expect(
-      await createTeam({
-        name: "Auto Loans",
-        description: "",
-        icon: "car",
-        adminUserId: "taylor",
-      }),
-    ).toEqual({
-      ok: false,
-      code: "auditor_cant_be_admin",
-      reason: "Taylor Nguyen is an Auditor and can't be a Team Admin.",
-    });
-    expect(await auditAt(at)).toEqual([]);
-    expect(
-      (await getTeamsSection()).people.some((p) => p.id === "taylor"),
-    ).toBe(false);
-  });
-});
-
-// ── Content types ─────────────────────────────────────────────
-
-describe("updateContentType", () => {
-  it("renames, adds and removes required sections; existing templates keep theirs", async () => {
-    as("riley");
-    const before = (await getContentTypesSection()).types.find(
-      (t) => t.id === CT,
-    )!;
-    expect(before.requiredSections.map((s) => s.key)).toEqual([
-      "offer_details",
-      "rates_and_fees",
-      "legal_notices",
-    ]);
-    expect(before.templates).toBeGreaterThan(0);
-
-    const at = as("riley");
-    const next = [
-      { key: "offer_details", title: "Offer summary" },
-      { key: "legal_notices", title: "Legal notices" },
-      { key: "", title: "Privacy" },
-    ];
-    expect(
-      await updateContentType({ contentTypeId: CT, requiredSections: next }),
-    ).toEqual({ ok: true });
-    expect(
-      (
-        await db.query.contentTypes.findFirst({
-          where: eq(contentTypes.id, CT),
-        })
-      )?.requiredSections,
-    ).toEqual([
-      { key: "offer_details", title: "Offer summary" },
-      { key: "legal_notices", title: "Legal notices" },
-      { key: "privacy", title: "Privacy" },
-    ]);
-    expect(
-      (await auditAt(at)).map((r) => [
-        r.action,
-        r.teamId,
-        (r.details as { area: string }).area,
-      ]),
-    ).toEqual([["platform.config_changed", null, "content_types"]]);
-    // The details are facts (no sentence); a section change says whether it only reordered.
-    const [changed] = await auditAt(at);
-    expect(changed!.details).toMatchObject({ reordered: false });
-    expect(changed!.details).not.toHaveProperty("summary");
-    expect(describeConfigChange(changed!.details!)).toBe(
-      "changed Disclosure required sections: added Privacy; removed Rates and fees; renamed Offer details to Offer summary",
-    );
-
-    // An existing draft that still has "Rates and fees" submits as before (nothing at submit checks sections).
-    const templateId = await submitted("t_coral", "maya");
-    expect((await versionOf(templateId))?.state).toBe("in_review");
-
-    // The same list again writes nothing; then back to the seeded sections.
-    const again = as("riley");
-    expect(
-      await updateContentType({
-        contentTypeId: CT,
-        requiredSections: next.map((s, i) =>
-          i === 2 ? { ...s, key: "privacy" } : s,
-        ),
-      }),
-    ).toEqual({
-      ok: true,
-    });
-    expect(await auditAt(again)).toEqual([]);
-    as("riley");
-    expect(
-      await updateContentType({
-        contentTypeId: CT,
-        requiredSections: before.requiredSections,
-      }),
-    ).toEqual({ ok: true });
-    expect(
-      (
-        await db.query.contentTypes.findFirst({
-          where: eq(contentTypes.id, CT),
-        })
-      )?.requiredSections,
-    ).toEqual(before.requiredSections);
-  });
-
-  it("refuses no sections and a duplicate title", async () => {
-    as("riley");
-    expect(
-      await updateContentType({ contentTypeId: CT, requiredSections: [] }),
-    ).toEqual({ ok: false, ...PLATFORM_REFUSALS.oneSection });
-    expect(
-      await updateContentType({
-        contentTypeId: CT,
-        requiredSections: [
-          { key: "offer_details", title: "Offer details" },
-          { key: "", title: "offer details" },
-        ],
-      }),
-    ).toEqual({
-      ok: false,
-      code: "section_duplicate",
-      reason: "There are two sections called offer details.",
-    });
-    expect(
-      await updateContentType({
-        contentTypeId: "ct_nope",
-        requiredSections: [{ key: "", title: "A" }],
-      }),
-    ).toEqual({
-      ok: false,
-      code: "content_type_gone",
-      reason: "This content type no longer exists.",
-    });
-  });
-});
-
-// ── Channel rules ─────────────────────────────────────────────
-
-describe("setChannelRule", () => {
-  it("turning Email off counts the Active versions it stops; turning it on restores it", async () => {
-    as("riley");
-    const row = (await getChannelRulesSection()).rows.find(
-      (r) => r.contentTypeId === CT,
-    )!;
-    expect(row.allowed).toEqual({
-      pdf: true,
-      web: true,
-      email: true,
-      push: false,
-      sms: false,
-    });
-    const activeEmail = (
-      await db
-        .select({ channels: versions.channels })
-        .from(versions)
-        .innerJoin(
-          schema.templates,
-          eq(schema.templates.id, versions.templateId),
-        )
-        .where(
-          and(
-            eq(versions.state, "active"),
-            eq(schema.templates.contentTypeId, CT),
-          ),
-        )
-    ).filter((v) => v.channels.includes("email")).length;
-    expect(row.activeUsing.email).toBe(activeEmail);
-
-    const off = as("riley");
-    expect(
-      await setChannelRule({
-        contentTypeId: CT,
-        channel: "email",
-        allowed: false,
-      }),
-    ).toEqual({ ok: true });
-    expect(
-      (
-        await db.query.contentTypes.findFirst({
-          where: eq(contentTypes.id, CT),
-        })
-      )?.allowedChannels,
-    ).toEqual(["pdf", "web"]);
-    const [audit] = await auditAt(off);
-    expect(audit?.details).toMatchObject({
-      area: "channel_rules",
-      channel: "email",
-      allowed: false,
-      activeUsing: activeEmail,
-    });
-
-    as("riley");
-    expect(
-      await setChannelRule({
-        contentTypeId: CT,
-        channel: "pdf",
-        allowed: false,
-      }),
-    ).toEqual({ ok: true });
-    as("riley");
-    expect(
-      await setChannelRule({
-        contentTypeId: CT,
-        channel: "web",
-        allowed: false,
-      }),
-    ).toEqual({
-      ok: false,
-      ...PLATFORM_REFUSALS.oneChannel,
-    });
-
-    for (const channel of ["pdf", "email"] as const) {
-      as("riley");
-      expect(
-        await setChannelRule({ contentTypeId: CT, channel, allowed: true }),
-      ).toEqual({ ok: true });
-    }
-    expect(
-      (
-        await db.query.contentTypes.findFirst({
-          where: eq(contentTypes.id, CT),
-        })
-      )?.allowedChannels,
-    ).toEqual(["pdf", "web", "email"]);
-  });
-
-  it("refuses a channel of the other family, and writes nothing", async () => {
-    as("riley");
-    expect(
-      await setChannelRule({
-        contentTypeId: CT,
-        channel: "push",
-        allowed: true,
-      }),
-    ).toEqual({
-      ok: false,
-      code: "channel_family",
-      reason: "Disclosures are documents. Push and SMS go on Alert templates.",
-    });
-    as("riley");
-    expect(
-      await setChannelRule({
-        contentTypeId: "ct_alert",
-        channel: "email",
-        allowed: true,
-      }),
-    ).toEqual({
-      ok: false,
-      code: "channel_family",
-      reason:
-        "Alerts are messages. PDF, Web and Email go on Disclosure templates.",
-    });
-    expect(
-      (
-        await db.query.contentTypes.findFirst({
-          where: eq(contentTypes.id, CT),
-        })
-      )?.allowedChannels,
-    ).toEqual(["pdf", "web", "email"]);
-    expect(
-      (
-        await db.query.contentTypes.findFirst({
-          where: eq(contentTypes.id, "ct_alert"),
-        })
-      )?.allowedChannels,
-    ).toEqual(["push", "sms"]);
-  });
-});
-
-// ── Business time zone ────────────────────────────────────────
-
-describe("setBusinessZone", () => {
-  const zoneRow = async () =>
-    (
-      await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, "business_zone"))
-    )[0];
+describe("the business time zone's section", () => {
   it("is Eastern until a Platform Admin picks another, from the US zones and UTC", async () => {
     as("riley");
     const section = await getBusinessZoneSection();
@@ -632,81 +188,14 @@ describe("setBusinessZone", () => {
     ]);
   });
 
-  it("changes the zone, records it, and moves no sunset already set", async () => {
-    const sunsetBefore = (
-      await db
-        .select({ id: versions.id, sunsetAt: versions.sunsetAt })
-        .from(versions)
-    ).filter((v) => v.sunsetAt);
-    const at = as("riley");
-    expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({
-      ok: true,
-    });
-    expect((await zoneRow())?.value).toBe("America/Los_Angeles");
-    expect((await getBusinessZoneSection()).zone).toBe("America/Los_Angeles");
-    const [audit] = await auditAt(at);
-    expect(audit).toMatchObject({
-      action: "platform.config_changed",
-      actorId: "riley",
-    });
-    expect(audit?.details).toMatchObject({
-      area: "business_zone",
-      from: "America/New_York",
-      to: "America/Los_Angeles",
-      pendingSunsets: 1,
-    });
-    // The sentence is worded on read, never stored in the details.
-    expect(audit?.details).not.toHaveProperty("summary");
-    expect(describeConfigChange(audit!.details!)).toBe(
-      "set the business time zone to Pacific (America/Los_Angeles)",
+  it("is Not found to anyone but a Platform Admin, as the Teams section is", async () => {
+    as("alex");
+    await expect(getTeamsSection()).rejects.toThrow(
+      /NEXT_HTTP_ERROR_FALLBACK;404/,
     );
-    expect(refresh).toHaveBeenCalledTimes(1);
-    // Sunsets keep their instants: their consumers have been told when they end.
-    const sunsetAfter = (
-      await db
-        .select({ id: versions.id, sunsetAt: versions.sunsetAt })
-        .from(versions)
-    ).filter((v) => v.sunsetAt);
-    expect(sunsetAfter).toEqual(sunsetBefore);
-    // The screen's line for the zone picked is the domain's, and the server refuses with the same problem.
-    expect(
-      describeZoneChange({
-        current: "America/New_York",
-        next: "America/Los_Angeles",
-      }),
-    ).toEqual({
-      problem: null,
-      changed: true,
-      lines: ["New sunset dates end at 00:00 Pacific (America/Los_Angeles)."],
-    });
-    expect(
-      describeZoneChange({ current: "America/New_York", next: "Europe/London" })
-        .problem,
-    ).toBe(PLATFORM_REFUSALS.pickZone);
-  });
-
-  it("writes nothing for the zone it already has, and refuses a zone off the list", async () => {
-    as("riley");
-    expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({
-      ok: true,
-    });
-    vi.mocked(refresh).mockClear();
-    const at = as("riley");
-    expect(await setBusinessZone({ zone: "America/Los_Angeles" })).toEqual({
-      ok: true,
-    });
-    expect(await setBusinessZone({ zone: "Europe/London" })).toEqual({
-      ok: false,
-      ...PLATFORM_REFUSALS.pickZone,
-    });
-    expect(await setBusinessZone({ zone: "" })).toEqual({
-      ok: false,
-      code: "invalid_input",
-      reason: "Check the form and try again.",
-    });
-    expect(await auditAt(at)).toEqual([]);
-    expect(refresh).not.toHaveBeenCalled();
-    expect((await zoneRow())?.value).toBe("America/Los_Angeles");
+    await expect(getBusinessZoneSection()).rejects.toThrow(
+      /NEXT_HTTP_ERROR_FALLBACK;404/,
+    );
   });
 });
 

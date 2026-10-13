@@ -1,14 +1,13 @@
 import "server-only";
 import { cache } from "react";
-import { eq, inArray } from "drizzle-orm";
-import { db } from "@/server/db/client";
-import {
-  membershipRoles,
-  memberships,
-  teams,
-  users,
-} from "@/server/db/schema/ucomp";
-import type { PlatformRole, TeamRole } from "@/domain/types";
+import { ROLE_LABEL } from "@/domain/access/roles";
+import type { PlatformRole } from "@/domain/types";
+import { requireRequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
+import type { PersonaFacts } from "@/server/services/demo";
+
+// The persona switcher's rows: the demo service's personas (`demo.personas`, facts), each with its one-line role
+// summary worded here. The profile menu reads the viewer's own row too, outside the demo.
 
 export interface PersonaSummary {
   id: string;
@@ -19,78 +18,41 @@ export interface PersonaSummary {
   summary: string;
 }
 
-const ROLE_LABEL: Record<TeamRole, string> = {
-  viewer: "Viewer",
-  author: "Author",
-  approver: "Approver",
-  team_admin: "Team Admin",
-};
-
 const PLATFORM_LABEL: Record<PlatformRole, string> = {
   platform_admin: "Platform Admin",
   auditor: "Auditor",
 };
 
-/** The role order inside a team reads from least to most authority. */
-const ROLE_ORDER: TeamRole[] = ["viewer", "author", "approver", "team_admin"];
-
-/** Switchable personas, in the order the switcher shows them. */
-export const getPersonas = cache(async () =>
-  db.query.users.findMany({ where: eq(users.isPersona, true) }),
-);
+/**
+ * Each persona with its one-line summary: their platform role, then each team they're active on with its roles
+ * from least to most authority ("Coral Offers · Approver & Team Admin"), or "No team yet". In the given order.
+ */
+export function personaSummaries(
+  personas: readonly PersonaFacts[],
+): PersonaSummary[] {
+  return personas.map((p) => {
+    const parts: string[] = [];
+    if (p.platformRole) parts.push(PLATFORM_LABEL[p.platformRole]);
+    for (const team of p.teams)
+      parts.push(
+        `${team.teamName} · ${team.roles.map((r) => ROLE_LABEL[r]).join(" & ")}`,
+      );
+    return {
+      id: p.id,
+      name: p.name,
+      initials: p.initials,
+      hue: p.hue,
+      summary: parts.length ? parts.join(", ") : "No team yet",
+    };
+  });
+}
 
 /** All switchable personas with their one-line role summary. Order = the switcher's order. */
 export const getPersonaSummaries = cache(
   async (): Promise<PersonaSummary[]> => {
-    const personas = await getPersonas();
-    const ids = personas.map((p) => p.id);
-    if (ids.length === 0) return [];
-
-    const rows = await db
-      .select({
-        membershipId: memberships.id,
-        userId: memberships.userId,
-        teamName: teams.name,
-        status: memberships.status,
-      })
-      .from(memberships)
-      .innerJoin(teams, eq(teams.id, memberships.teamId))
-      .where(inArray(memberships.userId, ids));
-
-    const roleRows = rows.length
-      ? await db
-          .select()
-          .from(membershipRoles)
-          .where(
-            inArray(
-              membershipRoles.membershipId,
-              rows.map((r) => r.membershipId),
-            ),
-          )
-      : [];
-
-    return personas.map((p) => {
-      const parts: string[] = [];
-      if (p.platformRole) parts.push(PLATFORM_LABEL[p.platformRole]);
-      for (const m of rows.filter(
-        (r) => r.userId === p.id && r.status === "active",
-      )) {
-        const roles = roleRows
-          .filter((rr) => rr.membershipId === m.membershipId)
-          .map((rr) => rr.role as TeamRole)
-          .sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
-        if (roles.length === 0) continue;
-        parts.push(
-          `${m.teamName} · ${roles.map((r) => ROLE_LABEL[r]).join(" & ")}`,
-        );
-      }
-      return {
-        id: p.id,
-        name: p.name,
-        initials: p.initials,
-        hue: p.avatarHue,
-        summary: parts.length ? parts.join(", ") : "No team yet",
-      };
-    });
+    const ctx = await requireRequestContext();
+    const result = await services().demo.personas(ctx);
+    // A backend without the demo tools has no personas: the profile menu shows the viewer alone.
+    return result.ok ? personaSummaries(result.personas) : [];
   },
 );
