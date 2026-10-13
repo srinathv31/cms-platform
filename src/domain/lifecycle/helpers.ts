@@ -4,6 +4,7 @@
 // been sent back, then "v2, round 2". Sunset and revoke are about released versions: "v2". A notification
 // stores the number and round as facts and is worded the same way when read (notifications.ts).
 
+import { REQUEST_REFUSALS, type Refusal } from "../refusals";
 import { versionLabel, type NumberedRound, type RoundRow } from "../rounds";
 import type {
   NotificationEffect,
@@ -46,6 +47,24 @@ export function sentence(v: NumberedRound): string {
 export function trimmed(value: string | null | undefined): string | null {
   const t = value?.trim() ?? "";
   return t === "" ? null : t;
+}
+
+/** The longest note to reviewers (submit) and the longest reason (request changes, start a revoke), trimmed. */
+export const NOTE_MAX = 2000;
+export const REASON_MAX = 2000;
+
+/** `note_too_long` for a note to reviewers over `NOTE_MAX` once trimmed; null otherwise. */
+export function noteRefusal(note: string | null | undefined): Refusal | null {
+  return (note?.trim().length ?? 0) > NOTE_MAX
+    ? REQUEST_REFUSALS.noteTooLong(NOTE_MAX)
+    : null;
+}
+
+/** `reason_too_long` for a reason over `REASON_MAX` once trimmed; null otherwise. A blank one is the transition's. */
+export function reasonRefusal(reason: string): Refusal | null {
+  return reason.trim().length > REASON_MAX
+    ? REQUEST_REFUSALS.reasonTooLong(REASON_MAX)
+    : null;
 }
 
 export function teamApproversExcept(...userIds: string[]): Recipients {

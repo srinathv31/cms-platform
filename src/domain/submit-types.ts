@@ -1,4 +1,28 @@
-import type { Channel, Variable } from "./types";
+import type { Channel, SampleSet, Variable } from "./types";
+
+/**
+ * What submit would freeze, as the backend reads it (`ReviewService.submitSummary`): the saved draft and the
+ * version it is compared with, as facts. The BFF shapes the dialog's `SubmitSummary` from it: the channels in the
+ * content type's order, and the sample sets listed with the generated defaults (whose names are the BFF's words).
+ */
+export interface SubmitFacts {
+  /** ISO: the backend's instant the baseline was decided at (a sunset that has passed moves it). */
+  asOf: string;
+  templateId: string;
+  /** The draft's `rev` as it was read: submit sends it back (`SubmitSummary.rev`). */
+  rev: number;
+  /** The number and round the draft gets at submit (`nextRound`). */
+  number: number;
+  round: number;
+  name: string;
+  /** The channels the draft renders to, as it stores them. */
+  channels: Channel[];
+  variables: Variable[];
+  /** The draft's own sample sets, as stored. */
+  sampleSets: SampleSet[];
+  /** The newest version that still renders (`contractBaseline`); null when none does. */
+  baseline: { number: number; name: string; variables: Variable[] } | null;
+}
 
 /**
  * What the submit dialog shows, read from the SAVED draft right after the pending autosave went out

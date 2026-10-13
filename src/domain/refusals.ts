@@ -173,10 +173,6 @@ export const REQUEST_REFUSALS = {
     "version_changed",
     "This version changed. Reload and try again.",
   ),
-  activeChanged: refusal(
-    "active_changed",
-    "The Active version changed. Try again.",
-  ),
   /** Edit: the version the new draft was to copy changed state before it was read. */
   latestChanged: refusal(
     "latest_changed",

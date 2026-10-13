@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TeamRole, Viewer } from "../types";
-import { decideCheck } from "./decide-check";
-import { CHAIN_2 } from "./fixtures";
+import { decideCheck, decideResource, stageRefusal } from "./decide-check";
+import { CHAIN_1, CHAIN_2, STAGES_2 } from "./fixtures";
 import { REFUSALS } from "./refusals";
 
 // Who may approve or send back a version at its current stage: the queue, the review screen and the actions ask
@@ -82,5 +82,54 @@ describe("decideCheck", () => {
         approvedBy: ["jordan"],
       }),
     ).toEqual({ ok: true });
+  });
+});
+
+// The two decide commands ask `can("version.decide")` about `decideResource` first, then, with the round read again
+// in their transaction, `stageRefusal`; the transitions refuse the rest in their own words.
+describe("decideResource and stageRefusal", () => {
+  const round = {
+    state: "in_review" as const,
+    submittedBy: "maya",
+    writers: ["maya", "priya"],
+    stages: STAGES_2,
+    currentStage: 1,
+  };
+
+  it("names the version's people, and while it is in review, whoever the stage it waits on names", () => {
+    expect(decideResource(TEAM, round, CHAIN_2)).toEqual({
+      teamId: TEAM,
+      submittedBy: "maya",
+      writers: ["maya", "priya"],
+      stageApproverIds: ["dana"],
+    });
+    expect(
+      decideResource(TEAM, { ...round, currentStage: 0 }, CHAIN_2)
+        .stageApproverIds,
+    ).toEqual([]);
+    expect(
+      decideResource(TEAM, { ...round, state: "changes_requested" }, CHAIN_2)
+        .stageApproverIds,
+      "a round no longer in review names nobody",
+    ).toEqual([]);
+  });
+
+  it("refuses anyone the stage's rule doesn't name, and leaves the rest to the transition", () => {
+    expect(stageRefusal(jordan, CHAIN_2, round, TEAM)).toMatchObject({
+      ok: false,
+      code: "waiting_on_stage",
+    });
+    expect(stageRefusal(dana, CHAIN_2, round, TEAM)).toBeNull();
+    expect(
+      stageRefusal(jordan, CHAIN_2, { ...round, currentStage: 0 }, TEAM),
+    ).toBeNull();
+    expect(
+      stageRefusal(jordan, CHAIN_2, { ...round, state: "active" }, TEAM),
+      "not in review: the transition refuses it",
+    ).toBeNull();
+    expect(
+      stageRefusal(jordan, CHAIN_1, round, TEAM),
+      "the stage left the chain: the transition refuses it",
+    ).toBeNull();
   });
 });

@@ -1,19 +1,13 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/server/db/client";
-import { templates, versions } from "@/server/db/schema/ucomp";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
-import { refusal, type ReadResult } from "@/server/api/reads";
-import { now } from "@/server/clock";
-import { REFUSALS } from "@/domain/lifecycle/refusals";
-import { contractBaseline } from "@/domain/lifecycle/baselines";
-import { can } from "@/domain/permissions";
-import { nextRound } from "@/domain/rounds";
-import { CHANNELS, type Viewer } from "@/domain/types";
+import type { SubmitFacts, SubmitSummary } from "@/domain/submit-types";
+import { CHANNELS } from "@/domain/types";
 import { listSets } from "@/editor/model/sample-sets";
-import type { SubmitSummary } from "@/domain/submit-types";
+import type { RequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
+import { refusal, type ReadResult } from "@/server/services/results";
 
 // A read, not a change: what the submit dialog lists, taken from the saved draft, served by
 // GET /api/templates/[templateId]/submit-summary. The dialog sits in the tab bar, a separate subtree
@@ -21,78 +15,43 @@ import type { SubmitSummary } from "@/domain/submit-types";
 // autosave has gone out (`session.flush()`), which makes the saved draft the live one, and again from
 // its "Refresh summary". The draft's `rev` comes with it: submit sends it back, and is refused if the
 // draft has changed since. Read-only, so nothing is written, audited or refreshed.
+//
+// The backend answers the facts (`ReviewService.submitSummary`); this lays them out for the dialog
+// (`submitSummaryOf`).
 
 const Input = z.object({ templateId: z.string().min(1).max(64) });
 
 export async function getSubmitSummary(
-  viewer: Viewer,
+  ctx: RequestContext,
   input: { templateId: string },
 ): Promise<ReadResult<{ summary: SubmitSummary }>> {
   const parsed = Input.safeParse(input);
   if (!parsed.success)
     return refusal(400, REQUEST_REFUSALS.templateUnavailable);
-  const template = await db
-    .select({ id: templates.id, teamId: templates.teamId })
-    .from(templates)
-    .where(eq(templates.id, parsed.data.templateId))
-    .limit(1)
-    .then((rows) => rows[0]);
-  if (!template) return refusal(404, REQUEST_REFUSALS.templateUnavailable);
+  const facts = await services().review.submitSummary(ctx, parsed.data);
+  if (!facts.ok) return facts;
+  return { ok: true, summary: submitSummaryOf(facts) };
+}
 
-  const allowed = can(viewer, "version.submit", { teamId: template.teamId });
-  if (!allowed.ok) return refusal(403, allowed);
-
-  const list = await db
-    .select({
-      number: versions.number,
-      round: versions.round,
-      state: versions.state,
-      rev: versions.rev,
-      sunsetAt: versions.sunsetAt,
-      name: versions.name,
-      channels: versions.channels,
-      variables: versions.variables,
-      sampleSets: versions.sampleSets,
-    })
-    .from(versions)
-    .where(eq(versions.templateId, template.id));
-
-  const draft = list.find((v) => v.state === "draft");
-  if (!draft) {
-    return refusal(
-      409,
-      list.some((v) => v.state === "in_review")
-        ? REFUSALS.alreadyInReview
-        : REQUEST_REFUSALS.noDraftToSubmit,
-    );
-  }
-  const at = await now();
-  // What submit will compare with: the newest version that still renders (the Active one, if any).
-  const baseline = contractBaseline(list, at);
-  const today = at.toISOString().slice(0, 10);
-  const next = nextRound(list);
-
+/**
+ * The dialog's summary from the backend's facts: the channels in the content type's order, and the names of
+ * every sample data set, the generated defaults first (`listSets`, whose default names are the BFF's words),
+ * listed on the day the backend read the draft (`asOf`).
+ */
+export function submitSummaryOf(facts: SubmitFacts): SubmitSummary {
   return {
-    ok: true,
-    summary: {
-      templateId: template.id,
-      rev: draft.rev,
-      number: next.number,
-      round: next.round,
-      name: draft.name,
-      channels: CHANNELS.filter((channel) => draft.channels.includes(channel)),
-      sampleSetNames: listSets(draft.sampleSets, draft.variables, today).map(
-        (set) => set.name,
-      ),
-      variables: draft.variables,
-      baseline:
-        baseline && baseline.number !== null
-          ? {
-              number: baseline.number,
-              name: baseline.name,
-              variables: baseline.variables,
-            }
-          : null,
-    },
+    templateId: facts.templateId,
+    rev: facts.rev,
+    number: facts.number,
+    round: facts.round,
+    name: facts.name,
+    channels: CHANNELS.filter((channel) => facts.channels.includes(channel)),
+    sampleSetNames: listSets(
+      facts.sampleSets,
+      facts.variables,
+      facts.asOf.slice(0, 10),
+    ).map((set) => set.name),
+    variables: facts.variables,
+    baseline: facts.baseline,
   };
 }

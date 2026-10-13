@@ -193,7 +193,6 @@ const SEAM_NOT_YET = [
   "src/server/actions/kit.ts",
   "src/server/actions/persona.ts",
   "src/server/actions/platform.ts",
-  "src/server/actions/review.ts",
   "src/server/actions/templates.ts",
   "src/server/clock.ts",
   "src/server/drafts/apply-patch.ts",
@@ -214,7 +213,6 @@ const SEAM_NOT_YET = [
   "src/server/queries/personas.ts",
   "src/server/queries/platform.ts",
   "src/server/queries/review.ts",
-  "src/server/queries/submit-summary.ts",
   "src/server/queries/template-access.ts",
   "src/server/queries/threads.ts",
   "src/server/queries/usage.ts",
@@ -223,7 +221,6 @@ const SEAM_NOT_YET = [
   "src/server/render/render-template.ts",
   "src/server/sunset-sweep.ts",
   "src/server/templates/create.ts",
-  "src/server/version-rows.ts",
 ];
 
 // The BFF files that still read the clock (N1), still decide with can() (N2), and still import the backend's own
@@ -254,7 +251,6 @@ const CLOCK_NOT_YET = [
   "src/server/queries/library.ts",
   "src/server/queries/platform.ts",
   "src/server/queries/review.ts",
-  "src/server/queries/submit-summary.ts",
   "src/server/queries/usage.ts",
   "src/server/queries/workspace.ts",
   "src/server/render/render-template.ts",
@@ -268,7 +264,6 @@ const DECIDES_NOT_YET = [
   "src/server/actions/kit.ts",
   "src/server/actions/persona.ts",
   "src/server/actions/platform.ts",
-  "src/server/actions/review.ts",
   "src/server/actions/templates.ts",
   "src/server/drafts/apply-patch.ts",
   "src/server/import/create.ts",
@@ -283,7 +278,6 @@ const DECIDES_NOT_YET = [
   "src/server/queries/platform.ts",
   "src/server/queries/require-can.ts",
   "src/server/queries/review.ts",
-  "src/server/queries/submit-summary.ts",
   "src/server/queries/template-access.ts",
   "src/server/queries/usage.ts",
   "src/server/queries/workspace.ts",

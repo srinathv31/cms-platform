@@ -59,6 +59,19 @@ export function approvedEarlierStage(
 }
 
 /**
+ * The Active version an approval replaces when it goes live (`approve`'s `active`): the template's Active row,
+ * unless it is the round being approved itself or has no number. Null when nothing is Active.
+ */
+export function replacedActive(
+  active: { id: string; number: number | null } | null | undefined,
+  round: { id: string },
+): { id: string; number: number } | null {
+  return active && active.id !== round.id && active.number !== null
+    ? { id: active.id, number: active.number }
+    : null;
+}
+
+/**
  * Approve the stage the version is waiting on. The version goes through its own stages (recorded at
  * submit), whatever the chain looks like now: at an earlier one it moves to the next; at its last it
  * goes live: Active, and the previous Active becomes Superseded (pinned consumers keep rendering it),
