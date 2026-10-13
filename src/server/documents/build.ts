@@ -1,4 +1,6 @@
-// Builders for the TipTap JSON the seed writes (contract: docs/render-spec.md §2).
+// Builders for the TipTap JSON the seed writes and the starters build (contract: docs/render-spec.md §2). Pure:
+// no database, so both the backend's seed and the BFF's starters (src/server/starters) import it, and the BFF
+// imports nothing of the seed.
 //
 // Block ids are derived from (template scope, block key), so a block that survives from one version
 // to the next keeps its id. That is what lets comment threads anchor across versions and drafts.

@@ -2,7 +2,7 @@ import "server-only";
 import { ensureBlockIds } from "@/editor/schema";
 import type { StarterContent } from "@/domain/lifecycle/types";
 import { assertNever } from "@/domain/assert-never";
-import { VariableKit } from "../seed/variables";
+import { VariableKit } from "@/server/documents/variables";
 import {
   blankAlert,
   cardActivity,

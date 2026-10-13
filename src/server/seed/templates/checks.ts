@@ -6,7 +6,7 @@ import { ALL_CHANNEL_FIELDS, channelFieldValue } from "@/domain/channel-fields";
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import { isReleased } from "@/domain/rounds";
 import { TEMPLATE_ID_PATTERN } from "@/server/ids";
-import { topLevelIds, variableKeys } from "../content";
+import { topLevelIds, variableKeys } from "@/server/documents/build";
 import { SEED_CONTENT_TYPES, type SeedContentType } from "../platform";
 import type { SeedTemplate, SeedVersion } from "./types";
 

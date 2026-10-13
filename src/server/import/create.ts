@@ -1,5 +1,4 @@
 import "server-only";
-import { eq } from "drizzle-orm";
 import { finishImport, refusalForUnreadableKind } from "@/domain/import";
 import {
   IMPORT_LIMITS,
@@ -8,50 +7,39 @@ import {
   type ImportRefusalName,
   type ImportResponse,
 } from "@/domain/import-types";
-import { createDraft } from "@/domain/lifecycle/drafts";
 import { REFUSALS as LIFECYCLE_REFUSALS } from "@/domain/lifecycle/refusals";
-import { REASONS, can } from "@/domain/permissions";
 import {
   REQUEST_REFUSALS,
   refuse,
   type Refused,
   type RefusalCode,
 } from "@/domain/refusals";
-import type { Viewer } from "@/domain/types";
 import { defaultSampleSets } from "@/editor/model/sample-sets";
-import { now } from "@/server/clock";
-import { db } from "@/server/db/client";
-import { teams, uploads } from "@/server/db/schema/ucomp";
-import { prepareBody } from "@/server/documents/prepare";
-import { inTransaction } from "@/server/services/local/transaction";
-import { newId } from "@/server/ids";
+import type { RequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
 import {
   conformToContentType,
-  freshTemplateId,
-  insertNewTemplate,
-  newTemplateType,
+  draftContentOf,
+  prepareDraftContent,
 } from "@/server/templates/create";
 import { convertFile } from "./convert";
 import { sniffKind } from "./sniff";
-import { defaultUploadsRoot, removeUpload, writeUpload } from "./store";
 
 // Import a file (Phase 7a): a .docx, .pdf or .txt becomes a new template whose first draft holds
 // its text, with `{{placeholders}}` as Text chips and the content type's required sections in place.
 // The order is the contract's (src/domain/import-types.ts): permission first, then size, kind,
 // conversion, then the document check (the body is stored as src/server/documents/prepare.ts makes
-// it, as an autosave would store it); the files are written, then ONE transaction inserts the
-// template, the draft (with `import_upload_id`), the uploads row and the audit event. If the
-// transaction fails, the folder goes.
+// it, as an autosave would store it); then the backend stores the template, the draft, the original and the
+// report (`templates.createImported`) in one write, or none of them.
+//
+// The BFF does everything that builds a document here (decision 0065, H3): it sniffs and converts the file,
+// asks the backend which content type documents are made on (`templates.newTemplateType`, whose `asOf` dates
+// the sample sets: the BFF reads no clock), fits the draft to it and prepares it. The backend only stores.
 
 export interface ImportFile {
   /** The client's file name: display text only, never a path. */
   name: string;
   bytes: Uint8Array;
-}
-
-export interface ImportOptions {
-  /** Where upload folders go. Default ./data/uploads. */
-  uploadsRoot?: string;
 }
 
 const refuseFile = (name: ImportRefusalName): ImportResponse =>
@@ -87,31 +75,34 @@ export function importStatus(response: ImportResponse): number {
   );
 }
 
+/** A refusal as the import answers it: its code and sentence, and nothing of the read's status. */
+const refused = ({ code, reason }: { code: RefusalCode; reason: string }) =>
+  refuse({ code, reason });
+
 /**
- * The permission half of an import, on its own so the route can ask it before reading the body. The
- * team is looked up only to check the permission on it; an unknown team fails the same way.
+ * The permission half of an import, on its own so the route can ask it before reading the body. The URL's team
+ * is resolved to its id once (`identity.space`), then the backend says whether the viewer may create on it. A
+ * team that isn't there, one the viewer may not enter, and All teams fail the same way (403).
  */
 export async function importPermission(
-  viewer: Viewer,
+  ctx: RequestContext,
   teamSlug: string,
-): Promise<{ ok: true; team: typeof teams.$inferSelect } | Refused> {
-  const team = teamSlug
-    ? await db.query.teams.findFirst({ where: eq(teams.slug, teamSlug) })
-    : undefined;
-  const allowed = can(viewer, "template.create", { teamId: team?.id ?? null });
-  if (!allowed.ok) return allowed;
-  if (!team) return refuse(REASONS.generic);
-  return { ok: true, team };
+): Promise<{ ok: true; teamId: string; teamSlug: string } | Refused> {
+  const space = await services().identity.space(ctx, { slug: teamSlug });
+  if (!space.ok) return refused(space);
+  const { teamId } = space.space;
+  if (teamId === null) return refuse(REQUEST_REFUSALS.teamGone);
+  const allowed = await services().templates.createPermission(ctx, { teamId });
+  return allowed.ok ? { ok: true, teamId, teamSlug } : refused(allowed);
 }
 
 export async function importTemplate(
-  viewer: Viewer,
+  ctx: RequestContext,
   input: { teamSlug: string; file: ImportFile | null },
-  options: ImportOptions = {},
 ): Promise<ImportResponse> {
-  const permitted = await importPermission(viewer, input.teamSlug);
+  const permitted = await importPermission(ctx, input.teamSlug);
   if (!permitted.ok) return permitted;
-  const { team } = permitted;
+  const { teamId, teamSlug } = permitted;
 
   const file = input.file;
   if (!file) return refuseFile("unreadable");
@@ -126,99 +117,53 @@ export async function importTemplate(
 
   // Import makes documents (`importUnavailable`): a file's text becomes the body. No content type makes
   // them: refused, as New template refuses it.
-  const chosen = await newTemplateType("document");
-  if (!chosen.ok) return chosen;
-  const { contentType } = chosen;
+  const type = await services().templates.newTemplateType(ctx, {
+    teamId,
+    family: "document",
+  });
+  if (!type.ok) return refused(type);
   const finished = finishImport({
     file: converted.file,
     filename: file.name,
     size: file.bytes.byteLength,
-    requiredSections: contentType.requiredSections,
+    requiredSections: type.requiredSections,
   });
-  // A document the check refuses is never stored (it couldn't be rendered): nothing is written.
-  const body = prepareBody(finished.body);
-  if (!body.ok) return refuse(IMPORT_REFUSALS.content(body.message));
-
-  const at = await now();
-  const templateId = await freshTemplateId();
-  const versionId = newId("v");
-  const uploadId = newId("up");
-  const created = createDraft({
+  const starter = conformToContentType(
+    {
+      key: "import",
+      name: finished.name,
+      body: finished.body,
+      variables: finished.variables,
+      // The sample sets are dated from the backend's instant, as a new template's are.
+      sampleSets: defaultSampleSets(finished.variables, type.asOf.slice(0, 10)),
+    },
+    type,
     // finishImport fitted the required sections already; the channels still follow the content type.
-    starter: conformToContentType(
-      {
-        key: "import",
-        name: finished.name,
-        body: body.doc,
-        variables: finished.variables,
-        sampleSets: defaultSampleSets(
-          finished.variables,
-          at.toISOString().slice(0, 10),
-        ),
-      },
-      contentType,
-      { sectionsFitted: true },
-    ),
-    createdBy: viewer.userId,
-    now: at,
-  });
-  // An import isn't a starter: no starter key, and the audit event names the source file.
-  created.changes.template.starterKey = null;
-  created.effects = created.effects.map((effect) =>
-    effect.kind === "audit" && effect.action === "template.created"
-      ? {
-          ...effect,
-          details: {
-            name: finished.name,
-            source: `import:${kind}`,
-            filename: finished.report.filename,
-          },
-        }
-      : effect,
+    { sectionsFitted: true },
   );
+  // A document the check refuses is never stored (it couldn't be rendered): nothing is written.
+  const prepared = prepareDraftContent(
+    draftContentOf(starter, { imported: true }),
+  );
+  if (!prepared.ok) return refuse(IMPORT_REFUSALS.content(prepared.message));
 
-  const root = options.uploadsRoot ?? defaultUploadsRoot();
-  try {
-    const path = await writeUpload(
-      {
-        uploadId,
-        kind,
-        bytes: file.bytes,
-        compareHtml: converted.file.compareHtml,
-        report: finished.report,
-      },
-      root,
-    );
-    await inTransaction(db, async (tx) => {
-      await insertNewTemplate(tx, {
-        templateId,
-        teamId: team.id,
-        contentTypeId: contentType.id,
-        versionId,
-        created,
-        at,
-        actorId: viewer.userId,
-        importUploadId: uploadId,
-      });
-      await tx.insert(uploads).values({
-        id: uploadId,
-        templateId,
-        filename: finished.report.filename,
-        mime: IMPORT_MIME[kind],
-        size: file.bytes.byteLength,
-        path,
-        createdBy: viewer.userId,
-        createdAt: at,
-      });
-    });
-  } catch (error) {
-    await removeUpload(uploadId, root).catch(() => undefined);
-    throw error;
-  }
+  const created = await services().templates.createImported(ctx, {
+    teamId,
+    contentTypeId: type.contentTypeId,
+    draft: prepared.draft,
+    original: {
+      filename: finished.report.filename,
+      mime: IMPORT_MIME[kind],
+      bytes: file.bytes,
+    },
+    report: finished.report,
+    compareHtml: converted.file.compareHtml ?? null,
+  });
+  if (!created.ok) return refused(created);
 
   return {
     ok: true,
-    templateId,
-    href: `/${team.slug}/templates/${templateId}`,
+    templateId: created.templateId,
+    href: `/${teamSlug}/templates/${created.templateId}`,
   };
 }

@@ -1,5 +1,12 @@
 import type { SeedCtx } from "../context";
-import { callout, disclosure, inlineDoc, p, table, ul } from "../content";
+import {
+  callout,
+  disclosure,
+  inlineDoc,
+  p,
+  table,
+  ul,
+} from "@/server/documents/build";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 

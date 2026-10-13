@@ -1,8 +1,8 @@
-// The variable catalog and sample sets. A version's variable list is the consumer's API contract.
-// Sample values use the canonical string forms in src/editor/model/types.ts.
+// The variable catalog and sample sets the seed and the starters use. A version's variable list is the consumer's
+// API contract. Sample values use the canonical string forms in src/editor/model/types.ts. Pure: no database.
 
 import type { SampleSet, Variable, VariableType } from "@/domain/types";
-import { DAY } from "./time";
+import { DAY_MS as DAY } from "@/domain/dates";
 
 export type VarKey =
   | "first_name"

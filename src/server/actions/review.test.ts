@@ -44,7 +44,7 @@ import {
 import { getViewer } from "@/server/viewer";
 import { getReviewScreen } from "@/server/queries/review";
 import { addComment } from "./comments";
-import { startDraft, submitDraft } from "./templates";
+import { startDraft } from "./templates";
 import {
   approveVersion,
   cancelRevoke,
@@ -211,7 +211,7 @@ describe("the review loop (scenario 3)", () => {
     await sentBack();
     as("maya");
     expect(
-      await submitDraft({ templateId, rev: await draftRev(db, templateId) }),
+      await submitVersion({ templateId, rev: await draftRev(db, templateId) }),
     ).toEqual({ ok: true, number: 1, round: 2 });
     settle();
   }
@@ -426,11 +426,11 @@ describe("the review loop (scenario 3)", () => {
     ).toHaveLength(1);
   });
 
-  it("Maya resubmits as v1, round 2 (through the Phase 3 name, submitDraft): a send-back uses up no number", async () => {
+  it("Maya resubmits as v1, round 2 (through submitVersion): a send-back uses up no number", async () => {
     await sentBack();
     const at = as("maya");
     expect(
-      await submitDraft({ templateId, rev: await draftRev(db, templateId) }),
+      await submitVersion({ templateId, rev: await draftRev(db, templateId) }),
     ).toEqual({ ok: true, number: 1, round: 2 });
     expect((await version(templateId, 1, 2))?.state).toBe("in_review");
     expect(

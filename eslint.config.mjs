@@ -188,17 +188,13 @@ const ratchet = (files, rules) => (files.length > 0 ? [{ files, rules }] : []);
 const SEAM_NOT_YET = [
   "src/server/access-sweep.ts",
   "src/server/actions/access.ts",
-  "src/server/actions/comments.ts",
-  "src/server/actions/create-template.ts",
   "src/server/actions/kit.ts",
   "src/server/actions/persona.ts",
   "src/server/actions/platform.ts",
   "src/server/actions/review.ts",
-  "src/server/actions/templates.ts",
   "src/server/clock.ts",
   "src/server/drafts/apply-patch.ts",
   "src/server/drafts/save-draft.ts",
-  "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/activity.ts",
   "src/server/queries/audit.ts",
@@ -206,7 +202,6 @@ const SEAM_NOT_YET = [
   "src/server/queries/compare.ts",
   "src/server/queries/consumer-api.ts",
   "src/server/queries/copilot.ts",
-  "src/server/queries/import.ts",
   "src/server/queries/integration.ts",
   "src/server/queries/library.ts",
   "src/server/queries/palette.ts",
@@ -222,7 +217,6 @@ const SEAM_NOT_YET = [
   "src/server/render/log.ts",
   "src/server/render/render-template.ts",
   "src/server/sunset-sweep.ts",
-  "src/server/templates/create.ts",
   "src/server/version-rows.ts",
 ];
 
@@ -245,7 +239,6 @@ const CLOCK_NOT_YET = [
   "src/server/actions/persona.ts",
   "src/server/api/http.ts",
   "src/server/drafts/save-draft.ts",
-  "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/audit.ts",
   "src/server/queries/clock.ts",
@@ -263,21 +256,16 @@ const CLOCK_NOT_YET = [
 const DECIDES_NOT_YET = [
   "src/components/library/library-view.tsx",
   "src/server/actions/access.ts",
-  "src/server/actions/comments.ts",
-  "src/server/actions/create-template.ts",
   "src/server/actions/kit.ts",
   "src/server/actions/persona.ts",
   "src/server/actions/platform.ts",
   "src/server/actions/review.ts",
-  "src/server/actions/templates.ts",
   "src/server/drafts/apply-patch.ts",
-  "src/server/import/create.ts",
   "src/server/queries/access.ts",
   "src/server/queries/audit.ts",
   "src/server/queries/base-version.ts",
   "src/server/queries/compare.ts",
   "src/server/queries/copilot.ts",
-  "src/server/queries/import.ts",
   "src/server/queries/integration.ts",
   "src/server/queries/palette.ts",
   "src/server/queries/platform.ts",
@@ -289,15 +277,7 @@ const DECIDES_NOT_YET = [
   "src/server/queries/workspace.ts",
   "src/server/render/render-template.ts",
 ];
-const INTERNALS_NOT_YET = [
-  "src/server/actions/demo.ts",
-  "src/server/starters/alerts.ts",
-  "src/server/starters/blank.ts",
-  "src/server/starters/card-offer-terms.ts",
-  "src/server/starters/fee-schedule.ts",
-  "src/server/starters/index.ts",
-  "src/server/starters/rate-change-notice.ts",
-];
+const INTERNALS_NOT_YET = ["src/server/actions/demo.ts"];
 
 // The editor's public modules: the table under "Public API" in src/editor/README.md. Code outside src/editor
 // imports these and nothing else, so the editor can change what is behind them. A module is public when the

@@ -1,8 +1,16 @@
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { ContractChange } from "@/domain/types";
 import type { SeedCtx } from "../context";
-import { callout, disclosure, hr, inlineDoc, p, table, ul } from "../content";
-import type { VarKey } from "../variables";
+import {
+  callout,
+  disclosure,
+  hr,
+  inlineDoc,
+  p,
+  table,
+  ul,
+} from "@/server/documents/build";
+import type { VarKey } from "@/server/documents/variables";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 

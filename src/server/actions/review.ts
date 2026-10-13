@@ -51,7 +51,7 @@ import {
   type FoundVersion,
 } from "@/server/version-rows";
 import type { Changed } from "@/server/services/types";
-import { draftRow } from "@/server/templates/create";
+import { draftRow } from "@/server/services/local/draft-row";
 import { check, refuse, serverAction, type CommitContext } from "./kit";
 
 // The review lifecycle: submit, request changes, approve, sunset, and the two-person revoke. A version is

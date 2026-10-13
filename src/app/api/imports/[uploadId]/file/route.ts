@@ -1,9 +1,7 @@
 import type { NextRequest } from "next/server";
-import { IMPORT_MIME } from "@/domain/import-types";
-import { REQUEST_REFUSALS } from "@/domain/refusals";
-import { readResponse, refusal, signedOutResponse } from "@/server/api/reads";
-import { getImportOriginalFile } from "@/server/queries/import";
+import { readResponse, signedOutResponse } from "@/server/api/reads";
 import { requestContextOrRefusal } from "@/server/context/request";
+import { services } from "@/server/services";
 
 // An imported template's original, exactly as uploaded (the Original tab draws a PDF from it).
 // 404 (`{ ok: false, code, reason }`, like every other refusal) when the upload doesn't exist or the
@@ -15,18 +13,18 @@ export async function GET(
 ) {
   const context = await requestContextOrRefusal();
   if (!context.ok) return signedOutResponse();
-  const { viewer } = context.context;
   const { uploadId } = await params;
-  const found = await getImportOriginalFile(viewer, uploadId);
-  if (!found)
-    return readResponse(refusal(404, REQUEST_REFUSALS.uploadUnavailable));
+  const found = await services().templates.importOriginal(context.context, {
+    uploadId,
+  });
+  if (!found.ok) return readResponse(found);
 
   return new Response(found.bytes.slice().buffer, {
     status: 200,
     headers: {
-      "Content-Type": IMPORT_MIME[found.ref.kind],
+      "Content-Type": found.mime,
       "Content-Length": String(found.bytes.byteLength),
-      "Content-Disposition": `inline; filename*=UTF-8''${encodeRfc5987(found.ref.filename)}`,
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeRfc5987(found.filename)}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },

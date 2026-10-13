@@ -1,16 +1,26 @@
 // Review comments: threads anchored to a block (or a channel field, or the whole version), their replies,
 // and resolving and reopening them (`src/domain/comments.ts` decides who may).
 //
-// Typed for step 2b: they still run in src/server/actions/comments.ts and src/server/queries/threads.ts.
+// The four commands run behind the seam; `threads` still runs in src/server/queries/threads.ts until its package
+// moves it (plan.md).
 
 import type {
   ActionResult,
+  Changed,
   ReadResult,
   RequestContext,
   Unsettled,
 } from "./types";
 
 export interface CommentService {
+  /**
+   * Starts a thread on one block of a draft or a version in review (or on a channel field, or the whole version:
+   * `DOCUMENT_THREAD`), with its first comment, both dated by the backend's clock. The thread belongs to the
+   * template, so drafts made from this version show it too; the version's author is told, unless they wrote it.
+   * Refuses, in order: the permission (`generic`; a version that isn't the template's is refused the same),
+   * `comments_closed` (only a draft and a version in review take comments), `comment_empty`, `comment_too_long`,
+   * `block_gone` (a version in review takes only the anchors it has).
+   */
   add(
     ctx: RequestContext,
     input: {
@@ -22,20 +32,31 @@ export interface CommentService {
     },
   ): Promise<ActionResult<{ threadId: string }>>;
 
+  /**
+   * One more comment in a thread, open or resolved (a reply doesn't reopen it). Everyone who has written in the
+   * thread, and the author of the version it began on, is told, never the one replying. Refuses, in order: the
+   * permission (`generic`; an unknown thread is refused the same), `comments_closed` (no version of the template
+   * takes comments where the thread shows), `comment_empty`, `comment_too_long`.
+   */
   reply(
     ctx: RequestContext,
     input: { threadId: string; body: string },
   ): Promise<ActionResult>;
 
+  /**
+   * Resolves an open thread. A compare-and-set on its status: a second click, or a second person, finds it resolved
+   * and writes nothing (`changed` is false), which is still ok. Refuses as `reply` does, without the text rules.
+   */
   resolve(
     ctx: RequestContext,
     input: { threadId: string },
-  ): Promise<ActionResult>;
+  ): Promise<ActionResult<Changed>>;
 
+  /** Reopens a resolved thread; compare-and-set, refusals and `changed` as `resolve`. */
   reopen(
     ctx: RequestContext,
     input: { threadId: string },
-  ): Promise<ActionResult>;
+  ): Promise<ActionResult<Changed>>;
 
   /** The template's threads, or one version's. */
   threads(

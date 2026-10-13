@@ -3,7 +3,7 @@ import type { PushPlatform } from "@/domain/messages/push";
 import type { RenderErrorCode } from "@/domain/render/types";
 import { DAY, HOUR, type SeedCtx, type VersionRef } from "./context";
 import type { ConsumerId } from "./platform";
-import { int, type Rng } from "./rng";
+import { int, type Rng } from "@/server/documents/rng";
 
 // About 90 days of synthetic render history. It records WHO rendered WHAT and WHEN, never any
 // variable values or customer data (the render log has no column for them).

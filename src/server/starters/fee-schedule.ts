@@ -1,6 +1,6 @@
 import type { JSONContent, Variable } from "@/domain/types";
-import { callout, disclosure, p, table, ul } from "../seed/content";
-import type { VariableKit } from "../seed/variables";
+import { callout, disclosure, p, table, ul } from "@/server/documents/build";
+import type { VariableKit } from "@/server/documents/variables";
 
 // Fee schedule: a checking account's fees as a table, with the ways to avoid the monthly fee.
 // Every declared variable is used.

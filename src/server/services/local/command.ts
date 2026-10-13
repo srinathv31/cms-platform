@@ -2,7 +2,7 @@ import "server-only";
 import type { ActionResult } from "@/domain/review-types";
 import { db } from "@/server/db/client";
 import { inTransaction, type Tx } from "./transaction";
-import type { Clock, TestHooks } from "../options";
+import type { Clock, IdSource, TestHooks } from "../options";
 import { answerFor, refuse } from "../refuse";
 import type { RequestContext } from "../types";
 
@@ -28,7 +28,10 @@ export { check, permit, refuse, RefusalError } from "../refuse";
 /** What every local area is built with (`localServices`). */
 export interface LocalDeps {
   clock: Clock;
+  ids: IdSource;
   hooks: TestHooks;
+  /** Where an import's files go (a test's own folder); the configured uploads folder when absent. */
+  uploadsRoot?: string;
 }
 
 /** What a command's steps see: the request and its input. */

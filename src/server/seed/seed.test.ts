@@ -35,7 +35,7 @@ import { asShown } from "@/server/testing/notifications";
 import { trySubmit } from "@/server/testing/submit-check";
 import { createContext } from "./context";
 import { seedDatabase, type SeedResult } from "./index";
-import { mulberry32 } from "./rng";
+import { mulberry32 } from "@/server/documents/rng";
 import { buildTemplate } from "./templates/build";
 import { seedCoralTemplates } from "./templates/coral";
 import type { SeedTemplate } from "./templates/types";

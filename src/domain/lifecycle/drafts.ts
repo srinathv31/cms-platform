@@ -2,12 +2,15 @@
 //
 //   newTemplateContentType  the content type a new Document or Alert is made on, for life
 //   createDraft    — → Draft (a new template from a starter)
+//   createTemplateFrom  — → Draft (a new template from the draft the BFF prepared: a starter, or an import)
+//   newTemplateRefusal  why a new template can't be made on a content type with these channels
 //   editLatest     the latest version, Active or Revoked → a new Draft copied from it ("Based on v3")
 //
 // The name is a version field, like the body: a new draft copies it, the author renames the draft, and
 // it freezes at submit.
 
-import { refuse, type Refusal } from "../refusals";
+import type { ImportKind } from "../import-report";
+import { REQUEST_REFUSALS, refuse, type Refusal } from "../refusals";
 import { compareRounds, type RoundRow } from "../rounds";
 import {
   contentTypeFamily,
@@ -18,6 +21,7 @@ import {
 import { REFUSALS } from "./refusals";
 import {
   LifecycleError,
+  type DraftContent,
   type LifecycleResult,
   type StarterContent,
   type VersionSnapshot,
@@ -130,27 +134,51 @@ export function createDraft(input: {
   now: Date;
 }): LifecycleResult<NewTemplateChanges> {
   const { starter, createdBy, now } = input;
-  const name = initialTemplateName(starter);
-  const isBlank = starter.key === BLANK_STARTER_KEY;
+  return createTemplateFrom({
+    draft: {
+      name: initialTemplateName(starter),
+      body: starter.body,
+      channelFields: starter.channelFields ?? {},
+      channels: [...(starter.channels ?? DEFAULT_CHANNELS.document)],
+      variables: [...starter.variables],
+      sampleSets: [...starter.sampleSets],
+      starterKey: starter.key === BLANK_STARTER_KEY ? null : starter.key,
+    },
+    createdBy,
+    now,
+  });
+}
+
+/**
+ * A new template and its first draft, from the draft the BFF built and prepared (`DraftContent`): New template
+ * (a starter, or Blank with no key) or Import (`imported` names the file's kind and name, for the audit row).
+ * What both backends call, so a template made on either is the same.
+ */
+export function createTemplateFrom(input: {
+  draft: DraftContent;
+  createdBy: string;
+  now: Date;
+  imported?: { kind: ImportKind; filename: string };
+}): LifecycleResult<NewTemplateChanges> {
+  const { draft, createdBy, now, imported } = input;
+  const source = imported
+    ? { source: `import:${imported.kind}`, filename: imported.filename }
+    : { source: draft.starterKey ? `starter:${draft.starterKey}` : "blank" };
 
   return {
     changes: {
-      template: {
-        starterKey: isBlank ? null : starter.key,
-        createdBy,
-        createdAt: now,
-      },
+      template: { starterKey: draft.starterKey, createdBy, createdAt: now },
       draft: {
         state: "draft",
         number: null,
         round: null,
         basedOnVersionId: null,
-        name,
-        body: clone(starter.body),
-        channelFields: clone(starter.channelFields ?? {}),
-        channels: [...(starter.channels ?? DEFAULT_CHANNELS.document)],
-        variables: clone([...starter.variables]),
-        sampleSets: clone([...starter.sampleSets]),
+        name: draft.name,
+        body: clone(draft.body),
+        channelFields: clone(draft.channelFields),
+        channels: [...draft.channels],
+        variables: clone([...draft.variables]),
+        sampleSets: clone([...draft.sampleSets]),
         contractChanges: null,
         currentStage: 0,
         rev: 0,
@@ -164,10 +192,23 @@ export function createDraft(input: {
       {
         kind: "audit",
         action: "template.created",
-        details: { name, source: isBlank ? "blank" : `starter:${starter.key}` },
+        details: { name: draft.name, ...source },
       },
     ],
   };
+}
+
+/**
+ * Why a new template can't be made on this content type with these channels, or null: the content type has to
+ * exist (`content_type_gone`), and the draft's channels have to be ones it allows (`draftChannelsRefusal`: the BFF
+ * fitted them when it built the draft, but Platform settings may have changed since). Both backends ask it.
+ */
+export function newTemplateRefusal(
+  contentType: { allowedChannels: readonly Channel[] } | undefined,
+  channels: readonly Channel[],
+): Refusal | null {
+  if (!contentType) return REQUEST_REFUSALS.contentTypeGone;
+  return draftChannelsRefusal(channels, contentType.allowedChannels);
 }
 
 // ── Editing a template ─────────────────────────────────────

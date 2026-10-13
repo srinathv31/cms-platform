@@ -17,8 +17,8 @@ import { POST } from "./route";
 
 // The route is thin: the viewer, the permission check, the import and Next's cookie and cache calls
 // are mocked; these tests check the order (permission before the body), the capped body read, the
-// form parsing, the HTTP mapping and the one-shot cookies. The import itself is tested against a real
-// database in src/server/import/create.test.ts.
+// form parsing, the HTTP mapping and the one-shot cookies. The import itself is tested against the fake
+// backend in src/server/import/create.test.ts, and against the local one in services/local/templates.test.ts.
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("@/server/import/create", async (original) => ({
   ...(await original<typeof import("@/server/import/create")>()),
@@ -81,12 +81,11 @@ const answerWith = (response: ImportResponse) =>
 beforeEach(() => {
   vi.mocked(getViewer).mockReset().mockResolvedValue(viewer);
   vi.mocked(importTemplate).mockReset();
-  vi.mocked(importPermission)
-    .mockReset()
-    .mockResolvedValue({
-      ok: true,
-      team: { id: "t_coral", slug: "coral-offers" } as never,
-    });
+  vi.mocked(importPermission).mockReset().mockResolvedValue({
+    ok: true,
+    teamId: "t_coral",
+    teamSlug: "coral-offers",
+  });
   jar.set.mockReset();
   vi.mocked(cookies).mockClear();
   vi.mocked(revalidatePath).mockReset();
@@ -111,8 +110,8 @@ describe("POST /api/imports", () => {
       href: "/coral-offers/templates/UC-4F7K2Q",
     });
 
-    const [who, input] = vi.mocked(importTemplate).mock.calls[0]!;
-    expect(who).toBe(viewer);
+    const [ctx, input] = vi.mocked(importTemplate).mock.calls[0]!;
+    expect(ctx.viewer).toBe(viewer);
     expect(input.teamSlug).toBe("coral-offers");
     expect(input.file?.name).toBe("notes.txt");
     expect(new TextDecoder().decode(input.file?.bytes)).toBe("hello");
@@ -184,7 +183,10 @@ describe("POST /api/imports", () => {
     vi.mocked(importPermission).mockResolvedValue(refuse(REASONS.generic));
     const res = await post(formWith(null), {}, null);
     expect(res.status).toBe(403);
-    expect(vi.mocked(importPermission).mock.calls[0]).toEqual([viewer, ""]);
+    expect(vi.mocked(importPermission).mock.calls[0]).toEqual([
+      expect.objectContaining({ viewer }),
+      "",
+    ]);
   });
 
   it("a missing file is passed on as null (the import answers unreadable)", async () => {
@@ -211,6 +213,19 @@ describe("POST /api/imports", () => {
     });
     expect(request.bodyUsed).toBe(false);
     expect(pulled.mb).toBeLessThanOrEqual(1); // at most what the stream queued up front
+    expect(importTemplate).not.toHaveBeenCalled();
+  });
+
+  it("401 when nobody is signed in, before anything else", async () => {
+    vi.mocked(getViewer).mockResolvedValue(null);
+    const res = await post(formWith(new File(["x"], "x.txt")));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: "signed_out",
+      reason: "Sign in to continue.",
+    });
+    expect(importPermission).not.toHaveBeenCalled();
     expect(importTemplate).not.toHaveBeenCalled();
   });
 

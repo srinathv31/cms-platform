@@ -7,6 +7,7 @@
 // `uploads` table and `versions.import_upload_id` already exist (0000_init). If something here is
 // wrong, make the smallest additive change and say so first in your report.
 
+import type { ImportDrop, ImportKind, ImportReport } from "./import-report";
 import { refusal, type Refused } from "./refusals";
 import type {
   Channel,
@@ -19,7 +20,16 @@ import type {
 
 // ── Files ────────────────────────────────────────────────────────────────────
 
-export type ImportKind = "docx" | "pdf" | "txt";
+// The report's facts (what a file held, and what the import did with it) are in ./import-report.ts, which the
+// service interfaces import; this file also holds the worded view models they may not.
+export type {
+  DetectedPlaceholder,
+  ImportDrop,
+  ImportKind,
+  ImportReport,
+  SectionFit,
+  SkippedPlaceholder,
+} from "./import-report";
 
 export const IMPORT_LIMITS = {
   /** Upload size, checked before anything is parsed (413). */
@@ -136,22 +146,6 @@ export const ORIGINAL_BASENAME = "original";
 // Required: a new template has no consumers, so nothing is breaking yet (the editor's paste makes
 // optional ones only because it lands in live templates).
 
-export interface DetectedPlaceholder {
-  key: string;
-  label: string;
-  /** The distinct spellings found, as written: "{{First Name}}", "{{first_name}}". */
-  raw: string[];
-  /** Chips made for this key. */
-  count: number;
-}
-
-export interface SkippedPlaceholder {
-  /** As written, e.g. "{{#if member}}". */
-  raw: string;
-  reason: "logic" | "invalid";
-  count: number;
-}
-
 // ── Required sections ────────────────────────────────────────────────────────
 //
 // The content type's sections are found by text, in order: a top-level heading (any level), or a
@@ -167,47 +161,7 @@ export interface SkippedPlaceholder {
 // Otherwise the name is the file name without its extension, with _ and - as spaces, first letter
 // capitalized, at most 120 characters.
 
-export interface SectionFit {
-  matched: {
-    key: string;
-    title: string;
-    /** The text it matched, as written. */ from: string;
-  }[];
-  added: { key: string; title: string }[];
-}
-
-// ── The import report: what came across and what didn't ──────────────────────
-
-export type ImportDrop =
-  | { kind: "images"; count: number }
-  | { kind: "comments"; count: number }
-  | { kind: "footnotes"; count: number }
-  | { kind: "headers_footers" }
-  /** docx: Word styles we don't map (mammoth's "Unrecognised paragraph style" warnings), by name. */
-  | { kind: "styles"; names: string[] }
-  /** pdf: text only; tables, columns and images arrive as plain paragraphs or not at all. */
-  | { kind: "pdf_layout" }
-  /** pdf: lines repeated at the top or bottom of most pages (running headers, page numbers). */
-  | { kind: "repeated_lines"; count: number };
-
-export interface ImportReport {
-  kind: ImportKind;
-  filename: string;
-  size: number;
-  /** pdf only. */
-  pages?: number;
-  nameFrom: "title" | "filename";
-  placeholders: DetectedPlaceholder[];
-  skippedPlaceholders: SkippedPlaceholder[];
-  sections: SectionFit;
-  counts: {
-    headings: number;
-    paragraphs: number;
-    lists: number;
-    tables: number;
-  };
-  dropped: ImportDrop[];
-}
+// ── The import report, in words (its facts are in ./import-report.ts) ────────
 
 /**
  * The report as short lines for the Original view (src/domain/import.ts: `describeImport`). Calm,

@@ -1,6 +1,5 @@
 import type { NextRequest } from "next/server";
-import { REQUEST_REFUSALS } from "@/domain/refusals";
-import { readResponse, refusal, signedOutResponse } from "@/server/api/reads";
+import { readResponse, signedOutResponse } from "@/server/api/reads";
 import { getImportOriginalView } from "@/server/queries/import";
 import { requestContextOrRefusal } from "@/server/context/request";
 
@@ -14,12 +13,10 @@ export async function GET(
 ) {
   const context = await requestContextOrRefusal();
   if (!context.ok) return signedOutResponse();
-  const { viewer } = context.context;
   const { uploadId } = await params;
-  const view = await getImportOriginalView(viewer, uploadId);
-  if (!view)
-    return readResponse(refusal(404, REQUEST_REFUSALS.uploadUnavailable));
-  return Response.json(view, {
+  const found = await getImportOriginalView(context.context, uploadId);
+  if (!found.ok) return readResponse(found);
+  return Response.json(found.view, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

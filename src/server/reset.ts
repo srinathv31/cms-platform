@@ -7,7 +7,7 @@ import type { ActionResult } from "@/domain/review-types";
 import { DATABASE_URL, db, libsql } from "./db/client";
 import { settings } from "./db/schema/ucomp";
 import { CLOCK_OFFSET_KEY } from "./clock";
-import { defaultUploadsRoot } from "./import/store";
+import { defaultUploadsRoot } from "./services/local/uploads";
 import { SEED_VERSION, seedDatabase } from "./seed";
 
 // Relative to the project root, which is the working directory for `next dev`, `next start`
