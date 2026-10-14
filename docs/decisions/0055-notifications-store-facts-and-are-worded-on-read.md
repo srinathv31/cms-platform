@@ -1,6 +1,15 @@
 # 0055. Notifications store facts and a link, and are worded when read
 
 Status: Accepted
+Amended 2026-10-13: built in lane F's step 2b-0b. `describeNotification(kind, facts, readerId)` is in
+`src/domain/notifications.ts` (with the kinds, beside the plain sentence a row with incomplete facts falls back
+to; `notificationFallback` and its hrefs went), and takes the reader: a notification about a member reads "Your
+access…" to them and "Devon Lin's access…" to a Team Admin. A lifecycle link is stored placed for its recipient,
+with the team's id (`PlacedNotificationLink`); the BFF builds the href with the slugs of the viewer's spaces, and a
+team they can't enter links to `/`. Worded second lines ("Next: Legal.") are facts too, so `body` is only a person's
+words. The migration rebuilt the table without `title` and `href` (the demo reseeds). The notification service
+(`list`, `markRead`, `markAllRead`) is behind the seam. A recertification's quarter label is worded from its deadline
+in a notification. The facts per kind are in [the data model](../reference/data-model.md#notification-kinds).
 Date: 2026-10-12
 
 ## Context
@@ -8,7 +17,7 @@ Date: 2026-10-12
 About two dozen builders in twelve domain modules word a notification's title when the event happens
 (`src/domain/lifecycle/submit.ts`, `approve.ts`, `revoke.ts`, `sunset.ts`, `src/domain/comments.ts`,
 `src/domain/access/members.ts`, `requests.ts`, `recertification.ts`, `sweep.ts`, among them), and `writeEffects`
-(`src/server/effects.ts`) stores that sentence with an href built from Next.js routes:
+(`src/server/services/local/effects.ts` now) stores that sentence with an href built from Next.js routes:
 
 ```json
 {

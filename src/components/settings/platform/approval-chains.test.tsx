@@ -2,12 +2,12 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ApproverFacts } from "@/domain/access-types";
 import type {
   ApprovalChainsSection,
   ApprovalChainView,
-  ApproverFacts,
   ChainStageView,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import { PLATFORM_REFUSALS } from "@/domain/platform-config/refusals";
 import type { ApproverRule } from "@/domain/types";
 

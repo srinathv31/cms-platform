@@ -3,7 +3,6 @@ import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { cn } from "@/lib/utils";
 import { WS } from "@/components/workspace/workspace-grid";
 import { formatAgo, formatStamp } from "@/domain/dates";
-import { now } from "@/server/clock";
 import { getActivity } from "@/server/queries/activity";
 import type { ActivityItem } from "@/server/queries/activity";
 import { Stamp } from "./stamp";
@@ -39,8 +38,9 @@ function Sentence({ item }: { item: ActivityItem }) {
 
 /**
  * The Activity tab: the template's audit trail as sentences, newest first, grouped by day under quiet
- * labels. Each row: who, what happened, the version, and when (relative on the demo clock; the
- * absolute time, in UTC, on hover or focus). Days are UTC days, like every absolute date on these tabs.
+ * labels. Each row: who, what happened, the version, and when (relative to the instant the backend read
+ * the events at, its demo clock; the absolute time, in UTC, on hover or focus). Days are UTC days, like
+ * every absolute date on these tabs.
  * Reads inside the page's <Stream>.
  */
 export async function ActivityContent({
@@ -49,9 +49,10 @@ export async function ActivityContent({
   params: Promise<{ team: string; templateId: string }>;
 }) {
   const { team, templateId } = await params;
-  const items = await getActivity(team, templateId);
-  const nowDate = await now();
-  const groups = dayGroups(items, nowDate);
+  const activity = await getActivity(team, templateId);
+  // How long ago, from the instant the backend read the events at: the BFF reads no clock.
+  const nowDate = new Date(activity.now);
+  const groups = dayGroups(activity.items, nowDate);
 
   return (
     <section

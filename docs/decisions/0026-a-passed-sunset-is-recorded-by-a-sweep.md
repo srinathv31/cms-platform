@@ -21,7 +21,7 @@ instant a sunset passes: the render rule reads the clock when a consumer asks.
   change's count of pending sunsets and the sweep all call it.
 - **A sweep records it.** `sweepSunsets` (domain) finds each version whose sunset has passed and has no
   `version.sunset_passed` audit row yet, and returns that row. `runSunsetSweep()`
-  ([src/server/sunset-sweep.ts](../../src/server/sunset-sweep.ts)) writes them in one transaction. Running it twice
+  ([src/server/services/local/sweeps.ts](../../src/server/services/local/sweeps.ts) now) writes them in one transaction. Running it twice
   writes nothing the second time.
 - **What the row says.** The actor is the system (null), as for the access sweep. The row is dated at the
   sunset, however late the sweep runs, as the access sweep backdates its lapses. Its details are typed

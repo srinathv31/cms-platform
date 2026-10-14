@@ -2,11 +2,11 @@
 
 import { ROLE_LABEL } from "@/domain/access/roles";
 import { validateDecisionNote } from "@/domain/access/requests";
+import { DECISION_NOTE_MAX } from "@/domain/access-types";
 import {
-  DECISION_NOTE_MAX,
   type AccessRequestRow,
   type AccessRequestsSection,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import { decideAccessRequest } from "@/server/actions/access";
 import { formatShortDate } from "@/domain/dates";
 import { firstName } from "./format";

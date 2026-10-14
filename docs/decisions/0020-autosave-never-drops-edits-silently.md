@@ -4,6 +4,11 @@ Status: Accepted
 Amended 2026-10-11: the refusals named in the second Context bullet (`conflict`, `forbidden`, `not_draft`, `not_found`)
 are now the codes `draft_changed`, `generic`, `version_not_draft` and `version_gone`, and the scheduler decides by code
 which refusals stop saving ([0041](0041-routes-refuse-in-the-actions-shape.md), A3).
+Amended 2026-10-13 (PR #79 review): every save carries `seq`, a count of its session's sends that rises with every
+send, retries included. A save behind the current rev from the session that wrote it lands only with a higher `seq`
+than that session's last save (`sessionOwnsRev`). Without it, a request the scheduler gave up on after 30 seconds and
+retried could land after its retry, as the session's own lost response, and silently put back the text the retry
+replaced. The backend records the `seq` with the session's last save (the version row's `last_save_seq` once ported).
 Date: 2026-10-09
 
 ## Context

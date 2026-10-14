@@ -1,13 +1,8 @@
 import "server-only";
 import { cache } from "react";
-import { desc, eq, sql } from "drizzle-orm";
-import {
-  AUDIT_PAGE_LIMIT,
-  type AuditCategory,
-  type AuditFilters,
-  type AuditPageData,
-  type AuditRow,
-} from "@/domain/access-types";
+import { notFound } from "next/navigation";
+import type { AuditFilters, AuditRow } from "@/domain/access-types";
+import type { AuditPageData } from "@/server/queries/access-models";
 import {
   SYSTEM_ACTOR,
   SYSTEM_INITIALS,
@@ -17,57 +12,42 @@ import {
   AUDIT_CATEGORIES,
   CATEGORY_LABEL,
   SYSTEM_PERSON,
-  actionKeyOf,
   actionLabel,
   actionOptions,
-  auditFacetCounts,
   auditQuery,
   categoryOf,
   datePresets,
   describeAuditEvent,
-  filterAuditRows,
   filterValues,
-  personKeysOf,
   subjectIdOf,
   toCsv,
   withFilterValues,
+  type AuditSearch,
 } from "@/domain/audit";
-import { ALL_SPACE, REASONS, can, isCrossTeam } from "@/domain/permissions";
-import { REQUEST_REFUSALS } from "@/domain/refusals";
+import { formatAgo, formatDateTime, utcDay } from "@/domain/dates";
 import type { Person } from "@/domain/review-types";
 import type { NumberedRound } from "@/domain/rounds";
-import type { VersionState, Viewer } from "@/domain/types";
-import { now } from "@/server/clock";
-import { db } from "@/server/db/client";
 import {
-  auditEvents,
-  teams,
-  templates,
-  versions,
-} from "@/server/db/schema/ucomp";
-import { refusal, type ReadRefusal } from "@/server/api/reads";
-import { formatAgo, formatDateTime, utcDay } from "@/domain/dates";
-import { getPeople, iso, personOf, type People } from "./review-shared";
-import { requireCan } from "./require-can";
-import { requireSpace } from "./spaces";
-import { currentName } from "./template-name";
+  requireRequestContext,
+  type RequestContext,
+} from "@/server/context/request";
+import { services } from "@/server/services";
+import type {
+  AuditEventFacts,
+  AuditExportFacts,
+  AuditPageFacts,
+  AuditTeamFacts,
+} from "@/server/services/audit";
+import type { ReadRefusal } from "@/server/services/results";
+import { peopleById, personOf, type People } from "@/domain/people";
+import { getShellFacts, requireSpace } from "./spaces";
 
-// The Audit page (/{team}/audit) and its CSV export (/{team}/audit/export), from one read.
-//
-// Scope: a team space shows that team's events to whoever holds `audit.view` there (its Team
-// Admins, the Auditor, the Platform Admin). "All teams" (Auditor, Platform Admin) shows every event,
-// platform-wide ones (team null) included, with a Team filter. Everything is read-only.
-//
-// The space's events are read once and filtered in memory: the menus need counts under every OTHER
-// filter, and an audit log of a prototype's size (hundreds to a few thousand rows) is cheap to scan.
-
-interface AuditScope {
-  slug: string;
-  isAll: boolean;
-  /** null: every team (the All teams space). */
-  teamId: string | null;
-  name: string;
-}
+// The Audit page (/{team}/audit) and its CSV export (/{team}/audit/export). The facts and the decisions come
+// from the audit service (`services().audit`, decision 0070): the events, the search narrowed to what the
+// space knows, and the counts and options the menus list under every other filter. The URL names a team by its
+// slug, so this resolves the `?team=` slugs to ids on the way in and back to slugs on the way out (decision
+// 0053); it words everything (a sentence for each event, its labels, "3 days ago", the menus' names, the CSV's
+// cells) and decides nothing. Everything is read-only.
 
 const SYSTEM_PERSON_VIEW: Person = {
   id: SYSTEM_PERSON,
@@ -86,7 +66,7 @@ const FILTER_KEYS = [
 ] as const satisfies readonly (keyof AuditFilters)[];
 
 /**
- * The Audit page's read model. 404 without `audit.view` in the space (a hidden page, not a refusal).
+ * The Audit page's read model. Not found without `audit.view` in the space (a hidden page, not a refusal).
  * Read once per request: the header's Export count and the table each pass their own filters object,
  * and React's `cache` keys an object by identity, so the read is cached on a string key instead.
  */
@@ -108,20 +88,18 @@ const auditPageFor = cache(
       if (values[i] !== null) filters[key] = values[i]!;
     });
     const space = await requireSpace(spaceSlug);
-    requireCan(space.viewer, "audit.view", {
-      teamId: space.teamId ?? ALL_SPACE,
+    const ctx = await requireRequestContext();
+    const shell = await getShellFacts();
+    const facts = await services().audit.page(ctx, {
+      teamId: space.teamId,
+      search: auditSearch(filters, shell.spaces),
     });
-    const { data } = await readAudit(
-      {
-        slug: space.slug,
-        isAll: space.isAll,
-        teamId: space.teamId,
-        name: space.name,
-      },
-      filters,
-      await now(),
-    );
-    return data;
+    if (!facts.ok) notFound();
+    return auditPageData(facts, {
+      slug: space.slug,
+      isAll: space.isAll,
+      name: space.name,
+    });
   },
 );
 
@@ -129,218 +107,173 @@ export type AuditExport =
   { ok: true; filename: string; csv: string; count: number } | ReadRefusal;
 
 /**
- * The CSV of every event the filters match (no page limit), for the export route. A route answers
- * with a refusal and its status instead of redirecting: unknown team → 404 `space_unavailable`; no
- * `audit.view` there → 403 `generic`.
+ * The CSV of every event the filters match (no page limit), for the export route. A route answers with a
+ * refusal and its status instead of redirecting: a team that isn't there, or isn't the viewer's to enter, is
+ * 404 `space_unavailable`; no `audit.view` there is 403 `generic`.
  */
 export async function getAuditExport(
-  viewer: Viewer,
+  ctx: RequestContext,
   spaceSlug: string,
   filters: AuditFilters,
 ): Promise<AuditExport> {
-  const scope = await auditScope(viewer, spaceSlug);
-  if (!scope.ok) return scope;
-  const nowDate = await now();
-  const { matching } = await readAudit(scope.scope, filters, nowDate);
-  return {
-    ok: true,
-    filename: `stencil-audit-${scope.scope.slug}-${utcDay(nowDate)}.csv`,
-    csv: toCsv(matching),
-    count: matching.length,
-  };
-}
-
-/** Who may read which space's audit, answered as a refusal with its status (for the export route). */
-export async function auditScope(
-  viewer: Viewer,
-  spaceSlug: string,
-): Promise<{ ok: true; scope: AuditScope } | ReadRefusal> {
-  const refused = refusal(403, REASONS.generic);
-  if (spaceSlug === ALL_SPACE) {
-    if (
-      !isCrossTeam(viewer) ||
-      !can(viewer, "audit.view", { teamId: ALL_SPACE }).ok
-    )
-      return refused;
-    return {
-      ok: true,
-      scope: { slug: ALL_SPACE, isAll: true, teamId: null, name: "All teams" },
-    };
-  }
-  const team = await db.query.teams.findFirst({
-    where: eq(teams.slug, spaceSlug),
+  const space = await services().identity.space(ctx, { slug: spaceSlug });
+  if (!space.ok) return space;
+  const shell = await services().identity.shell(ctx);
+  if (!shell.ok) return shell;
+  const facts = await services().audit.exportRows(ctx, {
+    teamId: space.space.teamId,
+    search: auditSearch(filters, shell.spaces),
   });
-  if (!team) return refusal(404, REQUEST_REFUSALS.spaceUnavailable);
-  if (!can(viewer, "audit.view", { teamId: team.id }).ok) return refused;
+  if (!facts.ok) return facts;
+  return auditExport(facts, space.space.slug);
+}
+
+/** The export's file from the service's facts. */
+export function auditExport(facts: AuditExportFacts, spaceSlug: string) {
+  const rows = auditRows(facts.events, facts);
   return {
-    ok: true,
-    scope: { slug: team.slug, isAll: false, teamId: team.id, name: team.name },
+    ok: true as const,
+    filename: `stencil-audit-${spaceSlug}-${utcDay(facts.asOf)}.csv`,
+    csv: toCsv(rows),
+    count: rows.length,
   };
 }
 
-// ── The read ─────────────────────────────────────────────────
+// ── Filters: the URL's slugs, the service's ids ───────────────
 
-async function readAudit(
-  space: AuditScope,
-  requested: AuditFilters,
-  nowDate: Date,
-): Promise<{ data: AuditPageData; matching: AuditRow[] }> {
-  const [events, people, teamRows] = await Promise.all([
-    loadEvents(space.teamId),
-    getPeople(),
-    db.select({ id: teams.id, slug: teams.slug, name: teams.name }).from(teams),
-  ]);
-  const teamsById = new Map(teamRows.map((t) => [t.id, t]));
-  const universe = events.map((e) => toRow(e, people, teamsById, nowDate));
+/** The URL's filters as the service takes them: the `?team=` slugs become team ids (a slug no team has is dropped). */
+export function auditSearch(
+  filters: AuditFilters,
+  spaces: readonly { teamId: string | null; slug: string }[],
+): AuditSearch {
+  const idOf = new Map(
+    spaces.flatMap((s): [string, string][] =>
+      s.teamId === null ? [] : [[s.slug, s.teamId]],
+    ),
+  );
+  return {
+    teamIds: filterValues(filters, "team").flatMap(
+      (slug) => idOf.get(slug) ?? [],
+    ),
+    personIds: filterValues(filters, "person"),
+    actions: filterValues(filters, "action"),
+    templateIds: filterValues(filters, "template"),
+    ...(filters.from ? { from: filters.from } : {}),
+    ...(filters.to ? { to: filters.to } : {}),
+  };
+}
 
-  // Pin a team space to itself, and keep only values the space knows: an unknown id in the URL
-  // would otherwise show a chip that matches nothing.
-  const filters = sanitize(requested, space, universe, teamRows);
-  const matching = filterAuditRows(universe, filters);
-  const counts = auditFacetCounts(universe, filters);
-  const today = utcDay(nowDate);
+/** The search the service applied, as the URL's filters: team ids back to slugs. */
+function auditFilters(
+  applied: AuditSearch,
+  slugOf: ReadonlyMap<string, string>,
+): AuditFilters {
+  let filters: AuditFilters = {};
+  filters = withFilterValues(
+    filters,
+    "team",
+    applied.teamIds.flatMap((id) => slugOf.get(id) ?? []),
+  );
+  filters = withFilterValues(filters, "person", applied.personIds);
+  filters = withFilterValues(filters, "action", applied.actions);
+  filters = withFilterValues(filters, "template", applied.templateIds);
+  if (applied.from) filters.from = applied.from;
+  if (applied.to) filters.to = applied.to;
+  return filters;
+}
 
-  const knownPeople = new Map<string, Person>();
-  const knownTemplates = new Map<
-    string,
-    { id: string; name: string; teamSlug: string }
-  >();
-  const knownActions = new Set<string>();
-  for (const [i, row] of universe.entries()) {
-    for (const key of personKeysOf(row)) {
-      if (!knownPeople.has(key))
-        knownPeople.set(
-          key,
-          key === SYSTEM_PERSON ? SYSTEM_PERSON_VIEW : personOf(people, key),
-        );
-    }
-    if (row.template && !knownTemplates.has(row.template.id)) {
-      // A row names its own version; the filter names the template once, as it is now.
-      const name = events[i]!.currentTemplateName ?? row.template.name;
-      knownTemplates.set(row.template.id, {
-        id: row.template.id,
-        name,
-        teamSlug: row.team?.slug ?? "",
-      });
-    }
-    knownActions.add(actionKeyOf(row));
-  }
+// ── The page and its rows ─────────────────────────────────────
 
-  const data: AuditPageData = {
-    space: { slug: space.slug, isAll: space.isAll, name: space.name },
-    rows: matching.slice(0, AUDIT_PAGE_LIMIT),
-    total: matching.length,
-    applied: filters,
+/** The Audit page from the service's facts. */
+export function auditPageData(
+  facts: AuditPageFacts,
+  space: AuditPageData["space"],
+): AuditPageData {
+  const people = peopleById(facts.people);
+  const teamsById = new Map(facts.teams.map((t) => [t.id, t]));
+  const slugOf = new Map(facts.teams.map((t) => [t.id, t.slug]));
+  const applied = auditFilters(facts.applied, slugOf);
+  const countOf = new Map(
+    facts.options.actions.map((a) => [a.action, a.count]),
+  );
+  const today = utcDay(facts.asOf);
+  const systemLast = (a: string, b: string) =>
+    Number(a === SYSTEM_PERSON) - Number(b === SYSTEM_PERSON);
+
+  return {
+    space,
+    rows: auditRows(facts.events, facts),
+    total: facts.total,
+    applied,
     options: {
-      teams: space.isAll
-        ? teamRows
-            .map((t) => ({
-              slug: t.slug,
-              name: t.name,
-              count: counts.team[t.slug] ?? 0,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        : [],
-      people: [...knownPeople.values()]
-        .map((p) => ({ ...p, count: counts.person[p.id] ?? 0 }))
+      teams: facts.options.teams
+        .flatMap((o) => {
+          const team = teamsById.get(o.id);
+          return team
+            ? [{ slug: team.slug, name: team.name, count: o.count }]
+            : [];
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      people: facts.options.people
+        .map((o) => ({
+          ...(o.id === SYSTEM_PERSON
+            ? SYSTEM_PERSON_VIEW
+            : personOf(people, o.id)),
+          count: o.count,
+        }))
         .sort((a, b) => systemLast(a.id, b.id) || a.name.localeCompare(b.name)),
       categories: AUDIT_CATEGORIES.map((c) => ({
         value: c,
         label: CATEGORY_LABEL[c],
-        count: counts.action[c] ?? 0,
+        count:
+          facts.options.categories.find((o) => o.category === c)?.count ?? 0,
       })),
       actions: actionOptions()
-        .filter(
-          (o) =>
-            knownActions.has(o.value) ||
-            filterValues(filters, "action").includes(o.value),
-        )
-        .map((o) => ({ ...o, count: counts.action[o.value] ?? 0 })),
-      templates: [...knownTemplates.values()]
-        .map((t) => ({ ...t, count: counts.template[t.id] ?? 0 }))
+        .filter((o) => countOf.has(o.value))
+        .map((o) => ({ ...o, count: countOf.get(o.value) ?? 0 })),
+      templates: facts.options.templates
+        .map((t) => ({
+          id: t.id,
+          name: t.name,
+          teamSlug: (t.teamId && slugOf.get(t.teamId)) || "",
+          count: t.count,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
       datePresets: datePresets(today),
     },
-    csvHref: `/${space.slug}/audit/export${auditQuery(filters)}`,
+    csvHref: `/${space.slug}/audit/export${auditQuery(applied)}`,
     today,
   };
-  return { data, matching };
 }
 
-interface EventRow {
-  id: string;
-  at: Date;
-  actorId: string | null;
-  teamId: string | null;
-  templateId: string | null;
-  /** The name of the event's version when it has one, else the template's current name. */
-  templateName: string | null;
-  /** The template's current name (`currentName`): the Template filter lists each template once by it. */
-  currentTemplateName: string | null;
-  action: string;
-  details: Record<string, unknown> | null;
-  /** The event's version row as it is now (left-joined: null when there is none). */
-  versionNumber: number | null;
-  versionRound: number | null;
-  versionState: VersionState | null;
-}
-
-/**
- * The space's events, newest first (same-moment rows: newest written first). An event about a version
- * names the template as that version had it, so the record (and its export) keeps the name the event
- * happened under; an event about the template alone (its creation) names it as the Library does now
- * (`currentName`).
- */
-async function loadEvents(teamId: string | null): Promise<EventRow[]> {
-  return db
-    .select({
-      id: auditEvents.id,
-      at: auditEvents.at,
-      actorId: auditEvents.actorId,
-      teamId: auditEvents.teamId,
-      templateId: auditEvents.templateId,
-      templateName: sql<
-        string | null
-      >`coalesce(${versions.name}, ${currentName(templates.id)})`,
-      currentTemplateName: currentName(templates.id),
-      action: auditEvents.action,
-      details: auditEvents.details,
-      versionNumber: versions.number,
-      versionRound: versions.round,
-      versionState: versions.state,
-    })
-    .from(auditEvents)
-    .leftJoin(versions, eq(versions.id, auditEvents.versionId))
-    .leftJoin(templates, eq(templates.id, auditEvents.templateId))
-    .where(teamId === null ? undefined : eq(auditEvents.teamId, teamId))
-    .orderBy(desc(auditEvents.at), desc(sql`${auditEvents}.rowid`));
+/** The events as rows, worded: a sentence for each, its labels, and its times counted from the read's `asOf`. */
+function auditRows(
+  events: readonly AuditEventFacts[],
+  facts: {
+    asOf: string;
+    teams: readonly AuditTeamFacts[];
+    people: readonly Person[];
+  },
+): AuditRow[] {
+  const people = peopleById(facts.people);
+  const teamsById = new Map(facts.teams.map((t) => [t.id, t]));
+  return events.map((e) => toRow(e, people, teamsById, facts.asOf));
 }
 
 function toRow(
-  e: EventRow,
+  e: AuditEventFacts,
   people: People,
-  teamsById: ReadonlyMap<string, { slug: string; name: string }>,
-  nowDate: Date,
+  teamsById: ReadonlyMap<string, AuditTeamFacts>,
+  asOf: string,
 ): AuditRow {
   const actor = e.actorId ? personOf(people, e.actorId) : null;
   const subjectId = subjectIdOf(e.action, e.details);
-  const team = e.teamId
-    ? (teamsById.get(e.teamId) ?? { slug: e.teamId, name: e.teamId })
-    : null;
-  const version: NumberedRound | null =
-    e.versionNumber !== null &&
-    e.versionRound !== null &&
-    e.versionState !== null
-      ? {
-          number: e.versionNumber,
-          round: e.versionRound,
-          state: e.versionState,
-        }
-      : null;
-  const category: AuditCategory = categoryOf(e.action);
+  // A team id names a team row (teams are never deleted); the row's slug and name, never the id, show.
+  const team = e.teamId ? (teamsById.get(e.teamId) ?? null) : null;
+  const version: NumberedRound | null = e.version;
   return {
     id: e.id,
-    at: iso(e.at),
+    at: e.at,
     actor,
     team: team ? { slug: team.slug, name: team.name } : null,
     template: e.templateId
@@ -349,52 +282,14 @@ function toRow(
     // The cell names the version as the event does: the round for a review event (`eventVersionLabel`).
     versionLabel: eventVersionLabel(e.action, version),
     action: e.action,
-    category,
+    category: categoryOf(e.action),
     actionLabel: actionLabel(e.action, actor !== null),
     summary: describeAuditEvent(
       { action: e.action, details: e.details, version },
       actor,
     ),
     subject: subjectId ? personOf(people, subjectId) : null,
-    when: formatDateTime(e.at, nowDate),
-    ago: formatAgo(e.at, nowDate, { capitalize: true }),
+    when: formatDateTime(e.at, asOf),
+    ago: formatAgo(e.at, asOf, { capitalize: true }),
   };
-}
-
-function sanitize(
-  requested: AuditFilters,
-  space: AuditScope,
-  universe: readonly AuditRow[],
-  teamRows: readonly { slug: string }[],
-): AuditFilters {
-  let f: AuditFilters = { ...requested };
-  if (space.isAll) {
-    const slugs = new Set(teamRows.map((t) => t.slug));
-    f = withFilterValues(
-      f,
-      "team",
-      filterValues(f, "team").filter((s) => slugs.has(s)),
-    );
-  } else {
-    delete f.team;
-  }
-  const people = new Set(universe.flatMap(personKeysOf));
-  const templateIds = new Set(
-    universe.flatMap((r) => (r.template ? [r.template.id] : [])),
-  );
-  f = withFilterValues(
-    f,
-    "person",
-    filterValues(f, "person").filter((p) => people.has(p)),
-  );
-  f = withFilterValues(
-    f,
-    "template",
-    filterValues(f, "template").filter((t) => templateIds.has(t)),
-  );
-  return f;
-}
-
-function systemLast(a: string, b: string): number {
-  return Number(a === SYSTEM_PERSON) - Number(b === SYSTEM_PERSON);
 }

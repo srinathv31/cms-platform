@@ -40,7 +40,7 @@ describe("requireSpace", () => {
     await expect(requireSpace("coral-offers")).resolves.toMatchObject({
       slug: "coral-offers",
       isAll: false,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       name: "Coral Offers",
     });
     await as("riley");
@@ -60,25 +60,49 @@ describe("requireSpace", () => {
     await expect(requireSpace("coral-offers")).rejects.toThrow(NOT_FOUND);
   });
 
-  // The persona switch stays on the page when `canSeeSpace` says the new persona sees it, so the two
-  // must agree, or the switch would land on a 404.
-  it("lets in exactly the people `canSeeSpace` says see the space", async () => {
-    const slugs = [
-      ALL_SPACE,
-      ...(await db.select({ slug: teams.slug }).from(teams)).map((t) => t.slug),
+  // The URL names a space by its slug; the checks below it ask `canSeeSpace` with the team's id. The two
+  // must agree, or a page would let in someone its own checks refuse.
+  it("lets in exactly the people `canSeeSpace` says see the space, by the team's id", async () => {
+    const spaces = [
+      { slug: ALL_SPACE, teamId: null },
+      ...(
+        await db.select({ slug: teams.slug, teamId: teams.id }).from(teams)
+      ).map((t) => ({ slug: t.slug, teamId: t.teamId as string | null })),
     ];
     for (const { id } of await db.select({ id: users.id }).from(users)) {
       const viewer = await as(id);
-      for (const slug of slugs) {
+      for (const { slug, teamId } of spaces) {
         const got = await requireSpace(slug).then(
-          () => true,
+          (space) => {
+            expect(space.teamId, `${slug}'s id`).toBe(teamId);
+            return true;
+          },
           (error: unknown) => {
             if (!NOT_FOUND.test(String((error as Error).message))) throw error;
             return false;
           },
         );
-        expect(got, `${id} in ${slug}`).toBe(canSeeSpace(viewer, slug));
+        expect(got, `${id} in ${slug}`).toBe(canSeeSpace(viewer, teamId));
       }
     }
+  });
+
+  it("says which settings groups the viewer may use there", async () => {
+    await as("alex");
+    await expect(requireSpace("coral-offers")).resolves.toMatchObject({
+      settings: { team: true, platform: false },
+    });
+    await as("maya");
+    await expect(requireSpace("coral-offers")).resolves.toMatchObject({
+      settings: { team: false, platform: false },
+    });
+    await as("riley");
+    await expect(requireSpace(ALL_SPACE)).resolves.toMatchObject({
+      settings: { team: false, platform: true },
+    });
+    await expect(requireSpace("deposits")).resolves.toMatchObject({
+      teamId: "t_deposits",
+      settings: { team: false, platform: true },
+    });
   });
 });

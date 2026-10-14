@@ -25,6 +25,155 @@ const noEditorBarrel = {
     "There is no @/editor barrel (it was removed: it loaded the React editor UI). Import the server-safe modules that define what you need: @/editor/schema, @/editor/model/*, @/editor/paste/*.",
 };
 
+// The backend seam's import rules (blocks under "The backend seam" below).
+const noDatabase = {
+  group: [
+    "drizzle-orm",
+    "drizzle-orm/*",
+    "@libsql/*",
+    "**/db/client",
+    "**/db/schema/*",
+  ],
+  allowTypeImports: true,
+  message:
+    "Only the local implementation (src/server/services/local) talks to the database. Reach data through services() (src/server/services/README.md).",
+};
+const noImplementations = {
+  group: [
+    "@/server/services/local",
+    "@/server/services/local/**",
+    "@/server/services/fake",
+    "@/server/services/fake/**",
+    "**/services/local",
+    "**/services/local/**",
+    "**/services/fake",
+    "**/services/fake/**",
+  ],
+  message:
+    "Reach the backend through services() (src/server/services/index.ts), never an implementation: with another backend configured, the local one isn't there.",
+};
+// What the domain's audit wording builds for the Audit page (`AuditRow`, worded) and reads from its URL
+// (`AuditFilters`, by team slug): view models, though they live in the domain beside the rules that build them.
+const noAuditViewModels = {
+  name: "@/domain/access-types",
+  importNames: ["AuditRow", "AuditFilters"],
+  message:
+    "The service interfaces carry facts: the Audit page's rows and URL filters are the BFF's (filters cross the seam by team id).",
+};
+const noViewModels = {
+  group: [
+    "@/server/queries/**",
+    "@/server/render/**",
+    "@/server/import/**",
+    "@/server/starters/**",
+    "@/server/api/**",
+    "@/components/**",
+    "@/domain/golive-types",
+    "@/domain/import-types",
+  ],
+  message:
+    "The service interfaces carry facts: not the BFF's view models (worded, with app URLs) or its modules. Declare a facts type beside the interface (decision 0072).",
+};
+// Who reads the clock (N1 in the seam's review): the backend does, and the request context never. A read that
+// decides by time answers the instant it decided at (`asOf`), and the BFF words its dates from it. The clock is
+// the local implementation's (services/local/clock.ts), so the implementations rule refuses it too; this one
+// says why.
+const noClock = {
+  group: ["@/server/services/local/clock", "**/services/local/clock"],
+  message:
+    "Only the backend reads the clock (the local implementation, /api/v1, the seed and the reset). A read that decides by time answers `asOf`: word dates from it (decision 0072).",
+};
+// Who decides (N2): the permission check runs behind the service interfaces (decision 0070). Read models and
+// components render the decided `can` the services answer; only the domain and the implementations call it.
+const decisionsMessage =
+  "Permission checks run behind the service interfaces (decision 0070): render the decided `can` a service answers. Only src/domain and the implementations call can() or canSeeSpace().";
+// The permission check and the space rules built on it (who sees which space, where a viewer lands).
+const decidingNames = [
+  "can",
+  "canSeeSpace",
+  "defaultSpace",
+  "isCrossTeam",
+  "rolesOn",
+  "spacesFor",
+];
+const noDecisions = {
+  paths: [
+    {
+      name: "@/domain/permissions",
+      importNames: decidingNames,
+      message: decisionsMessage,
+    },
+    // `check` and `permit` are can() for a command: the implementations' command kits call them.
+    {
+      name: "@/server/services/refuse",
+      importNames: ["check", "permit"],
+      message: decisionsMessage,
+    },
+  ],
+  patterns: [
+    { group: ["**/require-can"], message: decisionsMessage },
+    // The same, imported by a relative path.
+    {
+      group: ["**/domain/permissions"],
+      importNames: decidingNames,
+      message: decisionsMessage,
+    },
+    {
+      group: ["**/services/refuse"],
+      importNames: ["check", "permit"],
+      message: decisionsMessage,
+    },
+  ],
+};
+// The backend's own machinery (H4): the reset and the seed belong to the local backend (the demo tools reach them
+// through services().demo), and src/server/testing is test support. The BFF imports none of them.
+const noBackendInternals = {
+  group: [
+    "@/server/reset",
+    "**/server/reset",
+    "../reset",
+    "@/server/seed",
+    "@/server/seed/**",
+    "**/seed/**",
+    "../seed",
+    "./seed",
+    "@/server/testing/**",
+    "**/server/testing/**",
+    "../testing/**",
+    "./testing/**",
+  ],
+  message:
+    "The BFF doesn't import the backend's own machinery: the reset and the seed are the local backend's (reach the demo tools through services().demo), and src/server/testing is test support.",
+};
+// The three rules above reuse typescript-eslint's no-restricted-imports under names of their own, so each has its
+// own message and its own exemptions (flat config keeps one set of options per rule per file).
+const restrictedImports = nextTs.find(
+  (config) => config.plugins?.["@typescript-eslint"],
+).plugins["@typescript-eslint"].rules["no-restricted-imports"];
+const seamPlugin = {
+  rules: {
+    "no-clock": restrictedImports,
+    "no-decisions": restrictedImports,
+    "no-backend-internals": restrictedImports,
+  },
+};
+
+// Not checked by the seam rules: the local implementation and the database itself, the seed and the reset, the
+// shared database test support, the simulator (its own app and database), and tests.
+const SEAM_EXEMPT = [
+  "src/server/services/local/**",
+  "src/server/services/index.ts",
+  "src/server/db/**",
+  "src/server/seed/**",
+  "src/server/reset.ts",
+  "src/server/testing/**",
+  "src/lib/fresh-database.ts",
+  "src/lib/serialized-writes.ts",
+  "src/simulator/**",
+  "src/app/(simulator)/**",
+  "src/app/api/v1/**",
+  "**/*.test.{ts,tsx}",
+];
 // The editor's public modules: the table under "Public API" in src/editor/README.md. Code outside src/editor
 // imports these and nothing else, so the editor can change what is behind them. A module is public when the
 // README lists it, and the README lists it when it is a sensible part of the API: keep the two the same.
@@ -76,9 +225,9 @@ const editorSchemaNames = {
 };
 
 // The database client, for e2e: only e2e/helpers/state/db.ts may import it.
-const databaseMessage =
+const e2eDatabaseMessage =
   "e2e touches the database only through e2e/helpers/state (decision 0068): add a named function there, and import it from e2e/helpers/state.";
-const noDatabase = {
+const noE2eDatabase = {
   group: [
     "@libsql/*",
     "drizzle-orm",
@@ -88,7 +237,7 @@ const noDatabase = {
     "@/server/db",
     "@/server/db/*",
   ],
-  message: databaseMessage,
+  message: e2eDatabaseMessage,
 };
 const noStateInternals = {
   group: ["**/helpers/state/*", "./state/*"],
@@ -264,6 +413,87 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // ── The backend seam (src/server/services/README.md, decision 0072) ──────────
+  { plugins: { seam: seamPlugin } },
+  // A separate rule from the core no-restricted-imports above (typescript-eslint's, which can let type imports
+  // through), so the blocks there keep their own options. Flat config keeps one set of options per rule per file:
+  // each block below lists every seam pattern that applies to its files.
+  {
+    // Only the local implementation, the database module and the seed talk to the database, and only
+    // services/index.ts (with /api/v1, the seed, the reset and tests) reaches an implementation: everything else
+    // goes through services(). Row types from the schema may be imported as types (the fake keeps its rows in
+    // that shape).
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: SEAM_EXEMPT,
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [noDatabase, noImplementations] },
+      ],
+    },
+  },
+  {
+    // The interfaces themselves carry facts, never the BFF's worded view models or its modules.
+    files: ["src/server/services/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [noAuditViewModels],
+          patterns: [noDatabase, noImplementations, noViewModels],
+        },
+      ],
+    },
+  },
+  {
+    // /api/v1 is the backend's own API (the Java API serves it after the port): its handlers call the local
+    // implementation directly, but still not the database.
+    files: ["src/app/api/v1/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [noDatabase] },
+      ],
+    },
+  },
+  {
+    // Only the backend reads the clock. Exempt like the rules above (the local implementation, /api/v1, the
+    // reset, the seed, test support and tests are the backend's own).
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: SEAM_EXEMPT,
+    rules: { "seam/no-clock": ["error", { patterns: [noClock] }] },
+  },
+  {
+    // Only the domain and the implementations decide; `refuse.ts` is the implementations' shared command helper.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      "src/domain/**",
+      "src/server/services/local/**",
+      "src/server/services/fake/**",
+      "src/server/services/refuse.ts",
+      "src/simulator/**",
+      "**/*.test.{ts,tsx}",
+    ],
+    rules: { "seam/no-decisions": ["error", noDecisions] },
+  },
+  {
+    // The reset, the seed and the test support are the backend's and the tests'. The fake and the contract suite
+    // are test support too.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      ...SEAM_EXEMPT,
+      "src/server/services/fake/**",
+      "src/server/services/contract/**",
+    ],
+    rules: {
+      "seam/no-backend-internals": [
+        "error",
+        { patterns: [noBackendInternals] },
+      ],
+    },
+  },
   {
     // The published /api/v1 wire contract: self-contained types both UCOMP and the simulator compile against.
     files: ["src/contracts/**/*.ts"],
@@ -332,7 +562,7 @@ const eslintConfig = defineConfig([
         "error",
         {
           paths: [editorSchemaNames],
-          patterns: [editorInternals, noDatabase, noStateInternals],
+          patterns: [editorInternals, noE2eDatabase, noStateInternals],
         },
       ],
     },
@@ -347,7 +577,7 @@ const eslintConfig = defineConfig([
         "error",
         {
           paths: [editorSchemaNames],
-          patterns: [editorInternals, noDatabase],
+          patterns: [editorInternals, noE2eDatabase],
         },
       ],
     },

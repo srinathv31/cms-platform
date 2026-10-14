@@ -11,7 +11,7 @@ declared shape (`AuditDetailsByAction` in `src/domain/review-types.ts`: `version
 other spellings than the runtime: three aliases in `src/domain/audit.ts` (`version.revoke_confirmed` for
 `version.revoked`, and two more), and seeded notices carry `replacedByVersionNumber` where live ones carry
 `activeVersion` (`NoticeRow` in `src/domain/golive-types.ts`), so `noticeView` reads both defensively. Access and
-platform effects are a second vocabulary with a second writer (`src/server/access-effects.ts`; M-11 of the
+platform effects are a second vocabulary with a second writer (`src/server/services/local/access-effects.ts`; M-11 of the
 [October 12 review](../quality-review-2026-10-12.md)).
 
 These columns become the Java side's event DTOs or JSON columns. Today their shape is whatever the writer put there.

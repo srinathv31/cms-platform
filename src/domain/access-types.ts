@@ -1,10 +1,10 @@
-// Phase 6 contract: access and admin. Pure types, written by the lead; every Phase 6 agent codes
-// against this file. Domain inputs use Date; read models (server/queries → UI) use ISO strings,
-// because they cross into client components. Who implements what is in docs/archive/phase-6-brief.md.
+// Phase 6 contract: access and admin, as the domain rules take and give it. Pure types: the rules' inputs (facts,
+// with Date), the changes and effects they return, the sweep, and what the recertification and audit rules compute.
+// The screens' view models built from them are in src/server/queries/access-models.ts.
 //
-//   domain/access.ts           team access rules: request/decide, members, recertification,
+//   domain/access/             team access rules: request/decide, members, recertification,
 //                              inactivity, and the clock-driven sweep (lapse, flag, auto-suspend)
-//   domain/platform-config.ts  teams, content types, channel rules, approval chains
+//   domain/platform-config/    teams, content types, channel rules, approval chains
 //   domain/audit.ts            audit sentences, action groups, filters, CSV
 
 import type { Refused } from "./refusals";
@@ -19,10 +19,8 @@ import type { NumberedRound } from "./rounds";
 import type {
   ApproverRule,
   Channel,
-  ChannelFamily,
   MembershipStatus,
   MembershipStatusReason,
-  PermissionResult,
   PlatformRole,
   RequiredSection,
   TeamRole,
@@ -45,6 +43,8 @@ export const REQUESTABLE_ROLES = [
   "approver",
 ] as const satisfies readonly TeamRole[];
 export type RequestableRole = (typeof REQUESTABLE_ROLES)[number];
+/** The Access requests section lists the requests decided in this many days, newest first. */
+export const DECIDED_REQUESTS_WINDOW_DAYS = 30;
 export const ACCESS_REASON_MAX = 500;
 export const DECISION_NOTE_MAX = 500;
 
@@ -137,7 +137,7 @@ export type MembershipChange =
   | { kind: "update"; membershipId: string; set: MembershipSet }
   | { kind: "delete"; membershipId: string };
 
-// ── Effects (audit rows and notifications; server/access-effects.ts writes them) ─
+// ── Effects (audit rows and notifications; services/local/access-effects.ts writes them) ─
 
 export type AccessAuditAction =
   | "access.requested"
@@ -160,7 +160,7 @@ export type AccessAuditAction =
   | "recert.kept" // one member confirmed
   | "recert.removed" // one member removed during the review (their access ends at once)
   | "recert.closed" // the deadline passed, or every member was decided
-  | "platform.config_changed"; // details.area: "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone"; details.summary
+  | "platform.config_changed"; // details.area: "teams" | "content_types" | "channel_rules" | "approval_chains" | "business_zone", and that area's facts
 
 export type PlatformArea =
   | "teams"
@@ -196,6 +196,75 @@ export type AccessNotificationKind =
 /** Every notification kind the bell shows: lifecycle (Phase 4) and access (Phase 6). */
 export type AnyNotificationKind = NotificationKind | AccessNotificationKind;
 
+/**
+ * What each access notification stores (decision 0055): facts, never a sentence or a URL, with names as they
+ * were. `describeNotification` (notifications.ts) words them when read, for the person reading: a notification
+ * about a member (`userId`) reads "Your access…" to that member and "Devon Lin's access…" to a Team Admin. An
+ * instant is ISO; a recertification's quarter label (`Q1 2027`) is worded from its deadline, never stored here.
+ */
+export interface AccessNotificationFacts {
+  /** A request, to the team's Team Admins (the requester's reason is the body). */
+  access_requested: { actorName: string; teamName: string; role: TeamRole };
+  /**
+   * Access given: a request approved (`role`; the admin's note, if any, is the body), or a suspended or lapsed
+   * member restored with their roles (no `role`).
+   */
+  access_granted: { actorName: string; teamName: string; role?: TeamRole };
+  /** A request declined, to the requester (the admin's note is the body). */
+  access_denied: { actorName: string; teamName: string; role: TeamRole };
+  /** A member's roles replaced, to the member: every role after. */
+  roles_changed: { actorName: string; teamName: string; roles: TeamRole[] };
+  /** A member removed, to the member; `recertDueAt` (the review's deadline) when removed in an access review. */
+  access_removed: { actorName: string; teamName: string; recertDueAt?: string };
+  /** Unconfirmed at a review's deadline (`dueAt`): to the member, and to the team's Team Admins. */
+  access_lapsed: {
+    userId: string;
+    userName: string;
+    teamName: string;
+    dueAt: string;
+  };
+  /**
+   * Suspended after `daysInactive` days without a sign-in: by a Team Admin (`actorName`), to the member; or by the
+   * sweep (`actorName` null), to the member and the team's Team Admins.
+   */
+  access_suspended: {
+    userId: string;
+    userName: string;
+    teamName: string;
+    daysInactive: number;
+    actorName: string | null;
+  };
+  /**
+   * To the team's Team Admins: a member flagged at 90 days, suspended automatically at `suspendsAt`. Or
+   * (`keptLastAdmin`) to the Platform Admins: the sweep kept the team's last Team Admin past the automatic
+   * suspension, after `daysInactive` days.
+   */
+  inactivity_flagged:
+    | { userId: string; userName: string; teamName: string; suspendsAt: string }
+    | {
+        userId: string;
+        userName: string;
+        teamName: string;
+        daysInactive: number;
+        keptLastAdmin: true;
+      };
+  /**
+   * To the team's Team Admins: a review started, due at `dueAt`, with `members` to confirm. Or (`keptLastAdmin`)
+   * to the Platform Admins: the team's last Team Admin, unconfirmed at the deadline, kept their access.
+   */
+  recert_due:
+    | { teamName: string; dueAt: string; members: number }
+    | {
+        userId: string;
+        userName: string;
+        teamName: string;
+        dueAt: string;
+        keptLastAdmin: true;
+      };
+  /** A new team's first Team Admin, to them. */
+  team_admin_appointed: { actorName: string; teamName: string };
+}
+
 export type AccessRecipients =
   | { kind: "user"; userId: string }
   /** Every active Team Admin of the team, minus `exceptUserIds`. The actor is never notified. */
@@ -203,12 +272,15 @@ export type AccessRecipients =
   /** Every Platform Admin (additive, R1: the last Team Admin kept past a deadline). */
   | { kind: "platform_admins" };
 
-/** Team ids are their slugs (seed contract), so links build from the id. */
 export type TeamSettingsSection =
   "members" | "access-requests" | "recertification" | "inactivity";
 export type PlatformSettingsSection =
   "teams" | "content-types" | "channel-rules" | "approval-chains" | "time-zone";
 
+/**
+ * Where an access notification opens. A team's link names the team by id; the BFF builds the href from its slug
+ * when it reads the notification (decision 0055).
+ */
 export type AccessLink =
   | { to: "settings"; teamId: string; section: TeamSettingsSection }
   | { to: "library"; teamId: string }
@@ -216,20 +288,37 @@ export type AccessLink =
   /** A Platform settings section, from the "All teams" space (additive, R1). */
   | { to: "platform"; section: PlatformSettingsSection };
 
-export interface AccessNotificationEffect {
-  kind: "notification";
-  notification: AccessNotificationKind;
-  to: AccessRecipients;
-  teamId: string | null;
-  /** One plain sentence: "Morgan Lee asked for Author access to Coral Offers." */
-  title: string;
-  body?: string;
-  link: AccessLink;
-  /** Default: the action's `now` (the sweep backdates, like audit). */
-  at?: Date;
-}
+/** An access notification to write: its kind, its facts, whom it reaches and where it opens. */
+export type AccessNotificationEffect = {
+  [K in AccessNotificationKind]: {
+    kind: "notification";
+    notification: K;
+    to: AccessRecipients;
+    teamId: string | null;
+    facts: AccessNotificationFacts[K];
+    /** Only a person's own words: the requester's reason, the admin's note. */
+    body?: string;
+    link: AccessLink;
+    /** Default: the action's `now` (the sweep backdates, like audit). */
+    at?: Date;
+  };
+}[AccessNotificationKind];
 
 export type AccessEffect = AccessAuditEffect | AccessNotificationEffect;
+
+/** When access effects happen and who acted: what both implementations' access effects writers take. */
+export interface AccessEffectContext {
+  /** The backend's clock, read once by the command. Effects with their own `at` (the sweep) keep it. */
+  now: Date;
+  /** Who acted. null for the system (the clock-driven sweep). Effects may override with `actorId`. */
+  actorId: string | null;
+}
+
+/** How many rows of each kind an access effects writer wrote. */
+export interface AccessEffectsWritten {
+  audit: number;
+  notifications: number;
+}
 
 export type Ok<T> = { ok: true } & T;
 export type { Refused };
@@ -253,121 +342,7 @@ export interface SweepResult {
   effects: AccessEffect[];
 }
 
-// ── Read models: Request access (Morgan) — /request-access ──────────────────
-
-export interface RequestAccessTeam {
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  icon: string;
-  /** Active Team Admins ("its admin" on the card). */
-  admins: Person[];
-  /** The viewer's active roles here (a member may ask for another role). */
-  myRoles: TeamRole[];
-}
-
-export interface MyAccessRequest {
-  id: string;
-  teamId: string;
-  teamName: string;
-  role: TeamRole;
-  reason: string;
-  status: AccessRequestStatus;
-  createdAt: string;
-  decidedBy?: Person;
-  decidedAt?: string;
-  /** The admin's note. Shown on a denial. */
-  note?: string | null;
-}
-
-export interface RequestAccessData {
-  teams: RequestAccessTeam[];
-  /** The latest request per team, newest first. A pending one replaces the form for that team. */
-  requests: MyAccessRequest[];
-  /** Memberships that ended without the person asking: shown above the teams, one line each. */
-  ended: {
-    teamId: string;
-    teamName: string;
-    status: "lapsed" | "suspended";
-    reason: MembershipStatusReason | null;
-    at: string;
-  }[];
-  roles: readonly RequestableRole[];
-}
-
-// ── Read models: Settings, Team group — /{team}/settings/{section} ──────────
-
-export interface MemberRow {
-  membershipId: string;
-  person: Person;
-  title: string;
-  email: string;
-  roles: TeamRole[];
-  status: MembershipStatus;
-  statusReason: MembershipStatusReason | null;
-  statusChangedAt: string | null;
-  lastActiveAt: string | null;
-  addedAt: string;
-  isYou: boolean;
-  can: {
-    editRoles: PermissionResult;
-    remove: PermissionResult;
-    reinstate: PermissionResult;
-  };
-  /** The strips' lines (`memberConsequences`). */
-  consequences: { remove: string; reinstate: string };
-}
-
-export interface MembersSection {
-  team: { id: string; slug: string; name: string };
-  /** Active first, then suspended and lapsed; by name inside each. */
-  rows: MemberRow[];
-  roles: readonly TeamRole[];
-  /** YYYY-MM-DD, demo clock. */
-  today: string;
-}
-
-export interface AccessRequestRow {
-  id: string;
-  person: Person;
-  title: string;
-  role: TeamRole;
-  reason: string;
-  status: AccessRequestStatus;
-  createdAt: string;
-  decidedBy?: Person;
-  decidedAt?: string;
-  note?: string | null;
-  /** Disabled with "You can't decide your own access request." on your own. */
-  can: { decide: PermissionResult };
-  /** The Approve and Deny strips' lines (`requestConsequences`). */
-  consequences: { approve: string; deny: string };
-}
-
-export interface AccessRequestsSection {
-  team: { id: string; slug: string; name: string };
-  pending: AccessRequestRow[]; // oldest first
-  decided: AccessRequestRow[]; // last 30 days, newest first
-}
-
-export interface RecertItemRow {
-  userId: string;
-  person: Person;
-  title: string;
-  roles: TeamRole[];
-  lastActiveAt: string | null;
-  decision: RecertDecision | null;
-  decidedBy?: Person;
-  decidedAt?: string;
-  /** The member's status now (a removed member has no membership: "removed"). */
-  membership: MembershipStatus | "removed";
-  /** How the row reads once nothing is left to decide on it, in place of Keep and Remove (`recertItemOutcome`). */
-  outcome: string | null;
-  can: { decide: PermissionResult };
-  /** The Remove strip's line (`recertRemoveConsequence`). */
-  consequences: { remove: string };
-}
+// ── Recertification progress (domain/access/recertification.ts) ─────────────
 
 export interface RecertProgress {
   total: number;
@@ -375,178 +350,9 @@ export interface RecertProgress {
   kept: number;
   removed: number;
   pending: number;
-  /** "4 of 6 confirmed" */
-  label: string;
 }
 
 export type RecertPhase = "upcoming" | "open" | "closed";
-
-export interface RecertView {
-  id: string;
-  label: string;
-  startsAt: string;
-  dueAt: string;
-  completedAt: string | null;
-  phase: RecertPhase;
-  progress: RecertProgress;
-  items: RecertItemRow[];
-  /** Closed reviews: the members whose access lapsed at the deadline. */
-  lapsed: Person[];
-  /** The line under the numbers (`recertFootnote`). */
-  footnote: string;
-}
-
-export interface RecertificationSection {
-  team: { id: string; slug: string; name: string };
-  /** The open (or upcoming) review; else the last closed one. Null before the first review. */
-  current: RecertView | null;
-  /** "Start review": only when nothing is open or upcoming. */
-  can: { start: PermissionResult };
-  /** The Start review strip's line, with the deadline a review started now gets (`startRecertConsequence`). */
-  consequences: { start: string };
-  today: string;
-}
-
-export interface InactivityRow {
-  membershipId: string;
-  person: Person;
-  title: string;
-  roles: TeamRole[];
-  lastActiveAt: string | null;
-  daysInactive: number;
-  /** When automatic suspension happens (or happened). */
-  suspendsAt: string;
-  status: MembershipStatus;
-  statusReason: MembershipStatusReason | null;
-  /** Past day 120 and still active: the sweep kept them on as the team's last Team Admin (`heldAsLastAdmin`). */
-  heldAsLastAdmin: boolean;
-  can: {
-    suspend: PermissionResult;
-    keep: PermissionResult;
-    reinstate: PermissionResult;
-  };
-  /** The strips' lines (`memberConsequences`). */
-  consequences: { suspend: string; keep: string; reinstate: string };
-}
-
-export interface InactivitySection {
-  team: { id: string; slug: string; name: string };
-  /** Active members at or past 90 days, longest inactive first. */
-  flagged: InactivityRow[];
-  /** Suspended for inactivity (by an admin or automatically), most recent first. */
-  suspended: InactivityRow[];
-  thresholds: { flagDays: number; suspendDays: number };
-}
-
-// ── Read models: Settings, Platform group ────────────────────────────────────
-
-export interface TeamRow {
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  icon: string;
-  admins: Person[];
-  members: number; // active
-  templates: number;
-  createdAt: string;
-  /** The app name the team's push notifications show ("Coral"); null when not set. */
-  appName: string | null;
-  /** The short code the team's SMS come from ("26725"); null when not set. */
-  smsSender: string | null;
-}
-
-export interface TeamsSection {
-  teams: TeamRow[];
-  /** Everyone who can be a new team's first Team Admin (every user, by name). */
-  people: (Person & { title: string })[];
-  /** Lucide keys the icon picker offers. */
-  icons: readonly string[];
-}
-
-export interface ContentTypeView {
-  id: string;
-  key: string;
-  name: string;
-  /** Documents (PDF, Web, Email) or messages (Push, SMS): the family of the channels it allows. */
-  family: ChannelFamily;
-  requiredSections: RequiredSection[];
-  allowedChannels: Channel[];
-  /** The SMS footer every SMS of this type ends with; null when none (and on a document type). */
-  smsFooter: string | null;
-  /** The parts an SMS may take with the long sample values before submit refuses it. */
-  smsMaxParts: number;
-  templates: number;
-  /** Whether "Edit sections" may open (`sectionsRefusal`): a message type has no sections. */
-  can: { editSections: PermissionResult };
-}
-
-export interface ContentTypesSection {
-  types: ContentTypeView[];
-}
-
-export interface ChannelRuleRow {
-  contentTypeId: string;
-  name: string;
-  allowed: Record<Channel, boolean>;
-  /** Active versions per channel: the consequence line when turning one off. */
-  activeUsing: Record<Channel, number>;
-  /** Per channel, whether its switch may flip (`channelRuleRefusal`): the last channel on can't go off. */
-  can: { toggle: Record<Channel, PermissionResult> };
-}
-
-export interface ChannelRulesSection {
-  channels: readonly Channel[];
-  rows: ChannelRuleRow[];
-}
-
-export interface ChainStageView {
-  id: string;
-  position: number;
-  name: string;
-  rule: ApproverRule;
-  /** "Approver role" or the named person's name. */
-  ruleLabel: string;
-  /**
-   * Versions in review that still need this stage: the one they wait on, or one ahead of it in the
-   * stages they recorded at submit (`versionsNeeding`). Removing it is refused while > 0.
-   */
-  waiting: number;
-}
-
-export interface ApprovalChainView {
-  contentTypeId: string;
-  name: string;
-  stages: ChainStageView[];
-}
-
-export interface ApprovalChainsSection {
-  chains: ApprovalChainView[];
-  /** People a stage may name, with the teams whose templates they can see (shown beside the name). */
-  people: (Person & { title: string; teams: string[] })[];
-  /**
-   * The facts `validateChain` checks, for everyone in `people` and everyone a stage names now (who may
-   * have lost access since), so the chain editor validates as the admin edits.
-   */
-  approvers: ApproverFacts[];
-  /** The Platform Admin editing: nobody names themselves. */
-  viewerId: string;
-}
-
-/** Settings > Platform > Time zone: the business time zone sunset dates are read in (decision 0017). */
-export interface BusinessZoneSection {
-  /** The IANA id in force (`DEFAULT_BUSINESS_ZONE` until someone changes it). */
-  zone: string;
-  /** The zones on offer (`BUSINESS_ZONES`), each with its label: "Eastern (America/New_York)". */
-  zones: { id: string; label: string }[];
-  can: { change: PermissionResult };
-  /**
-   * What any change of zone leaves in place, worded by the domain from the sunsets still to come
-   * (`zoneChangeConsequences`): "2 sunsets already set don't move: …". The line for the zone picked comes
-   * from `describeZoneChange`, which the screen calls as the admin picks.
-   */
-  consequences: string[];
-}
 
 // ── Audit page — /{team}/audit ───────────────────────────────────────────────
 
@@ -595,129 +401,6 @@ export interface AuditRow {
   when: string;
   /** S3 addition: relative to the demo clock's now, "3 days ago". */
   ago: string;
-}
-
-/** A filter option with how many events it would match given every OTHER filter (S3 addition). */
-export interface AuditOption {
-  value: string;
-  label: string;
-  count: number;
-}
-
-export interface AuditPageData {
-  space: { slug: string; isAll: boolean; name: string };
-  rows: AuditRow[];
-  /** Matching rows before the page limit (rows holds at most AUDIT_PAGE_LIMIT). */
-  total: number;
-  applied: AuditFilters;
-  /**
-   * The five menus. Every option lists what the space holds (selected values always included),
-   * with counts under the other filters (S3 addition: counts, categories, templates, datePresets).
-   */
-  options: {
-    teams: { slug: string; name: string; count: number }[]; // empty in a team space
-    /** By name; the system ("UCOMP", id "system") last. */
-    people: (Person & { count: number })[];
-    /** The Action menu's group headings; selecting one filters the whole category. */
-    categories: (AuditOption & { value: AuditCategory })[];
-    /** In `actionOptions()` order (grouped by category). */
-    actions: {
-      value: string;
-      label: string;
-      category: AuditCategory;
-      count: number;
-    }[];
-    /** By name. */
-    templates: { id: string; name: string; teamSlug: string; count: number }[];
-    /** Last 7 / 30 / 90 days on the demo clock, inclusive of today. */
-    datePresets: { days: number; label: string; from: string; to: string }[];
-  };
-  /** Same filters, as a CSV download href. */
-  csvHref: string;
-  today: string;
-}
-
-export const AUDIT_PAGE_LIMIT = 500;
-
-// ── Notifications (the bell) ─────────────────────────────────────────────────
-
-/** The bell's row. Supersedes server/queries/notifications.ts's NotificationItem (additive fields). */
-export interface NotificationView {
-  id: string;
-  kind: AnyNotificationKind | string; // older seeded spellings stay readable
-  title: string;
-  body: string | null;
-  href: string | null;
-  createdAt: string;
-  ago: string;
-  unread: boolean;
-}
-
-export interface NotificationsData {
-  items: NotificationView[]; // newest first, at most 30
-  unreadCount: number;
-}
-
-// ── Sidebar card (the one dismissible slot above Settings and Help) ──────────
-
-/**
- * One card per space, by priority: access requests waiting (Team Admin) → recertification due
- * (Team Admin) → my request pending (a person with no team yet, on /request-access).
- * `id` is the dismissal key: it changes when the content changes (a new request re-shows the card).
- */
-export type SidebarCardModel =
-  | {
-      kind: "access_requests";
-      id: string;
-      teamSlug: string;
-      count: number;
-      firstName: string;
-      role: TeamRole;
-    }
-  | {
-      kind: "recert_due";
-      id: string;
-      teamSlug: string;
-      label: string;
-      dueAt: string;
-      progressLabel: string;
-    }
-  | {
-      kind: "my_request";
-      id: string;
-      teamName: string;
-      role: TeamRole;
-      createdAt: string;
-      /** Who decides it: the team's Team Admin ("waiting on Alex Kim"); the first by name if several (additive, R1). */
-      adminName?: string;
-    };
-
-// ── Server actions (all return ActionResult; every one checks permissions first) ─
-
-export interface PlatformActions {
-  // src/server/actions/platform.ts
-  createTeam(input: {
-    name: string;
-    description: string;
-    icon: string;
-    adminUserId: string;
-  }): Promise<ActionResult<{ slug: string }>>;
-  updateContentType(input: {
-    contentTypeId: string;
-    requiredSections: RequiredSection[];
-  }): Promise<ActionResult>;
-  setChannelRule(input: {
-    contentTypeId: string;
-    channel: Channel;
-    allowed: boolean;
-  }): Promise<ActionResult>;
-  /** The whole chain, in order. Existing stages keep their id; new ones have none. */
-  saveApprovalChain(input: {
-    contentTypeId: string;
-    stages: { id?: string; name: string; rule: ApproverRule }[];
-  }): Promise<ActionResult>;
-  /** One of `BUSINESS_ZONES`. Sunsets already set keep their instants. */
-  setBusinessZone(input: { zone: string }): Promise<ActionResult>;
 }
 
 // ── domain/platform-config.ts signatures (implemented by slice P1) ──────────

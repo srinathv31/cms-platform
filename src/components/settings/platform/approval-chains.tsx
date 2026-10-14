@@ -5,7 +5,7 @@ import { ArrowDown, ArrowRight, ArrowUp, Plus } from "lucide-react";
 import type {
   ApprovalChainView,
   ApprovalChainsSection,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import { ROLE_LABEL } from "@/domain/access/roles";
 import { STAGE_NAME_MAX } from "@/domain/platform-config/limits";
 import {

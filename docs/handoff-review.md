@@ -14,10 +14,10 @@ Ten independent reviewers read the whole codebase at `main` @ ec3978b (October 7
 
 | Status       | Critical | High | Medium | Low | Total |
 | ------------ | -------- | ---- | ------ | --- | ----- |
-| Open         | 0        | 1    | 3      | 5   | 9     |
-| Partly fixed | 1        | 4    | 6      | 2   | 13    |
-| Fixed        | 1        | 21   | 31     | 33  | 86    |
-| Deferred     | 0        | 2    | 1      | 0   | 3     |
+| Open         | 0        | 1    | 2      | 4   | 7     |
+| Partly fixed | 1        | 4    | 7      | 2   | 14    |
+| Fixed        | 1        | 22   | 31     | 34  | 88    |
+| Deferred     | 0        | 1    | 1      | 0   | 2     |
 
 Fixed so far: PR #6 (the render engine prints exactly what the author typed, in every channel), PR #7 (golden files and parity tests), PR #8 (the in-repo documentation system), PRs #9–#40 (the Fix first list, October 2026), PRs #47–#55 (most of Found while fixing, S8, H7, part of B6 and H8, and the approver viewing every output before approving), PRs #57–#61 (N22–N25, B6, G5, G6, T6, and A3 apart from `/api/v1`), PRs #63–#65 (H8, and G4 apart from the git history), PR #66 (N26 and N27), and PRs #67–#72 (A1, T3, T5, T7 and N20).
 
@@ -279,7 +279,7 @@ The PRs that fixed the [Fix first](#fix-first) list noticed these and left them 
 #### N23 · Low: The render log doesn't record which platform a push was for
 
 - **Status:** Fixed. `render_log.platform` (migration 0013, null for every channel but push and for older rows) is set by `runRender` and copied by `writeRenderLog`; the seed names a phone on every push, a template's Usage splits Push by iPhone and Android, and "Recent failures" names the phone. The team Overview's channel mix still shows Push as one share ([decision 0039](decisions/0039-the-render-log-keeps-a-pushs-platform.md)).
-- **Where:** `src/server/db/schema/ucomp.ts` (`renderLog`); `src/domain/render/types.ts` (`RenderLogEntry`); `src/server/render/log.ts` (`writeRenderLog`); `src/server/queries/usage.ts`
+- **Where:** `src/server/db/schema/ucomp.ts` (`renderLog`); `src/domain/render/types.ts` (`RenderLogEntry`); `src/server/services/local/render/log.ts` (`writeRenderLog`); `src/server/queries/usage.ts`
 - **What happens:** A push is rendered for one platform, which the request names (`platform`, `ios` or `android`, `ApiPushPlatform` in `src/contracts/api-v1.ts`): iPhone shows a subtitle and Android never does, and the 4,096-byte limit is checked per platform (`push_payload_too_large` carries the platform). The log row keeps only `channel: "push"`, so Usage can't split pushes by iPhone and Android, and a failed push can't be traced to the platform it failed on. Rows already written can't gain it later. The platform is a setting, not a variable value, so the log's keys-only rule allows it. Noticed while building push and SMS (PR #46).
 - **Fix:** Add a nullable `platform` column to `render_log` (a migration; null for every channel but push) and `platform` to `RenderLogEntry`, set it where the render route builds the entry, and copy it by name in `writeRenderLog` like the other fields. Seed the push history with both platforms. Then show it wherever the channel split is drawn (the Push share, by iPhone and Android, with the split in N22) and in "Recent failures".
 - **Evidence:** traced
@@ -356,7 +356,7 @@ If the backend moves to the Spring Boot API with this app as its BFF, these find
 | [B5 · Medium](#b5--medium-autosave-conflict-recovery-reads-the-audit-log)                         | `rev` and the last save session live on the version row, not in the audit log.                                                                                                                                                                                                                                                                                                                                 |
 | [A4 · Medium](#a4--medium-get-apiv1-routes-can-return-a-non-json-500)                             | Every route maps a failure to the contract's error body with a correlation id, in the error format [decision 0056](decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md) settles, together with the route half of [A3](#a3--medium-six-error-shapes-and-some-actions-throw).                                                                                                                      |
 | [A8 · Low](#a8--low-sample-urls-are-built-from-request-headers)                                   | The consumer base URL comes from configuration (`CONSUMER_API_BASE_URL`).                                                                                                                                                                                                                                                                                                                                      |
-| [A9 · Low](#a9--low-notifications-store-app-urls)                                                 | Notifications store the `NotificationLink` descriptor, and the BFF builds the link when it reads them.                                                                                                                                                                                                                                                                                                         |
+| [A9 · Low](#a9--low-notifications-store-app-urls)                                                 | Done: notifications store a link descriptor by team id, and the BFF builds the link when it reads them.                                                                                                                                                                                                                                                                                                        |
 | [D11 · Low](#d11--low-javascript-only-behavior-that-wont-port-cleanly)                            | Dates are validated by round trip (`2026-02-30` must fail, not become March 2), ids compare by code point, and lookups go through `Map`.                                                                                                                                                                                                                                                                       |
 
 ### The enterprise font
@@ -384,7 +384,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S2 · High: Identity fails open to the default persona
 
-- **Status:** Deferred. Replaced when real login lands. Whatever replaces `getViewer()` must refuse, not default to a person.
+- **Status:** Partly fixed. The request context fails closed (`src/server/context/request.ts`, [decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)): with `DEMO_MODE` off, a missing or unknown persona cookie is signed out, and a page goes to the sign-in hook (`signInRequired()`), an action answers `signed_out`, a read route 401. With the demo tools on, it still falls back to Maya, and a hand-set cookie still acts as its persona until real login lands.
 - **Where:** `src/server/viewer.ts` line 58; `src/app/api/templates/[templateId]/preview/route.ts` line 57
 - **What happens:** With no cookie or an unknown id, `getViewer()` returns Maya. Stencil's preview route uses it, so an anonymous `POST {version: "draft"}` to it renders Coral Offers' unreleased drafts (it is no longer on the public `/api/v1` URL). Whatever replaces the persona cookie will inherit this contract unless it changes now.
 - **Fix:** Return no viewer (401 or redirect to sign-in) when there's no identity. Make the persona switcher a dev-only provider behind the same function.
@@ -401,7 +401,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### S4 · High: Access deadlines only take effect when a demo trigger runs the sweep
 
 - **Status:** Deferred. Belongs to the real-login work: effective status at sign-in plus a scheduled sweep.
-- **Where:** `src/server/access-sweep.ts` line 144; `src/server/actions/persona.ts` line 39
+- **Where:** `src/server/services/local/sweeps.ts` (`runScheduledJobs`); `src/server/services/local/demo.ts` (`switchPersona`)
 - **What happens:** Recertification lapses and inactivity suspensions are applied by `runAccessSweep`, which runs on persona switch, Advance clock and access actions only. With real sign-in and real time, a lapsed approver keeps editing and approving until someone happens to run an access action. Each sweep also loads every membership and user.
 - **Fix:** A scheduled job (Spring `@Scheduled` or a cron route), plus computing effective membership status from the deadlines when the viewer is loaded.
 - **Evidence:** traced
@@ -409,7 +409,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### S5 · High: Consumer identity is a self-asserted header
 
 - **Status:** Partly fixed. A caller that isn't a registered consumer (`unknown_consumer`) writes no `render_log` row, so anonymous calls queue no writes, and the notices route answers 403 `consumer_mismatch` for any path but the caller's own, so no answer says which consumer ids exist. Credentials and rate limits wait for the gateway.
-- **Where:** `src/server/queries/consumer-api.ts` line 62; `src/app/api/v1/consumers/[consumerId]/notices/route.ts` line 27
+- **Where:** `src/server/services/local/consumer-api.ts` line 62; `src/app/api/v1/consumers/[consumerId]/notices/route.ts` line 27
 - **What happens:** `X-Consumer-Id` has no secret. The notices check (header must equal the path) looks like authorization, but the caller sets both. Every anonymous render of an existing template writes a `render_log` row through the process-wide write lock, so flooding the endpoint makes autosaves and approvals wait up to 15 seconds and then fail. None of this is documented as a prototype limit.
 - **Fix:** Client credentials (OAuth client-credentials or mTLS) at the gateway or BFF, rate limits, and no log rows for unauthenticated callers. State it in the contract.
 - **Evidence:** traced
@@ -424,7 +424,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### S7 · Medium: Comments are accepted on any version state
 
-- **Status:** Fixed. The comment policy is `src/domain/comments.ts`; the actions ask it again inside their transaction, so a comment, reply, resolve or reopen where no draft or version in review shows the thread is refused and writes nothing, and the review and workspace read models return `can.comment` decided.
+- **Status:** Fixed. The comment policy is `src/domain/comments.ts`; the comment commands (`src/server/services/local/comments.ts` and the fake) ask it again inside their transaction, so a comment, reply, resolve or reopen where no draft or version in review shows the thread is refused and writes nothing, and the review and workspace read models return `can.comment` decided.
 - **Where:** `src/server/actions/comments.ts` line 75; `src/components/comments/thread-state.ts` line 109
 - **What happens:** Only drafts and versions in review take comments, but that rule lives in `versionTakesComments` on the client. `addComment`, `reply` and `resolveThread` check permission only, so a direct call comments on an Active or Superseded version. The whole comment policy (length, block must exist, recipients) sits in the action with no `domain/comments.ts`.
 - **Fix:** A domain comment policy enforced in the actions, with the read model returning `can.comment`.
@@ -581,7 +581,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### I5 · High: A draft rename goes live without review
 
 - **Status:** Fixed. The name is a version field (`versions.name`; `templates.name` is gone), so a rename changes only the draft, shows in the submit dialog, the review rail and Compare, and reaches the render titles, the API and notices only when its version goes live ([decision 0016](decisions/0016-the-name-is-versioned.md)).
-- **Where:** `src/server/drafts/apply-patch.ts` line 165; `src/server/render/channels/web.ts` line 79
+- **Where:** `src/server/services/local/drafts.ts` (autosave's write, `server/drafts/apply-patch.ts` then); `src/server/render/channels/web.ts` line 79
 - **What happens:** Autosave writes `templates.name` directly. The name isn't versioned, so the Active version's web ``, PDF title metadata, API `name` and notice payloads change the moment an author types. The RenderDoc documents the name as internal-only, yet browsers show both titles to customers.
 - **Fix:** Make the name a version field, and give customer output its own title (the first heading or a dedicated field).
 - **Evidence:** verified
@@ -761,7 +761,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### A2 · High: Consumers polling notices can silently miss a revoke
 
 - **Status:** Fixed. Notices now page oldest first in commit order (`consumer_notices.seq`, never reused; the cursor carries a reset epoch) with an opaque `after` cursor, `nextCursor` and `hasMore`, `since` is gone, and search pages the same way ([decision 0006](decisions/0006-page-notices-by-commit-order.md)).
-- **Where:** `src/server/queries/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
+- **Where:** `src/server/services/local/consumer-api.ts` line 264; `src/contracts/api-v1.ts` line 211
 - **What happens:** Notices come newest-first with `since` and `limit` and no cursor or `hasMore`. A consumer polling with `since=lastSeen` that has more than `limit` new notices loses the oldest, which could be a revoke. Search is capped at 50 with no paging.
 - **Fix:** Oldest-first opaque cursor (`after`), `nextCursor` and `hasMore`; paging for search.
 - **Evidence:** traced
@@ -801,7 +801,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### A7 · Medium: The HTTP Date header carries the demo clock
 
 - **Status:** Deferred. Goes away with the demo clock.
-- **Where:** `src/server/api/http.ts` line 44
+- **Where:** `withDemoDate` in `src/server/services/local/consumer-api.ts` (it was `src/server/api/http.ts` line 44)
 - **What happens:** `withDemoDate` overwrites `Date`. The simulator stamps deliveries with it and orders batches by it at one-second resolution, so two sends in the same second can show the wrong latest batch. Any proxy that sets `Date` breaks it.
 - **Fix:** A separate `X-Stencil-Clock` header in demo mode, and a sequence column for ordering.
 - **Evidence:** traced
@@ -816,8 +816,8 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### A9 · Low: Notifications store app URLs
 
-- **Status:** Open
-- **Where:** `src/server/effects.ts` line 101
+- **Status:** Fixed. Notifications store their kind, the kind's facts and a link descriptor that names its team by id ([decision 0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md)); the bell words them (`describeNotification` in `src/domain/notifications.ts`) and builds the href (`src/server/notification-href.ts`) when it reads them. Lane F, step 2b-0b.
+- **Where:** `src/server/services/local/effects.ts` (`writeEffects`, which stored the href then)
 - **What happens:** Hrefs built from Next routes are persisted, though the domain already has a `NotificationLink` descriptor. Route changes break old notifications, and a Java backend can't build Next routes.
 - **Fix:** Store the descriptor and build the href when reading.
 - **Evidence:** traced
@@ -826,16 +826,16 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B1 · High: Server actions are the service layer
 
-- **Status:** Partly fixed. Rendering now runs through a DB-free engine (`src/server/render/engine.ts`, PR #6). Every other action is still the service layer.
-- **Where:** `src/server/actions/review.ts` line 443
-- **What happens:** `approveVersion` runs `getViewer`, a DB lookup, the permission check, a transaction with five reads, the domain call, writes and effects, then `refresh`. Every action is shaped this way, and 42 production files import the Drizzle client directly. There is nothing to swap for HTTP calls.
+- **Status:** Fixed. Every action and read reaches its data through a service interface ([decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md), `src/server/services/`): a fail-closed request context, the interfaces as facts, a local implementation that holds what the actions held (the Drizzle code, the permission checks, the clock, the effects), a fake loaded from the seed's fixture, and a contract suite both implementations pass and the Java API will run. Lint keeps it so: nothing outside `src/server/db`, the local implementation, the seed and the reset imports Drizzle, `getViewer()` is read only by the request context, the BFF never reads the clock or calls `can()`, and the four ratchets that listed what was left are gone. The HTTP implementation is the port's work.
+- **Where:** `src/server/actions/kit.ts`, `src/server/services/`
+- **What happened:** `approveVersion` ran `getViewer`, a DB lookup, the permission check, a transaction with five reads, the domain call, writes and effects, then `refresh`, and 42 production files imported the Drizzle client directly, so there was nothing to swap for HTTP calls.
 - **Fix:** Request context plus service interfaces (see The backend decision).
 - **Evidence:** verified
 
 #### B2 · High: About a third of the business rules live outside src/domain
 
-- **Status:** Partly fixed. The document rules (normalization, the content check, markers, links) are now single shared modules under `src/editor/model/` (PR #6). The comment policy has moved to `src/domain/comments.ts` ([S7](#s7--medium-comments-are-accepted-on-any-version-state)). Who may be named on an approval stage is one domain `validateChain` ([D4](#d4--high-the-chain-editor-saves-chains-nobody-can-approve), PR #14), and the settings screens' checks are domain functions their actions also run ([H2](#h2--medium-client-components-re-implement-domain-rules), PR #28); [N16](#n16--low-two-refusal-rules-still-live-outside-the-domain) lists two rules still outside. The lifecycle rules listed here are unchanged, and `decideCheck` still repeats the approve transition's earlier-stage rule.
-- **Where:** `src/server/actions/review.ts` line 312; `src/server/queries/review-shared.ts` line 207; `src/server/queries/consumer-api.ts` line 32
+- **Status:** Partly fixed. The document rules (normalization, the content check, markers, links) are now single shared modules under `src/editor/model/` (PR #6). The comment policy has moved to `src/domain/comments.ts` ([S7](#s7--medium-comments-are-accepted-on-any-version-state)). Who may be named on an approval stage is one domain `validateChain` ([D4](#d4--high-the-chain-editor-saves-chains-nobody-can-approve), PR #14), and the settings screens' checks are domain functions their actions also run ([H2](#h2--medium-client-components-re-implement-domain-rules), PR #28); [N16](#n16--low-two-refusal-rules-still-live-outside-the-domain) lists two rules still outside. The lifecycle rules listed here are unchanged. `decideCheck` is a domain function now (`src/domain/lifecycle/decide-check.ts`), sharing the approve transition's earlier-stage rule (`approvedEarlierStage`).
+- **Where:** `src/server/actions/review.ts` line 312; `src/server/services/local/consumer-api.ts` line 32
 - **What happens:** Submit auto-resolves threads; request-changes reuses an open draft; the comment policy; who may be named approver or Team Admin; channel defaults; which versions count as released and how search ranks; Auditor rules. Several are duplicated and drifting: `decideCheck` re-implements `approvedEarlierStage`, two copies of "who may see a version in review", the submit summary re-derives refusal sentences, and three components call `can()` themselves.
 - **Fix:** One domain function per rule; read models return capability flags.
 - **Evidence:** traced
@@ -851,22 +851,22 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 #### B4 · Medium: SQLite workarounds are spread through the code
 
 - **Status:** Partly fixed. Waiting is contained in the database client: `createAppClient` (`src/lib/serialized-writes.ts`) is the one place a write waits, 5 s for its turn, and nothing retries above it; the copies in `effects.ts`, `drafts/apply-patch.ts` and the simulator's `withBusyRetry` are gone, and import runs on `inTransaction` too. `rowid` ordering, `strftime` day buckets and the in-memory filtering remain.
-- **Where:** `src/server/effects.ts` line 222; `src/server/queries/library.ts` line 59
+- **Where:** `src/server/services/local/effects.ts`; `src/server/queries/library.ts` line 59
 - **What happens:** A process-wide write lock, three busy-retry copies (and one transaction with none), `rowid` ordering for audit and notifications, `strftime` day buckets, and in-memory filtering: the library loads every version of every team, and the audit page loads the whole log.
 - **Fix:** Contain retries in the DB client, order by ULID or sequence, filter in SQL.
 - **Evidence:** traced
 
 #### B5 · Medium: Autosave conflict recovery reads the audit log
 
-- **Status:** Open
-- **Where:** `src/server/drafts/apply-patch.ts` line 122
+- **Status:** Partly fixed. Autosave runs behind the seam (`DraftService.save`, lane F's step 2b-1), and the recovery's one read of the audit log is `lastSaveOf` in the local implementation, beside the save; the rule itself is the domain's `sessionOwnsRev`, given only the rev and the `seq` the session's last save recorded, so the Java API answers it from the version row's session columns instead ([decision 0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and the contract suite pins the behaviour, not the audit row. The prototype still reads the session's `draft.edited` row.
+- **Where:** `src/server/services/local/drafts.ts` (`lastSaveOf`)
 - **What happens:** Recovering from a lost save response reads `rev` from the `draft.edited` audit row's JSON. If audit moves to Spring or an event stream, autosave conflict handling breaks.
 - **Fix:** Store `lastSaveSession` and `rev` on the version row.
 - **Evidence:** traced
 
 #### B6 · Medium: Server code imports from components
 
-- **Status:** Fixed. A lint rule forbids `src/server` from importing `@/components`; `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. The review area's screen view models left `src/domain/review-types.ts` for the queries that build them: `ReviewScreenData`, `ReviewQueue` and `SunsetCalendar` in `src/server/queries/review-models.ts`, `VersionsData` and its items in `versions.ts`, `ThreadView` and `CommentView` in `threads.ts`, `ActivityItem` in `activity.ts` ([decision 0042](decisions/0042-read-models-beside-queries-and-an-editor-import-allowlist.md)). The read models in `access-types.ts`, `golive-types.ts` and `import-types.ts` stay in the domain for now.
+- **Status:** Fixed. A lint rule forbids `src/server` from importing `@/components`; `listSets` (and `isDefaultSet`) moved to `@/editor/model/sample-sets`, the `ucomp_created` cookie constants to `src/domain/arrival-cookies.ts`, and `SubmitSummary` to `src/domain/submit-types.ts`. The review area's screen view models left `src/domain/review-types.ts` for the queries that build them: `ReviewScreenData`, `ReviewQueue` and `SunsetCalendar` in `src/server/queries/review-models.ts`, `VersionsData` and its items in `versions.ts`, `ThreadView` and `CommentView` in `threads.ts`, `ActivityItem` in `activity.ts` ([decision 0042](decisions/0042-read-models-beside-queries-and-an-editor-import-allowlist.md)). The read models that were in `access-types.ts` are in `src/server/queries/access-models.ts` (lane F, step 2b-0a); those in `golive-types.ts` and `import-types.ts` stay in the domain for now.
 - **Where:** `src/server/queries/submit-summary.ts` line 12
 - **What happens:** `submit-summary.ts` takes the business function `listSets` from `components/preview/sample-sets`; `create-template.ts` and the imports route take cookie constants from components. `domain/review-types.ts` holds screen view models. No lint rule forbids it.
 - **Fix:** Add the rule; move `listSets` into `editor/model` and view models to `server/read-models`.
@@ -932,7 +932,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### T8 · Medium: Runtime paths assume the dev machine
 
-- **Status:** Partly fixed. The uploads folder is configurable (`UPLOADS_DIR`, absolute or relative; `resolveUploadsRoot` in `src/server/import/store.ts`), and the three path sites (`store.ts`, `pdf-fonts.ts`, `e2e/storage.ts`) hold up on Windows, with tests that run the Windows path rules on any machine. Still open: the PDF fonts are read from `node_modules` under the working directory, and `db:migrate` needs `tsx`; both wait for the deployment work in [T4](#t4--high-no-ci-node-pin-or-environment-template) and the enterprise font.
+- **Status:** Partly fixed. The uploads folder is configurable (`UPLOADS_DIR`, absolute or relative; `resolveUploadsRoot` in `src/server/services/local/uploads.ts`), and the three path sites (`uploads.ts`, `pdf-fonts.ts`, `e2e/storage.ts`) hold up on Windows, with tests that run the Windows path rules on any machine. Still open: the PDF fonts are read from `node_modules` under the working directory, and `db:migrate` needs `tsx`; both wait for the deployment work in [T4](#t4--high-no-ci-node-pin-or-environment-template) and the enterprise font.
 - **Where:** `src/server/render/channels/pdf-fonts.ts` line 47
 - **What happens:** PDF fonts are read from `process.cwd()/node_modules/...`, uploads go to `./data/uploads`, and `db:migrate` needs `tsx` from devDependencies. All three break in a standard container.
 - **Fix:** Copy fonts into the app, make the uploads location configurable, and compile the migration script.

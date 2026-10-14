@@ -11,7 +11,7 @@ import { validateValues } from "@/domain/render/validate";
 import { smsLength } from "@/domain/messages/gsm7";
 import type { JSONContent } from "@/domain/types";
 import { formatValue, validateValue } from "@/editor/model/variables";
-import { REQUIRED_SECTIONS, variableKeys } from "../seed/content";
+import { REQUIRED_SECTIONS, variableKeys } from "@/server/documents/build";
 import { ALERT_SMS_FOOTER } from "../seed/platform";
 import { trySubmit } from "../testing/submit-check";
 import {

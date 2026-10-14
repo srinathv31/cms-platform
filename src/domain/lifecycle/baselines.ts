@@ -103,6 +103,53 @@ export function renameBaseline<V extends BaselineFacts>(
     : live;
 }
 
+/**
+ * The versions a round's review screen sets beside it, each for its own purpose. Four, because after a revoke,
+ * or for a round sent back before its number went live, "the version before this one" means four different
+ * things:
+ */
+export interface ReviewScreenBaselines<V> {
+  /**
+   * What the redline, its "vs vN" label and the change count compare with (`reviewBaseline`). Null for a first
+   * version, or when that would be this version.
+   */
+  redline: V | null;
+  /**
+   * The Active version approving this one replaces: the Approve dialog's consequences and its sunset offer.
+   * Null when nothing is Active, or the Active version is this number's own release. Not `redline`: after a
+   * revoke the redline compares with the revoked version, which approving replaces nothing of.
+   */
+  replaces: V | null;
+  /**
+   * With nothing Active (after a revoke), the newest version that still renders (`contractBaseline`): the one
+   * its consumers move from, which the Approve dialog names, with what they have to map. Null when a version is
+   * Active, when nothing renders, and when it is this version's own number.
+   */
+  stillRenders: V | null;
+  /** The version whose name a rename is shown against (`renameBaseline`): the name customers get today. */
+  renamedFrom: V | null;
+}
+
+/** The four baselines of the review screen of `versionId` (one round of `number`), at `now`. */
+export function reviewScreenBaselines<V extends BaselineFacts>(
+  versions: readonly V[],
+  shown: { id: string; number: number },
+  now: Date,
+): ReviewScreenBaselines<V> {
+  const redline = reviewBaseline(versions, shown.id, now);
+  const active = versions.find((v) => v.state === "active");
+  const renders = active ? null : contractBaseline(versions, now);
+  return {
+    redline: redline?.number != null ? redline : null,
+    replaces: active && active.number !== shown.number ? active : null,
+    stillRenders:
+      renders && renders.number !== null && renders.number !== shown.number
+        ? renders
+        : null,
+    renamedFrom: renameBaseline(versions, shown.id, now),
+  };
+}
+
 /** Whether a row is the version `versionId` or another round of its number. */
 function ownNumber<V extends BaselineFacts>(
   versions: readonly V[],

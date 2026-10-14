@@ -18,7 +18,7 @@ import {
   importTemplate,
 } from "@/server/import/create";
 import { readBodyCapped } from "@/server/api/read-body";
-import { getViewer } from "@/server/viewer";
+import { requestContextOrRefusal } from "@/server/context/request";
 
 // Import a file: POST /api/imports?team=<slug>, multipart/form-data { file } → ImportResponse: the new
 // template, or a refusal as every refusal is, `{ ok: false, code, reason }` (src/domain/refusals.ts),
@@ -42,11 +42,13 @@ function respond(body: ImportResponse): Response {
 }
 
 export async function POST(request: NextRequest) {
-  const viewer = await getViewer();
+  const context = await requestContextOrRefusal();
+  if (!context.ok) return respond(context);
+  const ctx = context.context;
   const teamSlug = new URL(request.url).searchParams.get("team") ?? "";
 
   // Permission first, before a byte of the body is read.
-  const permitted = await importPermission(viewer, teamSlug);
+  const permitted = await importPermission(ctx, teamSlug);
   if (!permitted.ok) return respond(permitted);
 
   // Too large: refused from the declared length when there is one, else as soon as the count passes it.
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
   }
   const file = form.get("file");
 
-  const result = await importTemplate(viewer, {
+  const result = await importTemplate(ctx, {
     teamSlug,
     file:
       file instanceof File

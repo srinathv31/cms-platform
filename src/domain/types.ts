@@ -233,6 +233,13 @@ export interface DraftPatch extends ChannelFieldsPatch {
   rev: number;
   /** One per editing session (one page visit). */
   sessionKey: string;
+  /**
+   * Which send of its editing session this is: every send, a retry included, carries a higher one than the send
+   * before it. A save that is behind the current rev lands only when it is newer than the session's last save
+   * (`sessionOwnsRev`), so a request the client gave up on and retried can't land after its retry and put back what
+   * the retry replaced.
+   */
+  seq: number;
   body?: JSONContent;
   variables?: Variable[];
   /** The draft's name (a version field: editable only while a draft is open). */

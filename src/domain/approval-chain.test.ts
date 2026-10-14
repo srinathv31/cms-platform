@@ -80,7 +80,7 @@ function viewer(
       ? [
           {
             teamId: team,
-            teamSlug: team,
+            teamSlug: `slug-of-${team}`,
             teamName: team,
             roles,
             status: opts.status ?? "active",

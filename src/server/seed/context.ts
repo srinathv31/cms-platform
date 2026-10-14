@@ -6,8 +6,8 @@ import type { Channel, Variable, VersionState } from "@/domain/types";
 import type * as ucomp from "@/server/db/schema/ucomp";
 import type * as sim from "@/server/db/schema/sim";
 import { seededId } from "@/server/ids";
-import { fnv1a, mulberry32, type Rng } from "./rng";
-import { VariableKit } from "./variables";
+import { fnv1a, mulberry32, type Rng } from "@/server/documents/rng";
+import { VariableKit } from "@/server/documents/variables";
 
 export { DAY, HOUR } from "./time";
 import { DAY } from "./time";

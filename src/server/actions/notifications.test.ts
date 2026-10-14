@@ -1,186 +1,80 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
 import { refresh } from "next/cache";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { NOTIFICATION_KINDS } from "@/domain/audit";
-import type { Viewer } from "@/domain/types";
-import type { Db } from "@/server/db/client";
-import * as schema from "@/server/db/schema/ucomp";
-import { getNotificationsData } from "@/server/queries/notifications";
-import {
-  loadPersona,
-  seededDatabasePerTest,
-} from "@/server/testing/review-fixtures";
-import { getViewer } from "@/server/viewer";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import { services } from "@/server/services";
+import { fakeBackendPerTest } from "@/server/services/fake/testing";
 import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "./notifications";
 
-// The bell against a temporary database filled by the real seed. Alex has three notifications:
-// Chris's access request and the recertification (unread), Devon's inactivity flag (read).
+// The bell's actions as the BFF runs them, against the in-memory fake (decision 0068): what an action adds to
+// its service is the input's parse, the answer's shape, and whether the page refreshes. What the service decides
+// (whose notification it is, the read time, a second mark) is the contract suite's
+// (src/server/services/contract/notifications.ts). Seed: Alex has two unread notifications.
 
-const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
-
-vi.mock("@/server/db/client", async () => {
-  const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  return tempDatabase("ucomp-notifications-");
-});
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
-vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
+vi.mock("@/server/services", () => import("@/server/services/fake/testing"));
+vi.mock(
+  "@/server/context/request",
+  () => import("@/server/services/fake/testing"),
+);
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 
-const { notifications } = schema;
 const BASE = new Date("2026-10-04T12:00:00.000Z");
-
-let db: Db;
-const people: Record<string, Viewer> = {};
-
-seededDatabasePerTest({ base: BASE });
-
-beforeAll(async () => {
-  ({ db } = await import("@/server/db/client"));
-  for (const id of ["alex", "maya", "priya", "morgan"])
-    people[id] = await loadPersona(db, id);
-}, 60_000);
+const backend = fakeBackendPerTest({ base: BASE });
 
 beforeEach(() => {
   vi.mocked(refresh).mockClear();
 });
 
-function as(userId: string) {
-  vi.mocked(getViewer).mockResolvedValue(people[userId]!);
+async function unreadOf(userId: string) {
+  const list = await services().notifications.list(backend.as(userId), {
+    limit: 100,
+  });
+  if (!list.ok) throw new Error(list.code);
+  return list.items.filter((n) => n.readAt === null);
 }
 
-const unreadOf = (userId: string) =>
-  db
-    .select()
-    .from(notifications)
-    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
-
-describe("getNotificationsData", () => {
-  it("lists the viewer's notifications newest first, with the unread count and demo-clock times", async () => {
-    as("alex");
-    const data = await getNotificationsData();
-    expect(data.items.map((n) => n.kind)).toEqual([
-      "access_requested",
-      "recert_due",
-      "inactivity_flagged",
-    ]);
-    expect(data.unreadCount).toBe(2);
-    expect(data.items.map((n) => n.unread)).toEqual([true, true, false]);
-    expect(data.items[0]).toMatchObject({
-      title: "Chris Morales asked for Author access to Coral Offers.",
-      href: "/coral-offers/settings/access-requests",
-      ago: "Yesterday", // 1.5 days ago: calendar days on the demo clock
-    });
-    expect(data.items[2]!.ago).toBe("5 days ago");
-  });
-
-  it("gives every row a sentence and a link, falling back by kind when a row lacks them", async () => {
-    const at = new Date(BASE.getTime() - 60_000);
-    await db.insert(notifications).values(
-      NOTIFICATION_KINDS.map((kind, i) => ({
-        id: `nt_fallback_${i}`,
-        userId: "morgan",
-        teamId: "coral-offers",
-        kind,
-        title: "",
-        body: null,
-        href: null,
-        createdAt: new Date(at.getTime() - i * 1000),
-        readAt: null,
-      })),
-    );
-    as("morgan");
-    const data = await getNotificationsData();
-    expect(data.unreadCount).toBe(NOTIFICATION_KINDS.length);
-    expect(new Set(data.items.map((n) => n.kind))).toEqual(
-      new Set(NOTIFICATION_KINDS),
-    );
-    for (const n of data.items) {
-      expect(n.title, n.kind).toMatch(/^[A-Z].*[.]$/);
-      expect(n.href, n.kind).toMatch(/^\//);
-    }
-    expect(data.items.find((n) => n.kind === "recert_due")!.href).toBe(
-      "/coral-offers/settings/recertification",
-    );
-  });
-
-  it("words each time by calendar day: 23:00 the night before is Yesterday at 01:00 (D9)", async () => {
-    const before = env.now;
-    const ids = ["nt_d9_late", "nt_d9_early"];
-    env.now = new Date("2026-10-05T01:00:00.000Z");
-    try {
-      await db.insert(notifications).values(
-        [
-          new Date("2026-10-04T23:00:00.000Z"),
-          new Date("2026-10-05T00:30:00.000Z"),
-        ].map((createdAt, i) => ({
-          id: ids[i]!,
-          userId: "morgan",
-          teamId: "coral-offers",
-          kind: "recert_due",
-          title: "Recertification is due.",
-          body: null,
-          href: null,
-          createdAt,
-          readAt: null,
-        })),
-      );
-      as("morgan");
-      const ago = new Map(
-        (await getNotificationsData()).items.map((n) => [n.id, n.ago]),
-      );
-      expect(ago.get("nt_d9_late")).toBe("Yesterday");
-      expect(ago.get("nt_d9_early")).toBe("30 minutes ago");
-    } finally {
-      env.now = before;
-      await db.delete(notifications).where(inArray(notifications.id, ids));
-    }
-  });
-});
-
 describe("markNotificationRead", () => {
-  it("marks one of the viewer's own notifications read, on the demo clock", async () => {
-    as("priya");
-    const [first] = await unreadOf("priya");
-    expect(await markNotificationRead({ id: first!.id })).toEqual({ ok: true });
-    const row = await db.query.notifications.findFirst({
-      where: eq(notifications.id, first!.id),
+  it("answers { ok: true } and refreshes once it marked one; again, it answers the same and refreshes nothing", async () => {
+    const [first] = await unreadOf("alex");
+    expect(await markNotificationRead({ id: first!.id })).toEqual({
+      ok: true,
     });
-    expect(row!.readAt).toEqual(env.now);
     expect(refresh).toHaveBeenCalledTimes(1);
-    // Again: a no-op that succeeds.
-    expect(await markNotificationRead({ id: first!.id })).toEqual({ ok: true });
+    expect(await markNotificationRead({ id: first!.id })).toEqual({
+      ok: true,
+    });
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses someone else's notification, and one that doesn't exist, the same way", async () => {
-    as("maya");
+  it("answers notification_gone for an id that doesn't parse, as the service does for one that isn't the viewer's", async () => {
     const [alexs] = await unreadOf("alex");
+    backend.as("maya");
     const refused = await markNotificationRead({ id: alexs!.id });
     expect(refused).toEqual({
       ok: false,
-      code: "notification_gone",
-      reason: "This notification no longer exists.",
+      code: REQUEST_REFUSALS.notificationGone.code,
+      reason: REQUEST_REFUSALS.notificationGone.reason,
     });
-    expect(await markNotificationRead({ id: "nt_nope" })).toEqual(refused);
     expect(await markNotificationRead({ id: "" })).toEqual(refused);
-    expect((await unreadOf("alex")).map((n) => n.id)).toContain(alexs!.id);
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("answers signed_out when nobody is signed in", async () => {
+    backend.signOut();
+    expect(await markNotificationRead({ id: "nt_any" })).toMatchObject({
+      ok: false,
+      code: REQUEST_REFUSALS.signedOut.code,
+    });
   });
 });
 
 describe("markAllNotificationsRead", () => {
-  it("marks every unread one of the viewer's, and nobody else's", async () => {
-    as("alex");
-    const mayaBefore = (await unreadOf("maya")).length;
+  it("answers how many it marked, and refreshes only when it marked some", async () => {
+    backend.as("alex");
     expect(await markAllNotificationsRead()).toEqual({ ok: true, count: 2 });
-    expect(await unreadOf("alex")).toEqual([]);
-    expect((await unreadOf("maya")).length).toBe(mayaBefore);
-    expect((await getNotificationsData()).unreadCount).toBe(0);
     expect(refresh).toHaveBeenCalledTimes(1);
-    // Nothing left: count 0, no refresh.
     expect(await markAllNotificationsRead()).toEqual({ ok: true, count: 0 });
     expect(refresh).toHaveBeenCalledTimes(1);
   });

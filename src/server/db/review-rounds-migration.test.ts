@@ -40,7 +40,9 @@ vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-rounds-migration-");
 });
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
+vi.mock("@/server/services/local/clock", () => ({
+  now: vi.fn(async () => env.now),
+}));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 
@@ -128,7 +130,7 @@ async function oldTemplate(
   await insertAsBuilt(schema.templates, [
     {
       id,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentTypeId: "ct_disclosure",
       createdBy: "maya",
       createdAt: created,

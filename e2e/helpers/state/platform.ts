@@ -12,6 +12,16 @@ import {
 const UPSERT_SETTING =
   "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value";
 
+/**
+ * A team's id, by the slug its URLs name it by. The two are never the same (decision 0053): the database, the audit
+ * trail and the notifications hold the id, the URL the slug.
+ */
+export async function teamIdOf(slug: string): Promise<string> {
+  const row = await selectOne("SELECT id FROM teams WHERE slug = ?", [slug]);
+  if (!row) throw new Error(`No team has the slug ${slug}.`);
+  return String(row.id);
+}
+
 /** A setting's value, or undefined when it isn't set. */
 export async function setting<T = unknown>(
   key: string,

@@ -1,30 +1,22 @@
 import "server-only";
 import { cache } from "react";
-import { desc, eq } from "drizzle-orm";
-import { sunsetDay } from "@/domain/business-zone";
-import { getBusinessZone } from "@/server/business-zone";
-import { db } from "@/server/db/client";
-import {
-  contentTypes,
-  teams,
-  templates,
-  users,
-  versions,
-} from "@/server/db/schema/ucomp";
-import { demoNow } from "./dynamic";
-import { ALL_SPACE } from "@/domain/permissions";
-import { compareRounds, type RoundRow } from "@/domain/rounds";
-import {
-  contentTypeFamily,
-  type ChannelFamily,
-  type VersionState,
-} from "@/domain/types";
+import { notFound } from "next/navigation";
 import { formatAgo } from "@/domain/dates";
-import { sunsetPassed } from "@/domain/lifecycle/sunset";
+import type { Person } from "@/domain/review-types";
+import type { ChannelFamily, VersionState } from "@/domain/types";
+import { requireRequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
+import type { TemplateLibrary } from "@/server/services/templates";
+import { requireSpace } from "./spaces";
+
+// The Library's read model: a space's templates, newest edit first, with whether the viewer may create there.
+// The backend decides it (`services().templates.library`: which templates the viewer sees, the version each is
+// shown by, the status, the sunset, the order, `can.create`); this words the rows (how long ago, from the read's
+// `asOf`). It decides nothing.
 
 export interface LibraryRow {
   id: string;
-  /** The latest version's name (`pickLatest`): the open draft's, otherwise the newest version's. */
+  /** The latest version's name (`latestVersion`): the open draft's, otherwise the newest version's. */
   name: string;
   /**
    * Document or Alert: the template's kind, from its content type's channels (`contentTypeFamily`). It is
@@ -41,99 +33,55 @@ export interface LibraryRow {
   sunsetPassed: boolean;
   /** Number of the Active version, if any. */
   activeNumber: number | null;
+  /** How long ago the newest change to any of its versions was, from the read's `asOf`; "—" for none. */
   lastEdited: string;
-  owner: { name: string; initials: string; hue: number };
+  owner: Omit<Person, "id">;
 }
 
-/**
- * Latest = the open draft if there is one, otherwise the highest version number, and of its rounds the
- * latest (`compareRounds`). The CMS shows a template by this version's name (`currentName` in
- * template-name.ts is the same pick in SQL).
- */
-export function pickLatest<T extends RoundRow>(list: T[]): T | undefined {
-  const draft = list.find((v) => v.state === "draft");
-  if (draft) return draft;
-  return list.reduce<T | undefined>(
-    (best, v) => (best === undefined || compareRounds(v, best) > 0 ? v : best),
-    undefined,
-  );
+export interface LibraryData {
+  rows: LibraryRow[];
+  /** The viewer may create a template here. Never in the cross-team space. */
+  canCreate: boolean;
+  /** ISO: the backend's instant the rows were read at; the rows' ages count from it. */
+  asOf: string;
 }
 
-/** Templates in a space ("all" = every team), newest edit first. Caller has already passed requireSpace. */
-export const getLibraryRows = cache(
-  async (spaceSlug: string): Promise<LibraryRow[]> => {
-    const nowDate = await demoNow();
-    const zone = await getBusinessZone();
-
-    const templateRows = await db
-      .select({
-        id: templates.id,
-        allowedChannels: contentTypes.allowedChannels,
-        teamSlug: teams.slug,
-        teamName: teams.name,
-        ownerName: users.name,
-        ownerInitials: users.initials,
-        ownerHue: users.avatarHue,
-      })
-      .from(templates)
-      .innerJoin(teams, eq(teams.id, templates.teamId))
-      .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
-      .innerJoin(users, eq(users.id, templates.createdBy))
-      .where(spaceSlug === ALL_SPACE ? undefined : eq(teams.slug, spaceSlug));
-
-    if (templateRows.length === 0) return [];
-
-    // Light columns only: never load `body` for a list.
-    const versionRows = await db
-      .select({
-        templateId: versions.templateId,
-        number: versions.number,
-        round: versions.round,
-        state: versions.state,
-        name: versions.name,
-        sunsetAt: versions.sunsetAt,
-        updatedAt: versions.updatedAt,
-      })
-      .from(versions)
-      .orderBy(desc(versions.updatedAt));
-
-    const byTemplate = new Map<string, typeof versionRows>();
-    for (const v of versionRows) {
-      const list = byTemplate.get(v.templateId);
-      if (list) list.push(v);
-      else byTemplate.set(v.templateId, [v]);
-    }
-
-    const rows = templateRows.map((t) => {
-      const list = byTemplate.get(t.id) ?? [];
-      const latest = pickLatest(list);
-      const active = list.find((v) => v.state === "active");
-      const edited = list.reduce<Date | null>(
-        (max, v) => (max === null || v.updatedAt > max ? v.updatedAt : max),
-        null,
-      );
-      return {
-        row: {
-          id: t.id,
-          name: latest?.name ?? t.id,
-          family: contentTypeFamily(t.allowedChannels),
-          teamSlug: t.teamSlug,
-          teamName: t.teamName,
-          status: latest?.state ?? ("draft" as VersionState),
-          sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
-          sunsetPassed: latest ? sunsetPassed(latest, nowDate) : false,
-          activeNumber: active?.number ?? null,
-          lastEdited: edited ? formatAgo(edited, nowDate) : "—",
-          owner: {
-            name: t.ownerName,
-            initials: t.ownerInitials,
-            hue: t.ownerHue,
-          },
-        } satisfies LibraryRow,
-        editedAt: edited?.getTime() ?? 0,
-      };
+/** Templates in a space ("all" = every team), newest edit first. Not found when the viewer can't enter the space. */
+export const getLibrary = cache(
+  async (spaceSlug: string): Promise<LibraryData> => {
+    const ctx = await requireRequestContext();
+    const space = await requireSpace(spaceSlug);
+    const library = await services().templates.library(ctx, {
+      teamId: space.teamId,
     });
-
-    return rows.sort((a, b) => b.editedAt - a.editedAt).map((r) => r.row);
+    if (!library.ok) notFound();
+    return libraryData(library);
   },
 );
+
+/** The Library from the service's facts: each row with its age worded. */
+export function libraryData(library: TemplateLibrary): LibraryData {
+  return {
+    rows: library.rows.map((row): LibraryRow => ({
+      id: row.id,
+      name: row.name,
+      family: row.family,
+      teamSlug: row.teamSlug,
+      teamName: row.teamName,
+      status: row.status,
+      sunsetDay: row.sunsetDay,
+      sunsetPassed: row.sunsetPassed,
+      activeNumber: row.activeNumber,
+      lastEdited: row.lastEditedAt
+        ? formatAgo(row.lastEditedAt, library.asOf)
+        : "—",
+      owner: {
+        name: row.owner.name,
+        initials: row.owner.initials,
+        hue: row.owner.hue,
+      },
+    })),
+    canCreate: library.can.create.ok,
+    asOf: library.asOf,
+  };
+}

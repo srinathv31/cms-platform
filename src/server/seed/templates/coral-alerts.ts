@@ -1,5 +1,5 @@
 import type { SeedCtx } from "../context";
-import { emptyBody, inlineDoc, linesDoc } from "../content";
+import { emptyBody, inlineDoc, linesDoc } from "@/server/documents/build";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 
@@ -23,7 +23,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
     {
       id: "UC-EFXFMS",
       key: "payment-due-reminder",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentType: "alert",
       name: "Payment Due Reminder",
       createdBy: "maya",
@@ -83,7 +83,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
     {
       id: "UC-397J2A",
       key: "card-used-abroad",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentType: "alert",
       name: "Card Used Abroad",
       createdBy: "priya",
@@ -134,7 +134,7 @@ export function seedCoralAlerts(ctx: SeedCtx) {
     {
       id: "UC-FYN38M",
       key: "rate-change-heads-up",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentType: "alert",
       name: "Rate Change Heads-up",
       createdBy: "maya",

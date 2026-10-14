@@ -33,7 +33,7 @@ import { contentTypeFamily, familyChannels } from "@/domain/types";
 import { fileUrlOfPath } from "@/lib/file-url";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { findRound } from "@/server/queries/find-round";
+import { findRound } from "@/server/services/local/find-round";
 import { seedDatabase } from "@/server/seed";
 import { caseDir, inputPath } from "@/server/render/golden/files";
 import { GOLDEN_AT } from "@/server/render/golden/focused-cases";

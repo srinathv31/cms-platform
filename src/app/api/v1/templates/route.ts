@@ -10,13 +10,13 @@ import {
   correlationIdOf,
   errorResponse,
   jsonResponse,
-  withDemoDate,
 } from "@/server/api/http";
-import { now } from "@/server/clock";
+import { now } from "@/server/services/local/clock";
 import {
   requireConsumer,
   searchActiveTemplates,
-} from "@/server/queries/consumer-api";
+  withDemoDate,
+} from "@/server/services/local/consumer-api";
 
 // GET /api/v1/templates?q=&limit=&after=: search the templates a consumer can link (Active ones only),
 // paged with an opaque cursor. Contract: ApiTemplateSearch in src/contracts/api-v1.ts.

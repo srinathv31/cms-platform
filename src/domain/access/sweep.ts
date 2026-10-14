@@ -1,9 +1,7 @@
 // The sweep: what the clock did since last time. Applies every deadline the demo clock has reached
 // (a review's deadline, 90 days flagged, 120 days suspended), backdated to the instant each was reached.
 
-import { formatLongDate } from "../dates";
 import {
-  INACTIVITY_FLAG_DAYS,
   INACTIVITY_SUSPEND_DAYS,
   type AccessEffect,
   type MembershipChange,
@@ -152,8 +150,12 @@ export function sweepAccess(input: SweepInput): SweepResult {
             exceptUserIds: [member.id],
           },
           teamId: team.id,
-          title: `${member.name} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days.`,
-          body: `Access to ${team.name} is suspended automatically on ${formatLongDate(idle.suspendAt)}.`,
+          facts: {
+            userId: member.id,
+            userName: member.name,
+            teamName: team.name,
+            suspendsAt: idle.suspendAt.toISOString(),
+          },
           link: { to: "settings", teamId: team.id, section: "inactivity" },
           at: idle.flagAt,
         });
@@ -175,7 +177,12 @@ export function sweepAccess(input: SweepInput): SweepResult {
         first.recert.id,
         (lapsedByRecert.get(first.recert.id) ?? 0) + 1,
       );
-      const by = formatLongDate(first.at);
+      const lapsed = {
+        userId: member.id,
+        userName: member.name,
+        teamName: team.name,
+        dueAt: first.at.toISOString(),
+      };
       effects.push(
         {
           kind: "audit",
@@ -197,7 +204,7 @@ export function sweepAccess(input: SweepInput): SweepResult {
           notification: "access_lapsed",
           to: { kind: "user", userId: member.id },
           teamId: team.id,
-          title: `Your access to ${team.name} lapsed: it wasn't recertified by ${by}.`,
+          facts: lapsed,
           link: { to: "request-access" },
           at: first.at,
         },
@@ -210,7 +217,7 @@ export function sweepAccess(input: SweepInput): SweepResult {
             exceptUserIds: [member.id],
           },
           teamId: team.id,
-          title: `${member.name}'s access to ${team.name} lapsed: not recertified by ${by}.`,
+          facts: lapsed,
           link: { to: "settings", teamId: team.id, section: "recertification" },
           at: first.at,
         },
@@ -221,6 +228,13 @@ export function sweepAccess(input: SweepInput): SweepResult {
         statusReason: "inactivity_auto",
         statusChangedAt: first.at,
       } satisfies MembershipSet);
+      const suspended = {
+        userId: member.id,
+        userName: member.name,
+        teamName: team.name,
+        daysInactive: first.daysInactive,
+        actorName: null,
+      };
       effects.push(
         {
           kind: "audit",
@@ -240,7 +254,7 @@ export function sweepAccess(input: SweepInput): SweepResult {
           notification: "access_suspended",
           to: { kind: "user", userId: member.id },
           teamId: team.id,
-          title: `Your access to ${team.name} was suspended after ${first.daysInactive} days without a sign-in.`,
+          facts: suspended,
           link: { to: "request-access" },
           at: first.at,
         },
@@ -253,7 +267,7 @@ export function sweepAccess(input: SweepInput): SweepResult {
             exceptUserIds: [member.id],
           },
           teamId: team.id,
-          title: `${member.name}'s access to ${team.name} was suspended after ${first.daysInactive} days without a sign-in.`,
+          facts: suspended,
           link: { to: "settings", teamId: team.id, section: "inactivity" },
           at: first.at,
         },
@@ -303,10 +317,12 @@ function keptLastAdminEffects(
           dueAt: b.at.toISOString(),
         }
       : { daysInactive: b.daysInactive };
-  const title =
-    b.kind === "lapse"
-      ? `${member.name} wasn't recertified by ${formatLongDate(b.at)}, but as the last Team Admin of ${team.name} their access stays on.`
-      : `${member.name} hasn't signed in for ${b.daysInactive} days, but as the last Team Admin of ${team.name} their access stays on.`;
+  const kept = {
+    userId: member.id,
+    userName: member.name,
+    teamName: team.name,
+    keptLastAdmin: true as const,
+  };
   return [
     {
       kind: "audit",
@@ -322,14 +338,24 @@ function keptLastAdminEffects(
         ...details,
       },
     },
-    {
-      kind: "notification",
-      notification: b.kind === "lapse" ? "recert_due" : "inactivity_flagged",
-      to: { kind: "platform_admins" },
-      teamId: team.id,
-      title,
-      link: { to: "platform", section: "teams" },
-      at: b.at,
-    },
+    b.kind === "lapse"
+      ? {
+          kind: "notification",
+          notification: "recert_due",
+          to: { kind: "platform_admins" },
+          teamId: team.id,
+          facts: { ...kept, dueAt: b.at.toISOString() },
+          link: { to: "platform", section: "teams" },
+          at: b.at,
+        }
+      : {
+          kind: "notification",
+          notification: "inactivity_flagged",
+          to: { kind: "platform_admins" },
+          teamId: team.id,
+          facts: { ...kept, daysInactive: b.daysInactive },
+          link: { to: "platform", section: "teams" },
+          at: b.at,
+        },
   ];
 }

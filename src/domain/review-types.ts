@@ -8,6 +8,7 @@ import type {
   ContractChange,
   JSONContent,
   TeamRole,
+  VersionState,
 } from "./types";
 import type { ChannelField } from "./channel-fields";
 import type { Refused } from "./refusals";
@@ -22,7 +23,7 @@ export interface Person {
   hue: number;
 }
 
-// ── Effects: what a transition asks server/effects.ts to write, in the same transaction ──────
+// ── Effects: what a transition asks the effects writer (services/local/effects.ts) to write, in the same transaction ──
 
 export type AuditAction =
   | "template.created"
@@ -76,10 +77,12 @@ export type AuditEffect = {
 }[AuditAction];
 
 /**
- * Where a notification links to. The server turns it into an href with the team slug. A review link
- * names its round exactly when the round's label shows it (`reviewLink` in rounds.ts): without one, the
- * review screen is the number's head, or for a stage reviewer outside the team who can't open the head
- * (the next round waits on another stage), the newest round of the number they decided.
+ * Where a notification links to, as a transition names it: in the template's space. The writer places it for
+ * each recipient (`recipientLink` in recipients.ts) and stores it with the team's id (`PlacedNotificationLink`);
+ * the BFF builds the href from that when it reads it (decision 0055). A review link names its round exactly
+ * when the round's label shows it (`reviewLink` in rounds.ts): without one, the review screen is the number's
+ * head, or for a stage reviewer outside the team who can't open the head (the next round waits on another
+ * stage), the newest round of the number they decided.
  */
 export type NotificationLink =
   | { to: "review"; templateId: string; versionNumber: number; round?: number }
@@ -95,6 +98,21 @@ export type NotificationLink =
     }
   | { to: "versions"; templateId: string };
 
+/**
+ * A lifecycle link as a notification row stores it: placed in the space it opens in for its recipient, named
+ * by the team's id, never its slug or a route (decision 0053).
+ */
+export type PlacedNotificationLink =
+  | {
+      to: "review";
+      teamId: string;
+      templateId: string;
+      versionNumber: number;
+      round?: number;
+    }
+  | { to: "template"; teamId: string; templateId: string }
+  | { to: "versions"; teamId: string; templateId: string };
+
 export type NotificationKind =
   | "review_requested"
   | "changes_requested"
@@ -105,20 +123,88 @@ export type NotificationKind =
   | "version_revoked"
   | "sunset_scheduled";
 
+/**
+ * What each lifecycle notification stores (decision 0055): facts, never a sentence or a URL. Names are as they
+ * were when it was written (`actorName`, `templateName`, a stage's name), so it keeps the names it was written
+ * with (decision 0016). `describeNotification` (notifications.ts) words them when the notification is read; a
+ * person's own words (a submit note, a reason, a comment) are its `body`, not a fact.
+ */
+export interface NotificationFacts {
+  /**
+   * A round waits on a stage: at submit, the first stage's approvers are asked (no `stage`); after a stage's
+   * approval, or when a chain edit gives the waiting stage a new rule, that stage's (`stage`, its name).
+   * `actorName` is whoever acted: the submitter, the approver, the Platform Admin.
+   */
+  review_requested: {
+    actorName: string;
+    templateName: string;
+    number: number;
+    round: number;
+    stage?: string;
+  };
+  /** A stage approved, to the submitter: the stage and the next one, by the names the version has for them. */
+  stage_approved: {
+    actorName: string;
+    templateName: string;
+    number: number;
+    round: number;
+    stage: string;
+    next: string;
+  };
+  /** The version went Active, to the submitter. Released, it is named by its number alone. */
+  version_live: { actorName: string; templateName: string; number: number };
+  /** A round was sent back, to the submitter (the reason is the body). */
+  changes_requested: {
+    actorName: string;
+    templateName: string;
+    number: number;
+    round: number;
+  };
+  /**
+   * A comment or a reply (the comment is the body), on the version a thread began on, as it was then: a draft
+   * has no number or round.
+   */
+  comment_added: {
+    actorName: string;
+    templateName: string;
+    number: number | null;
+    round: number | null;
+    state: VersionState;
+    reply: boolean;
+  };
+  /** A revoke started, to the other approvers (the reason is the body). */
+  revoke_started: { actorName: string; templateName: string; number: number };
+  /** A revoke confirmed (the reason is the body). */
+  version_revoked: { actorName: string; templateName: string; number: number };
+  /** A sunset set or moved, to the version's submitter: the day, in the business time zone it was read in. */
+  sunset_scheduled: {
+    templateName: string;
+    number: number;
+    /** ISO: 00:00 on `sunsetDay` in `zone`. */
+    sunsetAt: string;
+    /** YYYY-MM-DD. */
+    sunsetDay: string;
+    zone: string;
+  };
+}
+
 /** Recipients are resolved by the server: a user, or every active member with a role on the template's team. */
 export type Recipients =
   | { kind: "user"; userId: string }
   | { kind: "team_role"; role: TeamRole; exceptUserIds?: string[] };
 
-export interface NotificationEffect {
-  kind: "notification";
-  notification: NotificationKind;
-  to: Recipients;
-  /** One plain sentence: "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review." */
-  title: string;
-  body?: string;
-  link: NotificationLink;
-}
+/** A lifecycle notification to write: its kind, its facts, whom it reaches and where it opens. */
+export type NotificationEffect = {
+  [K in NotificationKind]: {
+    kind: "notification";
+    notification: K;
+    to: Recipients;
+    facts: NotificationFacts[K];
+    /** Only a person's own words: the submit note, the reason, the comment. */
+    body?: string;
+    link: NotificationLink;
+  };
+}[NotificationKind];
 
 export type ConsumerNoticeKind =
   "new_version" | "sunset_scheduled" | "sunset_passed" | "revoked";
@@ -140,13 +226,41 @@ export interface ConsumerNoticeEffect {
     /** The business time zone `sunsetDay` was read in. */
     zone?: string;
     reason?: string; // revoke
+    /** new_version and sunset_scheduled: always, empty when there are none. */
     contractChanges?: ContractChange[];
-    contractLines?: string[];
   };
 }
 
 export type LifecycleEffect =
   AuditEffect | NotificationEffect | ConsumerNoticeEffect;
+
+/** Where a transition's effects belong, and when: what both implementations' effects writers date and address them with. */
+export interface EffectContext {
+  /**
+   * When it happened: the backend's clock, read once by the command. The sunset sweep passes the instant the
+   * sunset passed. Audit rows are dated then, and consumer notices go to the consumers that rendered the
+   * template from 90 days before it on.
+   */
+  at: Date;
+  /**
+   * When the effects are written, if later than `at`: the sunset sweep runs after the sunset. Notifications
+   * and consumer notices are created then, the moment they can first be read. Defaults to `at`.
+   */
+  writtenAt?: Date;
+  /** Who acted; null for the system (the sunset sweep). */
+  actorId: string | null;
+  teamId: string;
+  templateId: string;
+  /** The version the transition is about. An effect may name another one (`versionId`). */
+  versionId: string;
+}
+
+/** How many rows of each kind an effects writer wrote. */
+export interface EffectsWritten {
+  audit: number;
+  notifications: number;
+  consumerNotices: number;
+}
 
 // ── Approval chain (configuration, not code) ─────────────────────────────────
 

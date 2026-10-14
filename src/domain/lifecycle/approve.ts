@@ -9,13 +9,12 @@ import {
   stageRecipients,
   type RecordedDecision,
 } from "../approval-chain";
-import { describeChanges } from "../contract";
 import { makerCheckerRefusal } from "../permissions";
-import { refuse } from "../refusals";
+import { refuse, type Refusal } from "../refusals";
 import { outputsRefusal, viewedOutputs } from "../review-outputs";
 import { reviewLink } from "../rounds";
 import type { ApprovalStage, LifecycleEffect } from "../review-types";
-import { unique, roundOf, sentence, notify } from "./helpers";
+import { unique, roundOf, notify } from "./helpers";
 import { REFUSALS } from "./refusals";
 import { sunsetOn, isAfterToday } from "./sunset";
 import type { Ok, Outcome, ReviewVersion, ApprovalRecord } from "./types";
@@ -46,6 +45,31 @@ export interface Approved {
 }
 
 export type ApproveResult = Outcome<Approved>;
+
+/**
+ * Two stages need two people: someone who approved a stage of this round (`approvedBy`, from
+ * `approvedThisRound`) can't approve another. The approve transition and the decide check (`decideCheck`)
+ * both ask this.
+ */
+export function approvedEarlierStage(
+  actorId: string,
+  approvedBy: readonly string[],
+): Refusal | null {
+  return approvedBy.includes(actorId) ? REFUSALS.approvedEarlierStage : null;
+}
+
+/**
+ * The Active version an approval replaces when it goes live (`approve`'s `active`): the template's Active row,
+ * unless it is the round being approved itself or has no number. Null when nothing is Active.
+ */
+export function replacedActive(
+  active: { id: string; number: number | null } | null | undefined,
+  round: { id: string },
+): { id: string; number: number } | null {
+  return active && active.id !== round.id && active.number !== null
+    ? { id: active.id, number: active.number }
+    : null;
+}
 
 /**
  * Approve the stage the version is waiting on. The version goes through its own stages (recorded at
@@ -106,7 +130,8 @@ export function approve(input: {
   const wrote = makerCheckerRefusal(actorId, version);
   if (wrote) return refuse(wrote);
   const approved = approvedThisRound(input.decisions ?? []);
-  if (approved.includes(actorId)) return refuse(REFUSALS.approvedEarlierStage);
+  const earlier = approvedEarlierStage(actorId, approved);
+  if (earlier) return refuse(earlier);
   const stages = ownStages(version.stages, chain);
   const index = version.currentStage;
   const stage = stageOf(stages, index, chain);
@@ -135,7 +160,7 @@ export function approve(input: {
     decidedAt: now,
   };
   const review = reviewLink(version.templateId, reviewed);
-  const label = `${templateName} ${sentence(reviewed)}`;
+  const named = { templateName, number, round };
 
   // ── An earlier stage: on to the next one ──
   if (next) {
@@ -163,7 +188,7 @@ export function approve(input: {
         notify({
           notification: "review_requested",
           to: asked,
-          title: `${label} is waiting on ${next.name}.`,
+          facts: { actorName, ...named, stage: next.name },
           link: review,
         }),
       );
@@ -173,8 +198,7 @@ export function approve(input: {
         notify({
           notification: "stage_approved",
           to: { kind: "user", userId: version.submittedBy },
-          title: `${actorName} approved ${label} for ${stage.name}.`,
-          body: `Next: ${next.name}.`,
+          facts: { actorName, ...named, stage: stage.name, next: next.name },
           link: review,
         }),
       );
@@ -198,7 +222,6 @@ export function approve(input: {
   const sunset =
     active && sunsetPrevious !== null ? sunsetOn(sunsetPrevious, zone) : null;
   const contractChanges = [...(version.contractChanges ?? [])];
-  const contractLines = describeChanges(contractChanges, number);
 
   const effects: LifecycleEffect[] = [
     {
@@ -239,8 +262,7 @@ export function approve(input: {
         notification: "version_live",
         to: { kind: "user", userId: version.submittedBy },
         // Released: the number consumers know, "v2", whichever round it was approved on.
-        title: `${templateName} ${sentence({ number, round, state: "active" })} is now Active.`,
-        body: `${actorName} approved it.`,
+        facts: { actorName, templateName, number },
         link: { to: "template", templateId: version.templateId },
       }),
     );
@@ -253,7 +275,6 @@ export function approve(input: {
       versionNumber: number,
       activeVersion: number,
       contractChanges,
-      contractLines,
     },
   });
   if (active && sunset) {
@@ -268,7 +289,6 @@ export function approve(input: {
         sunsetDay: sunset.details.sunsetDay,
         zone: sunset.details.zone,
         contractChanges,
-        contractLines,
       },
     });
   }

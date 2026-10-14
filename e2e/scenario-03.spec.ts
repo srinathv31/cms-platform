@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { describeNotification } from "@/domain/notifications";
 import {
   correlation,
   expectError,
@@ -44,6 +45,7 @@ import {
   notificationsAbout,
   renderLogFor,
   versionById,
+  teamIdOf,
   versionNumbered,
   versionsOf,
   type VersionRecord,
@@ -1357,8 +1359,9 @@ test.describe("scenario 3: the review loop", () => {
         ["thread.resolved", "maya"],
         ["version.activated", "jordan"],
       ]);
+      const teamId = await teamIdOf(TEAM);
       for (const event of audit)
-        expect(event).toMatchObject({ teamId: TEAM, templateId: id });
+        expect(event).toMatchObject({ teamId, templateId: id });
       expect(audit[0].details).toMatchObject({
         number: 1,
         round: 1,
@@ -1415,7 +1418,7 @@ test.describe("scenario 3: the review loop", () => {
 
       // notifications: each submit asks the team's approvers except the submitter; the author hears about the
       // comment, the change request and the go-live.
-      const approvers = (await approversOf(TEAM)).filter(
+      const approvers = (await approversOf(teamId)).filter(
         (user) => user !== "maya",
       );
       expect(approvers, "Jordan and others can approve").toContain("jordan");
@@ -1436,32 +1439,42 @@ test.describe("scenario 3: the review loop", () => {
         approvers.length * 2 + 3,
       );
       for (const note of notes)
-        expect(note).toMatchObject({ teamId: TEAM, readAt: null });
-      // Round 1's ask names no round (nothing had been sent back yet), and its link is the bare one; round 2's names it.
+        expect(note).toMatchObject({ teamId, readAt: null });
+      // Stored as facts and a link by team id (decision 0055), worded when the bell reads them. Round 1's ask
+      // names no round (nothing had been sent back yet), and its link is the bare one; round 2's names it.
+      const says = (r: (typeof notes)[number]) =>
+        describeNotification(r.kind, r.facts, r.userId).title;
       const asked = notes.filter(
         (r) => r.kind === "review_requested" && r.userId === "jordan",
       );
-      expect(asked.map((r) => [r.title, r.href])).toEqual([
+      const maya = { actorName: "Maya Chen", templateName: NAME, number: 1 };
+      expect(asked.map((r) => [r.facts, r.link])).toEqual([
         [
-          `Maya Chen submitted ${NAME} v1 for review.`,
-          `/${TEAM}/review/${id}/1`,
+          { ...maya, round: 1 },
+          { to: "review", teamId, templateId: id, versionNumber: 1 },
         ],
         [
-          `Maya Chen submitted ${NAME} v1, round 2 for review.`,
-          `/${TEAM}/review/${id}/1?round=2`,
+          { ...maya, round: 2 },
+          { to: "review", teamId, templateId: id, versionNumber: 1, round: 2 },
         ],
+      ]);
+      expect(asked.map(says)).toEqual([
+        `Maya Chen submitted ${NAME} v1 for review.`,
+        `Maya Chen submitted ${NAME} v1, round 2 for review.`,
       ]);
       const [sentBack] = notes.filter((r) => r.kind === "changes_requested");
       expect(sentBack).toMatchObject({
-        title: `Jordan Ellis requested changes on ${NAME} v1, round 1.`,
         body: REASON,
-        href: `/${TEAM}/templates/${id}`,
+        link: { to: "template", teamId, templateId: id },
       });
+      expect(says(sentBack!)).toBe(
+        `Jordan Ellis requested changes on ${NAME} v1, round 1.`,
+      );
       const [live] = notes.filter((r) => r.kind === "version_live");
       expect(live).toMatchObject({
-        title: `${NAME} v1 is now Active.`,
-        href: `/${TEAM}/templates/${id}`,
+        link: { to: "template", teamId, templateId: id },
       });
+      expect(says(live!)).toBe(`${NAME} v1 is now Active.`);
     });
 
     await test.step("5.3 The render API: v1 renders as Coral, its released round, and no round is named", async () => {

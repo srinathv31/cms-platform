@@ -150,13 +150,13 @@ test("after another session saves first, the page turns read-only and offers Rel
   await test.step("Another session renames the draft: it saves first, through the same API", async () => {
     const { rev } = await theDraft();
     const res = await page.request.put(`/api/drafts/${draftId}`, {
-      data: { rev, sessionKey: randomUUID(), name: ELSEWHERE },
+      data: { rev, sessionKey: randomUUID(), seq: 1, name: ELSEWHERE },
     });
     expect(res.status()).toBe(200);
 
     // A save from the rev it just left is refused in the shape every refusal has, carrying the current rev.
     const stale = await page.request.put(`/api/drafts/${draftId}`, {
-      data: { rev, sessionKey: randomUUID(), name: "Too late" },
+      data: { rev, sessionKey: randomUUID(), seq: 1, name: "Too late" },
     });
     expect(stale.status()).toBe(409);
     expect(await stale.json()).toEqual({

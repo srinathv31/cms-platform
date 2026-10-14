@@ -14,7 +14,7 @@ import type {
   MembersSection,
   RecertificationSection,
   RecertItemRow,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 
 // The settings screens render what the server decided: who may do what (`can`), what each action
 // does (`consequences`), how a settled row reads. They never work a rule out themselves. The read
@@ -51,7 +51,7 @@ const { RecertificationView } = await import("./team/recertification-view");
 const { TimeZoneSectionView } = await import("./platform/time-zone");
 
 const OK = { ok: true } as const;
-const TEAM = { id: "coral-offers", slug: "coral-offers", name: "Coral Offers" };
+const TEAM = { id: "t_coral", slug: "coral-offers", name: "Coral Offers" };
 const person = (id: string, name: string) => ({
   id,
   name,
@@ -435,6 +435,7 @@ describe("Inactivity", () => {
     flagged: [row],
     suspended: [],
     thresholds: { flagDays: 90, suspendDays: 120 },
+    today: TODAY,
   });
 
   it("says Kept active only when the read model says the sweep held them, whatever the day count", async () => {
@@ -494,7 +495,6 @@ describe("Recertification", () => {
         kept: 0,
         removed: 0,
         pending: items.length,
-        label: "",
       },
       items,
       lapsed: [],

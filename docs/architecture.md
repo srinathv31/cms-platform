@@ -73,9 +73,11 @@ Conventions that nothing enforces yet, and where the code already breaks them:
    renders the header and tab bar.
 3. [versions-content.tsx](../src/components/versions/versions-content.tsx), a server component, awaits `params` and
    calls `getVersions()` from [queries/versions.ts](../src/server/queries/versions.ts).
-4. The read model checks access (`requireTemplate`), reads the demo time, queries the tables, and returns
-   `VersionsData`: plain, serializable, dates as ISO strings, one entry per version number with its review rounds
-   folded into it, and `can` results decided per version.
+4. The read model reads the request context ([context/request.ts](../src/server/context/request.ts): the viewer and
+   the demo time, once per request), checks the space, and asks the backend through the service interfaces
+   (`services().versions.history`, [services/](../src/server/services/README.md)). The backend checks access, queries
+   the tables and decides `can` per version; the read model words and lays out the facts and returns `VersionsData`:
+   plain, serializable, dates as ISO strings, one entry per version number with its review rounds folded into it.
 5. Client components (`version-actions.tsx`, `sunset-dialog.tsx`) receive it as props.
 
 Request data (cookies, `params`, database reads, the clock) is read only inside `<Stream>`. With Cache Components,
@@ -89,12 +91,18 @@ load." in the tab's place, under the header and the tab bar ([Errors](../src/app
    `useActionRun` ([use-action-run.ts](../src/components/primitives/use-action-run.ts)): one request at a time,
    closes on `ok`, shows `reason` otherwise.
 2. `setSunset` in [actions/review.ts](../src/server/actions/review.ts) runs on the server action kit, `serverAction`
-   in [actions/kit.ts](../src/server/actions/kit.ts): `getViewer()`, zod parse, permission check, `now()` once,
-   then one transaction. Inside it: re-read the version, call the domain transition, write the changes with a
-   compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row, notifications, consumer
-   notices) with `writeEffects`. A refusal anywhere rolls the transaction back and is the answer. On success,
-   `revalidatePath()` and `refresh()`.
-3. The transition (`setSunset` in [lifecycle/sunset.ts](../src/domain/lifecycle/sunset.ts)) decides; the action only writes. A
+   in [actions/kit.ts](../src/server/actions/kit.ts): the request context (the viewer, once; `signed_out` without a
+   viewer), zod parse, then the service, `services().review.setSunset`. On success, `revalidatePath()` and
+   `refresh()`. The BFF supplies no time.
+3. Behind the service, the local implementation ([services/local/review.ts](../src/server/services/local/review.ts))
+   checks the permission, reads its own clock once, then runs one transaction: re-read the version, call the
+   domain transition, write the
+   changes with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row,
+   notifications, consumer notices) with `writeEffects`. A notification is stored as its kind's facts and a link by
+   team id; the BFF words it and builds its href when the bell reads it
+   ([0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). A refusal anywhere rolls the transaction back and is the
+   answer. After the port, the Java API does this step.
+4. The transition (`setSunset` in [lifecycle/sunset.ts](../src/domain/lifecycle/sunset.ts)) decides; the command only writes. A
    refusal is a value with a stable `code`, which code branches on, and a `reason`, the sentence the person reads
    ([refusals.ts](../src/domain/refusals.ts)).
 
@@ -110,22 +118,24 @@ variations to avoid.
    refusal retrying can't fix (a conflict) stops it for good: the page turns read-only and offers Reload
    ([decision 0020](decisions/0020-autosave-never-drops-edits-silently.md)).
 2. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
-   client. It checks that the viewer may edit the draft before reading a byte of the body, reads the body with a
-   byte counter that stops at 2 MB (413 past it), parses the patch, and calls `saveDraft`.
-3. [apply-patch.ts](../src/server/drafts/apply-patch.ts) prepares the body and the channel fields (each by its id,
-   such as `"email.subject"`) with [prepare.ts](../src/server/documents/prepare.ts): normalized, checked against
-   the document limits and the editor schema, block ids added. Import stores documents through the same function.
-   Then, in one transaction, it checks permission, the `draft` state, and `rev` (tolerating a lost response from the
-   same session), writes with a compare-and-set (the channel fields laid over the stored ones), adds the saver to
-   the version's `writers` (nobody decides a version they wrote), and keeps one `draft.edited` audit row per editing
-   session. Nothing is refreshed; the client already has the content.
+   client. It asks the backend whether the viewer may edit the draft (`drafts.saveAccess`) before reading a byte of
+   the body, reads the body with a byte counter that stops at 2 MB (413 past it), and parses the patch.
+3. The route prepares the body and the channel fields (each by its id, such as `"email.subject"`) with
+   [prepare-patch.ts](../src/server/drafts/prepare-patch.ts), over [prepare.ts](../src/server/documents/prepare.ts):
+   normalized, checked against the document limits and the editor schema, block ids added. Import stores documents
+   through the same function. Then it calls `drafts.save` ([local/drafts.ts](../src/server/services/local/drafts.ts)
+   on this app's database, deciding with [autosave.ts](../src/domain/lifecycle/autosave.ts)): in one transaction it
+   checks permission, the `draft` state, and `rev` (tolerating a lost response from the same session, but not a request it gave up on arriving after its retry), writes with a
+   compare-and-set (the channel fields laid over the stored ones), adds the saver to the version's `writers` (nobody
+   decides a version they wrote), and keeps one `draft.edited` audit row per editing session. Nothing is refreshed;
+   the client already has the content.
 
 ### A consumer render, and the preview that shares it
 
 `POST /api/v1/templates/{id}/render`
 ([route.ts](../src/app/api/v1/templates/[templateId]/render/route.ts)) runs
-[render-template.ts](../src/server/render/render-template.ts), whose header lists every step and the error each
-returns. The rules are specified in [render-spec.md](render-spec.md). The one behind all of them: every channel
+[render-template.ts](../src/server/services/local/render/render-template.ts), the local implementation's render
+pipeline, whose header lists every step and the error each returns. The rules are specified in [render-spec.md](render-spec.md). The one behind all of them: every channel
 prints exactly what the author typed and saw, with no rounding, dropping, renumbering, or rewording.
 
 1. Find the template and version (404). A version number means its released version, else its latest round.
@@ -148,8 +158,8 @@ The golden files run the same engine on frozen inputs, so a golden file is exact
 The CMS preview is a separate route, `POST /api/templates/{id}/preview`
 ([route.ts](../src/app/api/templates/[templateId]/preview/route.ts)): it takes the person from the session, not an
 `X-Consumer-Id`, may name the review `round`, renders a draft or any state, skips the version rules and is logged as
-a preview. It runs the same `renderTemplate` and answers with the same bodies, so what an approver sees is what a
-consumer gets ([decision 0047](decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
+a preview. It asks the backend (`services().render.preview`), which runs the same pipeline, and answers with the
+same bodies, so what an approver sees is what a consumer gets ([decision 0047](decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 `/api/v1` serves consumers only and reads no session, so another backend can take it over without the browser's
 cookie. Coral calls the consumer URL over HTTP from the server, as a real consumer would.
 
@@ -200,12 +210,16 @@ What the Java API's MSSQL schema does instead: team and user ids
 ([0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and test data
 ([0069](decisions/0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)).
 [Porting the data model](reference/data-model.md) puts them together table by table, with every audit action's and
-notice kind's payload.
+notice kind's payload and every notification kind's facts.
 
 ## Time, identity, and demo data
 
-- **The demo clock.** `now()` in [clock.ts](../src/server/clock.ts) is real time plus `settings.clock_offset_days`.
-  It is the only reader of the current time on the server; domain functions take `now` as an argument. The Demo
+- **The demo clock.** `now()` in [services/local/clock.ts](../src/server/services/local/clock.ts) is real time plus
+  `settings.clock_offset_days`.
+  It is the backend's clock and the only reader of the current time on the server: a command dates its writes by
+  it, a read that decides by time answers it as `asOf`, and the BFF words its dates from that, reading no clock of
+  its own ([decision 0072](decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)). Domain
+  functions take `now` as an argument. The Demo
   pill's "Advance clock" moves the offset, and `/api/v1` responses carry it in their `Date` header.
 - **The business time zone.** A sunset date ends at 00:00 on that day in one platform time zone, a Platform
   setting that is `America/New_York` by default
@@ -213,13 +227,17 @@ notice kind's payload.
   the UI shows is UTC, and "today", "yesterday" and "3 days ago" count UTC calendar days, the same on every screen
   ([decision 0028](decisions/0028-today-and-yesterday-are-utc-calendar-days.md)). Dates, counts and plurals have
   one module each in `src/domain`: `dates.ts`, `numbers.ts`, `plural.ts`.
-- **Identity.** There is no login. `getViewer()` reads the `ucomp_persona` cookie. A missing or unknown cookie acts
-  as Maya.
+- **Identity.** There is no login. The request context ([context/request.ts](../src/server/context/request.ts))
+  reads the `ucomp_persona` cookie through `getViewer()`, which asks the identity service whom it names. A missing or
+  unknown cookie is signed out, and a page goes to `/sign-in`; with the demo tools on (`DEMO_MODE`), it acts as Maya.
+  A URL names a team by its slug; `requireSpace` resolves it to the team's id once (`identity.space`), and everything
+  below compares teams by id, which is never the slug
+  ([decision 0053](decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)).
 - **Seed** ([src/server/seed](../src/server/seed/index.ts)), deterministic, rebuilt by `npm run db:reset`:
 
   |                     |                                                                                                                                                                                                                             |
   | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | Teams               | `coral-offers`, `deposits`, `card-statements` (ids equal slugs); `all` is the cross-team space                                                                                                                              |
+  | Teams               | Slugs `coral-offers`, `deposits`, `card-statements` (ids `t_coral`, `t_deposits`, `t_cards`: never the slug); `all` is the cross-team space                                                                                 |
   | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer)                                                                                         |
   | Content types       | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a 3-part budget                         |
   | Templates           | Coral Offers: five disclosures, one in each lifecycle state, and three alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: three disclosures each |
@@ -255,8 +273,9 @@ Facts about the code today. Each line goes away in the PR that fixes it.
   rendering and fights the static shells Cache Components builds. A hash-based policy, `'strict-dynamic'`, or none
   is a decision still to make. `Strict-Transport-Security` belongs to the TLS terminator in front of the app.
 - Access deadlines (recertification, inactivity) apply, and passed sunsets reach the audit log and consumers' notices, only when the sweeps
-  run: on a clock advance, a persona switch, or an access action. There is no scheduled job. (A sunset still stops
-  renders on time: the render rule reads the clock.)
+  run: on a clock advance, a persona switch, or an access action. They are the backend's scheduled jobs behind the
+  service seam (`runScheduledJobs`), but nothing runs them on a timer yet. (A sunset still stops renders on time: the
+  render rule reads the clock.)
 - Several invariants rely on SQLite's single writer and would need constraints or locks on another database.
 - No CI, no Node version pin, no `.env.example`, and no machine-readable API description (OpenAPI).
 

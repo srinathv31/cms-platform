@@ -23,14 +23,14 @@ and every request-bound part streams. Reading request data outside `<Suspense>` 
    [stream.tsx](../components/primitives/stream.tsx): a `Suspense` plus a `ViewTransition`. The fallback must
    have the final geometry; the principles spec requires a CLS of 0. A throw inside a `<Stream>` goes to the
    route's error boundary (see [Errors](#errors)); `<Stream>` doesn't catch it.
-2. Request data is read only inside a `<Stream>`. That means `getViewer()` (the `ucomp_persona` cookie through
-   `cookies()`), awaited `params` and `searchParams`, database reads, and `now()`. The page's default export
-   stays synchronous.
+2. Request data is read only inside a `<Stream>`. That means the request context (the `ucomp_persona` cookie
+   through `cookies()`, [server/context/request.ts](../server/context/request.ts)), awaited `params` and
+   `searchParams`, database reads, and `now()`. The page's default export stays synchronous.
 3. `params` and `searchParams` go down as promises. Type the page with `PageProps<"/route">` (or
    `LayoutProps<"/route">`) and `await` inside the streamed component.
-4. Time comes from `now()` in [server/clock.ts](../server/clock.ts) (real time plus the demo clock's offset),
-   never `new Date()` or `Date.now()` in server code. `now()` awaits `connection()` and reads the database, so
-   it is request data too.
+4. Time comes from the backend: a read model hands the screen the service's `asOf`, the instant the backend
+   decided at (its demo clock, [server/services/local/clock.ts](../server/services/local/clock.ts): real time plus
+   the offset Advance clock moves). Never `new Date()` or `Date.now()` in server code.
 5. A database read that runs before any request API needs `await connection()` first. libSQL resolves in
    microtasks, so without it the read can land in the prerender. See `getSimCustomers` in
    [ui/lists.ts](../simulator/ui/lists.ts) and the simulator's
@@ -64,6 +64,12 @@ writes the route types and the global `PageProps`, `LayoutProps` and `RouteConte
 | `/[team]/usage`                         | [usage/page.tsx](<./(product)/[team]/usage/page.tsx>)                                                                                                                                                                     | Usage dashboard (`?tab=consumers`).                                                                                                                                                       |
 | `/[team]/audit`                         | [audit/page.tsx](<./(product)/[team]/audit/page.tsx>)                                                                                                                                                                     | Audit log; filters live in the search params.                                                                                                                                             |
 | `/[team]/settings/[section]`            | [settings/[section]/page.tsx](<./(product)/[team]/settings/[section]/page.tsx>)                                                                                                                                           | The settings dialog. Team sections: `members`, `access-requests`, `recertification`, `inactivity`. Platform sections: `teams`, `content-types`, `channel-rules`, `approval-chains`.       |
+
+### `sign-in`: where a signed-out person lands
+
+[sign-in/page.tsx](./sign-in/page.tsx), outside `AppFrame` and static: `signInRequired()`
+([server/context/sign-in.ts](../server/context/sign-in.ts)) sends a page here when nobody is signed in (no persona
+cookie with the demo tools off). Real sign-in (Better Auth, decision 0054) replaces it.
 
 ### `(simulator)`: Coral, the simulated consumer
 
@@ -171,14 +177,15 @@ A `notFound()` or `redirect()` passes through these boundaries to Next's own han
 
 ## How route handlers answer
 
-Every handler is request-time. A POST always is; a GET is made so by reading the persona cookie
-(`getViewer()`), the request headers, or `connection()` before the database.
+Every handler is request-time. A POST always is; a GET is made so by reading the request context (the persona
+cookie), the request headers, or `connection()` before the database. A handler that needs a person answers 401
+`signed_out` without one (`requestContextOrRefusal()`, `signedOutResponse()`), in its own response shape.
 
 **`/api/v1`** answers through [server/api/http.ts](../server/api/http.ts). Its wire shapes are in
 [contracts/api-v1.ts](../contracts/api-v1.ts) (a file with no imports, lint-enforced); the render contract is
 [domain/render/types.ts](../domain/render/types.ts).
 
-- Wrap the handler in `withDemoDate`, which sets the HTTP `Date` header to the demo clock. Coral stamps what it
+- Wrap the handler in `withDemoDate` ([server/services/local/consumer-api.ts](../server/services/local/consumer-api.ts)), which sets the HTTP `Date` header to the demo clock. Coral stamps what it
   receives with that header.
 - `correlationIdOf(request)` echoes `X-Correlation-Id` when it is 1 to 128 visible ASCII characters, else makes
   a `req_…` id. Every response carries it, `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
@@ -186,8 +193,8 @@ Every handler is request-time. A POST always is; a GET is made so by reading the
   `API_ERROR_STATUS` in [golive-types.ts](../domain/golive-types.ts) gives the code. Query parsers and error
   builders live in [golive/api-errors.ts](../domain/golive/api-errors.ts).
 - `X-Consumer-Id` must name a registered consumer. The GET routes check it first with `requireConsumer` in
-  [consumer-api.ts](../server/queries/consumer-api.ts); the notices route also requires it to match the path.
-  Render requires it too, and checks it in [render-template.ts](../server/render/render-template.ts). `/api/v1`
+  [consumer-api.ts](../server/services/local/consumer-api.ts); the notices route also requires it to match the path.
+  Render requires it too, and checks it in [render-template.ts](../server/services/local/render/render-template.ts). `/api/v1`
   reads no cookie and no session: Stencil's own previews are `POST /api/templates/[templateId]/preview`.
 - Search and notices page with an opaque `after` cursor and answer `nextCursor` and `hasMore`. The routes read
   `after` with `readSearchCursor` and `readNoticeCursor` in [golive/cursor.ts](../domain/golive/cursor.ts), which
@@ -217,24 +224,26 @@ server actions are its writes only.
 
 **Template reads** (`/api/templates/[templateId]/…`) are what a screen loads on demand, when a dialog or a menu
 opens. They are GET route handlers rather than server actions because an action is a public POST endpoint that runs
-one at a time with the page's mutations: a read would hold up Edit or Submit, or wait behind them. Each calls
-`getViewer()`, hands the viewer and the raw path and query values to its query in `src/server/queries/` (which
-parses them with zod and checks `can()`), and answers with `readResponse()` from
-[server/api/reads.ts](../server/api/reads.ts): 400 for values that don't parse, 403 for a viewer the permission
-refuses, 404 for an unknown template or version, 409 when there is nothing to read (no draft, no Active version).
+one at a time with the page's mutations: a read would hold up Edit or Submit, or wait behind them. Each reads the
+request context (401 without a viewer), hands the viewer and the raw path and query values to its query in
+`src/server/queries/` (which parses them with zod and checks `can()`), and answers with `readResponse()` from
+[server/api/reads.ts](../server/api/reads.ts): 400 for values that don't parse, 401 for nobody signed in, 403 for a
+viewer the permission refuses, 404 for an unknown template or version, 409 when there is nothing to read (no draft,
+no Active version).
 The browser calls them through `readTemplate()` in [lib/template-reads.ts](../lib/template-reads.ts). A request
-without a persona cookie acts as the default persona, as every page does, until real sign-in
+without a persona cookie is signed out unless the demo tools are on, where it acts as the default persona
 ([S2](../../docs/handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)).
 
 **The preview** (`POST /api/templates/[templateId]/preview`) is the one POST among them, because it carries the sample
-values. It reads the person from the session (`getViewer()`), renders through `renderTemplate` with `preview: true`,
-and answers with the same bodies, headers (plus `X-Stencil-Preview: true`) and `{ error: { code, message, details? } }`
+values. It reads the person from the request context (nobody signed in is refused 401 `signed_out` before the body is
+read, without asking the backend), checks the body, and asks the backend to render (`services().render.preview`, under the request's
+correlation id), and answers with the same bodies, headers (plus `X-Stencil-Preview: true`) and `{ error: { code, message, details? } }`
 errors as the consumer render route, through [server/api/render-http.ts](../server/api/render-http.ts) and
 `errorResponse`. It takes `version` as `"draft"` or a number, an optional `round`, and any state previews
 ([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)).
 
 **The palette's search** (`/api/palette/[space]?q=&template=`) is a read of the same kind: the route passes the
-viewer and the raw values to `searchPalette` in [queries/palette.ts](../server/queries/palette.ts) and answers with
+request context and the raw values to `searchPalette` in [queries/palette.ts](../server/queries/palette.ts) and answers with
 `readResponse()`, 400 for a `q` or `template` that doesn't parse and 404 for a space the viewer can't see. No page
 carries templates; the palette asks this route when it opens and as the viewer types
 ([decision 0024](../../docs/decisions/0024-the-palette-searches-on-the-server.md)).
@@ -244,7 +253,7 @@ carries templates; the palette asks this route when it opens and as the viewer t
 `body_too_large`. Imports: `IMPORT_LIMITS.maxBytes` (10 MiB) plus 64 KiB of multipart room, 413 `import_too_large`. Every one
 refuses a declared `Content-Length` over its cap before reading, then reads with `readBodyCapped`, which counts bytes
 and stops at the cap, because a declared length is only a hint and a chunked body has none. Drafts and imports
-check permission before any byte is read: drafts from the version id in the path (`draftAccessRefusal`), imports from
+check permission before any byte is read: drafts from the version id in the path (`drafts.saveAccess`), imports from
 the team in the query. Render is anonymous, so the cap is all that stands before its read. Drafts and imports are
 route handlers, not server actions, because actions run one at a time per client and cap bodies at 1 MB.
 
@@ -255,7 +264,8 @@ route handlers, not server actions, because actions run one at a time per client
 2. Render static chrome (`PageHeader`) directly. Put everything request-bound inside
    `<Stream fallback={<Skeleton with the final geometry />}>`.
 3. Write the streamed component in `src/components/<feature>/`. It awaits `params`, calls a query in
-   `src/server/queries/` (which resolves the viewer and, under `[team]`, `requireSpace`), and uses `now()`.
+   `src/server/queries/` (which resolves the viewer and, under `[team]`, `requireSpace`), and counts its dates from
+   the read model's `now` (the service's `asOf`).
 4. Add the route to the route lists in [helpers/principles.ts](../../e2e/helpers/principles.ts) with the personas
    that can see it, then run `npm run typecheck`, `npm run lint` and `npm run format:check`.
 
@@ -271,11 +281,13 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
   a co-located `route.test.ts`, and a case in `e2e/api/consumer.spec.ts`.
 - **Browser only, a read.** Data a page shows comes from a server component's props. Data loaded on demand (a
   dialog, a menu) is a GET route: copy
-  [api/templates/[templateId]/base-version/route.ts](./api/templates/[templateId]/base-version/route.ts) with its
-  query, and add the read to `TemplateRead` in `src/lib/template-reads.ts`. Never a server action.
+  [api/templates/[templateId]/base-version/route.ts](./api/templates/[templateId]/base-version/route.ts), which reads
+  the request context (401 without one) and answers its service read's `ReadResult` with `readResponse()`, and add the
+  read to `TemplateRead` in `src/lib/template-reads.ts`. Never a server action.
 - **Browser only, a write.** A server action in `src/server/actions/`. Use a route handler when the body can pass
   1 MB or requests must not queue: copy [api/drafts/[versionId]/route.ts](./api/drafts/[versionId]/route.ts) for
-  a capped write. Call `getViewer()` before the database and send `Cache-Control: no-store`. Type the context
+  a capped write. Read the request context before the database (`requestContextOrRefusal()`, 401 without a viewer)
+  and send `Cache-Control: no-store`. Type the context
   with `RouteContext<"/route">`, as the audit export does.
 
 ## Don't copy
@@ -296,10 +308,13 @@ Copy [versions/page.tsx](<./(product)/[team]/templates/[templateId]/versions/pag
 - **Route handlers:** co-located `route.test.ts` files under `api/`, run with `npx vitest run src/app/api`. The
   `/api/v1` tests call the exported handler with a `NextRequest` against a temporary migrated and seeded
   database (`tempDatabase` and `seededDatabasePerTest` in `src/server/testing/review-fixtures.ts`, one copy of the
-  database per test) and mock `@/server/clock`. The template
-  reads are tested the same way, all five in one file ([reads.test.ts](./api/templates/[templateId]/reads.test.ts)),
-  with `getViewer` mocked to each persona, and so is the palette's search
-  ([route.test.ts](./api/palette/[space]/route.test.ts)). The drafts and imports tests mock `getViewer` and the
+  database per test) and mock the backend's clock (`@/server/services/local/clock`): `/api/v1` is the backend's own
+  API. The template reads a screen makes on demand and the palette's search each have one `route.test.ts` beside
+  the route (the helpers they share are in `src/server/testing/read-routes.ts`) that checks only the HTTP mapping
+  and the 401, on the in-memory fake ([submit-summary](./api/templates/[templateId]/submit-summary/route.test.ts))
+  or with the request context and the service mocked (compare, base-version, integration, copilot-prompt, the
+  palette): what the service decides is the contract suite's. The drafts and imports
+  tests mock `getViewer` and the
   server function and test only the HTTP mapping. The audit export's test ([route.test.ts](<./(product)/[team]/audit/export/route.test.ts>)) mocks the viewer and the
   query the same way; the delivery file route has none.
 - **Pages:** no unit tests; Playwright covers them. Spec files run in parallel against the production build, one

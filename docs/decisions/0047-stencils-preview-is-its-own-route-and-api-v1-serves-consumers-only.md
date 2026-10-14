@@ -2,6 +2,11 @@
 
 Status: Accepted
 Amended 2026-10-12: the render engine moves to Java ([0067](0067-java-renders-every-channel.md)), so after the port the preview route calls Java's render endpoint with the viewer's identity, as the first Consequences line foresaw, and its error body moves with `/api/v1`'s to the UCOMP API's format ([0056](0056-api-v1-errors-follow-the-ucomp-api-error-format.md)).
+Amended 2026-10-13: the preview route asks the backend to render through the service interfaces (`services().render.preview`, with the request's context and its correlation id), which on this app's database runs the consumer route's pipeline (`runRender` in `src/server/services/local/render/render-template.ts`, where `previewAllowed` is). Nobody signed in is refused 401 `signed_out` by the route, before it reads the body and without asking the backend.
+Amended 2026-10-13 (PR #79 review): a template, version or draft the viewer may not preview reads as 404
+`template_not_found`, as one that isn't there, and is not logged
+([0052](0052-a-page-you-may-not-read-is-not-found.md)): a 403 after the template and the version were found told
+anyone signed in which templates, versions and drafts another team has. No route returns `preview_forbidden` now.
 Date: 2026-10-11
 
 ## Context
@@ -22,7 +27,7 @@ The handoff review's order for real sign-in puts this first: keep the session of
   reads ([0019](0019-on-demand-reads-are-get-routes.md)). It is a POST because it carries the sample values, and it
   writes no application state. `getViewer()` says who is previewing, and the route renders only for someone who may
   see that version (`previewAllowed` in `render-template.ts`, unchanged: the template's team, the stage a version in
-  review waits on, or a decider who still has active access), else 403 `preview_forbidden`. Any state previews: a
+  review waits on, or a decider who still has active access), else 404 `template_not_found` (amended above). Any state previews: a
   draft, a version in review, revoked, Superseded. It takes `version` as `"draft"` or a number, an optional `round`,
   the channel, a push's `platform`, `values` and `encoding`, with the same limits as the consumer route.
 - **The same engine and the same answers.** Both routes read the request with `readRenderRequest` and answer with

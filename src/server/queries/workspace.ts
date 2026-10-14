@@ -1,51 +1,39 @@
 import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { db } from "@/server/db/client";
-import {
-  contentTypes,
-  teams,
-  templates,
-  versions,
-} from "@/server/db/schema/ucomp";
-import { sunsetDay } from "@/domain/business-zone";
 import type { ChannelFields } from "@/domain/channel-fields";
-import { contractBaseline } from "@/domain/lifecycle/baselines";
-import { planDraftStart } from "@/domain/lifecycle/drafts";
-import { smsFooterOf } from "@/domain/lifecycle/submit";
-import { sunsetPassed } from "@/domain/lifecycle/sunset";
-import { canComment } from "@/domain/comments";
-import { ALL_SPACE, can, canSeeSpace } from "@/domain/permissions";
+import { utcDay } from "@/domain/dates";
+import type { ImportOriginalRef } from "@/domain/import-types";
+import type { WorkspaceActions } from "@/domain/lifecycle/version-actions";
 import type {
   MessageTypeRules,
   TeamSenders,
 } from "@/domain/platform-config/limits";
-import {
-  asNumbered,
-  nextRound,
-  versionLabel as labelOf,
-  type NumberedRound,
-} from "@/domain/rounds";
-import {
-  contentTypeFamily,
-  type Channel,
-  type ChannelFamily,
-  type JSONContent,
-  type PermissionResult,
-  type SampleSet,
-  type Variable,
-  type VersionState,
+import type { Person } from "@/domain/review-types";
+import { versionLabel, type NumberedRound } from "@/domain/rounds";
+import type {
+  Channel,
+  ChannelFamily,
+  JSONContent,
+  PermissionResult,
+  SampleSet,
+  Variable,
+  VersionState,
 } from "@/domain/types";
-import { getBusinessZone } from "@/server/business-zone";
-import { now } from "@/server/clock";
+import { requireRequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
+import type {
+  WorkspaceDocumentFacts,
+  WorkspaceHeaderFacts,
+} from "@/server/services/workspace";
+import { peopleById, personOf } from "@/domain/people";
 import { requireSpace } from "./spaces";
-import { pickLatest } from "./library";
-import { anchorIdsOf } from "./review-shared";
-import { loadThreads } from "./threads";
-import type { ImportOriginalRef } from "@/domain/import-types";
-import { getImportOriginalRef } from "./import";
-import type { ThreadView } from "./threads";
+import { threadViews, type ThreadView } from "./threads";
+
+// A template's workspace: the header every tab shows, and the document the Content tab edits or shows. The
+// template service decides (which version the workspace shows, what the viewer may do: services/workspace.ts);
+// these word its facts ("Based on v2", "Revert to v1, round 1") and lay them out. Not found when the template
+// isn't in the URL's space or isn't the viewer's to see.
 
 export interface WorkspaceHeaderData {
   id: string;
@@ -80,8 +68,6 @@ export interface WorkspaceHeaderData {
   round: number;
   /** The round in review, if there is one: the workspace links to its review screen (`reviewPath`). */
   inReview: NumberedRound | null;
-  /** The viewer may edit this team's drafts (false = "View only"). */
-  canEdit: boolean;
   /** The shown version is an open draft and the viewer can edit it (the name is a field, autosave runs). */
   editable: boolean;
   /**
@@ -90,108 +76,84 @@ export interface WorkspaceHeaderData {
    */
   draft: { versionId: string; rev: number } | null;
   /**
-   * "Edit" is offered: there's no open draft, the latest version is Active or Revoked (`planDraftStart`),
-   * and the viewer can edit.
+   * What the viewer may do here, decided: `edit` the team's drafts ("View only" when refused), Edit
+   * (`startDraft`: the black button on a live template), and Submit for review (`submit`, on the open draft).
    */
-  canStartDraft: boolean;
-  /** "Submit for review" is offered: the shown version is an open draft and the viewer may submit it. */
-  canSubmit: boolean;
+  can: WorkspaceActions;
+  /** ISO: the backend's instant the header was decided at (`asOf`); the badge's dates read against it. */
+  now: string;
 }
 
 /** Header data for /{team}/templates/{templateId}. 404 when the template isn't visible here. */
 export const getWorkspaceHeader = cache(
+  async (spaceSlug: string, templateId: string): Promise<WorkspaceHeaderData> =>
+    workspaceHeaderData(await getWorkspaceHeaderFacts(spaceSlug, templateId)),
+);
+
+/**
+ * The service's header facts for the template as seen from a space, asked once per render (the header is on
+ * every tab). Not found when the template isn't in the URL's space or isn't the viewer's to see.
+ */
+export const getWorkspaceHeaderFacts = cache(
   async (
     spaceSlug: string,
     templateId: string,
-  ): Promise<WorkspaceHeaderData> => {
+  ): Promise<WorkspaceHeaderFacts> => {
+    const ctx = await requireRequestContext();
     const space = await requireSpace(spaceSlug);
-
-    const tpl = await db
-      .select({
-        id: templates.id,
-        teamId: templates.teamId,
-        teamSlug: teams.slug,
-        teamName: teams.name,
-      })
-      .from(templates)
-      .innerJoin(teams, eq(teams.id, templates.teamId))
-      .where(eq(templates.id, templateId))
-      .limit(1)
-      .then((r) => r[0]);
-
-    if (!tpl) notFound();
-    if (spaceSlug !== ALL_SPACE && tpl.teamSlug !== spaceSlug) notFound();
-    if (!canSeeSpace(space.viewer, tpl.teamSlug)) notFound();
-
-    const list = await db
-      .select({
-        id: versions.id,
-        number: versions.number,
-        round: versions.round,
-        state: versions.state,
-        name: versions.name,
-        sunsetAt: versions.sunsetAt,
-        basedOnVersionId: versions.basedOnVersionId,
-        rev: versions.rev,
-      })
-      .from(versions)
-      .where(eq(versions.templateId, templateId));
-
-    const latest = pickLatest(list);
-    const active = list.find((v) => v.state === "active");
-    const review = list.find(
-      (v) => v.state === "in_review" && v.number !== null,
-    );
-    const zone = await getBusinessZone();
-    const at = await now();
-
-    const isDraft = !latest || latest.state === "draft";
-    // A draft is numbered as its submit will number it: the next version, or the next round of the one sent back.
-    const shown = isDraft ? nextRound(list) : asNumbered(latest);
-    const base =
-      isDraft && latest?.basedOnVersionId
-        ? list.find((v) => v.id === latest.basedOnVersionId)
-        : undefined;
-    const baseRound = base && base.number !== null ? asNumbered(base) : null;
-    const versionLabel = isDraft
-      ? baseRound
-        ? `Based on ${labelOf(baseRound)}`
-        : null
-      : labelOf(asNumbered(latest));
-    const canEdit = can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok;
-    const editable = canEdit && latest?.state === "draft";
-
-    return {
-      id: tpl.id,
-      name: latest?.name ?? tpl.id,
-      activeName: active?.name ?? null,
-      teamSlug: tpl.teamSlug,
-      teamName: tpl.teamName,
-      status: latest?.state ?? "draft",
-      sunsetDay: latest?.sunsetAt ? sunsetDay(latest.sunsetAt, zone) : null,
-      sunsetPassed: latest ? sunsetPassed(latest, at) : false,
-      versionLabel,
-      basedOn: baseRound
-        ? {
-            label: labelOf(baseRound, { style: "sentence" }),
-            active: baseRound.state === "active",
-          }
-        : null,
-      activeNumber: active?.number ?? null,
-      versionNumber: shown.number,
-      round: shown.round,
-      inReview: review ? asNumbered(review) : null,
-      canEdit,
-      editable,
-      draft:
-        editable && latest ? { versionId: latest.id, rev: latest.rev } : null,
-      canStartDraft: canEdit && planDraftStart(list).kind === "create",
-      canSubmit:
-        latest?.state === "draft" &&
-        can(space.viewer, "version.submit", { teamId: tpl.teamId }).ok,
-    };
+    const header = await services().templates.workspaceHeader(ctx, {
+      templateId,
+    });
+    // All teams holds every team's templates; a team's space only its own.
+    if (
+      !header.ok ||
+      (space.teamId !== null && header.template.teamId !== space.teamId)
+    )
+      notFound();
+    return header;
   },
 );
+
+/** The header from the service's facts: the name and status the badge shows, and the labels beside it. */
+export function workspaceHeaderData(
+  header: WorkspaceHeaderFacts,
+): WorkspaceHeaderData {
+  const { shown, basedOn } = header;
+  const draft = shown?.state === "draft" ? shown : null;
+  const editable = draft !== null && header.can.edit.ok;
+  return {
+    id: header.template.id,
+    // A template with no version at all (never the case through the app) shows its id, as the Library does.
+    name: shown?.name ?? header.template.id,
+    activeName: header.active?.name ?? null,
+    teamSlug: header.template.teamSlug,
+    teamName: header.template.teamName,
+    status: shown?.state ?? "draft",
+    sunsetDay: shown?.sunsetDay ?? null,
+    sunsetPassed: shown?.sunsetPassed ?? false,
+    // A submitted version is numbered as it is (`numbered`); a draft says what it was based on.
+    versionLabel:
+      shown && !draft
+        ? versionLabel({ ...header.numbered, state: shown.state })
+        : basedOn
+          ? `Based on ${versionLabel(basedOn)}`
+          : null,
+    basedOn: basedOn
+      ? {
+          label: versionLabel(basedOn, { style: "sentence" }),
+          active: basedOn.state === "active",
+        }
+      : null,
+    activeNumber: header.active?.number ?? null,
+    versionNumber: header.numbered.number,
+    round: header.numbered.round,
+    inReview: header.inReview,
+    editable,
+    draft: editable && draft ? { versionId: draft.id, rev: draft.rev } : null,
+    can: header.can,
+    now: header.asOf,
+  };
+}
 
 export interface WorkspaceDocumentData {
   /** The template's id (the render route is addressed by it). */
@@ -233,7 +195,7 @@ export interface WorkspaceDocumentData {
   channelFields: ChannelFields;
   /** The version's named sample data sets, as saved. The preview's switcher fills in any default that is missing. */
   sampleSets: SampleSet[];
-  /** The demo clock's date, YYYY-MM-DD: date samples are generated from it. */
+  /** The UTC day of `now`, YYYY-MM-DD: date samples are generated from it. */
   today: string;
   /** Only an open draft is editable, and only by an author on the template's team. */
   editable: boolean;
@@ -245,8 +207,12 @@ export interface WorkspaceDocumentData {
    * version while it is in review). Every thread shown here is one the viewer may then act on.
    */
   can: { comment: PermissionResult };
-  /** Phase 7a: the file the template was imported from (the rail's Original tab), on every version; null when it wasn't imported. */
+  /** The file the template was imported from (the rail's Original tab), on every version; null when it wasn't imported. */
   importOriginal: ImportOriginalRef | null;
+  /** Who is looking: the comments they write show under their name at once, before the server confirms them. */
+  viewer: Person;
+  /** ISO: the backend's instant the document was read at (`asOf`); the margin's times count from it. */
+  now: string;
 }
 
 /** The document shown on the Content tab: the open draft if there is one, otherwise the latest version. */
@@ -255,87 +221,59 @@ export const getWorkspaceDocument = cache(
     spaceSlug: string,
     templateId: string,
   ): Promise<WorkspaceDocumentData> => {
-    const header = await getWorkspaceHeader(spaceSlug, templateId);
+    const ctx = await requireRequestContext();
     const space = await requireSpace(spaceSlug);
-
-    const tpl = await db
-      .select({
-        teamId: templates.teamId,
-        allowedChannels: contentTypes.allowedChannels,
-        smsFooter: contentTypes.smsFooter,
-        smsMaxParts: contentTypes.smsMaxParts,
-        appName: teams.appName,
-        smsSender: teams.smsSender,
-      })
-      .from(templates)
-      .innerJoin(contentTypes, eq(contentTypes.id, templates.contentTypeId))
-      .innerJoin(teams, eq(teams.id, templates.teamId))
-      .where(eq(templates.id, header.id))
-      .limit(1)
-      .then((r) => r[0]);
-    if (!tpl) notFound();
-
-    const list = await db
-      .select({
-        id: versions.id,
-        number: versions.number,
-        round: versions.round,
-        state: versions.state,
-        sunsetAt: versions.sunsetAt,
-        rev: versions.rev,
-        body: versions.body,
-        variables: versions.variables,
-        channels: versions.channels,
-        channelFields: versions.channelFields,
-        smsFooter: versions.smsFooter,
-        sampleSets: versions.sampleSets,
-      })
-      .from(versions)
-      .where(eq(versions.templateId, header.id));
-
-    const shown = pickLatest(list);
-    if (!shown) notFound();
-    const at = await now();
-    const today = at.toISOString().slice(0, 10);
-    const threads = await loadThreads(header.id, anchorIdsOf(shown));
-    const importOriginal = await getImportOriginalRef(header.id);
-
-    return {
-      templateId: header.id,
-      teamName: header.teamName,
-      versionId: shown.id,
-      versionNumber: shown.state === "draft" ? null : shown.number,
-      round: shown.state === "draft" ? null : shown.round,
-      rev: shown.rev,
-      body: shown.body,
-      variables: shown.variables,
-      baseline:
-        shown.state === "draft"
-          ? (contractBaseline(list, at)?.variables ?? null)
-          : null,
-      channels: shown.channels,
-      allowedChannels: tpl.allowedChannels,
-      family: contentTypeFamily(tpl.allowedChannels),
-      messageRules: {
-        smsFooter: smsFooterOf(shown, tpl.smsFooter),
-        smsMaxParts: tpl.smsMaxParts,
-      },
-      senders: { appName: tpl.appName, smsSender: tpl.smsSender },
-      channelFields: shown.channelFields,
-      sampleSets: shown.sampleSets,
-      today,
-      editable:
-        shown.state === "draft" &&
-        can(space.viewer, "draft.edit", { teamId: tpl.teamId }).ok,
-      threads,
-      // The workspace is the team's: whoever a review stage names comments from the review screen.
-      can: {
-        comment: canComment(space.viewer, {
-          teamId: tpl.teamId,
-          version: { state: shown.state, stageApproverIds: [] },
-        }),
-      },
-      importOriginal,
-    };
+    const document = await services().templates.workspaceDocument(ctx, {
+      templateId,
+    });
+    if (
+      !document.ok ||
+      (space.teamId !== null && document.template.teamId !== space.teamId)
+    )
+      notFound();
+    return workspaceDocumentData(document, ctx.viewer.userId);
   },
 );
+
+/** The Content tab's document from the service's facts. `viewerId` is who is looking. */
+export function workspaceDocumentData(
+  document: WorkspaceDocumentFacts,
+  viewerId: string,
+): WorkspaceDocumentData {
+  const people = peopleById(document.people);
+  const { template, version, importOriginal } = document;
+  return {
+    templateId: template.id,
+    teamName: template.teamName,
+    versionId: version.id,
+    versionNumber: version.number,
+    round: version.round,
+    rev: version.rev,
+    body: version.body,
+    variables: version.variables,
+    baseline: document.baseline,
+    channels: version.channels,
+    allowedChannels: template.allowedChannels,
+    family: template.family,
+    messageRules: document.messageRules,
+    senders: document.senders,
+    channelFields: version.channelFields,
+    sampleSets: version.sampleSets,
+    today: utcDay(document.asOf),
+    editable: version.state === "draft" && document.can.edit.ok,
+    threads: threadViews(document.threads, people),
+    can: { comment: document.can.comment },
+    importOriginal: importOriginal
+      ? {
+          uploadId: importOriginal.uploadId,
+          filename: importOriginal.filename,
+          kind: importOriginal.kind,
+          size: importOriginal.size,
+          uploadedAt: importOriginal.uploadedAt,
+          uploadedByName: personOf(people, importOriginal.uploadedBy).name,
+        }
+      : null,
+    viewer: personOf(people, viewerId),
+    now: document.asOf,
+  };
+}

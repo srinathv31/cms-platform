@@ -10,8 +10,8 @@ and the seed does the same (`coral-offers`). The schema has both columns, `slug`
 ([H-1 of the October 12 review](../quality-review-2026-10-12.md)). The code then uses one where the other is meant:
 `getShell` in `src/server/queries/spaces.ts` passes a slug as `teamId` to `can()`; `getSidebarCards` in
 `src/server/queries/access.ts` filters `access_requests.team_id`, `recertifications.team_id` and
-`memberships.team_id` with slugs; `accessHref` (`src/server/access-effects.ts`) and `teamPath` (`src/domain/audit.ts`)
-build URLs from ids; notifications store hrefs that hold the slug (`notificationHref` in `src/server/effects.ts`).
+`memberships.team_id` with slugs; `accessHref` (`server/access-effects.ts` then) and `teamPath` (`src/domain/audit.ts`)
+build URLs from ids; notifications store hrefs that hold the slug (`notificationHref` in `server/effects.ts` then).
 Six comments call it "the seed contract". `/api/v1` publishes it as `team.id`.
 
 A JPA entity with a generated key (the default) would break every one of these without an error, and because the

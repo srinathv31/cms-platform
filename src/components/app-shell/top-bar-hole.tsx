@@ -1,6 +1,5 @@
-import { can } from "@/domain/permissions";
 import { DEMO_MODE } from "@/server/config";
-import { getViewer } from "@/server/viewer";
+import { requireRequestContext } from "@/server/context/request";
 import { getShell } from "@/server/queries/spaces";
 import { getPersonaSummaries } from "@/server/queries/personas";
 import { getNotificationsData } from "@/server/queries/notifications";
@@ -14,7 +13,7 @@ import { ProfileMenu } from "./profile-menu";
  */
 export async function TopBarHole() {
   const [viewer, shell, personas, notifications] = await Promise.all([
-    getViewer(),
+    requireRequestContext().then((context) => context.viewer),
     getShell(),
     getPersonaSummaries(),
     getNotificationsData(),
@@ -37,7 +36,7 @@ export async function TopBarHole() {
         me={me}
         // The switcher is a demo tool (decision 0051). Request time: the viewer is read above.
         personas={DEMO_MODE ? personas : null}
-        canRequestAccess={can(viewer, "access.request").ok}
+        canRequestAccess={shell.canRequestAccess.ok}
       />
     </div>
   );

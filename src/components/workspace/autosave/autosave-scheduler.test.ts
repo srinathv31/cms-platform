@@ -215,6 +215,7 @@ describe("a plain save", () => {
       body: doc("hello"),
       rev: 3,
       sessionKey: SESSION,
+      seq: 1,
     });
     expect(calls[0]!.options).toEqual({ keepalive: false });
   });
@@ -291,6 +292,7 @@ describe("debounce and max wait", () => {
       variables: [],
       rev: 3,
       sessionKey: SESSION,
+      seq: 1,
     });
   });
 
@@ -342,6 +344,7 @@ describe("one request at a time", () => {
       name: "N",
       rev: 4,
       sessionKey: SESSION,
+      seq: 2,
     });
     expect(autosave.getState().status).toBe("saving");
 
@@ -404,6 +407,7 @@ describe("network failures", () => {
       body: doc("keep me"),
       rev: 3,
       sessionKey: SESSION,
+      seq: 2,
     });
     // The error stays on screen during the retry rather than flickering to "Saving…".
     expect(autosave.getState()).toEqual({ status: "error", error: RETRYING });
@@ -447,6 +451,7 @@ describe("network failures", () => {
       variables: [],
       rev: 3,
       sessionKey: SESSION,
+      seq: 2,
     });
   });
 
@@ -665,7 +670,9 @@ describe("a request that never comes back", () => {
 
     await tick(1000);
     expect(calls).toHaveLength(2);
-    expect(calls[1]!.patch).toMatchObject({ name: "A", rev: 3 });
+    // The retry is a later send than the request it replaces, so the server can refuse that one if it lands late.
+    expect(calls[0]!.patch).toMatchObject({ name: "A", rev: 3, seq: 1 });
+    expect(calls[1]!.patch).toMatchObject({ name: "A", rev: 3, seq: 2 });
     await tick(0);
     // The first request is abandoned; answering the second one finishes the job.
     calls[1]!.resolve(saved(4));
@@ -806,6 +813,7 @@ describe("answers that stop saving", () => {
       body: doc("fine"),
       rev: 3,
       sessionKey: SESSION,
+      seq: 2,
     });
     await answer(saved(4));
     expect(autosave.getState()).toEqual({ status: "saved" });

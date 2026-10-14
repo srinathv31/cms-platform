@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { DialogTitle } from "@/components/ui/dialog";
-import { requireSpace, settingsAccessFor } from "@/server/queries/spaces";
+import { requireSpace } from "@/server/queries/spaces";
 import { findSection, groupOfSection } from "./sections";
 import type { SectionBody } from "./section-body";
 import { PLATFORM_SECTION_BODIES } from "./platform";
@@ -24,8 +24,8 @@ export async function SettingsPanel({
   const space = await requireSpace(team);
   const meta = findSection(section);
   const group = groupOfSection(section);
-  const access = settingsAccessFor(space.viewer, space.slug);
-  if (!meta || !group || !access[group]) redirect(`/${space.slug}/library`);
+  if (!meta || !group || !space.settings[group])
+    redirect(`/${space.slug}/library`);
   const Body = BODIES[section];
 
   return (

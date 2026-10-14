@@ -1,49 +1,80 @@
 import { NextRequest } from "next/server";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PaletteTemplateRow } from "@/domain/import-types";
 import { PALETTE_QUERY_MAX } from "@/domain/palette";
+import { REASONS } from "@/domain/permissions";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
+import type { SpaceFacts } from "@/domain/spaces";
 import type { Viewer } from "@/domain/types";
-import type { Db } from "@/server/db/client";
-import {
-  loadPersona,
-  seededDatabasePerTest,
-} from "@/server/testing/review-fixtures";
-import { getViewer } from "@/server/viewer";
+import { findRequestContext } from "@/server/context/request";
+import type { RequestContext } from "@/server/context/request";
+import { readAnswer } from "@/server/testing/read-routes";
+import type { PaletteFacts } from "@/server/services/templates";
 import { GET } from "./route";
 
-// The ⌘K palette's search, end to end: HTTP in, the real query against a temporary database filled by
-// the real seed, HTTP out. Only the database handle, the clock and the persona (`getViewer`) are swapped.
+// The ⌘K palette's search as the BFF runs it, on facts: HTTP in, the route and `searchPalette` for real, HTTP out.
+// The backend (`identity.space`, `templates.palette`) is stood in for by the answers below, so these tests check
+// only what the BFF adds: who is asking (before anything is parsed), the parse, the request it hands the backend
+// (the space's team by id, the search as typed, the template), the refusals it passes through, and the body it
+// answers with. Who may see which templates, Recent, the ranking and the caps are the backend's, and the contract
+// suite's.
 //
-// Seed facts used: Coral Offers has Annual Fee Waiver (Changes requested), Balance Transfer Intro
-// (Active), Cash Back Welcome Bonus (In review), Holiday Points Promo and Rate Change Notice; Deposits has
-// Everyday Checking, High-Yield Savings and Overdraft Protection; Card Statements has three Statement
-// Inserts. Maya (Author, Coral Offers) last acted on Cash Back, then Annual Fee Waiver, then Rate Change
-// Notice. Sam is a Viewer on Coral Offers, Eli an Author on Deposits only, Morgan has no team, Taylor is
-// the Auditor (every team, through All teams).
+// Facts used: Maya is signed in. Coral Offers (`coral-offers`, team `t_coral`) is a space she can enter, and so is
+// All teams (`all`, no team); a team's id is never its slug (decision 0053). Any other slug is a team she can't see.
 
-const env = vi.hoisted(() => ({ now: new Date("2026-10-04T12:00:00.000Z") }));
-
-vi.mock("@/server/db/client", async () => {
-  const { tempDatabase } = await import("@/server/testing/review-fixtures");
-  return tempDatabase("ucomp-palette-search-");
+const mocks = vi.hoisted(() => ({ space: vi.fn(), palette: vi.fn() }));
+vi.mock("@/server/services", () => ({
+  services: () => ({
+    identity: { space: mocks.space },
+    templates: { palette: mocks.palette },
+  }),
+}));
+vi.mock("@/server/context/request", async () => {
+  const { REQUEST_REFUSALS, refuse } = await import("@/domain/refusals");
+  const findRequestContext = vi.fn();
+  return {
+    findRequestContext,
+    requestContextOrRefusal: async () => {
+      const context = await findRequestContext();
+      return context
+        ? { ok: true, context }
+        : refuse(REQUEST_REFUSALS.signedOut);
+    },
+  };
 });
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
-vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 
-const CORAL = [
-  "Annual Fee Waiver — Terms",
-  "Balance Transfer Intro — Terms",
-  "Card Used Abroad",
-  "Cash Back Welcome Bonus — Terms",
-  "Holiday Points Promo — Terms",
-  "Payment Due Reminder",
-  "Rate Change Heads-up",
-  "Rate Change Notice",
-];
-const DEPOSITS = [
-  "Everyday Checking — Fee Schedule",
-  "High-Yield Savings — Rate Disclosure",
-  "Overdraft Protection — Terms",
-];
+const maya: RequestContext = {
+  viewer: { userId: "maya" } as Viewer,
+  correlationId: "req_test",
+  credential: { kind: "in_process", userId: "maya" },
+};
+
+const SPACES: Record<string, SpaceFacts> = {
+  "coral-offers": {
+    teamId: "t_coral",
+    slug: "coral-offers",
+    name: "Coral Offers",
+    kind: "team",
+    icon: "users",
+    can: {
+      viewAudit: { ok: true },
+      manageMembers: { ok: true },
+      managePlatform: { ok: true },
+    },
+  },
+  all: {
+    teamId: null,
+    slug: "all",
+    name: "All teams",
+    kind: "all",
+    icon: null,
+    can: {
+      viewAudit: { ok: true },
+      manageMembers: { ok: true },
+      managePlatform: { ok: true },
+    },
+  },
+};
 const INVALID = {
   ok: false,
   code: "invalid_search",
@@ -54,210 +85,193 @@ const NOT_YOURS = {
   code: "space_unavailable",
   reason: "This team isn't available to you.",
 };
-
-let db: Db;
-const people: Record<string, Viewer> = {};
-
-const ids = seededDatabasePerTest({ base: env.now });
-
-beforeAll(async () => {
-  ({ db } = await import("@/server/db/client"));
-  for (const id of ["maya", "sam", "eli", "morgan", "taylor"])
-    people[id] = await loadPersona(db, id);
-});
-
-beforeEach(() => as("maya"));
-
-function as(userId: string) {
-  vi.mocked(getViewer).mockResolvedValue(people[userId]!);
-}
-
-type Row = { id: string; name: string; teamSlug: string; status: string };
-type Body = {
-  ok: boolean;
-  code?: string;
-  reason?: string;
-  viewerId?: string;
-  space?: string;
-  query?: string;
-  canCreate?: boolean;
-  current?: boolean;
-  recent?: Row[];
-  templates?: Row[];
+const SIGNED_OUT = {
+  ok: false,
+  code: "signed_out",
+  reason: "Sign in to continue.",
 };
 
-/** GET /api/palette/{space}{query}: the status and the body, checking the headers every answer has. */
-async function search(space: string, query = "") {
-  const res = await GET(
+const cashBack: PaletteTemplateRow = {
+  id: "UC-AAAAAA",
+  name: "Cash Back Welcome Bonus — Terms",
+  teamSlug: "coral-offers",
+  teamName: "Coral Offers",
+  status: "in_review",
+};
+const balanceTransfer: PaletteTemplateRow = {
+  id: "UC-BBBBBB",
+  name: "Balance Transfer Intro — Terms",
+  teamSlug: "coral-offers",
+  teamName: "Coral Offers",
+  status: "active",
+};
+
+/** What the palette lists at rest for Maya: one recent template, one more by name; she may create here. */
+function facts(over: Partial<PaletteFacts> = {}): { ok: true } & PaletteFacts {
+  return {
+    ok: true,
+    query: "",
+    can: { create: { ok: true } },
+    current: false,
+    recent: [cashBack],
+    templates: [balanceTransfer],
+    ...over,
+  };
+}
+
+beforeEach(() => {
+  mocks.space.mockReset().mockImplementation(async (_ctx, { slug }) => {
+    const space = SPACES[slug];
+    return space
+      ? { ok: true, space }
+      : { ok: false, status: 404, ...REQUEST_REFUSALS.spaceUnavailable };
+  });
+  mocks.palette.mockReset().mockResolvedValue(facts());
+  vi.mocked(findRequestContext).mockReset().mockResolvedValue(maya);
+});
+
+/** GET /api/palette/{space}{query} through the route's handler. */
+function search(space: string, query = "") {
+  return GET(
     new NextRequest(
       `http://localhost/api/palette/${encodeURIComponent(space)}${query}`,
     ),
     {
       params: Promise.resolve({ space }),
-    },
+    } as Parameters<typeof GET>[1],
   );
-  expect(res.headers.get("Content-Type")).toMatch(/^application\/json/);
-  expect(res.headers.get("Cache-Control")).toBe("private, no-store");
-  return { status: res.status, body: (await res.json()) as Body };
 }
 
-const names = (rows: Row[] | undefined) => (rows ?? []).map((r) => r.name);
-
 describe("GET /api/palette/[space]", () => {
-  it("at rest: the viewer's recent templates, then the rest of the space's by name, and what they may do", async () => {
-    const { status, body } = await search("coral-offers");
+  it("200 with the palette's facts as the wire body: who it was read for, the space as the URL names it, what the person may do", async () => {
+    expect(await readAnswer(search("coral-offers"))).toEqual({
+      status: 200,
+      body: {
+        ok: true,
+        viewerId: "maya",
+        space: "coral-offers",
+        query: "",
+        canCreate: true,
+        current: false,
+        recent: [cashBack],
+        templates: [balanceTransfer],
+      },
+    });
+  });
+
+  it("canCreate is the decided permission's ok, and the query and current are the backend's", async () => {
+    mocks.palette.mockResolvedValue(
+      facts({
+        query: "terms coral",
+        can: { create: { ok: false, ...REASONS.generic } },
+        current: true,
+        recent: [],
+        templates: [cashBack, balanceTransfer],
+      }),
+    );
+    const { status, body } = await readAnswer(
+      search("all", "?q=++Terms++Coral"),
+    );
     expect(status).toBe(200);
-    expect(body).toMatchObject({
+    expect(body).toEqual({
       ok: true,
       viewerId: "maya",
-      space: "coral-offers",
-      query: "",
-      canCreate: true,
-      current: false,
-    });
-    expect(names(body.recent)).toEqual([
-      "Cash Back Welcome Bonus — Terms",
-      "Rate Change Heads-up",
-      "Annual Fee Waiver — Terms",
-      "Payment Due Reminder",
-      "Rate Change Notice",
-    ]);
-    expect(names(body.templates)).toEqual([
-      "Balance Transfer Intro — Terms",
-      "Card Used Abroad",
-      "Holiday Points Promo — Terms",
-    ]);
-    expect(body.recent![0]).toEqual({
-      id: ids["cash-back"],
-      name: "Cash Back Welcome Bonus — Terms",
-      teamSlug: "coral-offers",
-      teamName: "Coral Offers",
-      status: "in_review",
-    });
-  });
-
-  it("searches by q: every word, in the name, the team, the id or the status, without Recent", async () => {
-    expect(
-      names((await search("coral-offers", "?q=balance")).body.templates),
-    ).toEqual(["Balance Transfer Intro — Terms"]);
-    expect(
-      names((await search("coral-offers", "?q=In%20review")).body.templates),
-    ).toEqual(["Cash Back Welcome Bonus — Terms", "Card Used Abroad"]);
-    expect(
-      names(
-        (
-          await search(
-            "coral-offers",
-            `?q=${ids["holiday-points"]!.toLowerCase()}`,
-          )
-        ).body.templates,
-      ),
-    ).toEqual(["Holiday Points Promo — Terms"]);
-    const terms = await search("coral-offers", "?q=++Terms++Coral");
-    expect(terms.body).toMatchObject({ query: "terms coral", recent: [] });
-    // Recently touched ones first among equal matches.
-    expect(names(terms.body.templates)).toEqual([
-      "Cash Back Welcome Bonus — Terms",
-      "Annual Fee Waiver — Terms",
-      "Balance Transfer Intro — Terms",
-      "Holiday Points Promo — Terms",
-    ]);
-    expect((await search("coral-offers", "?q=zzz")).body.templates).toEqual([]);
-  });
-
-  it("lists only the space's templates, and only to people who can see it", async () => {
-    as("sam");
-    const sam = await search("coral-offers");
-    expect(sam.body).toMatchObject({
-      ok: true,
-      viewerId: "sam",
+      space: "all",
+      query: "terms coral",
       canCreate: false,
+      current: true,
       recent: [],
-    });
-    expect(names(sam.body.templates)).toEqual(CORAL);
-
-    as("eli");
-    const eli = await search("deposits", "?q=balance");
-    expect(eli.body).toMatchObject({
-      ok: true,
-      viewerId: "eli",
-      templates: [],
-    });
-    const atRest = (await search("deposits")).body;
-    expect(
-      [...names(atRest.recent), ...names(atRest.templates)].sort(),
-    ).toEqual(DEPOSITS);
-    expect(await search("coral-offers")).toEqual({
-      status: 404,
-      body: NOT_YOURS,
-    });
-    expect(await search("all")).toEqual({ status: 404, body: NOT_YOURS });
-
-    as("morgan");
-    expect(await search("coral-offers")).toEqual({
-      status: 404,
-      body: NOT_YOURS,
+      templates: [cashBack, balanceTransfer],
     });
   });
 
-  it("the cross-team space searches every team, for the people who have it", async () => {
-    as("taylor");
-    const statements = await search("all", "?q=statement+insert");
-    expect(statements.body).toMatchObject({
-      ok: true,
-      viewerId: "taylor",
-      canCreate: false,
+  it("asks the backend for the space's team by id, as the person asking, with the search as typed and the template", async () => {
+    await search("coral-offers", "?q=++Terms++Coral&template=UC-AAAAAA");
+    expect(mocks.space).toHaveBeenCalledExactlyOnceWith(maya, {
+      slug: "coral-offers",
     });
-    expect(statements.body.templates!.map((t) => t.teamSlug)).toEqual([
-      "card-statements",
-      "card-statements",
-      "card-statements",
-    ]);
-    expect((await search("all")).body.templates).toHaveLength(8); // a first page of the fourteen
-    expect(names((await search("all", "?q=overdraft")).body.templates)).toEqual(
-      ["Overdraft Protection — Terms"],
-    );
+    expect(mocks.palette).toHaveBeenCalledExactlyOnceWith(maya, {
+      teamId: "t_coral",
+      q: "  Terms  Coral",
+      templateId: "UC-AAAAAA",
+    });
   });
 
-  it("says whether the template being viewed is the viewer's to see here, and leaves it out of Recent", async () => {
-    const onCashBack = await search(
-      "coral-offers",
-      `?template=${ids["cash-back"]}`,
-    );
-    expect(onCashBack.body).toMatchObject({ current: true });
-    expect(names(onCashBack.body.recent)).toEqual([
-      "Rate Change Heads-up",
-      "Annual Fee Waiver — Terms",
-      "Payment Due Reminder",
-      "Rate Change Notice",
-    ]);
-    expect(names(onCashBack.body.templates)).toContain(
-      "Cash Back Welcome Bonus — Terms",
-    );
-
-    expect(
-      (await search("coral-offers", "?template=UC-ZZZZZZ")).body,
-    ).toMatchObject({ ok: true, current: false });
-    as("eli");
-    expect(
-      (await search("deposits", `?template=${ids["cash-back"]}`)).body,
-    ).toMatchObject({ ok: true, current: false });
+  it("asks for what isn't given as null, and for every team in All teams", async () => {
+    await search("all");
+    expect(mocks.palette).toHaveBeenCalledExactlyOnceWith(maya, {
+      teamId: null,
+      q: null,
+      templateId: null,
+    });
   });
 
-  it("400 for a search that doesn't parse: too long, or an empty or overlong template", async () => {
+  it("401 signed_out when nobody is signed in, without asking the backend", async () => {
+    vi.mocked(findRequestContext).mockResolvedValue(null);
+    expect(await readAnswer(search("coral-offers"))).toEqual({
+      status: 401,
+      body: SIGNED_OUT,
+    });
+    expect(await readAnswer(search("coral-offers", "?q=balance"))).toEqual({
+      status: 401,
+      body: SIGNED_OUT,
+    });
+    expect(mocks.space).not.toHaveBeenCalled();
+    expect(mocks.palette).not.toHaveBeenCalled();
+  });
+
+  it("400 for a search that doesn't parse: too long, or an empty or overlong template, without asking the backend", async () => {
     expect(
-      await search("coral-offers", `?q=${"a".repeat(PALETTE_QUERY_MAX + 1)}`),
+      await readAnswer(
+        search("coral-offers", `?q=${"a".repeat(PALETTE_QUERY_MAX + 1)}`),
+      ),
     ).toEqual({ status: 400, body: INVALID });
-    expect(await search("coral-offers", "?template=")).toEqual({
+    expect(await readAnswer(search("coral-offers", "?template="))).toEqual({
       status: 400,
       body: INVALID,
     });
-    expect(await search("coral-offers", `?template=${"U".repeat(65)}`)).toEqual(
-      { status: 400, body: INVALID },
-    );
     expect(
-      (await search("coral-offers", `?q=${"a".repeat(PALETTE_QUERY_MAX)}`))
-        .status,
+      await readAnswer(search("coral-offers", `?template=${"U".repeat(65)}`)),
+    ).toEqual({ status: 400, body: INVALID });
+    expect(mocks.space).not.toHaveBeenCalled();
+    expect(mocks.palette).not.toHaveBeenCalled();
+  });
+
+  it("a search of the longest length, and a template id of the longest, parse", async () => {
+    expect(
+      (
+        await readAnswer(
+          search(
+            "coral-offers",
+            `?q=${"a".repeat(PALETTE_QUERY_MAX)}&template=${"U".repeat(64)}`,
+          ),
+        )
+      ).status,
     ).toBe(200);
+  });
+
+  it("404 space_unavailable for a space the backend doesn't know, without asking for the palette", async () => {
+    expect(await readAnswer(search("deposits"))).toEqual({
+      status: 404,
+      body: NOT_YOURS,
+    });
+    // A team's id is not its slug (decision 0053): the backend resolves slugs only.
+    expect(await readAnswer(search("t_coral"))).toEqual({
+      status: 404,
+      body: NOT_YOURS,
+    });
+    expect(mocks.palette).not.toHaveBeenCalled();
+  });
+
+  it("passes the backend's own 404 space_unavailable through", async () => {
+    mocks.palette.mockResolvedValue({
+      ok: false,
+      status: 404,
+      ...REQUEST_REFUSALS.spaceUnavailable,
+    });
+    expect(await readAnswer(search("coral-offers"))).toEqual({
+      status: 404,
+      body: NOT_YOURS,
+    });
   });
 });

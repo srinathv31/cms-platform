@@ -31,10 +31,11 @@ import {
   newTemplateId,
   seededId,
 } from "@/server/ids";
+import { asShown } from "@/server/testing/notifications";
 import { trySubmit } from "@/server/testing/submit-check";
 import { createContext } from "./context";
 import { seedDatabase, type SeedResult } from "./index";
-import { mulberry32 } from "./rng";
+import { mulberry32 } from "@/server/documents/rng";
 import { buildTemplate } from "./templates/build";
 import { seedCoralTemplates } from "./templates/coral";
 import type { SeedTemplate } from "./templates/types";
@@ -291,13 +292,15 @@ describe("people, teams and access", () => {
     expect(users.find((u) => u.id === "maya")?.name).toBe("Maya Chen");
   });
 
-  it("has the three teams, with slugs as ids", () => {
-    expect(teams.map((t) => t.id).sort()).toEqual([
-      "card-statements",
-      "coral-offers",
-      "deposits",
+  it("has the three teams, each with an id that isn't its slug (decision 0053)", () => {
+    expect(
+      teams.map((t) => [t.id, t.slug]).sort(([a], [b]) => a!.localeCompare(b!)),
+    ).toEqual([
+      ["t_cards", "card-statements"],
+      ["t_coral", "coral-offers"],
+      ["t_deposits", "deposits"],
     ]);
-    for (const t of teams) expect(t.slug).toBe(t.id);
+    for (const t of teams) expect(t.slug).not.toBe(t.id);
   });
 
   it("gives no team a slug the app's own routes use (decision 0071)", () => {
@@ -319,15 +322,15 @@ describe("people, teams and access", () => {
         [...(byUser.get(m.userId) ?? []), `${m.teamId}:${r.join("+")}`].sort(),
       );
     }
-    expect(byUser.get("maya")).toEqual(["coral-offers:author"]);
-    expect(byUser.get("jordan")).toEqual(["coral-offers:approver"]);
-    expect(byUser.get("alex")).toEqual(["coral-offers:approver+team_admin"]);
+    expect(byUser.get("maya")).toEqual(["t_coral:author"]);
+    expect(byUser.get("jordan")).toEqual(["t_coral:approver"]);
+    expect(byUser.get("alex")).toEqual(["t_coral:approver+team_admin"]);
     expect(byUser.get("priya")).toEqual([
-      "coral-offers:author",
-      "deposits:viewer",
+      "t_coral:author",
+      "t_deposits:viewer",
     ]);
-    expect(byUser.get("sam")).toEqual(["coral-offers:viewer"]);
-    expect(byUser.get("dana")).toEqual(["coral-offers:viewer"]);
+    expect(byUser.get("sam")).toEqual(["t_coral:viewer"]);
+    expect(byUser.get("dana")).toEqual(["t_coral:viewer"]);
     for (const none of ["riley", "taylor", "morgan"])
       expect(byUser.has(none)).toBe(false);
 
@@ -337,10 +340,10 @@ describe("people, teams and access", () => {
     );
     expect(
       members
-        .filter((m) => m.teamId === "card-statements")
+        .filter((m) => m.teamId === "t_cards")
         .some((m) => personaIds.has(m.userId)),
     ).toBe(false);
-    expect(members.filter((m) => m.teamId === "coral-offers")).toHaveLength(7);
+    expect(members.filter((m) => m.teamId === "t_coral")).toHaveLength(7);
   });
 
   it("seeds the inactivity story and the stretch persona", () => {
@@ -370,7 +373,7 @@ describe("people, teams and access", () => {
       (e) => e.action === "access.flagged_inactive",
     );
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ actorId: null, teamId: "coral-offers" });
+    expect(events[0]).toMatchObject({ actorId: null, teamId: "t_coral" });
   });
 
   it("configures the Disclosure and Alert content types, each with a single approval stage", async () => {
@@ -417,9 +420,9 @@ describe("people, teams and access", () => {
       })
       .from(ucomp.teams);
     expect(rows.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
-      { id: "card-statements", appName: "Card Center", smsSender: "22737" },
-      { id: "coral-offers", appName: "Coral", smsSender: "26725" },
-      { id: "deposits", appName: "Deposits Online", smsSender: "33767" },
+      { id: "t_cards", appName: "Card Center", smsSender: "22737" },
+      { id: "t_coral", appName: "Coral", smsSender: "26725" },
+      { id: "t_deposits", appName: "Deposits Online", smsSender: "33767" },
     ]);
   });
 });
@@ -427,7 +430,7 @@ describe("people, teams and access", () => {
 describe("lifecycle states", () => {
   it("shows every state among the Coral Offers versions", () => {
     const coralTemplates = new Set(
-      templates.filter((t) => t.teamId === "coral-offers").map((t) => t.id),
+      templates.filter((t) => t.teamId === "t_coral").map((t) => t.id),
     );
     const states = new Set(
       versions
@@ -519,7 +522,7 @@ describe("lifecycle states", () => {
     for (const key of ALERTS) {
       const template = templates.find((t) => t.id === tpl(key))!;
       expect(template).toMatchObject({
-        teamId: "coral-offers",
+        teamId: "t_coral",
         contentTypeId: "ct_alert",
       });
       for (const v of versionsOf(key))
@@ -582,7 +585,7 @@ describe("lifecycle states", () => {
   });
 
   it("gives Deposits and Card Statements templates in Active and Draft", () => {
-    for (const team of ["deposits", "card-statements"]) {
+    for (const team of ["t_deposits", "t_cards"]) {
       const ids = new Set(
         templates.filter((t) => t.teamId === team).map((t) => t.id),
       );
@@ -1164,15 +1167,15 @@ describe("notifications, access and audit", () => {
       expect(approvals.filter((a) => a.versionId === v.id)).toHaveLength(0);
     }
 
-    const notes = (await db.select().from(ucomp.notifications)).filter(
-      (n) => n.userId === "jordan",
-    );
+    const notes = (await db.select().from(ucomp.notifications))
+      .filter((n) => n.userId === "jordan")
+      .map((n) => asShown(n));
     expect(notes).toHaveLength(2);
     for (const n of notes)
       expect(n).toMatchObject({
         kind: "review_requested",
         readAt: null,
-        teamId: "coral-offers",
+        teamId: "t_coral",
       });
     expect(notes.map((n) => n.href).sort()).toEqual(
       // Cash Back v3 was sent back once, so its link names the round (reviewPath); the alert's first round doesn't.
@@ -1180,6 +1183,28 @@ describe("notifications, access and audit", () => {
         `/coral-offers/review/${tpl("card-used-abroad")}/1`,
         `/coral-offers/review/${tpl("cash-back")}/3?round=2`,
       ].sort(),
+    );
+    // Stored by team id, never by slug or route (decision 0055).
+    expect(
+      notes
+        .map((n) => n.link)
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    ).toEqual(
+      [
+        {
+          to: "review",
+          teamId: "t_coral",
+          templateId: tpl("card-used-abroad"),
+          versionNumber: 1,
+        },
+        {
+          to: "review",
+          teamId: "t_coral",
+          templateId: tpl("cash-back"),
+          versionNumber: 3,
+          round: 2,
+        },
+      ].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
     );
 
     const waiting = versions.filter(
@@ -1194,13 +1219,13 @@ describe("notifications, access and audit", () => {
     const [request] = await db.select().from(ucomp.accessRequests);
     expect(request).toMatchObject({
       userId: "chris",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       role: "author",
       status: "pending",
     });
 
     const [recert] = await db.select().from(ucomp.recertifications);
-    expect(recert.teamId).toBe("coral-offers");
+    expect(recert.teamId).toBe("t_coral");
     expect(recert.dueAt.getTime()).toBe(base.getTime() + 30 * DAY);
     expect(recert.label).toMatch(/^Q[1-4] \d{4}$/);
     expect(recert.completedAt).toBeNull();
@@ -1462,7 +1487,7 @@ describe("one spelling per event", () => {
       }),
     ]);
     expect(await eventsOf("recert.started")).toEqual([
-      expect.objectContaining({ actorId: "alex", teamId: "coral-offers" }),
+      expect.objectContaining({ actorId: "alex", teamId: "t_coral" }),
     ]);
     const granted = await eventsOf("access.granted");
     for (const e of granted) {
@@ -1480,7 +1505,6 @@ describe("one spelling per event", () => {
     expect(keysOf(byArea("teams"))).toEqual([
       "area",
       "slug",
-      "summary",
       "teamName",
       "userId",
       "userName",
@@ -1510,7 +1534,10 @@ describe("one spelling per event", () => {
       contentTypeName: "Disclosure",
       added: ["Offer details", "Rates and fees", "Legal notices"],
       sections: ["Offer details", "Rates and fees", "Legal notices"],
+      reordered: false,
     });
+    // The sentence is worded on read (`describeConfigChange`), never stored in the details.
+    for (const e of config) expect(e.details).not.toHaveProperty("summary");
   });
 
   it("writes every consumer notice with the fields a live one has, under no other spelling", async () => {

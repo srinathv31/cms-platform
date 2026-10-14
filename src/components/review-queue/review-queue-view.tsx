@@ -1,7 +1,6 @@
 import { Stream } from "@/components/primitives/stream";
 import { PageHeader } from "@/components/primitives/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { now } from "@/server/clock";
 import { getReviewQueue } from "@/server/queries/review";
 import { requireSpaceFromParams } from "@/server/queries/spaces";
 import { queueTabs } from "./format-row";
@@ -18,10 +17,10 @@ async function SpaceEyebrow({ params }: { params: TeamParams }) {
 async function Queue({ params }: { params: TeamParams }) {
   const space = await requireSpaceFromParams(params);
   const queue = await getReviewQueue(space.slug);
-  const nowDate = await now();
   return (
     <ReviewQueueTabs
-      tabs={queueTabs(queue, space.slug, nowDate)}
+      // "3 days ago" counts from the instant the backend read the queue at.
+      tabs={queueTabs(queue, space.slug, new Date(queue.now))}
       showTeam={space.isAll}
     />
   );

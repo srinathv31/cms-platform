@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { CHANNEL_LABELS } from "@/domain/render/errors";
 import type { UsageDashboard } from "@/domain/golive-types";
 import { CHANNELS } from "@/domain/types";
-import { now } from "@/server/clock";
 import { getUsageDashboard } from "@/server/queries/usage";
 import {
   StatCard,
@@ -256,12 +255,11 @@ export async function UsageDashboardContent({
   const { team } = await params;
   const { tab } = await searchParams;
   const d = await getUsageDashboard(team);
-  const nowDate = await now();
   return (
     <UsageTabs
       initial={tab === "consumers" ? "consumers" : "overview"}
       overview={<Overview d={d} />}
-      consumers={<Consumers d={d} nowIso={nowDate.toISOString()} />}
+      consumers={<Consumers d={d} nowIso={d.asOf} />}
     />
   );
 }

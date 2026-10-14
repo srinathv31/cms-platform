@@ -6,16 +6,13 @@ import {
   renderFailed,
   renderTarget,
 } from "@/domain/render";
-import {
-  correlationIdOf,
-  errorResponse,
-  withDemoDate,
-} from "@/server/api/http";
+import { correlationIdOf, errorResponse } from "@/server/api/http";
+import { withDemoDate } from "@/server/services/local/consumer-api";
 import {
   readRenderRequest,
   renderSuccessResponse,
 } from "@/server/api/render-http";
-import { renderTemplate } from "@/server/render/render-template";
+import { renderTemplate } from "@/server/services/local/render/render-template";
 
 // POST /api/v1/templates/{templateId}/render: the render API, shaped like the future Java service.
 // The contract (body, headers, every error and its wording) is src/domain/render/types.ts.

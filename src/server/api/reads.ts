@@ -1,6 +1,7 @@
 import "server-only";
-import type { Refusal, RefusalCode } from "@/domain/refusals";
+import { REQUEST_REFUSALS } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
+import { refusal, type ReadResult } from "@/server/services/results";
 
 // The reads the browser asks for on demand, when a dialog or a menu opens: the GET routes under
 // src/app/api/templates/[templateId]/. They are route handlers, not server actions: an action is a public
@@ -8,25 +9,20 @@ import type { ActionResult } from "@/domain/review-types";
 // Submit, and Submit behind a read.
 //
 // Each read's query takes the viewer and the raw request values, parses them with zod, and returns a
-// `ReadResult`: the data, or a refusal with its code, the sentence to show and the status its route
-// answers. The body on the wire is the `ActionResult` the client reads (`{ ok: true, … }` or
+// `ReadResult` (src/server/services/results.ts): the data, or a refusal with its code, the sentence to show
+// and the status its route answers. The body on the wire is the `ActionResult` the client reads (`{ ok: true, … }` or
 // `{ ok: false, code, reason }`).
 
-/** Why a read refused, and the HTTP status its route answers with. */
-export interface ReadRefusal {
-  ok: false;
-  /** 400 the request doesn't parse · 403 the viewer may not · 404 no such template or version · 409 not in a state to read. */
-  status: 400 | 403 | 404 | 409;
-  code: RefusalCode;
-  reason: string;
+export {
+  refusal,
+  type ReadRefusal,
+  type ReadResult,
+} from "@/server/services/results";
+
+/** A read route's answer when nobody is signed in: 401 `signed_out`. */
+export function signedOutResponse(): Response {
+  return readResponse(refusal(401, REQUEST_REFUSALS.signedOut));
 }
-
-export type ReadResult<T> = ({ ok: true } & T) | ReadRefusal;
-
-export const refusal = (
-  status: ReadRefusal["status"],
-  { code, reason }: Refusal,
-): ReadRefusal => ({ ok: false, status, code, reason });
 
 /** A read route's answer: the result as JSON, never cached (it depends on the viewer and on the draft). */
 export function readResponse<T>(result: ReadResult<T>): Response {

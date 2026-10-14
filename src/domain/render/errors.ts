@@ -161,6 +161,13 @@ export function previewForbidden(): RenderError {
   return renderError("preview_forbidden", "You can't preview this template.");
 }
 
+// ── 401 ──────────────────────────────────────────────────────────────────────
+
+/** Stencil's preview with nobody signed in: the route answers it before asking the backend. */
+export function signedOut(): RenderError {
+  return renderError("signed_out", "Sign in to preview.");
+}
+
 // ── 404 ──────────────────────────────────────────────────────────────────────
 
 /** "Template UC-4F7K2Q doesn't exist." */

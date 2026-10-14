@@ -80,6 +80,11 @@ export function refuse({ code, reason }: Refusal): Refused {
  * someone else made first. Server actions and the on-demand reads (`src/server/api/reads.ts`) return them.
  */
 export const REQUEST_REFUSALS = {
+  /**
+   * Nobody is signed in: the request context found no viewer (src/server/context/request.ts). An action
+   * answers it; a read route answers it with 401.
+   */
+  signedOut: refusal("signed_out", "Sign in to continue."),
   /** The input doesn't parse. The sentence is the first problem the parser found, when it has one. */
   invalidInput: refusal(
     "invalid_input",
@@ -160,9 +165,13 @@ export const REQUEST_REFUSALS = {
   ),
   /** The compare-and-set missed: someone changed the row between the read and the write. */
   draftChanged: refusal("draft_changed", "This draft changed. Try again."),
-  activeChanged: refusal(
-    "active_changed",
-    "The Active version changed. Try again.",
+  /**
+   * A command's compare-and-set on a version missed: someone else changed it between the command's read and its
+   * write (on a database that doesn't serialize writes, two people acting at once). Nothing was written.
+   */
+  versionChanged: refusal(
+    "version_changed",
+    "This version changed. Reload and try again.",
   ),
   /** Edit: the version the new draft was to copy changed state before it was read. */
   latestChanged: refusal(

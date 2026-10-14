@@ -5,19 +5,22 @@ import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { Viewer } from "@/domain/types";
 import type { Db } from "@/server/db/client";
 import * as schema from "@/server/db/schema/ucomp";
-import { applyDraftPatch } from "@/server/drafts/apply-patch";
+import { prepareDraftPatch } from "@/server/drafts/prepare-patch";
 import {
   getTemplateDetail,
   listNotices,
   searchActiveTemplates,
-} from "@/server/queries/consumer-api";
-import { findRound } from "@/server/queries/find-round";
-import { getIntegrationPanel } from "@/server/queries/integration";
+} from "@/server/services/local/consumer-api";
+import { findRound } from "@/server/services/local/find-round";
+import type { RequestContext } from "@/server/context/request";
+import { integrationPanel } from "@/server/queries/integration";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
-import { getLibraryRows } from "@/server/queries/library";
+import { getLibrary } from "@/server/queries/library";
 import { searchPalette } from "@/server/queries/palette";
+import { services } from "@/server/services";
 import { getSubmitSummary } from "@/server/queries/submit-summary";
-import { runRender } from "@/server/render/render-template";
+import { runRender } from "@/server/services/local/render/render-template";
+import { asShown } from "@/server/testing/notifications";
 import {
   loadPersona,
   seededDatabasePerTest,
@@ -38,7 +41,9 @@ vi.mock("@/server/db/client", async () => {
   const { tempDatabase } = await import("@/server/testing/review-fixtures");
   return tempDatabase("ucomp-versioned-name-");
 });
-vi.mock("@/server/clock", () => ({ now: vi.fn(async () => env.now) }));
+vi.mock("@/server/services/local/clock", () => ({
+  now: vi.fn(async () => env.now),
+}));
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("next/cache", () => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -70,9 +75,16 @@ function as(userId: string) {
   return env.now;
 }
 
+/** The request context of Maya, who is asking the services directly. */
+const mayaContext = (): RequestContext => ({
+  viewer: people.maya!,
+  correlationId: "req_test",
+  credential: { kind: "in_process", userId: "maya" },
+});
+
 /** The name the ⌘K palette lists a template by, searched for by its id as Maya in Coral Offers. */
 async function paletteName(id: string) {
-  const result = await searchPalette(people.maya!, {
+  const result = await searchPalette(mayaContext(), {
     space: "coral-offers",
     q: id,
     template: null,
@@ -131,14 +143,20 @@ const found = async (q: string) =>
     .filter((r) => r.id === templateId)
     .map((r) => r.name);
 
+/** Maya renames the open draft, as autosave does: the route prepares the patch, the backend saves it. */
 async function rename(name: string) {
   const open = await draft();
-  const at = as("maya");
-  const result = await applyDraftPatch(db, {
-    viewer: people.maya!,
+  as("maya");
+  const prepared = prepareDraftPatch({
+    rev: open.rev,
+    sessionKey: "sess_rename",
+    seq: 1,
+    name,
+  });
+  if (!prepared.ok) throw new Error(prepared.reason);
+  const result = await services().drafts.save(mayaContext(), {
     versionId: open.id,
-    at,
-    patch: { rev: open.rev, sessionKey: "sess_rename", name },
+    patch: prepared.patch,
   });
   expect(result).toMatchObject({ ok: true });
 }
@@ -231,10 +249,12 @@ describe("a rename in a draft goes live only with its version", () => {
     expect(await found("card terms")).toEqual([]);
 
     // The SHARE sheet shows what consumers get.
-    const panel = await getIntegrationPanel(
+    const facts = await services().templates.integration(mayaContext(), {
       templateId,
-      "http://localhost:3000",
-    );
+    });
+    const panel = facts.ok
+      ? integrationPanel(facts, "http://localhost:3000")
+      : undefined;
     expect([panel?.template.name, panel?.jsonSchema.title]).toEqual([
       LIVE,
       `${LIVE} v2: values`,
@@ -269,7 +289,7 @@ describe("a rename in a draft goes live only with its version", () => {
     await renamedDraft();
     as("maya");
     expect(
-      (await getLibraryRows("coral-offers")).find((r) => r.id === templateId)
+      (await getLibrary("coral-offers")).rows.find((r) => r.id === templateId)
         ?.name,
     ).toBe(RENAMED);
     expect(await paletteName(templateId)).toBe(RENAMED);
@@ -278,7 +298,14 @@ describe("a rename in a draft goes live only with its version", () => {
   it("the submit summary lists the rename against the Active version", async () => {
     await renamedDraft();
     as("maya");
-    const result = await getSubmitSummary(people.maya!, { templateId });
+    const result = await getSubmitSummary(
+      {
+        viewer: people.maya!,
+        correlationId: "req_test",
+        credential: { kind: "in_process", userId: "maya" },
+      },
+      { templateId },
+    );
     expect(
       result.ok && {
         name: result.summary.name,
@@ -290,10 +317,12 @@ describe("a rename in a draft goes live only with its version", () => {
   it("submitted, it is reviewed under its new name; customers still see the old one", async () => {
     const at = await submittedV3();
     expect((await version(3)).name).toBe(RENAMED);
-    const sent = await db
-      .select()
-      .from(notifications)
-      .where(eq(notifications.createdAt, at));
+    const sent = (
+      await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.createdAt, at))
+    ).map((n) => asShown(n));
     expect(sent.map((n) => n.title)).toContain(
       `Maya Chen submitted ${RENAMED} v3 for review.`,
     );
@@ -312,10 +341,12 @@ describe("a rename in a draft goes live only with its version", () => {
       body: "Is the new name approved by Legal?",
     });
     expect(result).toMatchObject({ ok: true });
-    const sent = await db
-      .select()
-      .from(notifications)
-      .where(eq(notifications.createdAt, at));
+    const sent = (
+      await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.createdAt, at))
+    ).map((n) => asShown(n));
     expect(sent.map((n) => n.title)).toEqual([
       `Jordan Ellis commented on ${RENAMED} v3.`,
     ]);
@@ -375,7 +406,7 @@ describe("a template with no version at all", () => {
     const id = "UC-NOVERS";
     await db.insert(templates).values({
       id,
-      teamId: "coral-offers",
+      teamId: "t_coral",
       contentTypeId: "ct_disclosure",
       createdBy: "maya",
       createdAt: env.now,
@@ -383,7 +414,7 @@ describe("a template with no version at all", () => {
     try {
       expect(await paletteName(id)).toBe(id);
       expect(
-        (await getLibraryRows("coral-offers")).find((r) => r.id === id)?.name,
+        (await getLibrary("coral-offers")).rows.find((r) => r.id === id)?.name,
       ).toBe(id);
     } finally {
       await db.delete(templates).where(eq(templates.id, id));

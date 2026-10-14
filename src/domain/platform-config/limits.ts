@@ -57,6 +57,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "all",
   "api",
   "request-access",
+  "sign-in",
   "editor-lab",
   "pdf-lab",
   "sim",

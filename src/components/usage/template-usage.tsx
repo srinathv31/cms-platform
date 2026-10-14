@@ -17,7 +17,6 @@ import { plural } from "@/domain/plural";
 import { CHANNEL_LABELS, PLATFORM_LABELS } from "@/domain/render/errors";
 import type { TemplateUsageData } from "@/domain/golive-types";
 import { cn } from "@/lib/utils";
-import { now } from "@/server/clock";
 import { getTemplateUsage } from "@/server/queries/usage";
 import {
   StatCard,
@@ -135,7 +134,8 @@ export async function TemplateUsageContent({
 }) {
   const { team, templateId } = await params;
   const d = await getTemplateUsage(team, templateId);
-  const nowDate = await now();
+  // Ages count from the backend's instant the counts were made at.
+  const nowDate = new Date(d.asOf);
   // No version has ever been Active: nothing can have rendered it, so one calm line instead of empty charts.
   if (d.versions.length === 0) {
     return (

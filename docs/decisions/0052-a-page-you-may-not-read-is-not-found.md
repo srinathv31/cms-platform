@@ -1,6 +1,11 @@
 # 0052. A page you may not read is Not found
 
 Status: Accepted
+Amended 2026-10-13: `requireCan` is gone. The settings sections and the Audit page ask the service, which decides with `can()` behind
+the seam ([0070](0070-rules-and-permission-checks-sit-behind-the-service-interfaces.md)) and refuses the viewer who may not
+read: 403 `generic` where the team is theirs to enter, 404 `space_unavailable` for a team that isn't there. The read model turns
+the refusal into `notFound()`, so the page is the same. The audit export route answers the refusal's status, and a team the
+viewer can't enter is 404 there too (it was 403): the space is resolved first, as for a page.
 Date: 2026-10-12
 
 ## Context
@@ -17,7 +22,7 @@ to copy.
 
 - **One answer: the Not found page.** Whatever the viewer may not read shows the Not found page, the same one as for
   something that doesn't exist: a team space, a Team or Platform settings section, the Audit page. `requireCan(viewer, action, resource)`
-  in `src/server/queries/require-can.ts` is the one helper: the domain's `can()` decides, and a refusal of any kind
+  in `server/queries/require-can.ts` (as it was) is the one helper: the domain's `can()` decides, and a refusal of any kind
   (no role, a guard) becomes `notFound()`. `requireSpace` asks it for `template.view` on the team (or in the
   cross-team space), which is what `canSeeSpace` answers for the team switcher and the persona switch; a test holds
   the two to the same answer for every seeded person and space.

@@ -5,7 +5,7 @@ import { newSessionKey } from "./session-key";
 afterEach(() => vi.unstubAllGlobals());
 
 const accepted = (sessionKey: string) =>
-  parseDraftPatch({ rev: 0, sessionKey, name: "A" }).ok;
+  parseDraftPatch({ rev: 0, sessionKey, seq: 1, name: "A" }).ok;
 
 describe("newSessionKey", () => {
   it("is a UUID where crypto.randomUUID exists, and the route accepts it", () => {

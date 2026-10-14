@@ -76,16 +76,11 @@ export function setBusinessZone(input: {
     ok: true,
     zone: next,
     effects: [
-      configChanged(
-        "business_zone",
-        null,
-        `Set the business time zone to ${zoneLabel(next)}`,
-        {
-          from: current,
-          to: next,
-          pendingSunsets,
-        },
-      ),
+      configChanged("business_zone", null, {
+        from: current,
+        to: next,
+        pendingSunsets,
+      }),
     ],
   };
 }

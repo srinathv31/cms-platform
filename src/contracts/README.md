@@ -116,7 +116,7 @@ compares names and ids by code point, not by locale. The cursor format, and why 
 [decision 0006](../../docs/decisions/0006-page-notices-by-commit-order.md); the code is
 `src/domain/golive/cursor.ts`. The shared response headers (`Cache-Control: no-store`, `X-Correlation-Id`, `nosniff`), the error response
 and the demo-clock `Date` header come from [server/api/http.ts](../server/api/http.ts). The GET handlers read through
-`src/server/queries/consumer-api.ts` and the pure builders in `src/domain/golive/`.
+`src/server/services/local/consumer-api.ts` and the pure builders in `src/domain/golive/`.
 
 ## Errors
 
@@ -127,6 +127,7 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 | Status | Codes                                                                               |
 | ------ | ----------------------------------------------------------------------------------- |
 | 400    | `bad_request`, `consumer_required`                                                  |
+| 401    | `signed_out`                                                                        |
 | 403    | `unknown_consumer`, `preview_forbidden`, `consumer_mismatch`                        |
 | 404    | `template_not_found`, `version_not_found`                                           |
 | 409    | `version_not_released`                                                              |
@@ -135,7 +136,8 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 | 422    | `channel_not_allowed`, `channel_not_enabled`, `missing_variables`, `invalid_values` |
 | 500    | `render_failed`                                                                     |
 
-`preview_forbidden` is Stencil's own preview route's: `/api/v1` never returns it (it stays in `ApiErrorCode` so the
+`signed_out` is Stencil's own preview route's, and no route returns `preview_forbidden` (the preview answers a version
+the viewer may not see 404 `template_not_found`): `/api/v1` never returns either (they stay in `ApiErrorCode` so the
 two code lists match).
 
 `consumer_mismatch` belongs to the notices route, which answers it for a path naming any consumer but the caller, registered or not, so no answer says which consumer ids exist. The other 15 are the render codes

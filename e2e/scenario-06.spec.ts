@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { describeNotification } from "@/domain/notifications";
 import {
   correlation,
   expectError,
@@ -43,6 +44,7 @@ import {
   notificationsAbout,
   renderLogFor,
   simDeliveries,
+  teamIdOf,
   versionById,
 } from "./helpers/state";
 
@@ -391,7 +393,7 @@ test.describe("scenario 6: revoke", () => {
       expect(audit.map((e) => e.action)).toEqual(["version.revoke_started"]);
       expect(audit[0]).toMatchObject({
         actorId: "jordan",
-        teamId: TEAM,
+        teamId: await teamIdOf(TEAM),
         templateId: v1.templateId,
         versionId: v1.id,
       });
@@ -413,14 +415,22 @@ test.describe("scenario 6: revoke", () => {
         fresh.map((n) => n.userId).sort(),
         "to the approvers other than Jordan",
       ).toEqual(approvers.filter((id) => id !== "jordan"));
+      // Stored as facts and a link by team id (decision 0055), worded when the bell reads them.
       for (const note of fresh) {
         expect(note).toMatchObject({
-          teamId: TEAM,
-          title: `Jordan Ellis started revoking ${NAME} v1. Confirm or cancel.`,
+          teamId: v1.teamId,
+          facts: { actorName: "Jordan Ellis", templateName: NAME, number: 1 },
           body: REASON,
-          href: `/${TEAM}/templates/${v1.templateId}/versions`,
+          link: {
+            to: "versions",
+            teamId: v1.teamId,
+            templateId: v1.templateId,
+          },
           readAt: null,
         });
+        expect(
+          describeNotification(note.kind, note.facts, note.userId).title,
+        ).toBe(`Jordan Ellis started revoking ${NAME} v1. Confirm or cancel.`);
       }
 
       const notices = (
@@ -723,7 +733,7 @@ test.describe("scenario 6: revoke", () => {
       expect(audit.map((e) => e.actorId)).toEqual(["jordan", "alex"]);
       for (const event of audit)
         expect(event).toMatchObject({
-          teamId: TEAM,
+          teamId: v1.teamId,
           templateId: v1.templateId,
           versionId: v1.id,
         });
@@ -778,12 +788,19 @@ test.describe("scenario 6: revoke", () => {
       ).toEqual([...told].sort());
       for (const note of revoked) {
         expect(note).toMatchObject({
-          teamId: TEAM,
-          title: `Alex Kim confirmed the revoke of ${NAME} v1.`,
+          teamId: v1.teamId,
+          facts: { actorName: "Alex Kim", templateName: NAME, number: 1 },
           body: REASON,
-          href: `/${TEAM}/templates/${v1.templateId}/versions`,
+          link: {
+            to: "versions",
+            teamId: v1.teamId,
+            templateId: v1.templateId,
+          },
           readAt: null,
         });
+        expect(
+          describeNotification(note.kind, note.facts, note.userId).title,
+        ).toBe(`Alex Kim confirmed the revoke of ${NAME} v1.`);
       }
 
       // The other version is as it was.

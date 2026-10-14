@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { rolesLabel } from "@/domain/access/roles";
-import type { RecertificationSection, RecertView } from "@/domain/access-types";
+import type {
+  RecertificationSection,
+  RecertView,
+} from "@/server/queries/access-models";
 import {
   StatCard,
   StatLabel,

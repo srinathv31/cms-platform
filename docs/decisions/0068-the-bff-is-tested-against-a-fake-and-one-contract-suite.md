@@ -2,6 +2,11 @@
 
 Status: Accepted
 Amended 2026-10-12: the e2e helper is the folder `e2e/helpers/state/`, not one `state.ts`; its README lists what a Java implementation provides, and ESLint allows the database client only in `e2e/helpers/state/db.ts`.
+Amended 2026-10-13: the Java API's test clock must be settable to an exact instant, not only offset, and its
+fixture loader must take the base instant the seed was built on ([0069](0069-seed-ids-are-literal-and-the-seed-exports-a-fixture.md)):
+contract cases pin the backend's clock and compare state before and after, never find a write by its instant
+([0072](0072-the-bff-reaches-its-backend-through-service-interfaces.md)). The fake implements every command and only
+the reads a case needs to observe one; BFF read-model tests run on facts, not on the fake.
 Date: 2026-10-12
 
 ## Context

@@ -1,10 +1,18 @@
 // Small helpers the transitions share.
 //
-// A notification about a round names it as people read it (`versionLabel` in rounds.ts): "v2" until the
-// number has been sent back, then "v2, round 2". Sunset and revoke are about released versions: "v2".
+// A version is named in a sentence as people read it (`versionLabel` in rounds.ts): "v2" until the number has
+// been sent back, then "v2, round 2". Sunset and revoke are about released versions: "v2". A notification
+// stores the number and round as facts and is worded the same way when read (notifications.ts).
 
+import { REQUEST_REFUSALS, type Refusal } from "../refusals";
 import { versionLabel, type NumberedRound, type RoundRow } from "../rounds";
-import type { NotificationEffect, Recipients } from "../review-types";
+import type {
+  NotificationEffect,
+  NotificationFacts,
+  NotificationKind,
+  NotificationLink,
+  Recipients,
+} from "../review-types";
 import type { VersionState } from "../types";
 import { LifecycleError } from "./types";
 
@@ -41,16 +49,41 @@ export function trimmed(value: string | null | undefined): string | null {
   return t === "" ? null : t;
 }
 
+/** The longest note to reviewers (submit) and the longest reason (request changes, start a revoke), trimmed. */
+export const NOTE_MAX = 2000;
+export const REASON_MAX = 2000;
+
+/** `note_too_long` for a note to reviewers over `NOTE_MAX` once trimmed; null otherwise. */
+export function noteRefusal(note: string | null | undefined): Refusal | null {
+  return (note?.trim().length ?? 0) > NOTE_MAX
+    ? REQUEST_REFUSALS.noteTooLong(NOTE_MAX)
+    : null;
+}
+
+/** `reason_too_long` for a reason over `REASON_MAX` once trimmed; null otherwise. A blank one is the transition's. */
+export function reasonRefusal(reason: string): Refusal | null {
+  return reason.trim().length > REASON_MAX
+    ? REQUEST_REFUSALS.reasonTooLong(REASON_MAX)
+    : null;
+}
+
 export function teamApproversExcept(...userIds: string[]): Recipients {
   return { kind: "team_role", role: "approver", exceptUserIds: userIds };
 }
 
-/** A notification effect; `body` is left out when there is none. */
-export function notify(
-  n: Omit<NotificationEffect, "kind" | "body"> & { body?: string | null },
-): NotificationEffect {
+/** A notification effect, with the facts its kind stores; `body` (a person's own words) is left out when there is none. */
+export function notify<K extends NotificationKind>(n: {
+  notification: K;
+  to: Recipients;
+  facts: NotificationFacts[K];
+  body?: string | null;
+  link: NotificationLink;
+}): NotificationEffect {
   const { body, ...rest } = n;
-  return body
-    ? { kind: "notification", ...rest, body }
-    : { kind: "notification", ...rest };
+  // `K` is one kind, so this is that kind's member of the union; TypeScript can't see it through the generic.
+  return (
+    body
+      ? { kind: "notification", ...rest, body }
+      : { kind: "notification", ...rest }
+  ) as NotificationEffect;
 }

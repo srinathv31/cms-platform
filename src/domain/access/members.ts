@@ -14,7 +14,7 @@ import type {
 import { TEAM_ROLES, type TeamRole } from "../types";
 import { inactivity } from "./inactivity";
 import { ACCESS_REFUSALS } from "./refusals";
-import { sortRoles, rolesLabel } from "./roles";
+import { sortRoles } from "./roles";
 
 /** Why a member can't be given this set of roles, or null: they keep at least one. */
 export function validateRoles(roles: readonly TeamRole[]): Refusal | null {
@@ -62,6 +62,36 @@ export function losesLastAdmin(
   );
 }
 
+/** Whether the team has an active Team Admin among `memberships`. */
+function hasActiveAdmin(
+  memberships: readonly MembershipFacts[],
+  teamId: string,
+): boolean {
+  return memberships.some(
+    (m) =>
+      m.teamId === teamId &&
+      m.status === "active" &&
+      m.roles.includes("team_admin"),
+  );
+}
+
+/**
+ * The "at least one active Team Admin" rule, checked again once a change is written: `before` is the team as the
+ * command read it, `after` the team as it stands with the change. A team that had an active Team Admin keeps one.
+ * The transitions check it on what they read (`losesLastAdmin`); where writes don't take turns, two admins
+ * demoting each other can each read the other as still there, and this refuses the second at its write. Null
+ * when the team keeps an admin.
+ */
+export function lastAdminRefusal(
+  team: Named,
+  before: readonly MembershipFacts[],
+  after: readonly MembershipFacts[],
+): Refusal | null {
+  return hasActiveAdmin(before, team.id) && !hasActiveAdmin(after, team.id)
+    ? ACCESS_REFUSALS.lastAdmin(team.name)
+    : null;
+}
+
 export function changeRoles(
   input: MemberInput & TeamMemberships & { roles: readonly TeamRole[] },
 ):
@@ -96,7 +126,7 @@ export function changeRoles(
         notification: "roles_changed",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} changed your roles on ${team.name} to ${rolesLabel(roles)}.`,
+        facts: { actorName: actor.name, teamName: team.name, roles },
         link: { to: "library", teamId: team.id },
       },
     ],
@@ -130,7 +160,7 @@ export function removeMember(
         notification: "access_removed",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} removed your access to ${team.name}.`,
+        facts: { actorName: actor.name, teamName: team.name },
         link: { to: "request-access" },
       },
     ],
@@ -176,7 +206,13 @@ export function suspendInactive(
         notification: "access_suspended",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} suspended your access to ${team.name} after ${state.daysInactive} days without a sign-in.`,
+        facts: {
+          userId: member.id,
+          userName: member.name,
+          teamName: team.name,
+          daysInactive: state.daysInactive,
+          actorName: actor.name,
+        },
         link: { to: "request-access" },
       },
     ],
@@ -259,7 +295,7 @@ export function reinstate(
         notification: "access_granted",
         to: { kind: "user", userId: member.id },
         teamId: team.id,
-        title: `${actor.name} restored your access to ${team.name}.`,
+        facts: { actorName: actor.name, teamName: team.name },
         link: { to: "library", teamId: team.id },
       },
     ],

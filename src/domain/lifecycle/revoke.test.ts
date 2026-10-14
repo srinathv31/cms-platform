@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cancelRevoke, confirmRevoke, startRevoke } from "./revoke";
-import type { Recipients } from "../review-types";
+import { describeNotification } from "../notifications";
+import type { LifecycleEffect, Recipients } from "../review-types";
 import {
   NOW,
   TEMPLATE,
@@ -10,6 +11,12 @@ import {
   reviewVersion,
   tryStartRevoke,
 } from "./fixtures";
+
+/** A notification effect as its reader sees it (`describeNotification`): null for any other effect. */
+const worded = (effect: LifecycleEffect | undefined, readerId = "alex") =>
+  effect?.kind === "notification"
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 
 const APPROVERS_BUT = (userId: string): Recipients => ({
   kind: "team_role",
@@ -49,13 +56,29 @@ describe("startRevoke", () => {
           kind: "notification",
           notification: "revoke_started",
           to: APPROVERS_BUT("jordan"),
-          title:
-            "Jordan Ellis started revoking Balance Transfer Intro v1. Confirm or cancel.",
+          facts: {
+            actorName: "Jordan Ellis",
+            templateName: "Balance Transfer Intro",
+            number: 1,
+          },
           body: REVOKE_REASON,
           link: { to: "versions", templateId: TEMPLATE.id },
         },
       ],
     });
+  });
+
+  it("words the approvers' notification when it is read, with the reason as its body", () => {
+    const result = run();
+    const notification = result.ok ? result.effects[1] : undefined;
+    expect(worded(notification)).toEqual({
+      title:
+        "Jordan Ellis started revoking Balance Transfer Intro v1. Confirm or cancel.",
+      body: null,
+    });
+    expect(notification?.kind === "notification" && notification.body).toBe(
+      REVOKE_REASON,
+    );
   });
 
   it("works on the Active version too", () => {
@@ -115,7 +138,11 @@ describe("confirmRevoke", () => {
     kind: "notification",
     notification: "version_revoked",
     to,
-    title: "Alex Kim confirmed the revoke of Balance Transfer Intro v1.",
+    facts: {
+      actorName: "Alex Kim",
+      templateName: "Balance Transfer Intro",
+      number: 1,
+    },
     body: REVOKE_REASON,
     link: { to: "versions", templateId: TEMPLATE.id },
   });
@@ -147,6 +174,17 @@ describe("confirmRevoke", () => {
         revoked({ kind: "user", userId: "priya" }),
       ],
     });
+  });
+
+  it("words the same sentence for the approvers and the author when it is read", () => {
+    const result = run();
+    const notifications = result.ok
+      ? result.effects.filter((e) => e.kind === "notification")
+      : [];
+    expect(notifications.map((e) => worded(e, "priya")?.title)).toEqual([
+      "Alex Kim confirmed the revoke of Balance Transfer Intro v1.",
+      "Alex Kim confirmed the revoke of Balance Transfer Intro v1.",
+    ]);
   });
 
   it("refuses the approver who started it: a different approver must confirm", () => {

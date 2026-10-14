@@ -1,6 +1,8 @@
 // Validates the body of PUT /api/drafts/[versionId]. Pure TypeScript: no database, no framework.
-// What this checks is the shape and the size. Rules that need the database (is it a draft, is
-// the rev current, is the channel allowed for the content type) live in apply-patch.ts.
+// What this checks is the shape and the size. The route then prepares each document (prepare-patch.ts), and the
+// rules that need the draft as it stands (is it a draft, is the rev current, is the channel allowed for the content
+// type) are the backend's: `DraftService.save` (src/server/services/drafts.ts), deciding with
+// src/domain/lifecycle/autosave.ts.
 
 import { z } from "zod";
 import {
@@ -13,7 +15,7 @@ import type { DraftPatch, JSONContent } from "@/domain/types";
 import { formatCount } from "@/domain/numbers";
 import { identityOf } from "@/editor/model/contract";
 import { MAX_VALUE_LENGTH, isValidKey } from "@/editor/model/variables";
-import { changedFields } from "./audit-merge";
+import { changedFields } from "@/domain/lifecycle/autosave";
 
 /**
  * Largest request body accepted, in bytes. A long disclosure is well under 1 MB of JSON. The route
@@ -172,6 +174,7 @@ const patchSchema = z.strictObject({
   sessionKey: z
     .string()
     .regex(/^[A-Za-z0-9_-]{8,64}$/, { message: "is not a valid session key" }),
+  seq: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
   body: doc.optional(),
   variables: variables.optional(),
   name: name.optional(),

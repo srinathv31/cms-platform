@@ -3,11 +3,16 @@ import { ACCESS_REFUSALS } from "./refusals";
 import {
   changeRoles,
   keepInactive,
+  lastAdminRefusal,
   reinstate,
   removeMember,
   suspendInactive,
 } from "./members";
-import type { MembershipFacts } from "../access-types";
+import type {
+  AccessNotificationEffect,
+  MembershipFacts,
+} from "../access-types";
+import { describeNotification } from "../notifications";
 import {
   at,
   ago,
@@ -20,6 +25,15 @@ import {
   sweepAt,
   statusOf,
 } from "./fixtures";
+
+/** A notification effect as the person reading it sees it (`describeNotification`). */
+const words = (
+  effect: AccessNotificationEffect | undefined,
+  readerId: string,
+) =>
+  effect
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 
 describe("changeRoles", () => {
   const team = coral();
@@ -51,7 +65,16 @@ describe("changeRoles", () => {
         to: ["author", "approver"],
       },
     });
-    expect(notes(result.effects)[0]?.title).toBe(
+    expect(notes(result.effects)[0]).toMatchObject({
+      notification: "roles_changed",
+      to: { kind: "user", userId: "jordan" },
+      facts: {
+        actorName: "Alex Kim",
+        teamName: "Coral Offers",
+        roles: ["author", "approver"],
+      },
+    });
+    expect(words(notes(result.effects)[0], "jordan")?.title).toBe(
       "Alex Kim changed your roles on Coral Offers to Author & Approver.",
     );
   });
@@ -129,6 +152,52 @@ describe("changeRoles", () => {
   });
 });
 
+describe("lastAdminRefusal, checked again at the write", () => {
+  const twoAdmins = () => [
+    membership("alex", ["team_admin", "approver"]),
+    membership("jordan", ["team_admin", "approver"]),
+    membership("maya", ["author"]),
+  ];
+  const demoted = (ms: MembershipFacts[], userId: string) =>
+    ms.map((m) =>
+      m.userId === userId ? { ...m, roles: ["approver" as const] } : m,
+    );
+
+  it("lets a change through that leaves the team an active Team Admin", () => {
+    const before = twoAdmins();
+    expect(lastAdminRefusal(CORAL, before, demoted(before, "alex"))).toBeNull();
+  });
+
+  it("refuses the second of two admins demoting each other: each read the other as still there", () => {
+    const before = twoAdmins();
+    const both = demoted(demoted(before, "alex"), "jordan");
+    expect(lastAdminRefusal(CORAL, before, both)).toEqual(
+      ACCESS_REFUSALS.lastAdmin(CORAL.name),
+    );
+    // Suspended or removed counts the same as demoted.
+    const suspended = demoted(before, "jordan").map((m) =>
+      m.userId === "alex" ? { ...m, status: "suspended" as const } : m,
+    );
+    expect(lastAdminRefusal(CORAL, before, suspended)).toEqual(
+      ACCESS_REFUSALS.lastAdmin(CORAL.name),
+    );
+    expect(
+      lastAdminRefusal(
+        CORAL,
+        before,
+        demoted(before, "jordan").filter((m) => m.userId !== "alex"),
+      ),
+    ).toEqual(ACCESS_REFUSALS.lastAdmin(CORAL.name));
+  });
+
+  it("asks nothing of a team that had no active Team Admin to begin with, or of other teams", () => {
+    const before = [membership("maya", ["author"])];
+    expect(lastAdminRefusal(CORAL, before, before)).toBeNull();
+    const other = twoAdmins().map((m) => ({ ...m, teamId: "t_deposits" }));
+    expect(lastAdminRefusal(CORAL, other, [])).toBeNull();
+  });
+});
+
 describe("removeMember", () => {
   const team = coral();
   const base = {
@@ -153,9 +222,13 @@ describe("removeMember", () => {
       details: { userId: "maya", roles: ["author"] },
     });
     expect(notes(result.effects)[0]).toMatchObject({
-      title: "Alex Kim removed your access to Coral Offers.",
+      notification: "access_removed",
+      facts: { actorName: "Alex Kim", teamName: "Coral Offers" },
       link: { to: "request-access" },
     });
+    expect(words(notes(result.effects)[0], "maya")?.title).toBe(
+      "Alex Kim removed your access to Coral Offers.",
+    );
   });
 
   it("never yourself, never the last Team Admin", () => {
@@ -221,8 +294,23 @@ describe("suspendInactive and keepInactive", () => {
       action: "access.suspended",
       details: { reason: "inactivity", daysInactive: 95 },
     });
-    expect(notes(result.effects)[0]?.title).toBe(
+    expect(notes(result.effects)[0]).toMatchObject({
+      notification: "access_suspended",
+      to: { kind: "user", userId: "devon" },
+      facts: {
+        userId: "devon",
+        userName: "Devon Lin",
+        teamName: "Coral Offers",
+        daysInactive: 95,
+        actorName: "Alex Kim",
+      },
+    });
+    // Worded for the reader: the member hears "your", anyone else reads the member's name.
+    expect(words(notes(result.effects)[0], "devon")?.title).toBe(
       "Alex Kim suspended your access to Coral Offers after 95 days without a sign-in.",
+    );
+    expect(words(notes(result.effects)[0], "jordan")?.title).toBe(
+      "Alex Kim suspended Devon Lin's access to Coral Offers after 95 days without a sign-in.",
     );
   });
 
@@ -336,7 +424,12 @@ describe("reinstate", () => {
         roles: ["viewer"],
       },
     });
-    expect(notes(result.effects)[0]?.title).toBe(
+    expect(notes(result.effects)[0]).toMatchObject({
+      notification: "access_granted",
+      facts: { actorName: "Alex Kim", teamName: "Coral Offers" },
+    });
+    expect(notes(result.effects)[0]?.facts).not.toHaveProperty("role");
+    expect(words(notes(result.effects)[0], "devon")?.title).toBe(
       "Alex Kim restored your access to Coral Offers.",
     );
 

@@ -10,6 +10,7 @@ import {
   consumerNotices,
   findVersion,
   renderLog,
+  teamIdOf,
 } from "./helpers/state";
 import { asPersona, expect, hydrated, test } from "./helpers/scenario";
 
@@ -184,7 +185,7 @@ test("a persona switch records v1's passed sunset once, Activity says it stopped
   const day = sunsetDay(new Date(sunsetAt), NY);
   await expect.poll(async () => (await recorded()).length).toBe(1);
   const [row] = await recorded();
-  expect(row).toMatchObject({ actorId: null, teamId: TEAM });
+  expect(row).toMatchObject({ actorId: null, teamId: await teamIdOf(TEAM) });
   expect(row!.at, "dated at the sunset").toBe(sunsetAt);
   expect(row!.details).toEqual({
     number: 1,

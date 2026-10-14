@@ -1,8 +1,16 @@
 import { DOCUMENT_THREAD } from "@/domain/review-types";
 import type { ContractChange } from "@/domain/types";
 import type { SeedCtx } from "../context";
-import { callout, disclosure, hr, inlineDoc, p, table, ul } from "../content";
-import type { VarKey } from "../variables";
+import {
+  callout,
+  disclosure,
+  hr,
+  inlineDoc,
+  p,
+  table,
+  ul,
+} from "@/server/documents/build";
+import type { VarKey } from "@/server/documents/variables";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 
@@ -278,7 +286,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
     {
       id: "UC-D6KSGY",
       key: "balance-transfer",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       name: "Balance Transfer Intro — Terms",
       createdBy: "priya",
       createdAt: 160,
@@ -364,7 +372,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
     {
       id: "UC-J530DX",
       key: "cash-back",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       name: "Cash Back Welcome Bonus — Terms",
       createdBy: "maya",
       createdAt: 210,
@@ -513,7 +521,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
     {
       id: "UC-NYP7F0",
       key: "annual-fee-waiver",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       name: "Annual Fee Waiver — Terms",
       createdBy: "maya",
       createdAt: 10,
@@ -602,7 +610,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
     {
       id: "UC-WGGRJH",
       key: "holiday-points",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       name: "Holiday Points Promo — Terms",
       createdBy: "priya",
       createdAt: 175,
@@ -678,7 +686,7 @@ export function seedCoralTemplates(ctx: SeedCtx) {
     {
       id: "UC-PAS9A0",
       key: "rate-change-notice",
-      teamId: "coral-offers",
+      teamId: "t_coral",
       name: "Rate Change Notice",
       createdBy: "maya",
       createdAt: 130,

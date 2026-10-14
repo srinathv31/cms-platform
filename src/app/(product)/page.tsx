@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
 import { Stream } from "@/components/primitives/stream";
-import { defaultSpace } from "@/domain/permissions";
-import { getViewer } from "@/server/viewer";
+import { getShell } from "@/server/queries/spaces";
 
 async function GoHome(): Promise<never> {
-  const viewer = await getViewer();
-  const space = defaultSpace(viewer);
-  redirect(space ? `/${space}/library` : "/request-access");
+  // The first space the viewer may switch to (All teams for a platform role, else their first team by name).
+  const [space] = (await getShell()).spaces;
+  redirect(space ? `/${space.slug}/library` : "/request-access");
 }
 
 /** "/" sends everyone to their own space (or to request access when they have none). */

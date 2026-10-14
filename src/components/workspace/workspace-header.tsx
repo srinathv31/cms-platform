@@ -4,7 +4,6 @@ import { StatusBadge } from "@/components/primitives/status-badge";
 import { TemplateId } from "@/components/primitives/template-id";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { now } from "@/server/clock";
 import { getWorkspaceHeader } from "@/server/queries/workspace";
 import { NameField } from "./name-field";
 import { SaveStatus, SaveStopped } from "./save-status";
@@ -49,7 +48,6 @@ export async function WorkspaceHeader({
 }) {
   const { team, templateId } = await params;
   const t = await getWorkspaceHeader(team, templateId);
-  const nowDate = await now();
 
   return (
     <header className={cn(WS.header, HEADER)}>
@@ -72,7 +70,7 @@ export async function WorkspaceHeader({
               state={t.status}
               sunsetDay={t.sunsetDay}
               sunsetPassed={t.sunsetPassed}
-              now={nowDate}
+              now={t.now}
             />
           </span>
           {t.versionLabel ? (
@@ -95,7 +93,7 @@ export async function WorkspaceHeader({
               <SaveStatus templateId={t.id} basedOn={t.basedOn} />
             </span>
           ) : null}
-          {!t.canEdit ? (
+          {!t.can.edit.ok ? (
             <span className={META_ITEM}>
               <Badge
                 variant="outline"

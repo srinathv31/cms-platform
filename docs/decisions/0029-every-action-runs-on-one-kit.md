@@ -6,9 +6,20 @@ refuse in the same `{ ok: false, code, reason }` shape ([0041](0041-routes-refus
 only `/api/v1` waits for the Java API.
 Amended 2026-10-12: the demo tools check the demo flag (`demo_mode_off`) and `resetDemoAction` answers an
 `ActionResult`; they still check no permission and stay outside the kit ([0051](0051-the-demo-tools-run-only-in-demo-mode.md)).
+Amended 2026-10-13: the access, platform and demo actions call their services on the kit
+([0072](0072-the-bff-reaches-its-backend-through-service-interfaces.md)), and `accessAction` went. Access keeps its
+two differences behind the seam: the local implementation's access commands refuse a gone request, membership or
+review with its own sentence before the check, and run the scheduled jobs once the check has passed. The persona switch
+and Advance clock check the demo flag first, then run on the kit; the reset reads the request context itself.
 Amended 2026-10-12: `inTransaction` no longer retries a busy database. The database client is the one place a write
 waits (5 s for its turn), and a write that still can't go fails the action (`src/lib/serialized-writes.ts`, M-1 of
 the October 12 review).
+Amended 2026-10-13: an action behind the service interfaces declares `call` instead of `authorize` and
+`transaction`: the kit reads the request context (refusing `signed_out` without a viewer), parses, calls the
+service and runs `after` on `ok`; it reads no clock. The permission check, the backend's clock and the
+transaction run in the local implementation's command kit (`runCommand` in `src/server/services/local/command.ts`,
+[0072](0072-the-bff-reaches-its-backend-through-service-interfaces.md)). `setSunset` is the first; the rest move in
+step 2b of the seam.
 Date: 2026-10-09
 
 ## Context

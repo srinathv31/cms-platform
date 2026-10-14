@@ -50,14 +50,14 @@ export async function auditEvents(
   ).map((row) => fromRow<AuditEventRecord>("audit_events", row));
 }
 
-/** The notifications that link to a template, oldest first. */
+/** The notifications whose link names a template, oldest first. */
 export async function notificationsAbout(
   templateId: string,
 ): Promise<NotificationRecord[]> {
   return (
     await select(
-      "SELECT * FROM notifications WHERE href LIKE ? ORDER BY created_at, rowid",
-      [`%/${templateId}%`],
+      "SELECT * FROM notifications WHERE json_extract(link, '$.templateId') = ? ORDER BY created_at, rowid",
+      [templateId],
     )
   ).map((row) => fromRow<NotificationRecord>("notifications", row));
 }
@@ -70,9 +70,10 @@ export async function storedTextAbout(templateId: string): Promise<string> {
   const [renders, events, notifications, notices] = await Promise.all([
     select("SELECT * FROM render_log WHERE template_id = ?", [templateId]),
     select("SELECT * FROM audit_events WHERE template_id = ?", [templateId]),
-    select("SELECT * FROM notifications WHERE href LIKE ?", [
-      `%/${templateId}%`,
-    ]),
+    select(
+      "SELECT * FROM notifications WHERE json_extract(link, '$.templateId') = ?",
+      [templateId],
+    ),
     select("SELECT * FROM consumer_notices WHERE template_id = ?", [
       templateId,
     ]),

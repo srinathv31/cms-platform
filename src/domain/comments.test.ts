@@ -8,6 +8,7 @@ import {
   canComment,
   commentAnchors,
   commentText,
+  inReadingOrder,
   reopenThread,
   reply,
   resolveThread,
@@ -17,12 +18,19 @@ import {
   type CommentThread,
   type CommentVersion,
 } from "./comments";
+import { describeNotification } from "./notifications";
 import { REASONS } from "./permissions";
-import { DOCUMENT_THREAD } from "./review-types";
+import { DOCUMENT_THREAD, type LifecycleEffect } from "./review-types";
 import { VERSION_STATES, type TeamRole, type Viewer } from "./types";
 
 const NOW = new Date("2026-10-04T12:00:00.000Z");
 const GENERIC = { ok: false, ...REASONS.generic };
+
+/** A notification effect as its reader sees it (`describeNotification`): null for any other effect. */
+const words = (effect: LifecycleEffect | undefined, readerId = "maya") =>
+  effect?.kind === "notification"
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 const CLOSED = { ok: false, ...COMMENT_REFUSALS.closed };
 
 function person(
@@ -38,7 +46,7 @@ function person(
     platformRole,
     memberships: Object.entries(teams).map(([teamId, roles]) => ({
       teamId,
-      teamSlug: teamId,
+      teamSlug: `slug-of-${teamId}`,
       teamName: teamId,
       roles,
       status: "active" as const,
@@ -329,6 +337,46 @@ describe("commentAnchors: where a thread can anchor", () => {
   });
 });
 
+describe("inReadingOrder: a version's margin", () => {
+  const at = (seconds: number) => new Date(NOW.getTime() + seconds * 1000);
+  const thread = (id: string, blockId: string, seconds = 0) => ({
+    id,
+    blockId,
+    createdAt: at(seconds),
+  });
+
+  it("puts the document threads first, then by anchor, then the orphaned ones, oldest first within each", () => {
+    const ordered = inReadingOrder(
+      [
+        thread("t_gone", "b_gone"),
+        thread("t_two", "b_two"),
+        thread("t_doc_late", DOCUMENT_THREAD, 5),
+        thread("t_one_late", "b_one", 9),
+        thread("t_one", "b_one", 1),
+        thread("t_doc", DOCUMENT_THREAD, 2),
+      ],
+      ["b_one", "b_two"],
+    );
+    expect(ordered.map((t) => [t.id, t.orphaned])).toEqual([
+      ["t_doc", false],
+      ["t_doc_late", false],
+      ["t_one", false],
+      ["t_one_late", false],
+      ["t_two", false],
+      ["t_gone", true],
+    ]);
+  });
+
+  it("orders threads begun at the same moment by id", () => {
+    expect(
+      inReadingOrder(
+        [thread("t_b", "b_one"), thread("t_a", "b_one")],
+        ["b_one"],
+      ).map((t) => t.id),
+    ).toEqual(["t_a", "t_b"]);
+  });
+});
+
 describe("addComment", () => {
   const input = (patch: Partial<Parameters<typeof addComment>[0]> = {}) => ({
     viewer: jordan,
@@ -382,11 +430,29 @@ describe("addComment", () => {
           kind: "notification",
           notification: "comment_added",
           to: { kind: "user", userId: "maya" },
-          title: "Jordan commented on Spring Travel Rewards — Terms v3.",
+          facts: {
+            actorName: "Jordan",
+            templateName: TEMPLATE.name,
+            number: 3,
+            round: 1,
+            state: "in_review",
+            reply: false,
+          },
           body: "Still right?",
           link: { to: "review", templateId: TEMPLATE.id, versionNumber: 3 },
         },
       ],
+    });
+  });
+
+  it("words the author's notification when it is read: the comment itself is the body", () => {
+    const result = addComment(input());
+    expect(result.ok && words(result.effects[1])).toEqual({
+      title: "Jordan commented on Spring Travel Rewards — Terms v3.",
+      body: null,
+    });
+    expect(result.ok && result.effects[1]).toMatchObject({
+      body: "Still right?",
     });
   });
 
@@ -395,7 +461,7 @@ describe("addComment", () => {
       input({ version: version({ id: "v_3r2", round: 2 }) }),
     );
     expect(result.ok && result.effects[1]).toMatchObject({
-      title: "Jordan commented on Spring Travel Rewards — Terms v3, round 2.",
+      facts: { number: 3, round: 2, state: "in_review", reply: false },
       link: {
         to: "review",
         templateId: TEMPLATE.id,
@@ -403,6 +469,9 @@ describe("addComment", () => {
         round: 2,
       },
     });
+    expect(result.ok && words(result.effects[1])?.title).toBe(
+      "Jordan commented on Spring Travel Rewards — Terms v3, round 2.",
+    );
   });
 
   it("asks who may comment and whether the version takes comments", () => {
@@ -480,9 +549,19 @@ describe("addComment", () => {
     const onDraftResult = addComment(input({ version: draft }));
     expect(onDraftResult.ok && onDraftResult.effects[1]).toMatchObject({
       to: { kind: "user", userId: "maya" },
-      title: "Jordan commented on the draft of Spring Travel Rewards — Terms.",
+      facts: {
+        actorName: "Jordan",
+        templateName: TEMPLATE.name,
+        number: null,
+        round: null,
+        state: "draft",
+        reply: false,
+      },
       link: { to: "template", templateId: TEMPLATE.id },
     });
+    expect(onDraftResult.ok && words(onDraftResult.effects[1])?.title).toBe(
+      "Jordan commented on the draft of Spring Travel Rewards — Terms.",
+    );
     const own = addComment(input({ viewer: maya }));
     expect(own.ok && own.effects.map((e) => e.kind)).toEqual(["audit"]);
   });
@@ -528,12 +607,22 @@ describe("reply", () => {
           kind: "notification",
           notification: "comment_added",
           to: { kind: "user", userId },
-          title: "Jordan replied on Spring Travel Rewards — Terms v3.",
+          facts: {
+            actorName: "Jordan",
+            templateName: TEMPLATE.name,
+            number: 3,
+            round: 1,
+            state: "in_review",
+            reply: true,
+          },
           body: "Agreed.",
           link: { to: "review", templateId: TEMPLATE.id, versionNumber: 3 },
         })),
       ],
     });
+    expect(result.ok && words(result.effects[1])?.title).toBe(
+      "Jordan replied on Spring Travel Rewards — Terms v3.",
+    );
   });
 
   it("links a decided version's thread to its review screen, for whoever can't open the workspace", () => {
@@ -565,13 +654,16 @@ describe("reply", () => {
       }),
     );
     expect(result.ok && result.effects[1]).toMatchObject({
-      title: "Jordan replied on Spring Travel Rewards — Terms v3, round 1.",
+      facts: { number: 3, round: 1, state: "changes_requested", reply: true },
       link: {
         to: "template",
         templateId: TEMPLATE.id,
         reviewVersion: { number: 3, round: 1 },
       },
     });
+    expect(result.ok && words(result.effects[1])?.title).toBe(
+      "Jordan replied on Spring Travel Rewards — Terms v3, round 1.",
+    );
   });
 
   it("answers a resolved thread too, without reopening it", () => {

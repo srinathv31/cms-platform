@@ -1,10 +1,4 @@
 import { reviewPath } from "@/domain/rounds";
-import { now } from "@/server/clock";
-import {
-  getPeople,
-  personOf,
-  requireTemplate,
-} from "@/server/queries/review-shared";
 import {
   getWorkspaceDocument,
   getWorkspaceHeader,
@@ -19,12 +13,9 @@ export async function WorkspaceContent({
 }) {
   const { team, templateId } = await params;
   const doc = await getWorkspaceDocument(team, templateId);
-  // Review comments: who is looking (their comments show at once, under their name). Whether they may comment comes
-  // decided with the document (`doc.can.comment`).
-  const { space } = await requireTemplate(team, templateId);
+  // Review comments: who is looking (`doc.viewer`: their comments show at once, under their name). Whether they may
+  // comment comes decided with the document (`doc.can.comment`), and the margin's times count from `doc.now`.
   const { inReview } = await getWorkspaceHeader(team, templateId);
-  const viewer = personOf(await getPeople(), space.viewer.userId);
-  const nowIso = (await now()).toISOString();
   // A round in review opens on its review screen, in this space (anyone who sees the template here can).
   const reviewHref = inReview ? reviewPath(team, templateId, inReview) : null;
   return (
@@ -60,8 +51,8 @@ export async function WorkspaceContent({
       comments={{
         threads: doc.threads,
         canComment: doc.can.comment.ok,
-        viewer,
-        now: nowIso,
+        viewer: doc.viewer,
+        now: doc.now,
       }}
       rail={{ importOriginal: doc.importOriginal, reviewHref }}
     />

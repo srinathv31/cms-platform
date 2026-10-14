@@ -4,12 +4,18 @@ import {
   decideAccessRequest,
   requestAccess,
   requestDecisionRefusal,
+  requestPermission,
   validateAccessReason,
   validateDecisionNote,
 } from "./requests";
 import { REASONS } from "../permissions";
-import type { AccessRequestFacts, MembershipFacts } from "../access-types";
-import type { TeamRole } from "../types";
+import type {
+  AccessNotificationEffect,
+  AccessRequestFacts,
+  MembershipFacts,
+} from "../access-types";
+import { describeNotification } from "../notifications";
+import type { PlatformRole, TeamRole, Viewer } from "../types";
 import {
   at,
   ago,
@@ -36,6 +42,15 @@ function request(opts: Partial<AccessRequestFacts> = {}): AccessRequestFacts {
     ...opts,
   };
 }
+
+/** A notification effect as the person reading it sees it (`describeNotification`). */
+const words = (
+  effect: AccessNotificationEffect | undefined,
+  readerId: string,
+) =>
+  effect
+    ? describeNotification(effect.notification, effect.facts, readerId)
+    : null;
 
 describe("requestAccess", () => {
   const base = {
@@ -75,10 +90,17 @@ describe("requestAccess", () => {
     expect(note).toMatchObject({
       notification: "access_requested",
       to: { kind: "team_admins", teamId: CORAL.id, exceptUserIds: ["morgan"] },
-      title: "Morgan Lee asked for Author access to Coral Offers.",
+      facts: {
+        actorName: "Morgan Lee",
+        teamName: "Coral Offers",
+        role: "author",
+      },
       body: "Drafting the spring promotions.",
       link: { to: "settings", teamId: CORAL.id, section: "access-requests" },
     });
+    expect(words(note, "alex")?.title).toBe(
+      "Morgan Lee asked for Author access to Coral Offers.",
+    );
   });
 
   it("offers Viewer, Author and Approver only", () => {
@@ -174,7 +196,7 @@ describe("requestAccess", () => {
 describe("decideAccessRequest", () => {
   const base = {
     request: request(),
-    requester: PEOPLE.morgan,
+    requester: { ...PEOPLE.morgan, platformRole: null },
     team: CORAL,
     actor: PEOPLE.alex,
     decision: "approve" as const,
@@ -187,7 +209,7 @@ describe("decideAccessRequest", () => {
       decideAccessRequest({
         ...base,
         request: request({ userId: "alex" }),
-        requester: PEOPLE.alex,
+        requester: { ...PEOPLE.alex, platformRole: null },
       }),
     ).toEqual({
       ok: false,
@@ -207,6 +229,32 @@ describe("decideAccessRequest", () => {
       code: "request_decided",
       reason: "This request was already decided.",
     });
+  });
+
+  it("never approves an Auditor's request, whatever else holds; denying it still works", () => {
+    const taylor = { id: "taylor", name: "Taylor Brooks" };
+    const auditor = {
+      ...base,
+      request: request({ userId: taylor.id }),
+      requester: { ...taylor, platformRole: "auditor" as const },
+    };
+    expect(decideAccessRequest(auditor)).toEqual({
+      ok: false,
+      ...ACCESS_REFUSALS.auditorRequester(taylor.name),
+    });
+    // Before the actor's own checks: an Auditor's request names the reason it can't go through.
+    expect(
+      decideAccessRequest({
+        ...auditor,
+        request: request({ userId: taylor.id, status: "denied" }),
+      }),
+    ).toEqual({ ok: false, ...ACCESS_REFUSALS.auditorRequester(taylor.name) });
+    const denied = decideAccessRequest({
+      ...auditor,
+      decision: "deny",
+      note: "Auditors read; they don't hold roles.",
+    });
+    expect(denied.ok).toBe(true);
   });
 
   it("approving adds a membership with the role and tells the requester", () => {
@@ -242,9 +290,16 @@ describe("decideAccessRequest", () => {
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_granted",
       to: { kind: "user", userId: "morgan" },
-      title: "Alex Kim approved your Author access to Coral Offers.",
+      facts: {
+        actorName: "Alex Kim",
+        teamName: "Coral Offers",
+        role: "author",
+      },
       link: { to: "library", teamId: CORAL.id },
     });
+    expect(words(notes(result.effects)[0], "morgan")?.title).toBe(
+      "Alex Kim approved your Author access to Coral Offers.",
+    );
   });
 
   it("approving for an active member adds the role to the ones they have", () => {
@@ -303,11 +358,17 @@ describe("decideAccessRequest", () => {
     });
     expect(notes(result.effects)[0]).toMatchObject({
       notification: "access_denied",
-      title:
-        "Alex Kim declined your request for Author access to Coral Offers.",
+      facts: {
+        actorName: "Alex Kim",
+        teamName: "Coral Offers",
+        role: "author",
+      },
       body: "Ask Jordan first.",
       link: { to: "request-access" },
     });
+    expect(words(notes(result.effects)[0], "morgan")?.title).toBe(
+      "Alex Kim declined your request for Author access to Coral Offers.",
+    );
   });
 
   it("keeps the note short", () => {
@@ -338,7 +399,7 @@ describe("deciding a request: requestDecisionRefusal and validateDecisionNote", 
     );
     const input = {
       request: request(),
-      requester: PEOPLE.morgan,
+      requester: { ...PEOPLE.morgan, platformRole: null },
       team: CORAL,
       actor: PEOPLE.alex,
       now: at(0),
@@ -349,6 +410,31 @@ describe("deciding a request: requestDecisionRefusal and validateDecisionNote", 
     ).toEqual({
       ok: false,
       ...validateDecisionNote("deny", " "),
+    });
+  });
+});
+
+describe("requestPermission", () => {
+  const viewer = (platformRole: PlatformRole | null): Viewer => ({
+    userId: "someone",
+    name: "Someone",
+    initials: "SO",
+    title: "",
+    platformRole,
+    memberships: [],
+  });
+
+  it("lets anyone ask for a role, a Platform Admin included", () => {
+    expect(requestPermission(viewer(null), CORAL.id)).toEqual({ ok: true });
+    expect(requestPermission(viewer("platform_admin"), CORAL.id)).toEqual({
+      ok: true,
+    });
+  });
+
+  it("refuses an Auditor in plain words: they hold no team role", () => {
+    expect(requestPermission(viewer("auditor"), CORAL.id)).toEqual({
+      ok: false,
+      ...REASONS.auditorReadOnly,
     });
   });
 });

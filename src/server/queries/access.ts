@@ -1,762 +1,448 @@
 import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { DAY_MS, utcDay } from "@/domain/dates";
+import { utcDay } from "@/domain/dates";
 import {
-  changeRoles,
-  keepInactive,
-  reinstate,
-  removeMember,
-  suspendInactive,
-} from "@/domain/access/members";
-import {
-  decideRecertItem,
-  recertPhase,
-  recertProgress,
-  startRecert,
-} from "@/domain/access/recertification";
-import { firstName } from "@/domain/access/roles";
-import {
-  heldAsLastAdmin,
   memberConsequences,
   recertFootnote,
   recertItemOutcome,
+  recertProgressLabel,
   recertRemoveConsequence,
   requestConsequences,
   startRecertConsequence,
 } from "@/domain/access/consequences";
-import { inactivity } from "@/domain/access/inactivity";
-import { requestDecisionRefusal } from "@/domain/access/requests";
+import { firstName } from "@/domain/access/roles";
 import {
   INACTIVITY_FLAG_DAYS,
   INACTIVITY_SUSPEND_DAYS,
   REQUESTABLE_ROLES,
-  type AccessRequestFacts,
-  type AccessRequestRow,
-  type AccessRequestsSection,
-  type InactivityRow,
-  type InactivitySection,
-  type MemberRow,
-  type MembersSection,
-  type MembershipFacts,
-  type MyAccessRequest,
-  type Named,
-  type RecertFacts,
-  type RecertificationSection,
-  type RecertItemRow,
-  type RecertView,
-  type RequestAccessData,
-  type SidebarCardModel,
 } from "@/domain/access-types";
-import { ALL_SPACE, can, spacesFor } from "@/domain/permissions";
-import type { Person } from "@/domain/review-types";
-import { refuse, type Refusal, type Refused } from "@/domain/refusals";
-import { TEAM_ROLES, type PermissionResult, type Viewer } from "@/domain/types";
-import {
-  loadMembershipFacts,
-  loadRecertFacts,
-  loadRequestFacts,
-} from "@/server/access-sweep";
-import { db } from "@/server/db/client";
-import {
-  accessRequests,
-  auditEvents,
-  memberships,
-  recertifications,
-  teams,
-  users,
-} from "@/server/db/schema/ucomp";
-import { getViewer } from "@/server/viewer";
-import { demoNow } from "./dynamic";
-import { requireCan } from "./require-can";
+import { TEAM_ROLES } from "@/domain/types";
+import { requireRequestContext } from "@/server/context/request";
+import { services } from "@/server/services";
+import type {
+  HomeCardFacts,
+  InactiveMemberFacts,
+  InactivityFacts,
+  MemberFacts,
+  MembersFacts,
+  RecertificationFacts,
+  RequestAccessFacts,
+  RequestFacts,
+  RequestsFacts,
+  SidebarCardsFacts,
+} from "@/server/services/access";
+import type {
+  AccessRequestRow,
+  AccessRequestsSection,
+  InactivityRow,
+  InactivitySection,
+  MemberRow,
+  MembersSection,
+  RecertificationSection,
+  RecertItemRow,
+  RecertView,
+  RequestAccessData,
+  SidebarCardModel,
+} from "@/server/queries/access-models";
+import { isoOrUndefined } from "./iso";
+import { peopleById, personOf, type People } from "@/domain/people";
+import { requireSpace } from "./spaces";
 
-// Read models for team access: the Request access page (anyone), the four Team sections of the
-// settings modal (the team's Team Admins) and the sidebar cards. Every date is relative to the demo
-// clock. `can` on each row is the domain's own answer, dry-run against the facts, so a disabled
-// control carries the exact sentence the action would refuse with; `consequences` are the domain's
-// lines for each action's strip, so the screens word nothing themselves.
+// Read models for team access: the Request access page (anyone), the four Team sections of the settings modal
+// (the team's Team Admins) and the sidebar cards. The facts and the decisions come from the access service
+// (`services().access`, decision 0070): the rows as stored, what the viewer may do on each (`can`, decided),
+// and what time decides at the instant the read names (`asOf`). These read models word and lay them out: each
+// strip's `consequences`, how a settled row reads, a review's footnote, "4 of 6 confirmed", the cards' ids.
+// They decide nothing and read no clock: every date is counted from the read's `asOf`.
 
-const DECIDED_WINDOW_DAYS = 30;
-
-// ── Shared ────────────────────────────────────────────────────
-
-interface UserInfo extends Person {
-  title: string;
-  email: string;
-  lastActiveAt: Date | null;
-}
-
-const getUsers = cache(async (): Promise<ReadonlyMap<string, UserInfo>> => {
-  const rows = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      initials: users.initials,
-      hue: users.avatarHue,
-      title: users.title,
-      email: users.email,
-      lastActiveAt: users.lastActiveAt,
-    })
-    .from(users);
-  return new Map(rows.map((r) => [r.id, r]));
-});
-
-function userOf(people: ReadonlyMap<string, UserInfo>, id: string): UserInfo {
-  return (
-    people.get(id) ?? {
-      id,
-      name: id,
-      initials: id.slice(0, 2).toUpperCase(),
-      hue: 0,
-      title: "",
-      email: "",
-      lastActiveAt: null,
-    }
-  );
-}
-
-const personOf = (
-  people: ReadonlyMap<string, UserInfo>,
-  id: string,
-): Person => {
-  const { id: uid, name, initials, hue } = userOf(people, id);
-  return { id: uid, name, initials, hue };
+const named = (people: People, id: string) => {
+  const { name } = personOf(people, id);
+  return { id, name };
 };
 
-const named = (p: { id: string; name: string }): Named => ({
-  id: p.id,
-  name: p.name,
-});
-const iso = (d: Date) => d.toISOString();
-const isoOrNull = (d: Date | null | undefined) => (d ? d.toISOString() : null);
-const isoOrUndefined = (d: Date | null | undefined) =>
-  d ? d.toISOString() : undefined;
-const okOr = (r: { ok: true } | Refused): PermissionResult =>
-  r.ok ? { ok: true } : refuse(r);
-const okUnless = (refusal: Refusal | null): PermissionResult =>
-  refusal ? refuse(refusal) : { ok: true };
-
-/** The team behind a space slug (team ids are their slugs). 404 for an unknown one or "all". */
-async function teamBySlug(slug: string) {
-  if (slug === ALL_SPACE) notFound();
-  const team = await db.query.teams.findFirst({ where: eq(teams.slug, slug) });
-  if (!team) notFound();
-  return team;
-}
-
-/** A Team section: the viewer must manage the team's members (Team Admin); anyone else gets a 404. */
-async function teamSection(
-  slug: string,
-  action:
-    "team.manageMembers" | "team.decideAccessRequest" = "team.manageMembers",
-) {
-  const viewer = await getViewer();
-  const team = await teamBySlug(slug);
-  requireCan(viewer, action, { teamId: team.id });
-  const nowDate = await demoNow();
-  const people = await getUsers();
-  return {
-    viewer,
-    team,
-    nowDate,
-    people,
-    header: { id: team.id, slug: team.slug, name: team.name },
-  };
-}
-
-/** `can(viewer, "team.manageMembers")` on a member, then the domain's own answer. */
-function manage(
-  viewer: Viewer,
-  teamId: string,
-  subjectUserId: string,
-  domain: () => PermissionResult,
-): PermissionResult {
-  const allowed = can(viewer, "team.manageMembers", { teamId, subjectUserId });
-  return allowed.ok ? domain() : allowed;
-}
+/** The Date a fact's ISO instant is, for the domain's wording functions. */
+const date = (value: string | null): Date | null =>
+  value === null ? null : new Date(value);
 
 // ── Request access (/request-access) ─────────────────────────
-
-function myRequest(
-  r: AccessRequestFacts,
-  teamName: string,
-  people: ReadonlyMap<string, UserInfo>,
-): MyAccessRequest {
-  return {
-    id: r.id,
-    teamId: r.teamId,
-    teamName,
-    role: r.role,
-    reason: r.reason,
-    status: r.status,
-    createdAt: iso(r.createdAt),
-    decidedBy: r.decidedBy ? personOf(people, r.decidedBy) : undefined,
-    decidedAt: isoOrUndefined(r.decidedAt),
-    note: r.decisionNote,
-  };
-}
 
 /** Every team (with its Team Admins and the viewer's roles), the viewer's latest request per team, and ended access. */
 export const getRequestAccessData = cache(
   async (): Promise<RequestAccessData> => {
-    const viewer = await getViewer();
-    const people = await getUsers();
-    const teamRows = await db.select().from(teams).orderBy(teams.name);
-    const all = await loadMembershipFacts(db);
-    const nameOf = new Map(teamRows.map((t) => [t.id, t.name]));
-    const mine = all.filter((m) => m.userId === viewer.userId);
-
-    const latest = new Map<string, AccessRequestFacts>();
-    for (const r of await loadRequestFacts(
-      db,
-      eq(accessRequests.userId, viewer.userId),
-    ))
-      latest.set(r.teamId, r); // oldest first
-    const requests = [...latest.values()]
-      .sort(
-        (a, b) =>
-          b.createdAt.getTime() - a.createdAt.getTime() ||
-          b.id.localeCompare(a.id),
-      )
-      .map((r) => myRequest(r, nameOf.get(r.teamId) ?? r.teamId, people));
-
-    return {
-      teams: teamRows.map((t) => ({
-        id: t.id,
-        slug: t.slug,
-        name: t.name,
-        description: t.description,
-        icon: t.icon,
-        admins: all
-          .filter(
-            (m) =>
-              m.teamId === t.id &&
-              m.status === "active" &&
-              m.roles.includes("team_admin"),
-          )
-          .map((m) => personOf(people, m.userId))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-        myRoles:
-          mine.find((m) => m.teamId === t.id && m.status === "active")?.roles ??
-          [],
-      })),
-      requests,
-      ended: mine
-        .filter(
-          (m): m is MembershipFacts & { status: "lapsed" | "suspended" } =>
-            m.status !== "active",
-        )
-        .sort(
-          (a, b) =>
-            (b.statusChangedAt?.getTime() ?? 0) -
-            (a.statusChangedAt?.getTime() ?? 0),
-        )
-        .map((m) => ({
-          teamId: m.teamId,
-          teamName: nameOf.get(m.teamId) ?? m.teamId,
-          status: m.status,
-          reason: m.statusReason,
-          at: iso(m.statusChangedAt ?? m.addedAt),
-        })),
-      roles: REQUESTABLE_ROLES,
-    };
+    const ctx = await requireRequestContext();
+    const facts = await services().access.requestAccessData(ctx);
+    if (!facts.ok)
+      throw new Error(
+        `Request access refused a signed-in viewer: ${facts.code}`,
+      );
+    return requestAccessData(facts);
   },
 );
+
+/** The Request access page from the service's facts. */
+export function requestAccessData(
+  facts: RequestAccessFacts,
+): RequestAccessData {
+  const people = peopleById(facts.people);
+  const teamName = new Map(facts.teams.map((t) => [t.id, t.name]));
+  return {
+    teams: facts.teams.map((t) => ({
+      id: t.id,
+      slug: t.slug,
+      name: t.name,
+      description: t.description,
+      icon: t.icon,
+      admins: t.adminIds.map((id) => personOf(people, id)),
+      myRoles: t.myRoles,
+    })),
+    requests: facts.requests.map((r) => ({
+      id: r.id,
+      teamId: r.teamId,
+      teamName: teamName.get(r.teamId) ?? r.teamId,
+      role: r.role,
+      reason: r.reason,
+      status: r.status,
+      createdAt: r.createdAt,
+      decidedBy: r.decidedBy ? personOf(people, r.decidedBy) : undefined,
+      decidedAt: isoOrUndefined(date(r.decidedAt)),
+      note: r.note,
+    })),
+    ended: facts.ended.map((e) => ({
+      teamId: e.teamId,
+      teamName: teamName.get(e.teamId) ?? e.teamId,
+      status: e.status,
+      reason: e.reason,
+      at: e.at,
+    })),
+    roles: REQUESTABLE_ROLES,
+  };
+}
+
+// ── The Team sections ────────────────────────────────────────
+
+/**
+ * A Team section's space: the `[team]` segment resolved once (`requireSpace`), and its team's id for the service.
+ * Not found for All teams, which has no members to manage.
+ */
+async function teamSpace(slug: string) {
+  const space = await requireSpace(slug);
+  if (space.teamId === null) notFound();
+  return { ctx: await requireRequestContext(), teamId: space.teamId };
+}
+
+/** A section's facts, or Not found: a section the viewer may not read is not there (decision 0052). */
+function orNotFound<T>(facts: ({ ok: true } & T) | { ok: false }): T {
+  if (!facts.ok) notFound();
+  return facts;
+}
 
 // ── Members ──────────────────────────────────────────────────
 
-const STATUS_ORDER = { active: 0, suspended: 1, lapsed: 2 } as const;
-
 export const getMembersSection = cache(
   async (teamSlug: string): Promise<MembersSection> => {
-    const { viewer, team, nowDate, people, header } =
-      await teamSection(teamSlug);
-    const teamMemberships = await loadMembershipFacts(
-      db,
-      eq(memberships.teamId, team.id),
+    const { ctx, teamId } = await teamSpace(teamSlug);
+    return membersSection(
+      orNotFound(await services().access.members(ctx, { teamId })),
+      ctx.viewer.userId,
     );
-    const actor = { id: viewer.userId, name: viewer.name };
+  },
+);
 
-    const rows = teamMemberships.map((m): MemberRow => {
-      const user = userOf(people, m.userId);
-      const input = {
-        membership: m,
-        member: named(user),
-        team: named(team),
-        actor,
-        now: nowDate,
-        teamMemberships,
-      };
-      const said = memberConsequences(input);
+/** The Members section from the service's facts: each row with its strips' lines. */
+export function membersSection(
+  facts: MembersFacts,
+  viewerId: string,
+): MembersSection {
+  const people = peopleById(facts.people);
+  const now = new Date(facts.asOf);
+  return {
+    team: facts.team,
+    rows: facts.rows.map((m): MemberRow => {
+      const said = memberConsequences({
+        membership: membershipOf(m),
+        member: named(people, m.userId),
+        team: facts.team,
+        now,
+      });
       return {
-        membershipId: m.id,
+        membershipId: m.membershipId,
         person: personOf(people, m.userId),
-        title: user.title,
-        email: user.email,
+        title: m.title,
+        email: m.email,
         roles: m.roles,
         status: m.status,
         statusReason: m.statusReason,
-        statusChangedAt: isoOrNull(m.statusChangedAt),
-        lastActiveAt: isoOrNull(m.lastActiveAt),
-        addedAt: iso(m.addedAt),
-        isYou: m.userId === viewer.userId,
-        can: {
-          // Which roles is the editor's choice: here, only whether this member's roles can change at all.
-          editRoles: manage(viewer, team.id, m.userId, () =>
-            okOr(changeRoles({ ...input, roles: m.roles })),
-          ),
-          remove: manage(viewer, team.id, m.userId, () =>
-            okOr(removeMember(input)),
-          ),
-          reinstate: manage(viewer, team.id, m.userId, () =>
-            okOr(reinstate(input)),
-          ),
-        },
+        statusChangedAt: m.statusChangedAt,
+        lastActiveAt: m.lastActiveAt,
+        addedAt: m.addedAt,
+        isYou: m.userId === viewerId,
+        can: m.can,
         consequences: { remove: said.remove, reinstate: said.reinstate },
       };
-    });
-    rows.sort(
-      (a, b) =>
-        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
-        a.person.name.localeCompare(b.person.name),
-    );
-    return { team: header, rows, roles: TEAM_ROLES, today: utcDay(nowDate) };
-  },
-);
+    }),
+    roles: TEAM_ROLES,
+    today: utcDay(now),
+  };
+}
+
+/** What `memberConsequences` reads of a membership. */
+function membershipOf(
+  m: Pick<MemberFacts, "roles" | "addedAt" | "lastActiveAt">,
+) {
+  return {
+    roles: m.roles,
+    addedAt: new Date(m.addedAt),
+    lastActiveAt: date(m.lastActiveAt),
+  };
+}
 
 // ── Access requests ──────────────────────────────────────────
 
 export const getAccessRequestsSection = cache(
   async (teamSlug: string): Promise<AccessRequestsSection> => {
-    const { viewer, team, nowDate, people, header } = await teamSection(
-      teamSlug,
-      "team.decideAccessRequest",
+    const { ctx, teamId } = await teamSpace(teamSlug);
+    return accessRequestsSection(
+      orNotFound(await services().access.requests(ctx, { teamId })),
     );
-    const requests = await loadRequestFacts(
-      db,
-      eq(accessRequests.teamId, team.id),
-    ); // oldest first
-    const actor = { id: viewer.userId, name: viewer.name };
-    const since = nowDate.getTime() - DECIDED_WINDOW_DAYS * DAY_MS;
-
-    const row = (r: AccessRequestFacts): AccessRequestRow => {
-      const user = userOf(people, r.userId);
-      const allowed = can(viewer, "team.decideAccessRequest", {
-        teamId: team.id,
-        requesterId: r.userId,
-      });
-      return {
-        id: r.id,
-        person: personOf(people, r.userId),
-        title: user.title,
-        role: r.role,
-        reason: r.reason,
-        status: r.status,
-        createdAt: iso(r.createdAt),
-        decidedBy: r.decidedBy ? personOf(people, r.decidedBy) : undefined,
-        decidedAt: isoOrUndefined(r.decidedAt),
-        note: r.decisionNote,
-        can: {
-          decide: allowed.ok
-            ? okUnless(requestDecisionRefusal(r, actor))
-            : allowed,
-        },
-        consequences: requestConsequences({
-          requester: named(user),
-          role: r.role,
-          team: named(team),
-        }),
-      };
-    };
-
-    return {
-      team: header,
-      pending: requests.filter((r) => r.status === "pending").map(row),
-      decided: requests
-        .filter(
-          (r) =>
-            r.status !== "pending" &&
-            r.decidedAt &&
-            r.decidedAt.getTime() >= since &&
-            r.decidedAt <= nowDate,
-        )
-        .sort((a, b) => b.decidedAt!.getTime() - a.decidedAt!.getTime())
-        .map(row),
-    };
   },
 );
 
-// ── Recertification ──────────────────────────────────────────
-
-/** The open (or upcoming) review; else the most recent one. */
-function pickCurrent(
-  recerts: readonly RecertFacts[],
-  nowDate: Date,
-): RecertFacts | null {
-  const live = recerts.filter((r) => recertPhase(r, nowDate) !== "closed");
-  if (live.length) return live[0]!; // earliest start first
-  return (
-    [...recerts].sort((a, b) => b.dueAt.getTime() - a.dueAt.getTime())[0] ??
-    null
-  );
+/** The Access requests section from the service's facts. */
+export function accessRequestsSection(
+  facts: RequestsFacts,
+): AccessRequestsSection {
+  const people = peopleById(facts.people);
+  const row = (r: RequestFacts): AccessRequestRow => ({
+    id: r.id,
+    person: personOf(people, r.userId),
+    title: r.title,
+    role: r.role,
+    reason: r.reason,
+    status: r.status,
+    createdAt: r.createdAt,
+    decidedBy: r.decidedBy ? personOf(people, r.decidedBy) : undefined,
+    decidedAt: r.decidedAt ?? undefined,
+    note: r.note,
+    can: r.can,
+    consequences: requestConsequences({
+      requester: named(people, r.userId),
+      role: r.role,
+      team: facts.team,
+    }),
+  });
+  return {
+    team: facts.team,
+    pending: facts.pending.map(row),
+    decided: facts.decided.map(row),
+    today: utcDay(facts.asOf),
+  };
 }
+
+// ── Recertification ──────────────────────────────────────────
 
 export const getRecertificationSection = cache(
   async (teamSlug: string): Promise<RecertificationSection> => {
-    const { viewer, team, nowDate, people, header } =
-      await teamSection(teamSlug);
-    const teamMemberships = await loadMembershipFacts(
-      db,
-      eq(memberships.teamId, team.id),
+    const { ctx, teamId } = await teamSpace(teamSlug);
+    return recertificationSection(
+      orNotFound(await services().access.recertification(ctx, { teamId })),
     );
-    const recerts = await loadRecertFacts(
-      db,
-      eq(recertifications.teamId, team.id),
-    );
-    const actor = { id: viewer.userId, name: viewer.name };
-    const r = pickCurrent(recerts, nowDate);
+  },
+);
 
-    let current: RecertView | null = null;
-    if (r) {
-      const phase = recertPhase(r, nowDate);
-      // Who lapsed at this review's deadline: the sweep's audit rows name the review.
-      const lapsedRows =
-        phase === "closed"
-          ? await db
-              .select({ details: auditEvents.details })
-              .from(auditEvents)
-              .where(
-                and(
-                  eq(auditEvents.teamId, team.id),
-                  eq(auditEvents.action, "access.lapsed"),
-                ),
-              )
-          : [];
-      const lapsedIds = lapsedRows
-        .map((x) => x.details as { recertId?: string; userId?: string } | null)
-        .filter((d) => d?.recertId === r.id && typeof d.userId === "string")
-        .map((d) => d!.userId!);
+/** The Recertification section from the service's facts: the review's rows, outcomes and footnote. */
+export function recertificationSection(
+  facts: RecertificationFacts,
+): RecertificationSection {
+  const people = peopleById(facts.people);
+  const now = new Date(facts.asOf);
+  const r = facts.current;
 
-      const items = r.items.map((i): RecertItemRow => {
-        const user = userOf(people, i.userId);
-        const m = teamMemberships.find((x) => x.userId === i.userId) ?? null;
+  let current: RecertView | null = null;
+  if (r) {
+    const recert = {
+      startsAt: new Date(r.startsAt),
+      dueAt: new Date(r.dueAt),
+      completedAt: date(r.completedAt),
+    };
+    const lapsed = r.lapsedIds.map((id) => personOf(people, id));
+    current = {
+      id: r.id,
+      label: r.label,
+      startsAt: r.startsAt,
+      dueAt: r.dueAt,
+      completedAt: r.completedAt,
+      phase: r.phase,
+      progress: r.progress,
+      items: r.items.map((i): RecertItemRow => {
         const decidedBy = i.decidedBy
           ? personOf(people, i.decidedBy)
           : undefined;
         return {
           userId: i.userId,
           person: personOf(people, i.userId),
-          title: user.title,
-          roles: m?.roles ?? [],
-          lastActiveAt: isoOrNull(user.lastActiveAt),
+          title: i.title,
+          roles: i.roles,
+          lastActiveAt: i.lastActiveAt,
           decision: i.decision,
           decidedBy,
-          decidedAt: isoOrUndefined(i.decidedAt),
-          membership: m?.status ?? "removed",
+          decidedAt: i.decidedAt ?? undefined,
+          membership: i.membership,
           outcome: recertItemOutcome({
-            item: i,
+            item: { decision: i.decision, decidedAt: date(i.decidedAt) },
             decidedBy: decidedBy ?? null,
-            membership: m?.status ?? "removed",
-            recert: r,
-            now: nowDate,
+            membership: i.membership,
+            recert,
+            now,
           }),
-          can: {
-            decide: manage(viewer, team.id, i.userId, () =>
-              okOr(
-                decideRecertItem({
-                  recert: r,
-                  userId: i.userId,
-                  member: named(user),
-                  team: named(team),
-                  actor,
-                  decision: "keep",
-                  now: nowDate,
-                  teamMemberships,
-                }),
-              ),
+          can: i.can,
+          consequences: {
+            remove: recertRemoveConsequence(
+              named(people, i.userId),
+              facts.team,
             ),
           },
-          consequences: {
-            remove: recertRemoveConsequence(named(user), named(team)),
-          },
         };
-      });
-      items.sort((a, b) => a.person.name.localeCompare(b.person.name));
-      const lapsed = [...new Set(lapsedIds)]
-        .map((id) => personOf(people, id))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      current = {
-        id: r.id,
-        label: r.label,
-        startsAt: iso(r.startsAt),
-        dueAt: iso(r.dueAt),
-        completedAt: isoOrNull(r.completedAt),
-        phase,
-        progress: recertProgress(r, teamMemberships),
-        items,
-        lapsed,
-        footnote: recertFootnote({
-          recert: r,
-          lapsed,
-          team: named(team),
-          now: nowDate,
-        }),
-      };
-    }
-
-    const allowed = can(viewer, "team.manageMembers", { teamId: team.id });
-    const start = allowed.ok
-      ? okOr(
-          startRecert({
-            team: named(team),
-            actor,
-            now: nowDate,
-            memberships: teamMemberships,
-            unfinished: recerts.filter((x) => x.completedAt === null),
-          }),
-        )
-      : allowed;
-    return {
-      team: header,
-      current,
-      can: { start },
-      consequences: { start: startRecertConsequence(named(team), nowDate) },
-      today: utcDay(nowDate),
+      }),
+      lapsed,
+      footnote: recertFootnote({ recert, lapsed, team: facts.team, now }),
     };
-  },
-);
+  }
+  return {
+    team: facts.team,
+    current,
+    can: facts.can,
+    consequences: { start: startRecertConsequence(facts.team, now) },
+    today: utcDay(now),
+  };
+}
 
 // ── Inactivity ───────────────────────────────────────────────
 
 export const getInactivitySection = cache(
   async (teamSlug: string): Promise<InactivitySection> => {
-    const { viewer, team, nowDate, people, header } =
-      await teamSection(teamSlug);
-    const teamMemberships = await loadMembershipFacts(
-      db,
-      eq(memberships.teamId, team.id),
+    const { ctx, teamId } = await teamSpace(teamSlug);
+    return inactivitySection(
+      orNotFound(await services().access.inactivity(ctx, { teamId })),
     );
-    const actor = { id: viewer.userId, name: viewer.name };
-
-    const row = (m: MembershipFacts): InactivityRow => {
-      const user = userOf(people, m.userId);
-      const idle = inactivity(m, nowDate);
-      const input = {
-        membership: m,
-        member: named(user),
-        team: named(team),
-        actor,
-        now: nowDate,
-        teamMemberships,
-      };
-      const said = memberConsequences(input);
-      return {
-        membershipId: m.id,
-        person: personOf(people, m.userId),
-        title: user.title,
-        roles: m.roles,
-        lastActiveAt: isoOrNull(m.lastActiveAt),
-        daysInactive: idle.daysInactive,
-        // A suspended member's row shows when it happened.
-        suspendsAt: iso(
-          m.status === "suspended" && m.statusChangedAt
-            ? m.statusChangedAt
-            : idle.suspendAt,
-        ),
-        status: m.status,
-        statusReason: m.statusReason,
-        heldAsLastAdmin: heldAsLastAdmin(m, nowDate),
-        can: {
-          suspend: manage(viewer, team.id, m.userId, () =>
-            okOr(suspendInactive(input)),
-          ),
-          keep: manage(viewer, team.id, m.userId, () =>
-            okOr(keepInactive(input)),
-          ),
-          reinstate: manage(viewer, team.id, m.userId, () =>
-            okOr(reinstate(input)),
-          ),
-        },
-        consequences: {
-          suspend: said.suspend,
-          keep: said.keep,
-          reinstate: said.reinstate,
-        },
-      };
-    };
-
-    return {
-      team: header,
-      flagged: teamMemberships
-        .filter(
-          (m) => m.status === "active" && inactivity(m, nowDate).state !== "ok",
-        )
-        .map(row)
-        .sort(
-          (a, b) =>
-            b.daysInactive - a.daysInactive ||
-            a.person.name.localeCompare(b.person.name),
-        ),
-      suspended: teamMemberships
-        .filter(
-          (m) =>
-            m.status === "suspended" &&
-            (m.statusReason === "inactivity" ||
-              m.statusReason === "inactivity_auto"),
-        )
-        .sort(
-          (a, b) =>
-            (b.statusChangedAt?.getTime() ?? 0) -
-            (a.statusChangedAt?.getTime() ?? 0),
-        )
-        .map(row),
-      thresholds: {
-        flagDays: INACTIVITY_FLAG_DAYS,
-        suspendDays: INACTIVITY_SUSPEND_DAYS,
-      },
-    };
   },
 );
+
+/** The Inactivity section from the service's facts: each row with its strips' lines. */
+export function inactivitySection(facts: InactivityFacts): InactivitySection {
+  const people = peopleById(facts.people);
+  const now = new Date(facts.asOf);
+  const row = (m: InactiveMemberFacts): InactivityRow => {
+    const said = memberConsequences({
+      membership: membershipOf(m),
+      member: named(people, m.userId),
+      team: facts.team,
+      now,
+    });
+    return {
+      membershipId: m.membershipId,
+      person: personOf(people, m.userId),
+      title: m.title,
+      roles: m.roles,
+      lastActiveAt: m.lastActiveAt,
+      daysInactive: m.daysInactive,
+      suspendsAt: m.suspendsAt,
+      status: m.status,
+      statusReason: m.statusReason,
+      heldAsLastAdmin: m.heldAsLastAdmin,
+      can: m.can,
+      consequences: {
+        suspend: said.suspend,
+        keep: said.keep,
+        reinstate: said.reinstate,
+      },
+    };
+  };
+  return {
+    team: facts.team,
+    flagged: facts.flagged.map(row),
+    suspended: facts.suspended.map(row),
+    thresholds: {
+      flagDays: INACTIVITY_FLAG_DAYS,
+      suspendDays: INACTIVITY_SUSPEND_DAYS,
+    },
+    today: utcDay(now),
+  };
+}
 
 // ── Sidebar cards ────────────────────────────────────────────
 
 /**
- * One card per space the viewer can switch to, by priority: access requests waiting (Team Admin),
- * then a review open with members left to confirm (Team Admin). null when there's nothing to say.
- * The id changes when the content does, so a dismissed card comes back for a new request.
+ * The cards of the team spaces the viewer can switch to that have something to say, by team id: access requests
+ * waiting (Team Admin), then a review open with members left to confirm (Team Admin). A team with nothing to say
+ * has no entry. The id changes when the content does, so a dismissed card comes back for a new request.
  */
 export const getSidebarCards = cache(
-  async (): Promise<Record<string, SidebarCardModel | null>> => {
-    const viewer = await getViewer();
-    const teamRows = await db
-      .select({ slug: teams.slug, name: teams.name })
-      .from(teams);
-    const spaces = spacesFor(viewer, teamRows);
-    const cards: Record<string, SidebarCardModel | null> = Object.fromEntries(
-      spaces.map((s) => [s.slug, null]),
-    );
-    const managed = spaces
-      .filter((s) => s.kind === "team")
-      .map((s) => s.slug)
-      .filter(
-        (teamId) =>
-          can(viewer, "team.decideAccessRequest", { teamId }).ok ||
-          can(viewer, "team.manageMembers", { teamId }).ok,
+  async (): Promise<Record<string, SidebarCardModel>> => {
+    const ctx = await requireRequestContext();
+    const facts = await services().access.sidebarCards(ctx);
+    if (!facts.ok)
+      throw new Error(
+        `The sidebar cards refused a signed-in viewer: ${facts.code}`,
       );
-    if (managed.length === 0) return cards;
-
-    const nowDate = await demoNow();
-    const people = await getUsers();
-    const pending = await loadRequestFacts(
-      db,
-      and(
-        inArray(accessRequests.teamId, managed),
-        eq(accessRequests.status, "pending"),
-      ),
-    );
-    const recerts = await loadRecertFacts(
-      db,
-      inArray(recertifications.teamId, managed),
-    );
-    const allMemberships = await loadMembershipFacts(
-      db,
-      inArray(memberships.teamId, managed),
-    );
-
-    for (const teamId of managed) {
-      // Requests the viewer may decide (never their own), newest first.
-      const waiting = pending
-        .filter((r) => r.teamId === teamId && r.userId !== viewer.userId)
-        .sort(
-          (a, b) =>
-            b.createdAt.getTime() - a.createdAt.getTime() ||
-            b.id.localeCompare(a.id),
-        );
-      if (
-        waiting.length &&
-        can(viewer, "team.decideAccessRequest", { teamId }).ok
-      ) {
-        const newest = waiting[0]!;
-        cards[teamId] = {
-          kind: "access_requests",
-          id: `access-requests:${teamId}:${newest.id}:${waiting.length}`,
-          teamSlug: teamId,
-          count: waiting.length,
-          firstName: firstName(userOf(people, newest.userId).name),
-          role: newest.role,
-        };
-        continue;
-      }
-      const open = recerts.find(
-        (r) => r.teamId === teamId && recertPhase(r, nowDate) === "open",
-      );
-      if (open && can(viewer, "team.manageMembers", { teamId }).ok) {
-        const progress = recertProgress(
-          open,
-          allMemberships.filter((m) => m.teamId === teamId),
-        );
-        if (progress.pending > 0) {
-          cards[teamId] = {
-            kind: "recert_due",
-            id: `recert:${open.id}`,
-            teamSlug: teamId,
-            label: open.label,
-            dueAt: iso(open.dueAt),
-            progressLabel: progress.label,
-          };
-        }
-      }
-    }
-    return cards;
+    return sidebarCards(facts);
   },
 );
+
+/** The cards from the service's facts, by team id. */
+export function sidebarCards(
+  facts: SidebarCardsFacts,
+): Record<string, SidebarCardModel> {
+  const people = peopleById(facts.people);
+  return Object.fromEntries(
+    facts.cards.map((card): [string, SidebarCardModel] => [
+      card.teamId,
+      card.kind === "access_requests"
+        ? {
+            kind: "access_requests",
+            id: `access-requests:${card.teamId}:${card.newestRequestId}:${card.count}`,
+            teamSlug: card.teamSlug,
+            count: card.count,
+            firstName: firstName(personOf(people, card.requesterId).name),
+            role: card.role,
+          }
+        : {
+            kind: "recert_due",
+            id: `recert:${card.recertId}`,
+            teamSlug: card.teamSlug,
+            label: card.label,
+            dueAt: card.dueAt,
+            progressLabel: recertProgressLabel(card.progress),
+          },
+    ]),
+  );
+}
 
 /**
  * The card for a viewer with no space yet (Morgan on /request-access): their newest pending request.
  * Additive to the contract: `getShell` folds it in as `ShellData.homeCard`.
  */
 export const getHomeCard = cache(async (): Promise<SidebarCardModel | null> => {
-  const viewer = await getViewer();
-  const [newest] = await db
-    .select({
-      id: accessRequests.id,
-      role: accessRequests.role,
-      createdAt: accessRequests.createdAt,
-      teamId: accessRequests.teamId,
-      teamName: teams.name,
-    })
-    .from(accessRequests)
-    .innerJoin(teams, eq(teams.id, accessRequests.teamId))
-    .where(
-      and(
-        eq(accessRequests.userId, viewer.userId),
-        eq(accessRequests.status, "pending"),
-      ),
-    )
-    .orderBy(desc(accessRequests.createdAt), desc(accessRequests.id))
-    .limit(1);
-  if (!newest) return null;
-  // Who decides it: the team's active Team Admins, the first by name ("waiting on Alex Kim").
-  const people = await getUsers();
-  const [admin] = (
-    await loadMembershipFacts(db, eq(memberships.teamId, newest.teamId))
-  )
-    .filter(
-      (m) =>
-        m.status === "active" &&
-        m.roles.includes("team_admin") &&
-        m.userId !== viewer.userId,
-    )
-    .map((m) => userOf(people, m.userId).name)
-    .sort((a, b) => a.localeCompare(b));
+  const ctx = await requireRequestContext();
+  const facts = await services().access.homeCard(ctx);
+  if (!facts.ok)
+    throw new Error(`The home card refused a signed-in viewer: ${facts.code}`);
+  return homeCard(facts);
+});
+
+/** The home card from the service's facts. */
+export function homeCard(facts: HomeCardFacts): SidebarCardModel | null {
+  const { request } = facts;
+  if (!request) return null;
+  const people = peopleById(facts.people);
   return {
     kind: "my_request",
-    id: `my-request:${newest.id}`,
-    teamName: newest.teamName,
-    role: newest.role,
-    createdAt: iso(newest.createdAt),
-    ...(admin ? { adminName: admin } : {}),
+    id: `my-request:${request.id}`,
+    teamName: request.teamName,
+    role: request.role,
+    createdAt: request.createdAt,
+    ...(request.adminId
+      ? { adminName: personOf(people, request.adminId).name }
+      : {}),
   };
-});
+}

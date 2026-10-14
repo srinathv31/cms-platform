@@ -4,13 +4,13 @@ import {
   correlationIdOf,
   errorResponse,
   jsonResponse,
-  withDemoDate,
 } from "@/server/api/http";
-import { now } from "@/server/clock";
+import { now } from "@/server/services/local/clock";
 import {
   getTemplateDetail,
   requireConsumer,
-} from "@/server/queries/consumer-api";
+  withDemoDate,
+} from "@/server/services/local/consumer-api";
 
 // GET /api/v1/templates/{templateId}?version=&since=: a template's released versions and one
 // version's contract (+ the changes since an older one). Contract: ApiTemplateDetail in

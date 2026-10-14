@@ -41,6 +41,26 @@ export interface StarterContent {
   channelFields?: ChannelFields;
 }
 
+/**
+ * A new template's first draft, as the BFF built and prepared it (decision 0065): the starter or the import's
+ * conversion, fitted to the content type, its documents normalized, checked and given block ids. The backend
+ * stores it (`TemplateService.create`); it doesn't build documents.
+ */
+export interface DraftContent {
+  /** The template's name in the draft. */
+  name: string;
+  /** Normalized, checked, with block ids. */
+  body: JSONContent;
+  /** Each channel's own fields, prepared the same way. */
+  channelFields: ChannelFields;
+  /** The channels it renders, fitted to the content type's allowed ones. */
+  channels: Channel[];
+  variables: Variable[];
+  sampleSets: SampleSet[];
+  /** The starter it came from (`templates.starter_key`), or null for Blank and for an import. */
+  starterKey: string | null;
+}
+
 /** The content of a version that a draft is made from. */
 export interface VersionSnapshot {
   id: string;

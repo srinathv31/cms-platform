@@ -24,7 +24,12 @@ import {
   pushPayloadBytes,
 } from "../messages/push";
 import type { MessageTypeRules } from "../platform-config/limits";
-import { refuse, type Refusal, type Refused } from "../refusals";
+import {
+  REQUEST_REFUSALS,
+  refuse,
+  type Refusal,
+  type Refused,
+} from "../refusals";
 import { longSampleValues, resolveMessage } from "../render/message";
 import {
   nextRound,
@@ -33,7 +38,13 @@ import {
   type RoundRow,
 } from "../rounds";
 import { utcDay } from "../dates";
-import type { ApprovalStage, VersionStage } from "../review-types";
+import {
+  DOCUMENT_THREAD,
+  type ApprovalStage,
+  type LifecycleEffect,
+  type VersionStage,
+} from "../review-types";
+import type { SubmitFacts } from "../submit-types";
 import type {
   Channel,
   ContractChange,
@@ -42,16 +53,11 @@ import type {
   Variable,
   VersionState,
 } from "../types";
+import { contractBaseline } from "./baselines";
 import { withWriter } from "./drafts";
-import {
-  unique,
-  sentence,
-  trimmed,
-  teamApproversExcept,
-  notify,
-} from "./helpers";
+import { unique, trimmed, teamApproversExcept, notify } from "./helpers";
 import { REFUSALS } from "./refusals";
-import type { LifecycleResult } from "./types";
+import type { LifecycleResult, Outcome } from "./types";
 
 /** What `submit` reads from the draft. The caller loads it from the version row. */
 export interface SubmitDraft {
@@ -129,7 +135,7 @@ export interface SubmitInput {
   baseline: readonly Variable[] | null;
   now: Date;
   submittedBy: string;
-  /** For the notification: "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review." */
+  /** The submitter's name, as the notification keeps it ("Maya Chen submitted … for review."). */
   submitterName: string;
   templateId: string;
   templateName: string;
@@ -242,11 +248,115 @@ export function submit(input: SubmitInput): SubmitResult {
         to:
           (firstStage && stageRecipients(firstStage, writers)) ||
           teamApproversExcept(...writers),
-        title: `${input.submitterName} submitted ${input.templateName} ${sentence(submitted)} for review.`,
+        facts: {
+          actorName: input.submitterName,
+          templateName: input.templateName,
+          number,
+          round,
+        },
         body: submitNote,
         link: reviewLink(input.templateId, submitted),
       }),
     ],
+  };
+}
+
+/**
+ * The template's open draft, the one submit freezes: refused `already_in_review` when there is none because a
+ * round is in review (a second tab, a double click), else `no_draft_to_submit`. Submit and its summary ask it.
+ */
+export function draftToSubmit<V extends { state: VersionState }>(
+  versions: readonly V[],
+): Outcome<{ draft: V }> {
+  const draft = versions.find((v) => v.state === "draft");
+  if (draft) return { ok: true, draft };
+  return refuse(
+    versions.some((v) => v.state === "in_review")
+      ? REFUSALS.alreadyInReview
+      : REQUEST_REFUSALS.noDraftToSubmit,
+  );
+}
+
+/** What the submit summary reads of each of the template's versions. */
+export interface SummaryRow extends RoundRow {
+  rev: number;
+  sunsetAt: Date | null;
+  name: string;
+  channels: readonly Channel[];
+  variables: readonly Variable[];
+  sampleSets: readonly SampleSet[];
+}
+
+/**
+ * What submitting the template's draft would freeze, at `now` (`SubmitFacts`, less the template and the instant):
+ * the draft's rev, name, channels, variables and sample sets, the number and round it would get (`nextRound`),
+ * and the version it would be compared with (`contractBaseline`). Refused as `draftToSubmit` refuses.
+ */
+export function submitFacts(
+  versions: readonly SummaryRow[],
+  now: Date,
+): Outcome<Omit<SubmitFacts, "asOf" | "templateId">> {
+  const open = draftToSubmit(versions);
+  if (!open.ok) return open;
+  const { draft } = open;
+  const baseline = contractBaseline(versions, now);
+  return {
+    ok: true,
+    rev: draft.rev,
+    ...nextRound(versions),
+    name: draft.name,
+    channels: [...draft.channels],
+    variables: [...draft.variables],
+    sampleSets: [...draft.sampleSets],
+    baseline:
+      baseline && baseline.number !== null
+        ? {
+            number: baseline.number,
+            name: baseline.name,
+            variables: [...baseline.variables],
+          }
+        : null,
+  };
+}
+
+/** An open thread about the whole version: a change request (`DOCUMENT_THREAD`). */
+export interface OpenChangeRequest {
+  id: string;
+  /** The round that was sent back. */
+  originVersionId: string;
+}
+
+/**
+ * Submitting the next round answers the change requests that sent the last one back (Sri, Oct 5): each open
+ * thread about the whole version resolves as the submitter's, at the submit, and gets a `thread.resolved` audit
+ * row about the round that asked, saying which round answered it. Block comments stay as they are; the author
+ * resolves those one by one, so the caller passes only the open `DOCUMENT_THREAD` threads.
+ */
+export function answerChangeRequests(
+  threads: readonly OpenChangeRequest[],
+  submitted: { number: number; round: number; by: string; at: Date },
+): {
+  resolve: { status: "resolved"; resolvedBy: string; resolvedAt: Date };
+  effects: LifecycleEffect[];
+} {
+  return {
+    resolve: {
+      status: "resolved",
+      resolvedBy: submitted.by,
+      resolvedAt: submitted.at,
+    },
+    effects: threads.map((t) => ({
+      kind: "audit",
+      action: "thread.resolved",
+      versionId: t.originVersionId,
+      details: {
+        threadId: t.id,
+        blockId: DOCUMENT_THREAD,
+        auto: true,
+        resolvedWith: submitted.number,
+        resolvedWithRound: submitted.round,
+      },
+    })),
   };
 }
 

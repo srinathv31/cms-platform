@@ -4,13 +4,24 @@
 // decides is a marker that a loader resolves against the moment it loads. The shape is described in
 // README.md ("The fixture").
 
-import { getTableColumns, getTableName } from "drizzle-orm";
+import {
+  SQL,
+  StringChunk,
+  getTableColumns,
+  getTableName,
+  is,
+  type Column,
+} from "drizzle-orm";
+import { SQLiteTable } from "drizzle-orm/sqlite-core";
+import { quarterLabel } from "@/domain/access/recertification";
 import {
   DEFAULT_BUSINESS_ZONE,
   sunsetInstant,
   todayIn,
 } from "@/domain/business-zone";
 import { DAY_MS, addDays, daysBetween, isCalendarDay } from "@/domain/dates";
+import * as sim from "@/server/db/schema/sim";
+import * as ucomp from "@/server/db/schema/ucomp";
 import { SEED_VERSION, buildSeed } from "./index";
 
 /** The version of the fixture's own format. */
@@ -192,6 +203,31 @@ function exportInstant(
   return verified(instantMarker(instant, base), instant, base);
 }
 
+/**
+ * What the database stores in a column a row leaves out: the schema's default, else null. A fixture row is
+ * complete, so a loader inserts every column as written and the fake holds what the database holds. A default
+ * the schema states as SQL is a quoted literal (`sql\`'{}'\``); any other kind fails here, loudly.
+ */
+function columnDefault(column: Column): unknown {
+  if (column.defaultFn)
+    throw new Error(
+      `Seed fixture: ${column.name} has a default function; write the column in the seed.`,
+    );
+  if (!column.hasDefault || column.default === undefined) return null;
+  if (!is(column.default, SQL)) return column.default;
+  const [chunk, ...rest] = column.default.queryChunks;
+  const literal =
+    rest.length === 0 && is(chunk, StringChunk)
+      ? /^'((?:[^']|'')*)'$/.exec(chunk.value.join(""))
+      : null;
+  if (!literal)
+    throw new Error(
+      `Seed fixture: ${column.name}'s default isn't a literal the fixture can write.`,
+    );
+  const text = literal[1]!.replaceAll("''", "'");
+  return column.dataType === "json" ? JSON.parse(text) : text;
+}
+
 function exportRow(
   table: Parameters<typeof getTableColumns>[0],
   row: object,
@@ -200,7 +236,8 @@ function exportRow(
   const name = getTableName(table);
   const out: Record<string, unknown> = {};
   for (const [key, column] of Object.entries(getTableColumns(table))) {
-    const value = (row as Record<string, unknown>)[key] ?? null;
+    const given = (row as Record<string, unknown>)[key];
+    const value = given === undefined ? columnDefault(column) : given;
     if (value === null) out[column.name] = null;
     else if (column.dataType === "date")
       out[column.name] = exportInstant(value as Date, name, column.name, base);
@@ -223,6 +260,81 @@ export function buildFixture(base: Date = FIXTURE_BASE): SeedFixture {
       rows: rows.map((row) => exportRow(table, row, base)),
     })),
   };
+}
+
+// ── Loading ─────────────────────────────────────────────────────────────────
+
+/** One table of a loaded fixture: its rows as Drizzle reads them back (TypeScript keys, Dates, parsed JSON). */
+export interface LoadedTable {
+  name: string;
+  rows: Record<string, unknown>[];
+}
+
+const TABLES_BY_NAME = new Map<string, SQLiteTable>(
+  [...Object.values(ucomp), ...Object.values(sim)].flatMap((value) =>
+    is(value, SQLiteTable) ? [[getTableName(value), value] as const] : [],
+  ),
+);
+
+function loadValue(value: unknown, column: Column, resetAt: Date): unknown {
+  if (value === null) return null;
+  if (column.dataType === "date") {
+    if (!isTimeMarker(value))
+      throw new Error(`Seed fixture: ${column.name} holds no time marker.`);
+    return resolveMarker(value, resetAt);
+  }
+  if (column.dataType === "json") return resolveJson(value, resetAt);
+  return value;
+}
+
+/**
+ * The one piece of wording a loader derives: a recertification's quarter label (`Q1 2026`), in its row and in
+ * the audit event that started it, is the quarter of its resolved deadline, as `startRecert` writes it.
+ */
+function deriveLabels(tables: LoadedTable[]): void {
+  const rows = (name: string) =>
+    tables.find((t) => t.name === name)?.rows ?? [];
+  for (const recert of rows("recertifications"))
+    recert.label = quarterLabel(recert.dueAt as Date);
+  for (const event of rows("audit_events")) {
+    const details = event.details as Record<string, unknown> | null;
+    if (event.action === "recert.started" && typeof details?.dueAt === "string")
+      event.details = {
+        ...details,
+        label: quarterLabel(new Date(details.dueAt)),
+      };
+  }
+}
+
+/**
+ * Loads a fixture as the Java side's loader does: every table in order, every marker resolved against the
+ * moment it loads (`resetAt`), and the recertification labels derived from their deadlines. The rows come back
+ * in the shape Drizzle reads them from the database, so loaded at the moment the fixture was built they are the
+ * seeded database, row for row (fixture.test.ts checks it). The in-memory fake (src/server/services/fake) is
+ * built this way, so the contract suite's agreement test also checks the fixture.
+ */
+export function loadFixture(
+  fixture: SeedFixture,
+  resetAt: Date,
+): { templates: Record<string, string>; tables: LoadedTable[] } {
+  const tables = fixture.tables.map(({ name, rows }): LoadedTable => {
+    const table = TABLES_BY_NAME.get(name);
+    if (!table) throw new Error(`Seed fixture: no table ${name}.`);
+    const columns = Object.entries(getTableColumns(table));
+    return {
+      name,
+      rows: rows.map((row) =>
+        Object.fromEntries(
+          columns.map(([key, column]) => [
+            key,
+            loadValue(row[column.name] ?? null, column, resetAt),
+          ]),
+        ),
+      ),
+    };
+  });
+  deriveLabels(tables);
+  return { templates: { ...fixture.templates }, tables };
 }
 
 /** The fixture as JSON text, one row to a line, so a change to the seed shows as a short diff. */

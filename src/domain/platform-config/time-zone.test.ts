@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { describeConfigChange } from "./effects";
 import { PLATFORM_REFUSALS } from "./refusals";
 import {
   describeZoneChange,
@@ -47,15 +48,14 @@ describe("the business time zone (decision 0017)", () => {
   });
 
   it("sets a zone on the list with one audit row, records nothing for the same zone, and refuses as the screen does", () => {
-    expect(
-      setBusinessZone({
-        current: "America/New_York",
-        next: "America/Chicago",
-        pendingSunsets: 2,
-        actor: riley,
-        now: NOW,
-      }),
-    ).toEqual({
+    const result = setBusinessZone({
+      current: "America/New_York",
+      next: "America/Chicago",
+      pendingSunsets: 2,
+      actor: riley,
+      now: NOW,
+    });
+    expect(result).toEqual({
       ok: true,
       zone: "America/Chicago",
       effects: [
@@ -65,7 +65,6 @@ describe("the business time zone (decision 0017)", () => {
           teamId: null,
           details: {
             area: "business_zone",
-            summary: "Set the business time zone to Central (America/Chicago)",
             from: "America/New_York",
             to: "America/Chicago",
             pendingSunsets: 2,
@@ -73,6 +72,11 @@ describe("the business time zone (decision 0017)", () => {
         },
       ],
     });
+    // The Audit page words the row when it reads it.
+    const audit = result.ok ? result.effects[0] : undefined;
+    expect(audit?.kind === "audit" && describeConfigChange(audit.details)).toBe(
+      "set the business time zone to Central (America/Chicago)",
+    );
     expect(
       setBusinessZone({
         current: "UTC",

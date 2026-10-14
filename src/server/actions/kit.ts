@@ -1,107 +1,62 @@
 import "server-only";
 import type { z } from "zod";
-import { can } from "@/domain/permissions";
 import { REQUEST_REFUSALS, type Refusal } from "@/domain/refusals";
 import type { ActionResult } from "@/domain/review-types";
-import type {
-  Action,
-  PermissionResource,
-  PermissionResult,
-  Viewer,
-} from "@/domain/types";
-import { now } from "@/server/clock";
-import { db } from "@/server/db/client";
-import { inTransaction, type Tx } from "@/server/effects";
-import { getViewer } from "@/server/viewer";
+import {
+  requestContextOrRefusal,
+  type RequestContext,
+} from "@/server/context/request";
+import { answerFor, refuse } from "@/server/services/refuse";
 
-// The server action kit: the one shape every mutation in this folder has (AGENTS.md, "Server code"),
-// written once. An action declares its steps and `serverAction` runs them in this order:
+// The server action kit: the one shape every mutation in this folder has (AGENTS.md, "Server code"), written
+// once. An action declares its steps and `serverAction` runs them in this order:
 //
-//   1. `getViewer()`.
-//   2. The input, parsed with zod. Input that doesn't parse is refused: `invalid_input`, or the
-//      action's own refusal (`invalid`).
-//   3. `authorize`: read what the input names, outside any transaction and only to learn whom to
-//      check (its team, its people), then check the permission: `check()` for a `can()` action,
-//      `permit()` for a domain rule. A record that doesn't exist is refused like a forbidden one. Then
-//      refuse what the request can't be (the record is gone, the note is too long). It returns what
-//      the transaction needs.
-//   4. `now()`, once.
-//   5. `transaction`: ONE `inTransaction`, run once (a busy database fails it). Re-read, ask the domain, write
-//      with a compare-and-set, and write the effects (audit rows, notifications, consumer notices).
-//   6. `after`, only when the transaction committed with `ok`: `revalidatePath()`, `refresh()`, and
-//      `redirect()` last.
+//   1. The request context (src/server/context/request.ts): who is asking. Nobody signed in is refused
+//      (`signed_out`) before anything else.
+//   2. The input, parsed with zod. Input that doesn't parse is refused: `invalid_input`, or the action's own
+//      refusal (`invalid`).
+//   3. `call`: the service (src/server/services), with the context and the parsed input. The backend checks
+//      the permission, reads its own clock, asks the domain, writes with a compare-and-set and writes the
+//      effects, or refuses; the BFF decides nothing itself and supplies no time (decisions 0070, 0072). A
+//      `call` that asks more than one service (New template reads the content type, then creates) may stop
+//      with a read's refusal: `refuse(refusal)`.
+//   4. `after`, only when the service answered `ok`: `revalidatePath()`, `refresh()`, and `redirect()` last.
 //
-// A refusal is `refuse(refusal)` in steps 3 and 5 (or a transaction returning `{ ok: false, … }`): it
-// stops the action, rolls the transaction back, and becomes the answer, `{ ok: false, code, reason }`.
-// Anything else thrown is a bug: it propagates, and the browser shows its own failure sentence. Next's
-// `redirect()` in `after` propagates too, as Next expects.
+// A refusal is the service's `{ ok: false, code, reason }`, answered as it is. Anything thrown is a bug or an
+// outage: it propagates, and the browser shows its own failure sentence. Next's `redirect()` in `after`
+// propagates too, as Next expects.
 //
-// `refuse` here throws; the domain's `refuse` (domain/refusals.ts) builds the result a rule returns.
 // Not "use server": that would make every export here a public endpoint.
 
-/** A refusal raised in an action's steps: it rolls the transaction back and becomes the answer. */
-export class RefusalError extends Error {
-  constructor(readonly refusal: Refusal) {
-    super(refusal.reason);
-    this.name = "RefusalError";
-  }
-}
+export { refuse } from "@/server/services/refuse";
 
-/** Stops the action with this refusal as its answer. Inside the transaction, nothing it wrote is kept. */
-export function refuse(refusal: Refusal): never {
-  throw new RefusalError(refusal);
-}
-
-/** A permission decided by a domain rule (`canComment`, …): refused, it stops the action with its reason. */
-export function permit(result: PermissionResult): void {
-  if (!result.ok) refuse(result);
-}
-
-/** `can()` for the action on the resource: refused, it stops the action with its reason. */
-export function check(
-  viewer: Viewer,
-  action: Action,
-  resource: PermissionResource,
-): void {
-  permit(can(viewer, action, resource));
-}
-
-/** Who is acting, and the input as parsed. */
-export interface ActionContext<I> {
-  viewer: Viewer;
-  input: I;
-}
-
-/** What the transaction and `after` see: the context, what `authorize` found, and the clock, read once. */
-export interface CommitContext<I, F> extends ActionContext<I> {
-  found: F;
-  now: Date;
-}
-
-export interface ActionSteps<I, F, T extends object> {
+interface InputSteps<I> {
   /** The input's schema. */
   input: z.ZodType<I>;
   /** What input that doesn't parse answers. Without it, `invalid_input` with its plain sentence. */
   invalid?: Refusal | ((error: z.ZodError) => Refusal);
-  /** Reads what the input names (outside the transaction), checks the permission, and returns what the transaction needs. */
-  authorize: (ctx: ActionContext<I>) => F | Promise<F>;
-  /** The one transaction: re-read, ask the domain, compare-and-set, effects. Read and write through `tx`. */
-  transaction: (tx: Tx, ctx: CommitContext<I, F>) => Promise<ActionResult<T>>;
-  /** After the transaction committed with `ok`: revalidate, refresh, and redirect last. */
+}
+
+/** A server action's steps: parse, then call the service. */
+export interface ServiceSteps<I, T extends object> extends InputSteps<I> {
+  /** Asks the service, with the request context. */
+  call: (ctx: RequestContext, input: I) => Promise<ActionResult<T>>;
+  /** After the service answered `ok`: revalidate, refresh, and redirect last. */
   after?: (
     result: { ok: true } & T,
-    ctx: CommitContext<I, F>,
+    c: { ctx: RequestContext; input: I },
   ) => void | Promise<void>;
 }
 
 /** Runs a server action's steps (see the top of this file) and answers with its `ActionResult`. */
-export async function serverAction<
-  I,
-  F,
-  T extends object = Record<never, never>,
->(raw: unknown, steps: ActionSteps<I, F, T>): Promise<ActionResult<T>> {
+export async function serverAction<I, T extends object = Record<never, never>>(
+  raw: unknown,
+  steps: ServiceSteps<I, T>,
+): Promise<ActionResult<T>> {
   try {
-    const viewer = await getViewer();
+    const context = await requestContextOrRefusal();
+    if (!context.ok) return context;
+    const { context: ctx } = context;
     const parsed = steps.input.safeParse(raw);
     if (!parsed.success) {
       const { invalid } = steps;
@@ -112,23 +67,10 @@ export async function serverAction<
       );
     }
     const input = parsed.data;
-    const found = await steps.authorize({ viewer, input });
-    const ctx: CommitContext<I, F> = { viewer, input, found, now: await now() };
-    const result = await inTransaction(db, async (tx) => {
-      const answer = await steps.transaction(tx, ctx);
-      // A refusal returned rather than raised rolls back the same way.
-      if (!answer.ok) refuse(answer);
-      return answer;
-    });
-    await steps.after?.(result, ctx);
+    const result = await steps.call(ctx, input);
+    if (result.ok) await steps.after?.(result, { ctx, input });
     return result;
   } catch (error) {
-    if (error instanceof RefusalError)
-      return {
-        ok: false,
-        code: error.refusal.code,
-        reason: error.refusal.reason,
-      };
-    throw error;
+    return answerFor(error);
   }
 }

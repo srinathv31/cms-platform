@@ -8,6 +8,7 @@ golden case, a starter, a seeded body or a mutation of one. The schema also hold
 (`#/$defs/field-line`, `#/$defs/field-lines`). It is looser than the check in three rules the Java side keeps in code, the
 table grid, the 12-column limit and list depth, listed in [render spec](../render-spec.md) §2 with the block id sentence
 this record asks for.
+Amended 2026-10-13: New template and Import prepare their documents in the BFF as autosave does (`prepareDraftContent` in `src/server/templates/create.ts`, over `prepareBody` and `prepareField`), the starters included, and hand a `DraftContent` to the backend, which stores it ([0073](0073-the-bff-builds-a-new-templates-draft-and-the-backend-draws-its-id.md)).
 Date: 2026-10-12
 
 ## Context

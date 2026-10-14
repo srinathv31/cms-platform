@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
+import { describeNotification } from "../notifications";
 import { REFUSALS } from "./refusals";
-import { smsFooterOf, submit, type SubmitDraft } from "./submit";
+import {
+  answerChangeRequests,
+  draftToSubmit,
+  smsFooterOf,
+  submit,
+  submitFacts,
+  type SubmitDraft,
+  type SummaryRow,
+} from "./submit";
 import type { MessageTypeRules } from "../platform-config/limits";
-import type { ApprovalStage, Recipients } from "../review-types";
+import {
+  DOCUMENT_THREAD,
+  type ApprovalStage,
+  type Recipients,
+} from "../review-types";
 import type { RoundRow } from "../rounds";
 import type { JSONContent, Variable } from "../types";
 import {
@@ -75,7 +88,12 @@ describe("submit", () => {
       role: "approver",
       exceptUserIds: ["maya"],
     },
-    title: `Maya Chen submitted Spring Travel Rewards — Terms v${number}${(extra.round ?? 1) > 1 ? `, round ${extra.round}` : ""} for review.`,
+    facts: {
+      actorName: "Maya Chen",
+      templateName: TEMPLATE.name,
+      number,
+      round: extra.round ?? 1,
+    },
     ...(extra.body ? { body: extra.body } : {}),
     link: {
       to: "review",
@@ -162,6 +180,29 @@ describe("submit", () => {
       submitted(1, { round: 2 }),
       reviewRequested(1, { round: 2 }),
     ]);
+    // The notification keeps the round as a fact; read, it is worded with the round named.
+    const notification = result.ok && result.effects[1];
+    expect(
+      notification &&
+        notification.kind === "notification" &&
+        describeNotification(
+          notification.notification,
+          notification.facts,
+          "priya",
+        ),
+    ).toEqual({
+      title:
+        "Maya Chen submitted Spring Travel Rewards — Terms v1, round 2 for review.",
+      body: null,
+    });
+    expect(
+      notification && notification.kind === "notification" && notification.link,
+    ).toEqual({
+      to: "review",
+      templateId: TEMPLATE.id,
+      versionNumber: 1,
+      round: 2,
+    });
   });
 
   it("keeps the note to reviewers, trimmed, and passes it on to them", () => {
@@ -867,5 +908,116 @@ describe("submit", () => {
       code: "undefined_variables",
       reason: "Define or remove {{promo_code}} before submitting.",
     });
+  });
+});
+
+// Submit and its summary find the draft the same way, and the summary's facts are what submit will freeze.
+describe("draftToSubmit and submitFacts", () => {
+  const row = (over: Partial<SummaryRow> & Pick<SummaryRow, "state">) => ({
+    number: null,
+    round: null,
+    rev: 0,
+    sunsetAt: null,
+    name: TEMPLATE.name,
+    channels: ["pdf", "web"] as const,
+    variables: VARIABLES,
+    sampleSets: SAMPLE_SETS,
+    ...over,
+  });
+  const draft = row({ state: "draft", rev: 7, name: "Renamed" });
+  const sentBack = row({ state: "changes_requested", number: 2, round: 1 });
+  const live = row({
+    state: "active",
+    number: 1,
+    round: 1,
+    variables: VARIABLES.slice(0, 1),
+  });
+
+  it("finds the open draft, or says why there is none", () => {
+    expect(draftToSubmit([live, draft])).toEqual({ ok: true, draft });
+    expect(
+      draftToSubmit([live, row({ state: "in_review", number: 2, round: 1 })]),
+    ).toMatchObject({ ok: false, code: REFUSALS.alreadyInReview.code });
+    expect(draftToSubmit([live])).toMatchObject({
+      ok: false,
+      code: "no_draft_to_submit",
+    });
+  });
+
+  it("is the draft's rev and content, the round it would get, and the version that still renders", () => {
+    expect(submitFacts([live, sentBack, draft], NOW)).toEqual({
+      ok: true,
+      rev: 7,
+      number: 2,
+      round: 2,
+      name: "Renamed",
+      channels: ["pdf", "web"],
+      variables: VARIABLES,
+      sampleSets: SAMPLE_SETS,
+      baseline: {
+        number: 1,
+        name: TEMPLATE.name,
+        variables: VARIABLES.slice(0, 1),
+      },
+    });
+  });
+
+  it("has no baseline when nothing renders: the Superseded version's sunset has passed at `now`", () => {
+    const superseded = row({
+      state: "superseded",
+      number: 1,
+      round: 1,
+      sunsetAt: new Date(NOW.getTime() - 1),
+    });
+    expect(submitFacts([superseded, draft], NOW)).toMatchObject({
+      ok: true,
+      number: 2,
+      round: 1,
+      baseline: null,
+    });
+    expect(
+      submitFacts(
+        [{ ...superseded, sunsetAt: new Date(NOW.getTime() + 1) }, draft],
+        NOW,
+      ),
+    ).toMatchObject({ baseline: { number: 1 } });
+  });
+});
+
+describe("answerChangeRequests", () => {
+  it("resolves each open change request as the submitter's, with an audit row about the round that asked", () => {
+    const answered = answerChangeRequests(
+      [
+        { id: "th_1", originVersionId: "v_r1" },
+        { id: "th_2", originVersionId: "v_r2" },
+      ],
+      { number: 1, round: 3, by: "maya", at: NOW },
+    );
+    expect(answered.resolve).toEqual({
+      status: "resolved",
+      resolvedBy: "maya",
+      resolvedAt: NOW,
+    });
+    expect(answered.effects).toEqual(
+      ["th_1", "th_2"].map((threadId, i) => ({
+        kind: "audit",
+        action: "thread.resolved",
+        versionId: i === 0 ? "v_r1" : "v_r2",
+        details: {
+          threadId,
+          blockId: DOCUMENT_THREAD,
+          auto: true,
+          resolvedWith: 1,
+          resolvedWithRound: 3,
+        },
+      })),
+    );
+  });
+
+  it("writes nothing when no change request is open", () => {
+    expect(
+      answerChangeRequests([], { number: 1, round: 1, by: "maya", at: NOW })
+        .effects,
+    ).toEqual([]);
   });
 });

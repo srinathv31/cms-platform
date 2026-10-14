@@ -129,6 +129,22 @@ export function replacedBy<T extends RoundRow>(
   return head !== undefined && head.round !== shown.round ? head : null;
 }
 
+/**
+ * The version the CMS shows a template by (the workspace, its name in every list): the open draft if there is
+ * one, otherwise the highest number, and of its rounds the latest (`compareRounds`). Undefined with no rows.
+ */
+export function latestVersion<T extends RoundRow>(
+  rows: readonly T[],
+): T | undefined {
+  const draft = rows.find((row) => row.state === "draft");
+  if (draft) return draft;
+  return rows.reduce<T | undefined>(
+    (best, row) =>
+      best === undefined || compareRounds(row, best) > 0 ? row : best,
+    undefined,
+  );
+}
+
 /** Every round of a number, newest first. */
 export function roundsOf<T extends RoundRow>(
   rows: readonly T[],
@@ -206,7 +222,7 @@ export function reviewHistoryName(number: number, count: number): string {
  * The round's review screen. The bare URL is the number's head (its released row, else its latest
  * round), so `?round=` is added exactly when the label shows the round: otherwise the bare URL is
  * already this row. (For a stage reviewer outside the team the head is closed to, the bare URL opens
- * the newest round they may open instead: `requireReviewVersion` on the server.)
+ * the newest round they may open instead: `roundToOpen` in review-access.ts.)
  */
 export function reviewPath(
   space: string,

@@ -40,7 +40,8 @@ export type ApiErrorCode =
   | "consumer_required"
   | "body_too_large" // 413: the body is over 1,000,000 bytes
   | "unknown_consumer"
-  | "preview_forbidden" // 403: never returned by /api/v1; Stencil's own preview route uses it (kept so the codes match RenderErrorCode)
+  | "preview_forbidden" // 403: returned by no route (the preview answers 404 template_not_found); kept so the codes match RenderErrorCode
+  | "signed_out" // 401: never returned by /api/v1; Stencil's own preview route, with nobody signed in (the same)
   | "template_not_found"
   | "version_not_found"
   | "version_not_released"
@@ -160,6 +161,7 @@ export interface ApiTemplateSummary {
   id: string; // "UC-4F7K2Q"
   /** The Active version's name. Each version keeps the name it was approved with; a rename arrives with a new version. */
   name: string;
+  /** The owning team. `id` is opaque ("t_coral"): never parse it, and never read it as the team's URL name. */
   team: { id: string; name: string };
   contentType: { key: string; name: string }; // { key: "disclosure", name: "Disclosure" }
   activeVersion: number;
@@ -197,6 +199,7 @@ export interface ApiTemplateDetail {
    * names the contract's own version.
    */
   name: string;
+  /** The owning team. `id` is opaque ("t_coral"): never parse it, and never read it as the team's URL name. */
   team: { id: string; name: string };
   contentType: { key: string; name: string };
   asOf: string;

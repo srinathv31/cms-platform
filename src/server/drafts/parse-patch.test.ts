@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { JSONContent } from "@/domain/types";
+import type { JSONContent, Variable } from "@/domain/types";
+import { createVariableStore } from "@/editor/state/variable-store";
 import {
   MAX_BODY_SIZE,
   docProblem,
@@ -8,7 +9,11 @@ import {
   parseDraftPatchText,
 } from "./parse-patch";
 
-const base = { rev: 4, sessionKey: "6f1c2b7e-4a0d-4f43-9a58-3a6a1f0f7b21" };
+const base = {
+  rev: 4,
+  sessionKey: "6f1c2b7e-4a0d-4f43-9a58-3a6a1f0f7b21",
+  seq: 1,
+};
 const doc: JSONContent = {
   type: "doc",
   content: [
@@ -162,6 +167,11 @@ describe("parseDraftPatch", () => {
   it("refuses a bad rev", () => {
     for (const rev of [-1, 1.5, "3", null, undefined, NaN])
       expect(message({ ...base, rev, body: doc })).toMatch(/^rev /);
+  });
+
+  it("refuses a bad seq: every send counts from 1", () => {
+    for (const seq of [0, -1, 1.5, "3", null, undefined, NaN])
+      expect(message({ ...base, seq, body: doc })).toMatch(/^seq /);
   });
 
   it("refuses a missing or odd session key", () => {
@@ -340,6 +350,38 @@ describe("parseDraftPatchText", () => {
     expect(parseDraftPatchText("")).toMatchObject({ ok: false });
   });
 
+  // Handoff review D8: a rename is one change to the contract only if the variable's identity survives autosave.
+  it("keeps the identity the editor's variable store gives a renamed variable, across two sessions", () => {
+    /** One editing session: the store opens on the saved list, edits it, and autosave sends what it reports. */
+    const session = (
+      saved: readonly Variable[],
+      edit: (store: ReturnType<typeof createVariableStore>) => void,
+    ) => {
+      const store = createVariableStore(saved, () => "v-new-0001");
+      edit(store);
+      const result = parseDraftPatchText(
+        JSON.stringify({ ...base, variables: store.getState().variables }),
+      );
+      if (!result.ok) throw new Error(result.message);
+      return result.patch.variables!;
+    };
+    const first = session([variable as Variable], (store) =>
+      store.getState().update("first_name", { key: "given_name" }),
+    );
+    expect(first).toEqual([
+      { ...variable, key: "given_name", id: "first_name" },
+    ]);
+    // After a reload the next rename chains onto the first, and a new variable under the old key is another one.
+    const second = session(first, (store) => {
+      store.getState().update("given_name", { key: "name_on_card" });
+      store.getState().create({ ...(variable as Variable) });
+    });
+    expect(second).toEqual([
+      { ...variable, key: "name_on_card", id: "first_name" },
+      { ...variable, id: "v-new-0001" },
+    ]);
+  });
+
   it("refuses text over the size limit before parsing it", () => {
     const result = parseDraftPatchText(" ".repeat(MAX_BODY_SIZE + 1));
     expect(result).toEqual({
@@ -349,7 +391,7 @@ describe("parseDraftPatchText", () => {
   });
 
   it("keeps a sample value that is a string exactly as sent (21.90 stays 21.90)", () => {
-    const text = `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"Maya","values":{"apr":"21.90","big":"1000000000000000000000","exp":"1e3"}}]}`;
+    const text = `{"rev":4,"sessionKey":"${base.sessionKey}","seq":1,"sampleSets":[{"id":"s1","name":"Maya","values":{"apr":"21.90","big":"1000000000000000000000","exp":"1e3"}}]}`;
     const result = parseDraftPatchText(text);
     expect(result).toMatchObject({ ok: true });
     if (!result.ok) return;
@@ -362,7 +404,7 @@ describe("parseDraftPatchText", () => {
 
   it("refuses a sample value sent as a JSON number, whatever its digits (decision 0058)", () => {
     for (const number of ["21.90", "95", "1e3", `1${"0".repeat(1000)}`]) {
-      const text = `{"rev":4,"sessionKey":"${base.sessionKey}","sampleSets":[{"id":"s1","name":"A","values":{"n":${number}}}]}`;
+      const text = `{"rev":4,"sessionKey":"${base.sessionKey}","seq":1,"sampleSets":[{"id":"s1","name":"A","values":{"n":${number}}}]}`;
       const result = parseDraftPatchText(text);
       expect(result.ok).toBe(false);
       expect(!result.ok && result.message).toMatch(
@@ -373,7 +415,7 @@ describe("parseDraftPatchText", () => {
 
   it("leaves numbers elsewhere alone", () => {
     const result = parseDraftPatchText(
-      `{"rev":4.0,"sessionKey":"${base.sessionKey}","name":"A"}`,
+      `{"rev":4.0,"sessionKey":"${base.sessionKey}","seq":1,"name":"A"}`,
     );
     expect(result).toMatchObject({ ok: true, patch: { rev: 4 } });
   });

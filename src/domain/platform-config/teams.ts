@@ -93,8 +93,12 @@ export function cannotBeFirstTeamAdmin(
     : null;
 }
 
-/** Creates a team (id = slug, the seed contract) with `admin` as its first Team Admin. */
+/**
+ * Creates a team with `admin` as its first Team Admin. `id` is the new team's id, drawn by the caller: opaque,
+ * never the slug, which only the URL uses (decision 0053).
+ */
 export function createTeam(input: {
+  id: string;
   name: string;
   description: string;
   icon: string;
@@ -123,7 +127,7 @@ export function createTeam(input: {
   if (problem) return refuse(problem);
 
   const team = {
-    id: slug,
+    id: input.id,
     slug,
     name,
     description,
@@ -144,17 +148,12 @@ export function createTeam(input: {
       },
     },
     effects: [
-      configChanged(
-        "teams",
-        team.id,
-        `Created team ${name} with ${admin.name} as Team Admin`,
-        {
-          teamName: name,
-          slug,
-          userId: admin.id,
-          userName: admin.name,
-        },
-      ),
+      configChanged("teams", team.id, {
+        teamName: name,
+        slug,
+        userId: admin.id,
+        userName: admin.name,
+      }),
       {
         kind: "audit",
         action: "access.granted",
@@ -172,7 +171,7 @@ export function createTeam(input: {
         notification: "team_admin_appointed",
         to: { kind: "user", userId: admin.id },
         teamId: team.id,
-        title: `${actor.name} made you Team Admin of ${name}.`,
+        facts: { actorName: actor.name, teamName: name },
         link: { to: "settings", teamId: team.id, section: "members" },
       },
     ],

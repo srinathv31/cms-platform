@@ -8,9 +8,9 @@ import { getAuditExport } from "@/server/queries/audit";
 import { getViewer } from "@/server/viewer";
 import { GET } from "./route";
 
-// The route is thin: the viewer and the export are mocked (the export is tested against a real database
-// in src/server/queries/audit.test.ts), and these tests check what the route makes of the answer: the
-// file with its headers, or a refusal in the shape every refusal has, with its status.
+// The route is thin: the viewer and the export are mocked (the export is shaped in src/server/queries/audit.test.ts
+// and decided by the audit service, src/server/services/contract/audit.ts), and these tests check what the route
+// makes of the answer: the file with its headers, or a refusal in the shape every refusal has, with its status.
 vi.mock("@/server/viewer", () => ({ getViewer: vi.fn() }));
 vi.mock("@/server/queries/audit", () => ({ getAuditExport: vi.fn() }));
 
@@ -61,10 +61,19 @@ describe("GET /[team]/audit/export", () => {
       count: 0,
     });
     await get("all", "?person=riley&action=access");
-    expect(getAuditExport).toHaveBeenCalledWith(viewer, "all", {
-      person: "riley",
-      action: "access",
-    });
+    expect(getAuditExport).toHaveBeenCalledWith(
+      expect.objectContaining({ viewer }),
+      "all",
+      { person: "riley", action: "access" },
+    );
+  });
+
+  it("is a 401 when nobody is signed in, and asks for nothing", async () => {
+    vi.mocked(getViewer).mockResolvedValue(null);
+    const res = await get("all");
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ ok: false, code: "signed_out" });
+    expect(getAuditExport).not.toHaveBeenCalled();
   });
 
   it.each([

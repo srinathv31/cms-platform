@@ -33,18 +33,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import type { AnyNotificationKind } from "@/domain/access-types";
 import type {
-  AnyNotificationKind,
   NotificationView,
   NotificationsData,
-} from "@/domain/access-types";
+} from "@/server/queries/access-models";
 import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/server/actions/notifications";
 import { NAV_ICON_STROKE } from "./nav";
 
-/** One quiet glyph per kind. An unknown (older) kind falls back to the bell. */
+/** One quiet glyph per kind. A kind this app doesn't know yet (`kind` null) falls back to the bell. */
 const KIND_ICON: Record<AnyNotificationKind, LucideIcon> = {
   review_requested: ClipboardCheck,
   changes_requested: PencilLine,
@@ -65,8 +65,6 @@ const KIND_ICON: Record<AnyNotificationKind, LucideIcon> = {
   recert_due: ShieldCheck,
   team_admin_appointed: KeyRound,
 };
-
-const ICONS: Record<string, LucideIcon | undefined> = KIND_ICON;
 
 type Change = { type: "one"; id: string } | { type: "all" };
 
@@ -100,7 +98,7 @@ function Row({
 }) {
   const content = (
     <>
-      {createElement(ICONS[item.kind] ?? Bell, {
+      {createElement(item.kind ? KIND_ICON[item.kind] : Bell, {
         "aria-hidden": true,
         strokeWidth: NAV_ICON_STROKE,
         className: cn(

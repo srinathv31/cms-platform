@@ -428,8 +428,12 @@ test("after the Active version is revoked, an author corrects it from its conten
     expect(notices[1].payload).toMatchObject({
       versionNumber: 3,
       activeVersion: 3,
-      contractLines: ["v3 makes `offer_end_date` optional."],
+      contractChanges: [
+        { kind: "made_optional", key: "offer_end_date", breaking: false },
+      ],
     });
+    // Facts only: the sentences are worded when read (decision 0055).
+    expect(notices[1].payload).not.toHaveProperty("contractLines");
   });
 
   await test.step("4.4 Coral renders v3, with the fix; v2 stays refused", async () => {

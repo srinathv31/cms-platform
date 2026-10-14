@@ -28,6 +28,7 @@ import type {
 } from "@/domain/types";
 import type { ChannelFields } from "@/domain/channel-fields";
 import type { PushPlatform } from "@/domain/messages/push";
+import type { StoredNotificationLink } from "@/domain/notifications";
 import type { ConsumerNoticeKind, VersionStage } from "@/domain/review-types";
 
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
@@ -404,9 +405,15 @@ export const notifications = sqliteTable(
       .references(() => users.id),
     teamId: text("team_id"),
     kind: text("kind").notNull(),
-    title: text("title").notNull(),
+    /**
+     * What happened, never a sentence (decision 0055): the kind's facts (`NotificationFacts`,
+     * `AccessNotificationFacts`), names as they were. The BFF words them when it reads the row.
+     */
+    facts: json<Record<string, unknown>>("facts").notNull(),
+    /** Where it opens: a link descriptor naming its team by id, never a slug or a route. */
+    link: json<StoredNotificationLink>("link").notNull(),
+    /** Only a person's own words: a submit note, a reason, a comment, an admin's note. */
     body: text("body"),
-    href: text("href"),
     createdAt: ts("created_at").notNull(),
     readAt: ts("read_at"),
   },

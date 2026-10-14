@@ -74,6 +74,7 @@ import {
   simDeliveries,
   simLink,
   storedTextAbout,
+  teamIdOf,
   templateById,
 } from "./helpers/state";
 
@@ -1963,7 +1964,7 @@ test("the demo script, scenarios 1–11, as one story from a fresh reset", async
       state: "superseded",
       revoke: null,
     });
-    const sam = await membershipOf("sam", TEAM);
+    const sam = await membershipOf("sam", await teamIdOf(TEAM));
     expect(sam?.status, "Sam's access is back").toBe("active");
     expect(
       [await templateById(springId), await templateById(importedId)],

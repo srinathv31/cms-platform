@@ -28,17 +28,18 @@ import {
   DOCUMENT_THREAD,
   type LifecycleEffect,
   type NotificationEffect,
+  type NotificationFacts,
   type NotificationLink,
 } from "./review-types";
 import { fieldsOfChannels } from "./channel-fields";
-import {
-  asNumbered,
-  compareRounds,
-  reviewLink,
-  versionLabel,
-  type RoundRef,
-} from "./rounds";
-import type { Channel, PermissionResult, VersionState, Viewer } from "./types";
+import { asNumbered, compareRounds, reviewLink, type RoundRef } from "./rounds";
+import type {
+  Channel,
+  JSONContent,
+  PermissionResult,
+  VersionState,
+  Viewer,
+} from "./types";
 
 // ── Limits and sentences ──────────────────────────────────────
 
@@ -163,6 +164,30 @@ export function threadBeganBy(
 }
 
 /**
+ * A version's threads in the order its margin shows them, each marked orphaned when its anchor isn't in the
+ * version any more (deleted since): the document threads (a change request's reason) first, then by where their
+ * anchors appear (`anchors`, from `anchorIdsOf`), then the orphaned ones; oldest first within each, then by id.
+ */
+export function inReadingOrder<
+  T extends { id: string; blockId: string; createdAt: Date },
+>(
+  threads: readonly T[],
+  anchors: readonly string[],
+): (T & { orphaned: boolean })[] {
+  const position = new Map(anchors.map((id, index) => [id, index] as const));
+  const rank = (blockId: string) =>
+    blockId === DOCUMENT_THREAD ? -1 : (position.get(blockId) ?? Infinity);
+  return [...threads]
+    .sort(
+      (a, b) =>
+        rank(a.blockId) - rank(b.blockId) ||
+        a.createdAt.getTime() - b.createdAt.getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )
+    .map((t) => ({ ...t, orphaned: rank(t.blockId) === Infinity }));
+}
+
+/**
  * Where a thread on a version can anchor, in reading order: the fields of each channel that is on (a
  * message's whole content; a document's email subject and preheader, which show above its body), then
  * each block of the body (`blockIds`, top-level and nested). A thread on a field is about its whole text,
@@ -173,6 +198,26 @@ export function commentAnchors(
   channels: readonly Channel[],
 ): string[] {
   return [...fieldsOfChannels(channels).map((field) => field.id), ...blockIds];
+}
+
+/** Where a thread on this version can anchor, in reading order (`commentAnchors`): its fields, then its blocks. */
+export function anchorIdsOf(version: {
+  body: JSONContent | null | undefined;
+  channels: readonly Channel[];
+}): string[] {
+  return commentAnchors(blockIdsOf(version.body), version.channels);
+}
+
+/** Every block id in a document, in reading order (top-level blocks and any nested ones that carry an id). */
+export function blockIdsOf(doc: JSONContent | null | undefined): string[] {
+  const ids: string[] = [];
+  const walk = (node: JSONContent) => {
+    const id = node.attrs?.id;
+    if (typeof id === "string" && id !== "") ids.push(id);
+    for (const child of node.content ?? []) walk(child);
+  };
+  if (doc) for (const block of doc.content ?? []) walk(block);
+  return ids;
 }
 
 // ── Who may comment ───────────────────────────────────────────
@@ -293,7 +338,7 @@ export function addComment(input: {
       },
     },
     ...notifyEach([authorOf(version)], viewer.userId, {
-      title: `${viewer.name} commented on ${versionPhrase(template.name, version)}.`,
+      facts: commentFacts(viewer, template.name, version, false),
       body: text.body,
       link: commentLink(template.id, version),
     }),
@@ -367,7 +412,7 @@ export function reply(input: {
       [authorOf(thread.origin), ...input.participants],
       viewer.userId,
       {
-        title: `${viewer.name} replied on ${versionPhrase(template.name, thread.origin)}.`,
+        facts: commentFacts(viewer, template.name, thread.origin, true),
         body: text.body,
         link: commentLink(template.id, thread.origin),
       },
@@ -462,7 +507,11 @@ function authorOf(
 function notifyEach(
   userIds: readonly string[],
   actorId: string,
-  n: { title: string; body: string; link: NotificationLink },
+  n: {
+    facts: NotificationFacts["comment_added"];
+    body: string;
+    link: NotificationLink;
+  },
 ): NotificationEffect[] {
   return [...new Set(userIds)]
     .filter((userId) => userId !== actorId)
@@ -496,13 +545,25 @@ function commentLink(
   };
 }
 
-/** "the draft of Spring Travel", "Spring Travel v2", or "Spring Travel v1, round 2" once v1 was sent back. */
-function versionPhrase(
+/**
+ * What a `comment_added` notification stores: who wrote, and the version the thread is on as it is now (a draft
+ * has no number or round), so it reads "…commented on the draft of Spring Travel", "…on Spring Travel v2", or
+ * "…on Spring Travel v1, round 2" once v1 was sent back.
+ */
+function commentFacts(
+  viewer: Viewer,
   templateName: string,
   version: { number: number | null; round: number | null; state: VersionState },
-): string {
-  if (version.number === null) return `the draft of ${templateName}`;
-  return `${templateName} ${versionLabel(asNumbered(version), { style: "sentence" })}`;
+  reply: boolean,
+): NotificationFacts["comment_added"] {
+  return {
+    actorName: viewer.name,
+    templateName,
+    number: version.number,
+    round: version.number === null ? null : version.round,
+    state: version.state,
+    reply,
+  };
 }
 
 /** The round a thread began on; null when it began in the open draft. */

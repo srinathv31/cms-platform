@@ -6,14 +6,14 @@
 //     domain/activity.ts, access and platform actions read their details;
 //   - the filters (`?team&person&action&template&from&to`, each a comma list), their matching and
 //     the facet counts the five menus show;
-//   - the CSV export (RFC 4180);
-//   - a fallback sentence and link for every notification kind the bell shows.
+//   - the CSV export (RFC 4180).
+//
+// The bell's notifications are worded in notifications.ts.
 //
 // No framework imports: the server queries, the export route and client components all use it.
 
 import { ROLE_LABEL, rolesLabel } from "./access/roles";
 import type {
-  AnyNotificationKind,
   AuditCategory,
   AuditDomain,
   AuditFilters,
@@ -28,6 +28,7 @@ import {
   isCalendarDay,
   utcDay,
 } from "./dates";
+import { describeConfigChange } from "./platform-config/effects";
 import { plural } from "./plural";
 import type { Person } from "./review-types";
 import type { NumberedRound } from "./rounds";
@@ -168,8 +169,9 @@ export interface AuditEventInput {
 }
 
 /**
- * One sentence. Lifecycle actions delegate to `describeActivity`; access and platform actions read
- * their details (userName, role/roles, from/to, reason, note, label, dueAt, area, summary).
+ * One sentence. Lifecycle actions delegate to `describeActivity`; access actions read their details
+ * (userName, role/roles, from/to, reason, note, label, dueAt), and platform ones their area's facts
+ * (`describeConfigChange`).
  * Details never hold variable values, so nothing here can leak one.
  */
 export function describeAuditEvent(
@@ -306,17 +308,14 @@ export function describeAuditEvent(
     }
 
     case "platform.config_changed": {
-      const summary = text(d.summary);
-      return summary
-        ? continued(who, summary)
+      const done = describeConfigChange(d);
+      return done
+        ? `${who} ${done}${/[.!?]$/.test(done) ? "" : "."}`
         : `${who} changed the ${areaText(d.area)}.`;
     }
 
-    default: {
-      const summary = text(d.summary);
-      if (summary) return continued(who, summary);
+    default:
       return `${who}: ${actionLabel(e.action).toLowerCase()}.`;
-    }
   }
 }
 
@@ -468,80 +467,125 @@ export function activeFilterCount(filters: AuditFilters): number {
   );
 }
 
-/** Does the row pass every filter (but `skip`, for that facet's own counts)? */
-export function matchesAuditFilters(
-  row: AuditRow,
-  filters: AuditFilters,
-  skip?: AuditFacet,
-): boolean {
-  if (skip !== "team") {
-    const teams = filterValues(filters, "team");
-    if (teams.length && !(row.team && teams.includes(row.team.slug)))
-      return false;
-  }
-  if (skip !== "person") {
-    const people = filterValues(filters, "person");
-    if (people.length && !personKeysOf(row).some((p) => people.includes(p)))
-      return false;
-  }
-  if (skip !== "action") {
-    const actions = filterValues(filters, "action");
-    if (
-      actions.length &&
-      !actions.includes(row.category) &&
-      !actions.includes(actionKeyOf(row))
-    )
-      return false;
-  }
-  if (skip !== "template") {
-    const templates = filterValues(filters, "template");
-    if (
-      templates.length &&
-      !(row.template && templates.includes(row.template.id))
-    )
-      return false;
-  }
-  const day = utcDay(row.at);
-  if (filters.from && day < filters.from) return false;
-  if (filters.to && day > filters.to) return false;
-  return true;
+// ── Searching the log (the backend's side of the filters) ───────────────────
+
+/**
+ * The filters as the backend takes them: lists of ids (a team by its id, never its slug: decision 0053), each
+ * list's values ORed, the fields ANDed. The URL's `AuditFilters` (slugs, comma lists) are the BFF's; it resolves
+ * them to this.
+ */
+export interface AuditSearch {
+  teamIds: string[];
+  /** User ids, or `SYSTEM_PERSON` for the clock-driven events. Matches who acted OR whom the event is about. */
+  personIds: string[];
+  /** Categories or canonical actions (`actionKeyOf`). */
+  actions: string[];
+  /** Template ids (UC-XXXXXX). */
+  templateIds: string[];
+  /** YYYY-MM-DD, UTC days, inclusive. */
+  from?: string;
+  to?: string;
 }
 
-export function filterAuditRows(
-  rows: readonly AuditRow[],
-  filters: AuditFilters,
-): AuditRow[] {
-  return rows.filter((r) => matchesAuditFilters(r, filters));
+/** No filter at all. */
+export const NO_AUDIT_SEARCH: Readonly<AuditSearch> = Object.freeze({
+  teamIds: [],
+  personIds: [],
+  actions: [],
+  templateIds: [],
+});
+
+/** What a filter looks at on one event of the log: an audit row, as facts. */
+export interface AuditEventKeys {
+  /** ISO. */
+  at: string;
+  action: string;
+  /** null: the system (a clock-driven event). */
+  actorId: string | null;
+  /** null: a platform-wide event. */
+  teamId: string | null;
+  templateId: string | null;
+  details: Record<string, unknown> | null;
 }
 
-/** The canonical action a row files under (what the Action filter compares). */
-export function actionKeyOf(row: Pick<AuditRow, "action" | "actor">): string {
-  return canonicalAction(row.action, row.actor !== null);
+/** The canonical action an event files under (what the Action filter compares). */
+export function actionKeyOf(
+  e: Pick<AuditEventKeys, "action" | "actorId">,
+): string {
+  return canonicalAction(e.action, e.actorId !== null);
 }
 
-/** Who the Person filter matches on a row: who acted (or "system") and whom it's about. */
+/** Who the Person filter matches on an event: who acted (or "system") and whom it's about. */
 export function personKeysOf(
-  row: Pick<AuditRow, "actor" | "subject">,
+  e: Pick<AuditEventKeys, "action" | "actorId" | "details">,
 ): string[] {
-  const keys = [row.actor?.id ?? SYSTEM_PERSON];
-  if (row.subject && row.subject.id !== keys[0]) keys.push(row.subject.id);
+  const keys = [e.actorId ?? SYSTEM_PERSON];
+  const subject = subjectIdOf(e.action, e.details);
+  if (subject && subject !== keys[0]) keys.push(subject);
   return keys;
 }
 
-export interface AuditFacetCounts {
+/** Does the event pass every filter (but `skip`, for that facet's own counts)? */
+export function matchesAuditSearch(
+  e: AuditEventKeys,
+  search: AuditSearch,
+  skip?: AuditFacet,
+): boolean {
+  if (
+    skip !== "team" &&
+    search.teamIds.length &&
+    !(e.teamId && search.teamIds.includes(e.teamId))
+  )
+    return false;
+  if (
+    skip !== "person" &&
+    search.personIds.length &&
+    !personKeysOf(e).some((p) => search.personIds.includes(p))
+  )
+    return false;
+  if (
+    skip !== "action" &&
+    search.actions.length &&
+    !search.actions.includes(categoryOf(e.action)) &&
+    !search.actions.includes(actionKeyOf(e))
+  )
+    return false;
+  if (
+    skip !== "template" &&
+    search.templateIds.length &&
+    !(e.templateId && search.templateIds.includes(e.templateId))
+  )
+    return false;
+  const day = utcDay(e.at);
+  if (search.from && day < search.from) return false;
+  if (search.to && day > search.to) return false;
+  return true;
+}
+
+export function filterAuditEvents<E extends AuditEventKeys>(
+  events: readonly E[],
+  search: AuditSearch,
+): E[] {
+  return events.filter((e) => matchesAuditSearch(e, search));
+}
+
+export interface AuditSearchCounts {
+  /** By team id. */
   team: Record<string, number>;
+  /** By user id, or `SYSTEM_PERSON`. */
   person: Record<string, number>;
   /** Canonical actions AND categories. */
   action: Record<string, number>;
+  /** By template id. */
   template: Record<string, number>;
 }
 
-/** For each menu: how many rows each value would match with every OTHER filter applied. */
-export function auditFacetCounts(
-  rows: readonly AuditRow[],
-  filters: AuditFilters,
-): AuditFacetCounts {
-  const counts: AuditFacetCounts = {
+/** For each menu: how many events each value would match with every OTHER filter applied. */
+export function auditSearchCounts(
+  events: readonly AuditEventKeys[],
+  search: AuditSearch,
+): AuditSearchCounts {
+  const counts: AuditSearchCounts = {
     team: {},
     person: {},
     action: {},
@@ -549,20 +593,52 @@ export function auditFacetCounts(
   };
   const bump = (bag: Record<string, number>, key: string) =>
     (bag[key] = (bag[key] ?? 0) + 1);
-  for (const row of rows) {
-    if (row.team && matchesAuditFilters(row, filters, "team"))
-      bump(counts.team, row.team.slug);
-    if (matchesAuditFilters(row, filters, "person"))
-      for (const p of personKeysOf(row)) bump(counts.person, p);
-    if (matchesAuditFilters(row, filters, "action")) {
-      bump(counts.action, actionKeyOf(row));
-      bump(counts.action, row.category);
+  for (const e of events) {
+    if (e.teamId && matchesAuditSearch(e, search, "team"))
+      bump(counts.team, e.teamId);
+    if (matchesAuditSearch(e, search, "person"))
+      for (const p of personKeysOf(e)) bump(counts.person, p);
+    if (matchesAuditSearch(e, search, "action")) {
+      bump(counts.action, actionKeyOf(e));
+      bump(counts.action, categoryOf(e.action));
     }
-    if (row.template && matchesAuditFilters(row, filters, "template"))
-      bump(counts.template, row.template.id);
+    if (e.templateId && matchesAuditSearch(e, search, "template"))
+      bump(counts.template, e.templateId);
   }
   return counts;
 }
+
+/**
+ * The search narrowed to what the space knows, so a chip never matches nothing: a team space is pinned to its
+ * own team (the Team filter is for All teams, which keeps only the teams there are), and a person or template
+ * the space's events never name is dropped. Values are unique, in the order asked.
+ */
+export function sanitizeAuditSearch(
+  requested: AuditSearch,
+  space: { isAll: boolean; teamIds: readonly string[] },
+  universe: readonly AuditEventKeys[],
+): AuditSearch {
+  const known = (values: readonly string[], allowed: Set<string>) =>
+    [...new Set(values)].filter((v) => allowed.has(v));
+  return {
+    ...requested,
+    teamIds: space.isAll
+      ? known(requested.teamIds, new Set(space.teamIds))
+      : [],
+    personIds: known(
+      requested.personIds,
+      new Set(universe.flatMap(personKeysOf)),
+    ),
+    actions: [...new Set(requested.actions)],
+    templateIds: known(
+      requested.templateIds,
+      new Set(universe.flatMap((e) => (e.templateId ? [e.templateId] : []))),
+    ),
+  };
+}
+
+/** The Audit page shows at most this many events, newest first; the export has no limit. */
+export const AUDIT_PAGE_LIMIT = 500;
 
 // ── Dates ───────────────────────────────────────────────────────────────────
 
@@ -677,147 +753,6 @@ export function parseCsv(csv: string): string[][] {
   return rows;
 }
 
-// ── Notifications (the bell) ────────────────────────────────────────────────
-
-/** Every kind the bell knows, lifecycle (Phase 4) then access (Phase 6). */
-export const NOTIFICATION_KINDS = [
-  "review_requested",
-  "changes_requested",
-  "stage_approved",
-  "version_live",
-  "comment_added",
-  "revoke_started",
-  "version_revoked",
-  "sunset_scheduled",
-  "access_requested",
-  "access_granted",
-  "access_denied",
-  "roles_changed",
-  "access_removed",
-  "access_lapsed",
-  "access_suspended",
-  "inactivity_flagged",
-  "recert_due",
-  "team_admin_appointed",
-] as const satisfies readonly AnyNotificationKind[];
-
-// Fails to compile when a kind is added to AnyNotificationKind but not listed above.
-type MissingKind = Exclude<
-  AnyNotificationKind,
-  (typeof NOTIFICATION_KINDS)[number]
->;
-const allKindsListed: MissingKind extends never ? true : MissingKind = true;
-void allKindsListed;
-
-export function isNotificationKind(kind: string): kind is AnyNotificationKind {
-  return (NOTIFICATION_KINDS as readonly string[]).includes(kind);
-}
-
-type Where = { team: string | null; teamName: string | null };
-
-const NOTIFICATION_FALLBACKS: Record<
-  AnyNotificationKind,
-  { title: (t: string) => string; href: (w: Where) => string }
-> = {
-  review_requested: {
-    title: () => "A version is waiting for your review.",
-    href: (w) => teamPath(w, "review"),
-  },
-  changes_requested: {
-    title: () => "Changes were requested on a version you submitted.",
-    href: (w) => teamPath(w, "library"),
-  },
-  stage_approved: {
-    title: () => "A version passed a review stage.",
-    href: (w) => teamPath(w, "review"),
-  },
-  version_live: {
-    title: () => "A version is now Active.",
-    href: (w) => teamPath(w, "library"),
-  },
-  comment_added: {
-    title: () => "There's a new comment on a version in review.",
-    href: (w) => teamPath(w, "review"),
-  },
-  revoke_started: {
-    title: () => "A revoke is waiting for a second approver.",
-    href: (w) => teamPath(w, "review"),
-  },
-  version_revoked: {
-    title: () => "A version was revoked.",
-    href: (w) => teamPath(w, "library"),
-  },
-  sunset_scheduled: {
-    title: () => "A sunset date was set.",
-    href: (w) => teamPath(w, "library"),
-  },
-  access_requested: {
-    title: (t) => `Someone asked for access to ${t}.`,
-    href: (w) => teamPath(w, "settings/access-requests"),
-  },
-  access_granted: {
-    title: (t) => `You now have access to ${t}.`,
-    href: (w) => teamPath(w, "library"),
-  },
-  access_denied: {
-    title: (t) => `Your request for access to ${t} was declined.`,
-    href: () => "/request-access",
-  },
-  roles_changed: {
-    title: (t) => `Your roles in ${t} changed.`,
-    href: (w) => teamPath(w, "library"),
-  },
-  access_removed: {
-    title: (t) => `Your access to ${t} was removed.`,
-    href: () => "/request-access",
-  },
-  access_lapsed: {
-    title: (t) => `Access to ${t} lapsed.`,
-    href: () => "/request-access",
-  },
-  access_suspended: {
-    title: (t) => `Access to ${t} was suspended.`,
-    href: () => "/request-access",
-  },
-  inactivity_flagged: {
-    title: (t) =>
-      `A member of ${t} hasn't signed in for ${INACTIVITY_FLAG_DAYS} days.`,
-    href: (w) => teamPath(w, "settings/inactivity"),
-  },
-  recert_due: {
-    title: (t) => `An access review for ${t} is due.`,
-    href: (w) => teamPath(w, "settings/recertification"),
-  },
-  team_admin_appointed: {
-    title: (t) => `You're the Team Admin of ${t}.`,
-    href: (w) => teamPath(w, "settings/members"),
-  },
-};
-
-/** Team ids are their slugs (seed contract). No team: the app's root, which lands in the viewer's space. */
-function teamPath(w: Where, rest: string): string {
-  return w.team ? `/${w.team}/${rest}` : "/";
-}
-
-/**
- * The sentence and link a notification shows when its row lacks them (rows written before a field
- * existed). Writers store both; the stored ones win. Unknown kinds fall back to the team's library.
- */
-export function notificationFallback(
-  kind: string,
-  where: Where,
-): { title: string; href: string } {
-  const teamName = where.teamName ?? "your team";
-  if (isNotificationKind(kind)) {
-    const f = NOTIFICATION_FALLBACKS[kind];
-    return { title: f.title(teamName), href: f.href(where) };
-  }
-  return {
-    title: "Something changed in Stencil.",
-    href: teamPath(where, "library"),
-  };
-}
-
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function text(value: unknown): string {
@@ -869,20 +804,6 @@ function possessive(name: string): string {
 
 function capitalize(s: string): string {
   return s ? s[0]!.toUpperCase() + s.slice(1) : s;
-}
-
-/** "Turned off PDF" → "turned off PDF" (a summary continues the actor's sentence). */
-function lowerFirst(s: string): string {
-  if (!s) return s;
-  // Keep acronyms and names ("PDF", "UCOMP") as they are.
-  if (/^[A-Z]{2,}/.test(s)) return s;
-  return s[0]!.toLowerCase() + s.slice(1);
-}
-
-/** "Riley Brooks turned off PDF for Disclosure." (a summary continues the actor's name). */
-function continued(who: string, summary: string): string {
-  const s = lowerFirst(summary);
-  return `${who} ${s}${/[.!?]$/.test(s) ? "" : "."}`;
 }
 
 /** "Stem: the text." with one closing period; just "Stem." when there's no text. Whitespace collapses. */

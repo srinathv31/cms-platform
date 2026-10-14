@@ -1,8 +1,9 @@
 // Requesting and deciding access. Anyone may ask for Viewer, Author or Approver on a team, with a reason.
 // One pending request per team. A Team Admin of that team approves or denies (a denial needs a note),
-// never their own.
+// never their own. An Auditor holds no team role: they can't ask for one, and a request of theirs can't be
+// approved.
 
-import { REASONS } from "../permissions";
+import { can, REASONS } from "../permissions";
 import { refuse, type Refusal } from "../refusals";
 import {
   ACCESS_REASON_MAX,
@@ -15,10 +16,27 @@ import {
   type Ok,
   type Refused,
 } from "../access-types";
-import type { TeamRole } from "../types";
+import type {
+  PermissionResult,
+  PlatformRole,
+  TeamRole,
+  Viewer,
+} from "../types";
 import { reinstatedSet } from "./members";
 import { ACCESS_REFUSALS } from "./refusals";
-import { ROLE_LABEL, sortRoles, isRequestableRole } from "./roles";
+import { sortRoles, isRequestableRole } from "./roles";
+
+/**
+ * Whether `viewer` may ask for a role on the team: `access.request`, which the Auditor is refused in plain words
+ * (`auditor_read_only`: read-only everywhere, so no team role to ask for) rather than the generic sentence.
+ */
+export function requestPermission(
+  viewer: Viewer,
+  teamId: string,
+): PermissionResult {
+  if (viewer.platformRole === "auditor") return refuse(REASONS.auditorReadOnly);
+  return can(viewer, "access.request", { teamId });
+}
 
 export interface NewAccessRequest {
   userId: string;
@@ -102,7 +120,7 @@ export function requestAccess(input: {
           exceptUserIds: [requester.id],
         },
         teamId: team.id,
-        title: `${requester.name} asked for ${ROLE_LABEL[role]} access to ${team.name}.`,
+        facts: { actorName: requester.name, teamName: team.name, role },
         body: reason,
         link: { to: "settings", teamId: team.id, section: "access-requests" },
       },
@@ -146,12 +164,15 @@ export function validateDecisionNote(
 
 /**
  * Approve: a new membership with the role; an active member gains the role; a suspended or lapsed
- * member is reinstated with exactly the requested role (and a fresh inactivity clock).
+ * member is reinstated with exactly the requested role (and a fresh inactivity clock). A request made
+ * before its requester became an Auditor (or written around `requestPermission`) can't be approved: an
+ * Auditor holds no team role. Denying it still works.
  * Deny: needs a note, which the requester sees.
  */
 export function decideAccessRequest(input: {
   request: AccessRequestFacts;
-  requester: Named;
+  /** The requester, with their platform role as it is now. */
+  requester: Named & { platformRole: PlatformRole | null };
   team: Named;
   actor: Named;
   decision: "approve" | "deny";
@@ -167,6 +188,8 @@ export function decideAccessRequest(input: {
     }>
   | Refused {
   const { request, requester, team, actor, decision, now, membership } = input;
+  if (decision === "approve" && requester.platformRole === "auditor")
+    return refuse(ACCESS_REFUSALS.auditorRequester(requester.name));
   const refusal =
     requestDecisionRefusal(request, actor) ??
     validateDecisionNote(decision, input.note);
@@ -204,7 +227,7 @@ export function decideAccessRequest(input: {
           notification: "access_denied",
           to: { kind: "user", userId: requester.id },
           teamId: team.id,
-          title: `${actor.name} declined your request for ${ROLE_LABEL[role]} access to ${team.name}.`,
+          facts: { actorName: actor.name, teamName: team.name, role },
           body: note,
           link: { to: "request-access" },
         },
@@ -261,7 +284,7 @@ export function decideAccessRequest(input: {
         notification: "access_granted",
         to: { kind: "user", userId: requester.id },
         teamId: team.id,
-        title: `${actor.name} approved your ${ROLE_LABEL[role]} access to ${team.name}.`,
+        facts: { actorName: actor.name, teamName: team.name, role },
         body: note || undefined,
         link: { to: "library", teamId: team.id },
       },

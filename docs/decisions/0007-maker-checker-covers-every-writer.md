@@ -3,6 +3,9 @@
 Status: Accepted
 Amended 2026-10-11: the edit transition the Decision names `editActive` is `editLatest` now, and it also opens a draft
 from a Revoked version ([0009](0009-correct-a-revoked-version-from-its-content.md), handoff review D1, PR #16).
+Amended 2026-10-13: the test that checks the writers backfill is
+[version-backfills.test.ts](../../src/server/db/version-backfills.test.ts) now; the review commands run behind the
+service interfaces ([0072](0072-the-bff-reaches-its-backend-through-service-interfaces.md)).
 Date: 2026-10-08
 
 ## Context
@@ -28,7 +31,7 @@ How the code holds it:
 - **The writers live on the version**, in `versions.writers`, a JSON array of user ids
   ([ucomp.ts](../../src/server/db/schema/ucomp.ts)). A new draft starts with whoever started it
   (`createDraft`, `editActive`). Each autosave adds its saver inside the save's transaction
-  ([apply-patch.ts](../../src/server/drafts/apply-patch.ts)), and `submit` adds the submitter. Request changes copies
+  ([autosave.ts](../../src/domain/lifecycle/autosave.ts)), and `submit` adds the submitter. Request changes copies
   the in-review version's writers into the new draft, or merges them into a draft that is already open. The
   approver who asked for changes isn't a writer unless they later edit it. A draft started from the Active version
   starts a fresh set, so having written an earlier released version bars nobody.

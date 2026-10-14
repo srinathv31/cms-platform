@@ -57,20 +57,20 @@ behind them.
 
 ## 2. What differs from the Node code today
 
-| Area                                  | Node today                                                                                                    | Decided                                                                                  | Changed by                                                                                          | Record                                                                                                                                                  |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| How a consumer proves who it is       | An `X-Consumer-Id: coral` header, with no credential                                                          | OAuth 2.0 client credentials with Entra ID; 401 and 403 as in section 3                  | The Java API, at the port                                                                           | [0057](../decisions/0057-consumers-authenticate-with-client-credentials.md)                                                                             |
-| Error body                            | `{ "error": { "code", "message", "details"? } }`                                                              | The UCOMP API's error format, carrying a stable code and that code's details             | The Java API at the port; the CMS preview route in the same change                                  | [0056](../decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md)                                                                            |
-| An unexpected failure on a GET route  | Next.js's default HTML 500 ([A4](../handoff-review.md#a4--medium-get-apiv1-routes-can-return-a-non-json-500)) | The error format, with a code and the correlation id                                     | The Java API                                                                                        | A4                                                                                                                                                      |
-| The HTTP `Date` header                | The demo clock (`withDemoDate` in `src/server/api/http.ts`)                                                   | Real time; a demo clock, if one survives, in a header of its own                         | The Java API from the start; Node when the demo clock goes                                          | [A7](../handoff-review.md#a7--medium-the-http-date-header-carries-the-demo-clock)                                                                       |
-| The clock behind `asOf` and the rules | The demo clock (real time plus an offset the demo moves)                                                      | The server's clock, with a test-only offset in demo and test environments                | The Java API                                                                                        | [0068](../decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)                                                                    |
-| Search                                | Loads every Active version and ranks in memory                                                                | Filters, ranks and pages in SQL, with the same matches and order                         | The Java API                                                                                        | [0059](../decisions/0059-template-search-ranks-and-pages-in-sql.md)                                                                                     |
-| `team.id`                             | Equal to the team's slug (`coral-offers`)                                                                     | An opaque id, never equal to a slug                                                      | Node, in the backend seam work (to-do item 3)                                                       | [0053](../decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)                                                                           |
-| `templateId`                          | `UC-` and six characters, described by its format in code comments                                            | An opaque string with a maximum length and examples, no pattern                          | The spec                                                                                            | [0060](../decisions/0060-template-ids-are-random-and-retried-on-a-collision.md)                                                                         |
-| Which check runs first on a render    | The body, then the consumer header, then the template and version, then whether the consumer is registered    | _Proposed:_ authentication and the consumer first, before the body is read (section 4.4) | The gateway and Spring Security                                                                     | None: 0057 fixes the statuses, not an order (section 15)                                                                                                |
-| Rate limits                           | None                                                                                                          | Per client id, at the gateway                                                            | The gateway                                                                                         | 0057                                                                                                                                                    |
-| Stored notice payloads                | Carry `contractLines`, English nothing reads (section 12)                                                     | Facts only, one shape per kind. Nothing a consumer receives changes                      | Node: the backend seam work (`contractLines`, to-do item 3) and the seed work (the spellings, 0064) | [0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md), [0064](../decisions/0064-payloads-are-facts-with-one-shape-per-event.md) |
-| Rendering                             | The Node engine                                                                                               | A Java engine, held to the render spec and the golden files                              | The Java API, at the port                                                                           | [0067](../decisions/0067-java-renders-every-channel.md)                                                                                                 |
+| Area                                  | Node today                                                                                                    | Decided                                                                                  | Changed by                                                                          | Record                                                                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| How a consumer proves who it is       | An `X-Consumer-Id: coral` header, with no credential                                                          | OAuth 2.0 client credentials with Entra ID; 401 and 403 as in section 3                  | The Java API, at the port                                                           | [0057](../decisions/0057-consumers-authenticate-with-client-credentials.md)                                                                             |
+| Error body                            | `{ "error": { "code", "message", "details"? } }`                                                              | The UCOMP API's error format, carrying a stable code and that code's details             | The Java API at the port; the CMS preview route in the same change                  | [0056](../decisions/0056-api-v1-errors-follow-the-ucomp-api-error-format.md)                                                                            |
+| An unexpected failure on a GET route  | Next.js's default HTML 500 ([A4](../handoff-review.md#a4--medium-get-apiv1-routes-can-return-a-non-json-500)) | The error format, with a code and the correlation id                                     | The Java API                                                                        | A4                                                                                                                                                      |
+| The HTTP `Date` header                | The demo clock (`withDemoDate` in `src/server/services/local/consumer-api.ts`)                                | Real time; a demo clock, if one survives, in a header of its own                         | The Java API from the start; Node when the demo clock goes                          | [A7](../handoff-review.md#a7--medium-the-http-date-header-carries-the-demo-clock)                                                                       |
+| The clock behind `asOf` and the rules | The demo clock (real time plus an offset the demo moves)                                                      | The server's clock, with a test-only offset in demo and test environments                | The Java API                                                                        | [0068](../decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)                                                                    |
+| Search                                | Loads every Active version and ranks in memory                                                                | Filters, ranks and pages in SQL, with the same matches and order                         | The Java API                                                                        | [0059](../decisions/0059-template-search-ranks-and-pages-in-sql.md)                                                                                     |
+| `team.id`                             | An opaque id (`t_coral`), never the slug: done in the backend seam work                                       | An opaque id, never equal to a slug                                                      | Node, in the backend seam work (to-do item 3)                                       | [0053](../decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)                                                                           |
+| `templateId`                          | `UC-` and six characters, described by its format in code comments                                            | An opaque string with a maximum length and examples, no pattern                          | The spec                                                                            | [0060](../decisions/0060-template-ids-are-random-and-retried-on-a-collision.md)                                                                         |
+| Which check runs first on a render    | The body, then the consumer header, then the template and version, then whether the consumer is registered    | _Proposed:_ authentication and the consumer first, before the body is read (section 4.4) | The gateway and Spring Security                                                     | None: 0057 fixes the statuses, not an order (section 15)                                                                                                |
+| Rate limits                           | None                                                                                                          | Per client id, at the gateway                                                            | The gateway                                                                         | 0057                                                                                                                                                    |
+| Stored notice payloads                | Facts only, one shape per kind: done in the backend seam work and the seed work (section 12)                  | Facts only, one shape per kind. Nothing a consumer receives changes                      | Done in Node (the backend seam work, `contractLines`; the seed work, the spellings) | [0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md), [0064](../decisions/0064-payloads-are-facts-with-one-shape-per-event.md) |
+| Rendering                             | The Node engine                                                                                               | A Java engine, held to the render spec and the golden files                              | The Java API, at the port                                                           | [0067](../decisions/0067-java-renders-every-channel.md)                                                                                                 |
 
 ## 3. Security
 
@@ -118,7 +118,7 @@ security:
 ```
 
 **Node today:** a consumer names itself in `X-Consumer-Id` and proves nothing (`requireConsumer` in
-`src/server/queries/consumer-api.ts`). No header is 400 `consumer_required`; an id that isn't in `consumers` is 403
+`src/server/services/local/consumer-api.ts`). No header is 400 `consumer_required`; an id that isn't in `consumers` is 403
 `unknown_consumer`; a notices path that isn't the header's id is 403 `consumer_mismatch`. Two leaks are already
 stopped: an unregistered caller writes no `render_log` row, and the notices route no longer has a
 `consumer_not_found` code that told callers which ids exist. Consumers come from the seed. Coral, the simulated consumer in this repo,
@@ -201,7 +201,8 @@ a code has none (`errorResponse` in `src/server/api/http.ts`):
 | 403    | `unknown_consumer`       | all four              | The caller isn't a registered consumer.                                                                                                                               |
 | 403    | new, name open           | all four (Java)       | _Proposed (0057 doesn't say):_ a registered consumer without the operation's app role. _Suggestion:_ `role_required`.                                                 |
 | 403    | `consumer_mismatch`      | notices               | The path names a consumer other than the caller.                                                                                                                      |
-| 403    | `preview_forbidden`      | never `/api/v1`       | The CMS preview route's: the viewer may not see that version. In `ApiErrorCode` only so the code lists match.                                                         |
+| 403    | `preview_forbidden`      | never `/api/v1`       | Returned by no route: the CMS preview answers a version the viewer may not see 404 `template_not_found`. In `ApiErrorCode` only so the code lists match.              |
+| 401    | `signed_out`             | never `/api/v1`       | The CMS preview route's: nobody is signed in. In `ApiErrorCode` only so the code lists match.                                                                         |
 | 404    | `template_not_found`     | template, render      | No template with that id; for the template read, also a template with no released version.                                                                            |
 | 404    | `version_not_found`      | template, render      | The template has no version with that number.                                                                                                                         |
 | 409    | `version_not_released`   | template, render      | The number exists but isn't released: in review, or sent back for changes. A draft has no number yet, so a number only a draft would take is 404 `version_not_found`. |
@@ -273,8 +274,8 @@ the same bodies and the same error body as the render route today, and the appro
 ([0067](../decisions/0067-java-renders-every-channel.md)), and its error body changes to the UCOMP format in the same
 change as `/api/v1`'s, together with its readers (`src/components/preview/render-preview.ts`) and Coral's client
 (`src/simulator/ucomp-api.ts`). Java's preview endpoint is internal and outside this spec: it takes `version` as
-`"draft"` or a number, an optional `round`, and the viewer, renders any state, and refuses with 403
-`preview_forbidden`. The app's other routes keep their `{ ok: false, code, reason }` shape
+`"draft"` or a number, an optional `round`, and the viewer, renders any state, and answers a template, version or
+draft the viewer may not see 404 `template_not_found`, as one that isn't there, unlogged. The app's other routes keep their `{ ok: false, code, reason }` shape
 ([0041](../decisions/0041-routes-refuse-in-the-actions-shape.md)).
 
 ## 5. Endpoints
@@ -284,7 +285,7 @@ Every operation also answers the 401, 403 and 429 of [section 3](#3-security), a
 ### 5.1 Search templates
 
 `GET /api/v1/templates?q=&limit=&after=` answers `ApiTemplateSearch`. Code: `src/app/api/v1/templates/route.ts` and
-`searchActiveTemplates` in `src/server/queries/consumer-api.ts`.
+`searchActiveTemplates` in `src/server/services/local/consumer-api.ts`.
 
 | Parameter | In    | Type             | Required | Meaning                                                                                                                                             | Example                         |
 | --------- | ----- | ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
@@ -311,7 +312,7 @@ of this list.".
     {
       "id": "UC-4F7K2Q",
       "name": "Spring Travel Rewards — Terms",
-      "team": { "id": "coral-offers", "name": "Coral Offers" },
+      "team": { "id": "t_coral", "name": "Coral Offers" },
       "contentType": { "key": "disclosure", "name": "Disclosure" },
       "activeVersion": 3,
       "activatedAt": "2026-09-20T14:05:00.000Z",
@@ -329,7 +330,7 @@ of this list.".
 
 `GET /api/v1/templates/{templateId}?version=&since=` answers `ApiTemplateDetail`. Code:
 [the route](../../src/app/api/v1/templates/[templateId]/route.ts) and `getTemplateDetail` in
-`src/server/queries/consumer-api.ts`.
+`src/server/services/local/consumer-api.ts`.
 
 | Parameter    | In    | Type           | Required | Meaning                                                                                                                                                                                        | Example     |
 | ------------ | ----- | -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
@@ -359,7 +360,7 @@ or `since`).
 {
   "id": "UC-4F7K2Q",
   "name": "Spring Travel Rewards — Terms",
-  "team": { "id": "coral-offers", "name": "Coral Offers" },
+  "team": { "id": "t_coral", "name": "Coral Offers" },
   "contentType": { "key": "disclosure", "name": "Disclosure" },
   "asOf": "2026-10-04T12:00:00.000Z",
   "activeVersion": 3,
@@ -452,7 +453,7 @@ Here v2's contract was `first_name` and `purchase_apr`, both required, and v3 re
 
 `GET /api/v1/consumers/{consumerId}/notices?after=&templateId=&limit=` answers `ApiNoticeList`. Code:
 [the route](../../src/app/api/v1/consumers/[consumerId]/notices/route.ts) and `listNotices` in
-`src/server/queries/consumer-api.ts`.
+`src/server/services/local/consumer-api.ts`.
 
 | Parameter    | In    | Type              | Required | Meaning                                                                                                      | Example     |
 | ------------ | ----- | ----------------- | -------- | ------------------------------------------------------------------------------------------------------------ | ----------- |
@@ -517,7 +518,7 @@ before the notices were reset. Start again without after." or "limit must be a n
 
 `POST /api/v1/templates/{templateId}/render` with an `ApiRenderRequest` body. Code:
 [the route](../../src/app/api/v1/templates/[templateId]/render/route.ts), `readRenderRequest` and
-`renderSuccessResponse` in `src/server/api/render-http.ts`, and the pipeline in `src/server/render/render-template.ts`.
+`renderSuccessResponse` in `src/server/api/render-http.ts`, and the pipeline in `src/server/services/local/render/render-template.ts`.
 
 The body is JSON, at most 1,000,000 bytes: refused from a declared `Content-Length` before anything is read, and
 otherwise as soon as the bytes read pass the limit (a chunked body has no length). Nothing past the limit is buffered.
@@ -608,17 +609,17 @@ The paging fields `ApiTemplateSearch` and `ApiNoticeList` share.
 
 Everything describes the template's Active version.
 
-| Field           | Type            | Meaning                                                                                                                                                                                        | Example                                       |
-| --------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `id`            | string          | The template id ([section 7](#7-identifiers)).                                                                                                                                                 | `"UC-4F7K2Q"`                                 |
-| `name`          | string          | The Active version's name. Each version keeps the name it was approved with, so a rename arrives with a new version ([0016](../decisions/0016-the-name-is-versioned.md)). 1 to 120 characters. | `"Spring Travel Rewards — Terms"`             |
-| `team`          | `{ id, name }`  | The team that owns the template. `id` is opaque.                                                                                                                                               | `{"id":"coral-offers","name":"Coral Offers"}` |
-| `contentType`   | `{ key, name }` | The template's content type. `key` is stable and open-ended.                                                                                                                                   | `{"key":"disclosure","name":"Disclosure"}`    |
-| `activeVersion` | integer         | The Active version's number.                                                                                                                                                                   | `3`                                           |
-| `activatedAt`   | instant         | When it went Active ([section 14](#14-the-fields-the-review-called-ambiguous)).                                                                                                                | `"2026-09-20T14:05:00.000Z"`                  |
-| `channels`      | `ApiChannel[]`  | The channels it renders: turned on for the version and still allowed by its content type, in the order pdf, web, email, push, sms.                                                             | `["pdf","web","email"]`                       |
-| `variableCount` | integer         | Variables in its contract.                                                                                                                                                                     | `3`                                           |
-| `requiredCount` | integer         | Of those, the required ones.                                                                                                                                                                   | `3`                                           |
+| Field           | Type            | Meaning                                                                                                                                                                                        | Example                                    |
+| --------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `id`            | string          | The template id ([section 7](#7-identifiers)).                                                                                                                                                 | `"UC-4F7K2Q"`                              |
+| `name`          | string          | The Active version's name. Each version keeps the name it was approved with, so a rename arrives with a new version ([0016](../decisions/0016-the-name-is-versioned.md)). 1 to 120 characters. | `"Spring Travel Rewards — Terms"`          |
+| `team`          | `{ id, name }`  | The team that owns the template. `id` is opaque.                                                                                                                                               | `{"id":"t_coral","name":"Coral Offers"}`   |
+| `contentType`   | `{ key, name }` | The template's content type. `key` is stable and open-ended.                                                                                                                                   | `{"key":"disclosure","name":"Disclosure"}` |
+| `activeVersion` | integer         | The Active version's number.                                                                                                                                                                   | `3`                                        |
+| `activatedAt`   | instant         | When it went Active ([section 14](#14-the-fields-the-review-called-ambiguous)).                                                                                                                | `"2026-09-20T14:05:00.000Z"`               |
+| `channels`      | `ApiChannel[]`  | The channels it renders: turned on for the version and still allowed by its content type, in the order pdf, web, email, push, sms.                                                             | `["pdf","web","email"]`                    |
+| `variableCount` | integer         | Variables in its contract.                                                                                                                                                                     | `3`                                        |
+| `requiredCount` | integer         | Of those, the required ones.                                                                                                                                                                   | `3`                                        |
 
 ### 6.4 ApiTemplateDetail
 
@@ -819,7 +820,7 @@ Decisions [0060](../decisions/0060-template-ids-are-random-and-retried-on-a-coll
 | Id                 | Where                                                                                       | Today                                                                                           | Publish as                                                                                  |
 | ------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `templateId`       | paths, `id`, a notice's `template.id`, `X-Stencil-Template-Id`, the schema's `$id`, the PDF | `UC-` and six Crockford base32 characters, `UC-4F7K2Q` (`newTemplateId` in `src/server/ids.ts`) | An opaque string: a maximum length and examples, no pattern. _Suggestion:_ `maxLength: 64`. |
-| `team.id`          | search results and template reads                                                           | Equal to the team's slug, `coral-offers`                                                        | An opaque string. After the backend seam work (0053), an id like `t_coral`, never a slug.   |
+| `team.id`          | search results and template reads                                                           | An opaque id, `t_coral`, never the slug (0053)                                                  | An opaque string, never a slug.                                                             |
 | `consumerId`       | the notices path, `ApiNoticeList.consumerId`, inside notice cursors                         | `coral`, `deposits-online` (`consumers.id`)                                                     | An opaque string.                                                                           |
 | A notice's `id`    | `ApiNotice.id`                                                                              | `cn_` and ten lower-case Crockford base32 characters                                            | An opaque string. Unique; not an order.                                                     |
 | `contentType.key`  | search results and template reads                                                           | `disclosure`, `alert`                                                                           | A stable, open-ended string.                                                                |
@@ -830,9 +831,9 @@ new id on a unique violation, at most three times. Consumers keep it, so it neve
 product owner defines one, is a separate field and never `templateId` unless the product owner says so; whether the
 `UC-` prefix stays is the product owner's question too.
 
-**Node today:** `freshTemplateId` (`src/server/templates/create.ts`) reads up to four times for an unused id and then
-inserts, with no retry on a unique violation. That is safe with SQLite's one writer and not with two concurrent
-creates, which is why the Java create retries.
+**Node today:** the local implementation's create draws an id, inserts, and writes again with another id when the
+insert finds it taken, three attempts in all (`src/server/services/template-id.ts`, decision 0060); the Java create
+does the same around its transaction.
 
 Two details for the port:
 
@@ -878,7 +879,7 @@ Decisions [0017](../decisions/0017-a-sunset-date-ends-at-midnight-in-the-busines
   rules, not `Date`.
 
 **Node today:** every `/api/v1` response's `Date` header, and every `asOf`, is the demo clock (real time plus an
-offset the demo's "Advance clock" moves; `withDemoDate` in `src/server/api/http.ts`). Coral stamps what it receives
+offset the demo's "Advance clock" moves; `withDemoDate` in `src/server/services/local/consumer-api.ts`). Coral stamps what it receives
 with that header. Both go with the demo clock.
 
 ## 9. Paging and cursors
@@ -938,7 +939,7 @@ Decisions [0006](../decisions/0006-page-notices-by-commit-order.md) and
 ## 10. Search: matching and order
 
 Decision [0059](../decisions/0059-template-search-ranks-and-pages-in-sql.md); code: `searchActiveTemplates` in
-`src/server/queries/consumer-api.ts` and `compareSearchKeys` in `src/domain/golive/cursor.ts`.
+`src/server/services/local/consumer-api.ts` and `compareSearchKeys` in `src/domain/golive/cursor.ts`.
 
 1. The candidates are the templates with an Active version. A template's name, for matching, ordering, the cursor and
    the result, is its Active version's.
@@ -996,7 +997,7 @@ Decisions [0006](../decisions/0006-page-notices-by-commit-order.md),
 [0055](../decisions/0055-notifications-store-facts-and-are-worded-on-read.md) and
 [0064](../decisions/0064-payloads-are-facts-with-one-shape-per-event.md). Code: `noticeView` in
 `src/domain/golive/notices.ts` (the wire shape and the sentence) and the `consumer_notice` effect in
-`src/server/effects.ts` (who gets one).
+`src/server/services/local/effects.ts` (who gets one).
 
 A notice is Stencil's word to one consumer that something happened to one version of one template. Read state is the
 consumer's business.
@@ -1029,8 +1030,8 @@ records the event. After the port the 90-day audience is read from the daily ren
 _Suggestion for Java:_ one record with nullable fields serialized with nulls included gives exactly this JSON; a
 sealed hierarchy per kind is fine if it serializes the same way, with every field present.
 
-**Node today:** stored payloads still carry `contractLines`, English that nothing reads, which the backend seam work
-removes (0055); none of it reaches the wire. The seed writes the same fields as the runtime (0064). The full catalogue
+**Node today:** stored payloads hold facts only (0055): `contractChanges` is always present on `new_version` and
+`sunset_scheduled`, empty when there are none, and no sentence is stored. The seed writes the same fields as the runtime (0064). The full catalogue
 of stored notice payloads is in the [data model page](data-model.md#payloads).
 
 ## 13. Rendering
@@ -1133,20 +1134,20 @@ Each of these needs a decision this brief doesn't make.
 
 ## 16. Where each rule lives in the code
 
-| What                                                                          | Where                                                                                                                                        |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| The wire shapes                                                               | `src/contracts/api-v1.ts`, [src/contracts/README.md](../../src/contracts/README.md)                                                          |
-| The status table and the drift checks between the domain's types and the wire | `src/domain/golive-types.ts`                                                                                                                 |
-| The four handlers                                                             | [src/app/api/v1](../../src/app/api/v1/templates/route.ts) and its siblings                                                                   |
-| Shared headers and the error response                                         | `src/server/api/http.ts`                                                                                                                     |
-| The render body and the render responses                                      | `src/server/api/render-http.ts`                                                                                                              |
-| The GET routes' reads                                                         | `src/server/queries/consumer-api.ts`                                                                                                         |
-| Cursors                                                                       | `src/domain/golive/cursor.ts`                                                                                                                |
-| The GET routes' parameters and sentences                                      | `src/domain/golive/api-errors.ts`                                                                                                            |
-| Notices on the wire                                                           | `src/domain/golive/notices.ts`                                                                                                               |
-| Contract changes and the JSON Schema                                          | `src/domain/golive/contract-diff.ts`, `src/domain/golive/json-schema.ts`, `src/editor/model/contract.ts`                                     |
-| The render pipeline, version rules, values and errors                         | `src/server/render/render-template.ts`, `src/domain/render/version-rules.ts`, `src/domain/render/validate.ts`, `src/domain/render/errors.ts` |
-| Who gets a notice, and `seq`                                                  | `src/server/effects.ts`                                                                                                                      |
-| Sunset days and zones                                                         | `src/domain/business-zone.ts`                                                                                                                |
-| A consumer's client (Coral)                                                   | `src/simulator/ucomp-api.ts`                                                                                                                 |
-| Executable examples                                                           | the `route.test.ts` beside each handler, `e2e/api/consumer.spec.ts`, `e2e/api/render.spec.ts`, and the golden cases                          |
+| What                                                                          | Where                                                                                                                                                       |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The wire shapes                                                               | `src/contracts/api-v1.ts`, [src/contracts/README.md](../../src/contracts/README.md)                                                                         |
+| The status table and the drift checks between the domain's types and the wire | `src/domain/golive-types.ts`                                                                                                                                |
+| The four handlers                                                             | [src/app/api/v1](../../src/app/api/v1/templates/route.ts) and its siblings                                                                                  |
+| Shared headers and the error response                                         | `src/server/api/http.ts`                                                                                                                                    |
+| The render body and the render responses                                      | `src/server/api/render-http.ts`                                                                                                                             |
+| The GET routes' reads                                                         | `src/server/services/local/consumer-api.ts`                                                                                                                 |
+| Cursors                                                                       | `src/domain/golive/cursor.ts`                                                                                                                               |
+| The GET routes' parameters and sentences                                      | `src/domain/golive/api-errors.ts`                                                                                                                           |
+| Notices on the wire                                                           | `src/domain/golive/notices.ts`                                                                                                                              |
+| Contract changes and the JSON Schema                                          | `src/domain/golive/contract-diff.ts`, `src/domain/golive/json-schema.ts`, `src/editor/model/contract.ts`                                                    |
+| The render pipeline, version rules, values and errors                         | `src/server/services/local/render/render-template.ts`, `src/domain/render/version-rules.ts`, `src/domain/render/validate.ts`, `src/domain/render/errors.ts` |
+| Who gets a notice, and `seq`                                                  | `src/server/services/local/effects.ts`                                                                                                                      |
+| Sunset days and zones                                                         | `src/domain/business-zone.ts`                                                                                                                               |
+| A consumer's client (Coral)                                                   | `src/simulator/ucomp-api.ts`                                                                                                                                |
+| Executable examples                                                           | the `route.test.ts` beside each handler, `e2e/api/consumer.spec.ts`, `e2e/api/render.spec.ts`, and the golden cases                                         |

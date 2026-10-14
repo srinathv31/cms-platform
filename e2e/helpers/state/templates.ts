@@ -44,7 +44,11 @@ const OWNED: readonly Owned[] = [
     arg: (id) => id,
   },
   { table: "audit_events", where: "template_id = ?", arg: (id) => id },
-  { table: "notifications", where: "href LIKE ?", arg: (id) => `%/${id}%` },
+  {
+    table: "notifications",
+    where: "json_extract(link, '$.templateId') = ?",
+    arg: (id) => id,
+  },
   { table: "consumer_notices", where: "template_id = ?", arg: (id) => id },
   { table: "render_log", where: "template_id = ?", arg: (id) => id },
   { table: "versions", where: "template_id = ?", arg: (id) => id },
@@ -93,7 +97,7 @@ async function deleteOwned(
 async function removeUploadFolders(uploadIds: readonly string[]) {
   for (const id of uploadIds)
     if (/^[\w-]{8,}$/.test(id))
-      // A few retries, as in `removeUpload` (src/server/import/store.ts): on Windows a virus scanner can still
+      // A few retries, as in `removeUpload` (src/server/services/local/uploads.ts): on Windows a virus scanner can still
       // hold a file it was just handed.
       await rm(path.join(E2E_UPLOADS_DIR, id), {
         recursive: true,

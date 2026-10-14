@@ -8,7 +8,8 @@
 //   - One request at a time. Changes made while one is out wait for the next.
 //   - The rev is the one the server last returned.
 //   - A network or server failure retries with backoff, a few times, then shows an error. The next
-//     change starts over.
+//     change starts over. Every send carries a higher `seq` than the one before, so a request given up on
+//     that lands after its retry is refused rather than putting back what the retry replaced.
 //   - A new editing session starts (a new session key, so a new audit row) when the last saved
 //     change is more than 30 minutes old.
 //   - A refusal stops saving for good, because retrying cannot fix it and a conflict must never be
@@ -25,7 +26,7 @@ import type { DraftPatch, DraftSaveResponse } from "@/domain/types";
 export type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
 /** The fields of a draft that changed. Whatever is missing is left as it is on the server. */
-export type SaveFields = Omit<DraftPatch, "rev" | "sessionKey">;
+export type SaveFields = Omit<DraftPatch, "rev" | "sessionKey" | "seq">;
 
 export interface AutosaveState {
   status: SaveStatus;
@@ -162,6 +163,10 @@ export function createAutosave(options: AutosaveOptions): Autosave {
 
   let rev = options.initialRev;
   let sessionKey = options.sessionKey;
+  // Counts every send, retries included, so the server can tell a request given up on from the retry that
+  // replaced it, whichever arrives first (`seq` in DraftPatch). One counter for every session the scheduler runs:
+  // it only has to rise within each.
+  let seq = 0;
   // When the session last saved. null before its first save, and after a request whose outcome we
   // don't know: that save may have landed, and the server only accepts a resend (see the lost
   // response rule in apply-patch.ts) under the same key.
@@ -287,7 +292,8 @@ export function createAutosave(options: AutosaveOptions): Autosave {
       lastSavedAt = sentAt;
     }
 
-    const patch: DraftPatch = { ...fields, rev, sessionKey };
+    seq += 1;
+    const patch: DraftPatch = { ...fields, rev, sessionKey, seq };
     // `async` turns a synchronous throw from `send` into a rejection like any other.
     const request = (async () => options.send(patch, { keepalive }))();
     inflight = new Promise<DraftSaveResponse | null>((resolve) => {

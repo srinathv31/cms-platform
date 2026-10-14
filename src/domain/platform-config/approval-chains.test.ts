@@ -9,6 +9,7 @@ import {
   saveApprovalChain,
   validateChain,
 } from "./approval-chains";
+import { describeConfigChange } from "./effects";
 import type { ApprovalStage } from "../review-types";
 import type { ApproverRule } from "../types";
 import { NOW, riley, alex } from "./fixtures";
@@ -372,17 +373,16 @@ describe("saveApprovalChain", () => {
     });
 
   it("adds Dana Park's Legal reviewer stage after the team's approvers", () => {
-    expect(
-      run({
-        inReview: [
-          {
-            versionId: "v3",
-            stages: [{ id: "stage_team", name: "Team approver" }],
-            currentStage: 0,
-          },
-        ],
-      }),
-    ).toEqual({
+    const result = run({
+      inReview: [
+        {
+          versionId: "v3",
+          stages: [{ id: "stage_team", name: "Team approver" }],
+          currentStage: 0,
+        },
+      ],
+    });
+    expect(result).toEqual({
       ok: true,
       stages: [
         {
@@ -405,8 +405,6 @@ describe("saveApprovalChain", () => {
           teamId: null,
           details: {
             area: "approval_chains",
-            summary:
-              "Set Disclosure approval chain: Team approver (Approver role) → Legal reviewer (Dana Park)",
             contentTypeId: "ct_disclosure",
             contentTypeName: "Disclosure",
             before: ["Team approver"],
@@ -419,12 +417,18 @@ describe("saveApprovalChain", () => {
               {
                 name: "Legal reviewer",
                 rule: { kind: "user", userId: "dana" },
+                userName: "Dana Park",
               },
             ],
           },
         },
       ],
     });
+    // The row keeps the person's name as it was; the Audit page words the chain when it reads it.
+    const audit = result.ok ? result.effects[0] : undefined;
+    expect(audit?.kind === "audit" && describeConfigChange(audit.details)).toBe(
+      "set Disclosure approval chain: Team approver (Approver role) → Legal reviewer (Dana Park)",
+    );
   });
 
   it("reorders and renames stages, keeping their ids; versions in review are left as they are", () => {

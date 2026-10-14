@@ -1,6 +1,11 @@
 # 0018. Settings screens render decisions; the domain makes them
 
 Status: Accepted
+Amended 2026-10-13: the backend answers the facts and the decided `can`, and the BFF words everything else. The settings
+reads (`AccessService.members`, `.requests`, `.recertification`, `.inactivity`, `.sidebarCards`, `.homeCard`, `PlatformService`'s five)
+return the rows as stored, `asOf`, and `can` run by `src/domain/access/row-actions.ts` and `src/domain/platform-config/`; the
+read models in `src/server/queries/access.ts` and `platform.ts` word `consequences`, a settled row's outcome, a review's
+footnote and "4 of 6 confirmed" from those facts with the same domain functions, counting every date from the read's `asOf`.
 Date: 2026-10-09
 
 ## Context

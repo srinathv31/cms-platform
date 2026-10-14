@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { REFUSALS } from "./refusals";
-import { setSunset, sweepSunsets, type SunsetFacts } from "./sunset";
+import {
+  setSunset,
+  sunsetUnchanged,
+  sweepSunsets,
+  type SunsetFacts,
+} from "./sunset";
+import { describeNotification } from "../notifications";
 import { VERSION_STATES } from "../types";
 import {
   NOW,
@@ -55,17 +61,39 @@ describe("setSunset", () => {
             sunsetAt: "2027-03-01T05:00:00.000Z",
             sunsetDay: "2027-03-01",
             zone: ZONE,
+            contractChanges: [],
           },
         },
         {
           kind: "notification",
           notification: "sunset_scheduled",
           to: { kind: "user", userId: "priya" },
-          title:
-            "Balance Transfer Intro v1 will stop rendering on March 1, 2027.",
+          facts: {
+            templateName: "Balance Transfer Intro",
+            number: 1,
+            sunsetAt: "2027-03-01T05:00:00.000Z",
+            sunsetDay: "2027-03-01",
+            zone: ZONE,
+          },
           link: { to: "versions", templateId: TEMPLATE.id },
         },
       ],
+    });
+  });
+
+  it("words the author's notification when it is read: the day, in the zone it was set in", () => {
+    const result = run();
+    const notification = result.ok ? result.effects[2] : undefined;
+    expect(
+      notification?.kind === "notification" &&
+        describeNotification(
+          notification.notification,
+          notification.facts,
+          "priya",
+        ),
+    ).toEqual({
+      title: "Balance Transfer Intro v1 will stop rendering on March 1, 2027.",
+      body: null,
     });
   });
 
@@ -140,8 +168,18 @@ describe("setSunset", () => {
         sunsetDay: "2027-03-01",
         zone: ZONE,
         contractChanges: [ANNUAL_FEE_ADDED],
-        contractLines: ["v2 adds required `annual_fee` (Currency)."],
       },
+    });
+  });
+
+  it("sends no contract changes when nothing is Active, whatever it is given: the notice has one shape", () => {
+    const result = run({
+      activeNumber: null,
+      contractChanges: [ANNUAL_FEE_ADDED],
+    });
+    expect(result.ok && result.effects[1]).toMatchObject({
+      notice: "sunset_scheduled",
+      payload: { activeVersion: null, contractChanges: [] },
     });
   });
 
@@ -359,5 +397,40 @@ describe("sweepSunsets", () => {
       expect(sweep([facts({ state })]), state).toEqual([]);
     }
     expect(sweep([facts({ number: null })])).toEqual([]);
+  });
+});
+
+describe("sunsetUnchanged", () => {
+  const superseded = { state: "superseded" as const, sunsetAt: MARCH_1 };
+
+  it("is the day the version already has, while it can still be moved", () => {
+    expect(sunsetUnchanged(superseded, MARCH_1_DAY, ZONE, NOW)).toBe(true);
+    expect(sunsetUnchanged(superseded, TOMORROW_DAY, ZONE, NOW)).toBe(false);
+    expect(
+      sunsetUnchanged(
+        { ...superseded, sunsetAt: null },
+        MARCH_1_DAY,
+        ZONE,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("is no repeat once the sunset has passed, or for a version that isn't Superseded", () => {
+    expect(sunsetUnchanged(superseded, MARCH_1_DAY, ZONE, MARCH_1)).toBe(false);
+    expect(
+      sunsetUnchanged(
+        { ...superseded, state: "active" },
+        MARCH_1_DAY,
+        ZONE,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("reads the day in the zone: the same day in another zone is another instant", () => {
+    expect(
+      sunsetUnchanged(superseded, MARCH_1_DAY, "America/Los_Angeles", NOW),
+    ).toBe(false);
   });
 });

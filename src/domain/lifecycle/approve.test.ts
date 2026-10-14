@@ -1,10 +1,15 @@
 import { OUTPUT_KEYS } from "../review-outputs";
 import { describe, expect, it } from "vitest";
 import { REFUSALS } from "./refusals";
-import { approve } from "./approve";
+import { approve, replacedActive } from "./approve";
 import type { ReviewVersion } from "./types";
+import { describeNotification } from "../notifications";
 import { REASONS } from "../permissions";
-import type { ApprovalStage, VersionStage } from "../review-types";
+import type {
+  ApprovalStage,
+  LifecycleEffect,
+  VersionStage,
+} from "../review-types";
 import {
   NOW,
   TEMPLATE,
@@ -43,6 +48,12 @@ describe("approve", () => {
       ...over,
     });
 
+  /** A notification effect as its reader sees it (`describeNotification`): null for any other effect. */
+  const worded = (effect: LifecycleEffect | undefined, readerId = "maya") =>
+    effect?.kind === "notification"
+      ? describeNotification(effect.notification, effect.facts, readerId)
+      : null;
+
   const activated = (supersedes: number | null, stage = "Team approver") => ({
     kind: "audit",
     action: "version.activated",
@@ -64,8 +75,11 @@ describe("approve", () => {
     kind: "notification",
     notification: "version_live",
     to: { kind: "user", userId: "maya" },
-    title: "Spring Travel Rewards — Terms v2 is now Active.",
-    body: "Jordan Ellis approved it.",
+    facts: {
+      actorName: "Jordan Ellis",
+      templateName: TEMPLATE.name,
+      number: 2,
+    },
     link: { to: "template", templateId: TEMPLATE.id },
   };
   const newVersion = {
@@ -76,7 +90,6 @@ describe("approve", () => {
       versionNumber: 2,
       activeVersion: 2,
       contractChanges: [ANNUAL_FEE_ADDED],
-      contractLines: ["v2 adds required `annual_fee` (Currency)."],
     },
   };
 
@@ -101,6 +114,14 @@ describe("approve", () => {
       },
       wentLive: true,
       effects: [activated(1), superseded, live, newVersion],
+    });
+  });
+
+  it("tells the submitter their version is Active, worded when it is read", () => {
+    const result = run();
+    expect(result.ok && worded(result.effects[2])).toEqual({
+      title: "Spring Travel Rewards — Terms v2 is now Active.",
+      body: "Jordan Ellis approved it.",
     });
   });
 
@@ -143,7 +164,6 @@ describe("approve", () => {
           sunsetDay: "2027-03-01",
           zone: ZONE,
           contractChanges: [ANNUAL_FEE_ADDED],
-          contractLines: ["v2 adds required `annual_fee` (Currency)."],
         },
       },
     ]);
@@ -350,20 +370,43 @@ describe("approve", () => {
             kind: "notification",
             notification: "review_requested",
             to: { kind: "user", userId: "dana" },
-            title:
-              "Spring Travel Rewards — Terms v2 is waiting on Legal reviewer.",
+            facts: {
+              actorName: "Jordan Ellis",
+              templateName: TEMPLATE.name,
+              number: 2,
+              round: 1,
+              stage: "Legal reviewer",
+            },
             link: { to: "review", templateId: TEMPLATE.id, versionNumber: 2 },
           },
           {
             kind: "notification",
             notification: "stage_approved",
             to: { kind: "user", userId: "maya" },
-            title:
-              "Jordan Ellis approved Spring Travel Rewards — Terms v2 for Team approver.",
-            body: "Next: Legal reviewer.",
+            facts: {
+              actorName: "Jordan Ellis",
+              templateName: TEMPLATE.name,
+              number: 2,
+              round: 1,
+              stage: "Team approver",
+              next: "Legal reviewer",
+            },
             link: { to: "review", templateId: TEMPLATE.id, versionNumber: 2 },
           },
         ],
+      });
+    });
+
+    it("words the two notifications when they are read: who is waiting, and what the submitter hears", () => {
+      const result = run({ chain: CHAIN_2 });
+      expect(result.ok && worded(result.effects[1], "dana")).toEqual({
+        title: "Spring Travel Rewards — Terms v2 is waiting on Legal reviewer.",
+        body: null,
+      });
+      expect(result.ok && worded(result.effects[2])).toEqual({
+        title:
+          "Jordan Ellis approved Spring Travel Rewards — Terms v2 for Team approver.",
+        body: "Next: Legal reviewer.",
       });
     });
 
@@ -390,16 +433,22 @@ describe("approve", () => {
           },
         },
         expect.objectContaining({
-          title:
-            "Spring Travel Rewards — Terms v2, round 2 is waiting on Legal reviewer.",
+          notification: "review_requested",
+          facts: expect.objectContaining({ round: 2, stage: "Legal reviewer" }),
           link: review,
         }),
         expect.objectContaining({
-          title:
-            "Jordan Ellis approved Spring Travel Rewards — Terms v2, round 2 for Team approver.",
+          notification: "stage_approved",
+          facts: expect.objectContaining({ round: 2, stage: "Team approver" }),
           link: review,
         }),
       ]);
+      expect(result.ok && worded(result.effects[1], "dana")?.title).toBe(
+        "Spring Travel Rewards — Terms v2, round 2 is waiting on Legal reviewer.",
+      );
+      expect(result.ok && worded(result.effects[2])?.title).toBe(
+        "Jordan Ellis approved Spring Travel Rewards — Terms v2, round 2 for Team approver.",
+      );
     });
 
     it("doesn't supersede or sunset anything before the last stage", () => {
@@ -467,8 +516,17 @@ describe("approve", () => {
           role: "approver",
           exceptUserIds: ["maya", "dana"],
         },
-        title: "Spring Travel Rewards — Terms v2 is waiting on Team approver.",
+        facts: {
+          actorName: "Dana Park",
+          templateName: TEMPLATE.name,
+          number: 2,
+          round: 1,
+          stage: "Team approver",
+        },
       });
+      expect(result.ok && worded(result.effects[1], "jordan")?.title).toBe(
+        "Spring Travel Rewards — Terms v2 is waiting on Team approver.",
+      );
 
       const coWritten = run({
         chain: teamSecond,
@@ -643,8 +701,17 @@ describe("approve", () => {
       expect(result.ok && result.effects[1]).toMatchObject({
         notification: "review_requested",
         to: { kind: "user", userId: "naomi" },
-        title: "Spring Travel Rewards — Terms v2 is waiting on Legal reviewer.",
+        facts: {
+          actorName: "Jordan Ellis",
+          templateName: TEMPLATE.name,
+          number: 2,
+          round: 1,
+          stage: "Legal reviewer",
+        },
       });
+      expect(result.ok && worded(result.effects[1], "naomi")?.title).toBe(
+        "Spring Travel Rewards — Terms v2 is waiting on Legal reviewer.",
+      );
     });
 
     it("on migrated data, an approval matched to the stage it waits on still bars its approver", () => {
@@ -718,5 +785,18 @@ describe("approve", () => {
       code: "stage_missing",
       reason: "This version's approval stage no longer exists.",
     });
+  });
+});
+
+describe("replacedActive", () => {
+  it("is the template's Active version, unless it is the round being approved or has no number", () => {
+    const round = { id: "v_3" };
+    expect(replacedActive({ id: "v_2", number: 2 }, round)).toEqual({
+      id: "v_2",
+      number: 2,
+    });
+    expect(replacedActive({ id: "v_3", number: 3 }, round)).toBeNull();
+    expect(replacedActive({ id: "v_2", number: null }, round)).toBeNull();
+    expect(replacedActive(undefined, round)).toBeNull();
   });
 });

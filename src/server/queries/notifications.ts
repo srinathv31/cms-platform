@@ -1,71 +1,74 @@
 import "server-only";
 import { cache } from "react";
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { formatAgo } from "@/domain/dates";
+import {
+  describeNotification,
+  isNotificationKind,
+} from "@/domain/notifications";
+import { requireRequestContext } from "@/server/context/request";
+import { notificationHref } from "@/server/notification-href";
 import type {
   NotificationView,
   NotificationsData,
-} from "@/domain/access-types";
-import { notificationFallback } from "@/domain/audit";
-import { db } from "@/server/db/client";
-import { notifications, teams } from "@/server/db/schema/ucomp";
-import { demoNow } from "./dynamic";
-import { getViewer } from "@/server/viewer";
-import { formatAgo } from "@/domain/dates";
+} from "@/server/queries/access-models";
+import { services } from "@/server/services";
+import type { NotificationList } from "@/server/services/notifications";
+import { getShellFacts } from "./spaces";
+
+// The bell. A notification is stored as facts and a link descriptor (decision 0055): the service lists the
+// viewer's (`services().notifications.list`), and this read model words each one for the viewer
+// (`describeNotification`), builds its href from its link with the slugs of the viewer's spaces (the identity
+// service's shell), and says how long ago it came from the list's `asOf`. It decides nothing and reads no clock.
 
 /** The bell holds this many, newest first. */
 export const NOTIFICATIONS_LIMIT = 30;
 
-/**
- * The bell: the viewer's latest notifications (newest first) and how many are unread in all. Every
- * row has a sentence and a link: the ones its writer stored, else the kind's fallback
- * (domain/audit.ts `notificationFallback`). Times are relative to the demo clock.
- */
+/** The viewer's latest notifications (newest first) and how many are unread in all. */
 export const getNotificationsData = cache(
   async (): Promise<NotificationsData> => {
-    const viewer = await getViewer();
-    const nowDate = await demoNow();
-    const [rows, unread, teamRows] = await Promise.all([
-      db
-        .select()
-        .from(notifications)
-        .where(eq(notifications.userId, viewer.userId))
-        .orderBy(
-          desc(notifications.createdAt),
-          desc(sql`${notifications}.rowid`),
-        )
-        .limit(NOTIFICATIONS_LIMIT),
-      db
-        .select({ n: count() })
-        .from(notifications)
-        .where(
-          and(
-            eq(notifications.userId, viewer.userId),
-            isNull(notifications.readAt),
-          ),
-        ),
-      db
-        .select({ id: teams.id, slug: teams.slug, name: teams.name })
-        .from(teams),
+    const ctx = await requireRequestContext();
+    const [list, shell] = await Promise.all([
+      services().notifications.list(ctx, { limit: NOTIFICATIONS_LIMIT }),
+      getShellFacts(),
     ]);
-    const teamsById = new Map(teamRows.map((t) => [t.id, t]));
-
-    const items: NotificationView[] = rows.map((n) => {
-      const team = n.teamId ? teamsById.get(n.teamId) : undefined;
-      const fallback = notificationFallback(n.kind, {
-        team: team?.slug ?? null,
-        teamName: team?.name ?? null,
-      });
-      return {
-        id: n.id,
-        kind: n.kind,
-        title: n.title.trim() || fallback.title,
-        body: n.body,
-        href: n.href || fallback.href,
-        createdAt: n.createdAt.toISOString(),
-        ago: formatAgo(n.createdAt, nowDate, { capitalize: true }),
-        unread: n.readAt === null,
-      };
-    });
-    return { items, unreadCount: unread[0]?.n ?? 0 };
+    if (!list.ok)
+      throw new Error(
+        `The notifications refused a signed-in viewer: ${list.code}`,
+      );
+    return notificationsData(list, shell.spaces, ctx.viewer.userId);
   },
 );
+
+/**
+ * The bell's rows from the stored notifications, for `readerId`: each worded (a person's own words stay its
+ * body), linked under the slug of the space its link names (`spaces`: the viewer's, by team id; a team they
+ * can't enter links to the app's root), and dated relative to the list's `asOf`. Pure.
+ */
+export function notificationsData(
+  list: NotificationList,
+  spaces: readonly { teamId: string | null; slug: string }[],
+  readerId: string,
+): NotificationsData {
+  const slugs = new Map(
+    spaces.flatMap((s): [string, string][] =>
+      s.teamId === null ? [] : [[s.teamId, s.slug]],
+    ),
+  );
+  const slugOf = (teamId: string) => slugs.get(teamId) ?? null;
+  return {
+    items: list.items.map((n): NotificationView => {
+      const words = describeNotification(n.kind, n.facts, readerId);
+      return {
+        id: n.id,
+        kind: isNotificationKind(n.kind) ? n.kind : null,
+        title: words.title,
+        body: n.body ?? words.body,
+        href: notificationHref(n.link, slugOf),
+        createdAt: n.createdAt,
+        ago: formatAgo(n.createdAt, list.asOf, { capitalize: true }),
+        unread: n.readAt === null,
+      };
+    }),
+    unreadCount: list.unreadCount,
+  };
+}

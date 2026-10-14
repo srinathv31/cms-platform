@@ -12,11 +12,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type {
-  AuditCategory,
-  AuditFilters,
-  AuditPageData,
-} from "@/domain/access-types";
+import type { AuditCategory, AuditFilters } from "@/domain/access-types";
+import type { AuditPageData } from "@/server/queries/access-models";
 import {
   AUDIT_CATEGORIES,
   CATEGORY_LABEL,

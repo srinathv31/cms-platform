@@ -28,6 +28,12 @@ const TEAMS = {
   "card-statements": "Card Statements",
 } as const;
 type TeamSlug = keyof typeof TEAMS;
+/** Each team's id: never its slug (decision 0053), so a check handed a slug finds nothing. */
+const ID: Record<TeamSlug, string> = {
+  "coral-offers": "t_coral",
+  deposits: "t_deposits",
+  "card-statements": "t_cards",
+};
 
 // Each refusal's code (what the UI branches on) and its sentence (the copy), pinned.
 const GENERIC = {
@@ -56,7 +62,13 @@ function member(
   roles: TeamRole[],
   status: MembershipStatus = "active",
 ): ViewerMembership {
-  return { teamId: team, teamSlug: team, teamName: TEAMS[team], roles, status };
+  return {
+    teamId: ID[team],
+    teamSlug: team,
+    teamName: TEAMS[team],
+    roles,
+    status,
+  };
 }
 
 function person(
@@ -96,12 +108,10 @@ const riley = person("riley", { platformRole: "platform_admin" });
 const taylor = person("taylor", { platformRole: "auditor" });
 const morgan = person("morgan");
 
-const coral = { teamId: "coral-offers" } satisfies PermissionResource;
-const deposits = { teamId: "deposits" } satisfies PermissionResource;
-const cardStatements = {
-  teamId: "card-statements",
-} satisfies PermissionResource;
-const allTeams = { teamId: ALL_SPACE } satisfies PermissionResource;
+const coral = { teamId: "t_coral" } satisfies PermissionResource;
+const deposits = { teamId: "t_deposits" } satisfies PermissionResource;
+const cardStatements = { teamId: "t_cards" } satisfies PermissionResource;
+const allTeams = { teamId: null } satisfies PermissionResource;
 
 const allow = { ok: true };
 const deny = (refusal: { code: string; reason: string }) => ({
@@ -762,7 +772,7 @@ describe("membership status", () => {
       const v = person("maya", {
         memberships: [member("coral-offers", ["author", "approver"], status)],
       });
-      expect(rolesOn(v, "coral-offers")).toEqual([]);
+      expect(rolesOn(v, "t_coral")).toEqual([]);
       for (const action of [
         "template.view",
         "draft.edit",
@@ -773,7 +783,7 @@ describe("membership status", () => {
       }
       expect(spacesFor(v)).toEqual([]);
       expect(defaultSpace(v)).toBeNull();
-      expect(canSeeSpace(v, "coral-offers")).toBe(false);
+      expect(canSeeSpace(v, "t_coral")).toBe(false);
       expect(can(v, "access.request", coral)).toEqual(allow);
     },
   );
@@ -806,7 +816,8 @@ describe("personas", () => {
   });
 
   it("Priya edits in Coral but is view-only in Deposits", () => {
-    expect(rolesOn(priya, "deposits")).toEqual(["viewer"]);
+    expect(rolesOn(priya, "t_deposits")).toEqual(["viewer"]);
+    expect(rolesOn(priya, "deposits")).toEqual([]);
     expect(can(priya, "draft.edit", coral)).toEqual(allow);
     expect(can(priya, "template.view", deposits)).toEqual(allow);
     expect(can(priya, "integration.view", deposits)).toEqual(allow);
@@ -835,11 +846,11 @@ describe("personas", () => {
   });
 
   it("Alex is Team Admin and Approver on Coral", () => {
-    expect([...rolesOn(alex, "coral-offers")].sort()).toEqual([
+    expect([...rolesOn(alex, "t_coral")].sort()).toEqual([
       "approver",
       "team_admin",
     ]);
-    expect(rolesOn(alex, "deposits")).toEqual([]);
+    expect(rolesOn(alex, "t_deposits")).toEqual([]);
     expect(can(alex, "audit.view", coral)).toEqual(allow);
     expect(can(alex, "audit.view", deposits).ok).toBe(false);
     expect(can(alex, "audit.view", allTeams).ok).toBe(false);
@@ -877,13 +888,13 @@ describe("personas", () => {
   it("Morgan has no team and sees no spaces", () => {
     expect(spacesFor(morgan)).toEqual([]);
     expect(defaultSpace(morgan)).toBeNull();
-    for (const slug of [...Object.keys(TEAMS), ALL_SPACE])
-      expect(canSeeSpace(morgan, slug)).toBe(false);
+    for (const teamId of [...Object.values(ID), null])
+      expect(canSeeSpace(morgan, teamId)).toBe(false);
     expect(can(morgan, "template.view", coral).ok).toBe(false);
   });
 
-  it('"all" and a missing team are the same cross-team context', () => {
-    for (const r of [allTeams, { teamId: null }, {}]) {
+  it("no team is the cross-team context", () => {
+    for (const r of [allTeams, {}]) {
       expect(can(maya, "template.view", r).ok).toBe(false);
       expect(can(taylor, "template.view", r).ok).toBe(true);
     }
@@ -901,13 +912,13 @@ describe("spaces", () => {
   });
 
   it('puts "All teams" first for cross-team viewers', () => {
-    const all = { slug: "all", name: "All teams", kind: "all" };
+    const all = { teamId: null, slug: "all", name: "All teams", kind: "all" };
     expect(spacesFor(riley)).toEqual([all]);
     expect(spacesFor(taylor)).toEqual([all]);
     const teams = [
-      { slug: "deposits", name: "Deposits" },
-      { slug: "coral-offers", name: "Coral Offers" },
-      { slug: "card-statements", name: "Card Statements" },
+      { id: "t_deposits", slug: "deposits", name: "Deposits" },
+      { id: "t_coral", slug: "coral-offers", name: "Coral Offers" },
+      { id: "t_cards", slug: "card-statements", name: "Card Statements" },
     ];
     expect(spacesFor(taylor, teams).map((s) => s.slug)).toEqual([
       "all",
@@ -923,13 +934,25 @@ describe("spaces", () => {
       memberships: [...priya.memberships].reverse(),
     };
     const expected = [
-      { slug: "coral-offers", name: "Coral Offers", kind: "team" },
-      { slug: "deposits", name: "Deposits", kind: "team" },
+      {
+        teamId: "t_coral",
+        slug: "coral-offers",
+        name: "Coral Offers",
+        kind: "team",
+      },
+      {
+        teamId: "t_deposits",
+        slug: "deposits",
+        name: "Deposits",
+        kind: "team",
+      },
     ];
     expect(spacesFor(priya)).toEqual(expected);
     expect(spacesFor(reversed)).toEqual(expected);
     expect(
-      spacesFor(priya, [{ slug: "card-statements", name: "Card Statements" }]),
+      spacesFor(priya, [
+        { id: "t_cards", slug: "card-statements", name: "Card Statements" },
+      ]),
     ).toEqual(expected);
   });
 
@@ -941,12 +964,13 @@ describe("spaces", () => {
     expect(defaultSpace(morgan)).toBeNull();
   });
 
-  it("canSeeSpace follows membership, and every space for cross-team viewers", () => {
-    expect(canSeeSpace(priya, "deposits")).toBe(true);
-    expect(canSeeSpace(priya, "card-statements")).toBe(false);
-    expect(canSeeSpace(maya, ALL_SPACE)).toBe(false);
-    expect(canSeeSpace(riley, "card-statements")).toBe(true);
-    expect(canSeeSpace(taylor, ALL_SPACE)).toBe(true);
+  it("canSeeSpace follows membership by team id, and every space for cross-team viewers", () => {
+    expect(canSeeSpace(priya, "t_deposits")).toBe(true);
+    expect(canSeeSpace(priya, "deposits")).toBe(false);
+    expect(canSeeSpace(priya, "t_cards")).toBe(false);
+    expect(canSeeSpace(maya, null)).toBe(false);
+    expect(canSeeSpace(riley, "t_cards")).toBe(true);
+    expect(canSeeSpace(taylor, null)).toBe(true);
   });
 });
 

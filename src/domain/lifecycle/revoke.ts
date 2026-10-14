@@ -68,7 +68,11 @@ export function startRevoke(input: {
       notify({
         notification: "revoke_started",
         to: teamApproversExcept(actorId),
-        title: `${input.actorName} started revoking ${input.templateName} v${number}. Confirm or cancel.`,
+        facts: {
+          actorName: input.actorName,
+          templateName: input.templateName,
+          number,
+        },
         body: reason,
         link: { to: "versions", templateId: version.templateId },
       }),
@@ -106,7 +110,7 @@ export function confirmRevoke(input: {
     confirmedAt: now.toISOString(),
   };
   const versions = { to: "versions", templateId: version.templateId } as const;
-  const title = `${actorName} confirmed the revoke of ${templateName} v${number}.`;
+  const facts = { actorName, templateName, number };
 
   const effects: LifecycleEffect[] = [
     {
@@ -133,7 +137,7 @@ export function confirmRevoke(input: {
     notify({
       notification: "version_revoked",
       to: teamApproversExcept(actorId),
-      title,
+      facts,
       body: started.reason,
       link: versions,
     }),
@@ -143,7 +147,7 @@ export function confirmRevoke(input: {
       notify({
         notification: "version_revoked",
         to: { kind: "user", userId: version.submittedBy },
-        title,
+        facts,
         body: started.reason,
         link: versions,
       }),

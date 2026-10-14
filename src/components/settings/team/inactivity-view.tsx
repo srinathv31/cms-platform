@@ -1,7 +1,10 @@
 "use client";
 
 import { rolesLabel } from "@/domain/access/roles";
-import type { InactivityRow, InactivitySection } from "@/domain/access-types";
+import type {
+  InactivityRow,
+  InactivitySection,
+} from "@/server/queries/access-models";
 import type { PermissionResult } from "@/domain/types";
 import {
   keepInactive,

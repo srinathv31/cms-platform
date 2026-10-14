@@ -33,7 +33,7 @@ backend knows (a stored row, the audit trail, a counter).
 | `consumers.ts` | Registered consumers, their notices (`consumerNotices`, `noticeSeqs`) and the render log (`renderLog`, `renderLogFor`).                  |
 | `simulator.ts` | Coral's own data: links (`simLink`, `linkOffer`), deliveries (`simDeliveries`), and what a spec must put back (`rememberSimulator`).     |
 | `people.ts`    | Memberships and roles (`membershipOf`, `approversOf`) and sign-in times.                                                                 |
-| `platform.ts`  | Settings, a content type's approval chain and allowed channels, `withAllowedChannels`.                                                   |
+| `platform.ts`  | Teams (`teamIdOf`: a team's id by its slug), settings, a content type's approval chain and allowed channels, `withAllowedChannels`.      |
 | `clock.ts`     | The demo clock: `clockOffsetDays`, `setClockOffsetDays`, `demoNow`, `clockDay`. Java provides a test-only offset for it.                 |
 | `templates.ts` | `removeTemplate`, `rememberTemplate` (put a template back as it was), `addTemplateLike`, `uploadsOf`.                                    |
 | `fixtures.ts`  | `createSpringTravel`: Maya's Spring Travel Rewards, live as v2, which several specs build on.                                            |
@@ -66,4 +66,5 @@ step even when one fails, and throws the first failure. A spec that re-seeds wit
 Name it for what the spec asks (`approversOf(teamId)`, not `selectMembers`), return records, and put it with its
 concern. Don't export `select` or `execute`, and don't take SQL as a parameter: a generic query is the thing this
 folder exists to prevent. Team arguments are a team's id where the caller holds one (`SeedVersion.teamId`) and its
-slug (`teamSlug`) where the spec is describing a URL.
+slug (`teamSlug`) where the spec is describing a URL. The two always differ (decision 0053): a spec that holds only
+the slug asks `teamIdOf(slug)` for the id.

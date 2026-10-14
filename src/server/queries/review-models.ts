@@ -53,6 +53,8 @@ export interface ReviewQueue {
   waiting: ReviewQueueRow[]; // the viewer can act on the current stage, and didn't submit it
   submitted: ReviewQueueRow[]; // submitted by the viewer, still in review
   decided: ReviewQueueRow[]; // decided in the last 30 days, on teams the viewer can see
+  /** ISO: the backend's instant the queue was read at (`asOf`); "3 days ago" counts from it. */
+  now: string;
 }
 
 export interface ReviewScreenData {
@@ -153,8 +155,12 @@ export interface ReviewScreenData {
   };
   /** For the approve dialog: computes consequences client-side as the sunset date changes. */
   consumerUsage: ConsumerUsage[];
-  /** YYYY-MM-DD, demo clock (UTC): the sample sets' "today". */
+  /** ISO: the backend's instant the screen was decided at (`asOf`); its relative times count from it. */
+  now: string;
+  /** YYYY-MM-DD, the UTC day of `now`: the sample sets' "today". */
   today: string;
+  /** Who is looking: the comments they write show under their name at once, before the server confirms them. */
+  viewer: Person;
   /** The approve dialog's sunset picker. */
   sunsetCalendar: SunsetCalendar;
   /**

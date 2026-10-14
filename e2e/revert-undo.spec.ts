@@ -219,8 +219,8 @@ test("switching tabs after Revert to v2 takes the Undo away, and the content sho
 });
 
 // What Revert to v2 reads is a GET route, not a server action (handoff review A6), and it answers by the persona
-// cookie: Eli's session gets v2, and a request without it is refused. (Until real sign-in, a request with no cookie
-// acts as the default persona, Maya, who holds no role on Deposits.)
+// cookie: Eli's session gets v2, and a request without it is refused as not found. (Until real sign-in, a request with
+// no cookie acts as the default persona, Maya, who holds no role on Deposits and so can't see the template.)
 test("the version Revert reads is a GET route that a request without Eli's session is refused", async ({
   page,
   playwright,
@@ -240,10 +240,10 @@ test("the version Revert reads is a GET route that a request without Eli's sessi
   const noSession = await playwright.request.newContext({ baseURL });
   try {
     const refused = await noSession.get(read);
-    expect(refused.status()).toBe(403);
+    expect(refused.status()).toBe(404);
     expect(await refused.json()).toEqual({
       ok: false,
-      code: "generic",
+      code: "template_unavailable",
       reason: expect.stringMatching(/\S/),
     });
     expect(
