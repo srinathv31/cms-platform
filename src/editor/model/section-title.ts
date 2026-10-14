@@ -1,4 +1,4 @@
-// How a heading's text is compared with a required section's title (Phase 7a). Shared by the import
+// How a heading's text is compared with a required section's title. Shared by the import
 // (a Word heading "1. Offer Details:" is the "Offer details" section) and the editor's paste (a pasted
 // "## Rates and fees" merges into the document's required "Rates and fees"). Pure; no TipTap.
 

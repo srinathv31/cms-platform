@@ -11,7 +11,7 @@
 // The live editor is rebuilt when a hidden route shows again (lib/use-editor-lifecycle.ts carries the
 // document and undo history over), and the block handle is loaded ahead of it (lib/load-block-handle.ts).
 //
-// Review comments (Phase 4): `threads` / `activeThreadId` are highlights (extensions/review-threads.ts,
+// Review comments: `threads` / `activeThreadId` are highlights (extensions/review-threads.ts,
 // in the static paint too); `onRequestComment` adds Comment to the toolbar (read-only too) and
 // ⌘⌥M; the handle places and reveals threads for the host (lib/block-rects.ts). Mechanics only: the
 // host draws the threads themselves.

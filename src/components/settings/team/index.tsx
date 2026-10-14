@@ -7,7 +7,7 @@ import {
   RecertificationBody,
 } from "./bodies";
 
-// Team group section bodies (Phase 6, slice U1). The group's nav counts live in ./nav-counts.ts.
+// Team group section bodies. The group's nav counts live in ./nav-counts.ts.
 
 export const TEAM_SECTION_BODIES: Record<TeamSettingsSection, SectionBody> = {
   members: MembersBody,
