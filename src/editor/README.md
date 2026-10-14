@@ -5,23 +5,18 @@ drag, and typed variables that are impossible to break. Built on open-source Tip
 shadcn/ui (Base UI) for every visible control. It knows nothing about Next.js, the database,
 personas or the template lifecycle: the host passes data in and receives events out.
 
-**Status: Phase 2 complete, ready to lift; Phase 4 adds review-comment mechanics.** The public API
-below is frozen for Phase 2: later phases may add props and exports, but won't change or remove
-these. Phase 4 additions are marked as such. Three members that were accepted and never used are gone: the
-`renderThread` prop, the `requiredSections` prop (the document's `requiredKey` attributes carry the sections) and
-the root runtime's `dispose()`.
+**How to read a file here.** The comment at the top of a file is its contract: what the file is for and what it
+promises its callers. A `/** */` comment documents one export. A `//` comment inside a body records a decision at the
+line it explains. Read the header first, then the exports; for an example, see the header of
+[lib/history-carry.ts](lib/history-carry.ts).
 
-Contents: [Public API](#public-api-frozen-for-phase-2) · [Composition](#composition) ·
+Contents: [Public API](#public-api) · [Composition](#composition) ·
 [Document contract](#document-contract-tiptap-json) · [Behavior](#behavior) ·
 [Keyboard](#keyboard) · [Paste](#paste) · [Alignment](#alignment) ·
 [Performance](#performance) · [Lifting it into another app](#lifting-it-into-another-app) ·
-[Changes since Phase 1](#changes-since-phase-1) · [Changes since Phase 2](#changes-since-phase-2) ·
-[Changes since Phase 3](#changes-since-phase-3) · [Changes since Phase 4](#changes-since-phase-4) ·
-[Changes since Phase 7a](#changes-since-phase-7a) ·
-[Changes for the message composer](#changes-for-the-message-composer) ·
 [How it's built](#how-its-built)
 
-## Public API (frozen for Phase 2)
+## Public API
 
 There's no barrel (no `index.ts`): hosts import each export from the module that defines it, so a
 route compiles only the parts of the editor it uses. The entry modules:
@@ -99,7 +94,7 @@ interface DocumentEditorProps {
   readOnly?: boolean;
   onVariablesChange?: (variables: Variable[]) => void;
   requiredNote?: string;
-  // Review comments (Phase 4; see Behavior → Comments):
+  // Review comments (see Behavior → Comments):
   threads?: readonly ThreadAnchor[]; // open ones are highlighted; resolved ones aren't
   activeThreadId?: string | null; // the stronger highlight
   onThreadClick?: (threadId: string) => void; // a click on a highlight
@@ -149,14 +144,14 @@ interface StaticDocumentProps {
   align?: "center" | "start";
   className?: string;
   threads?: readonly ThreadAnchor[];
-  activeThreadId?: string | null; // Phase 4: the same highlights
+  activeThreadId?: string | null; // the same highlights
 }
 ```
 
 `DocumentEditorHandle.focus(target?)` works before the editor has mounted (it's applied on mount);
 without a target it returns the caret to where it was.
 
-Phase 4 adds to the handle (each works read-only, before mount and while hidden in `<Activity>`).
+The handle's other members each work read-only, before mount and while hidden in `<Activity>`.
 All are required members of the type, so a test double or adapter of the handle implements every one
 (no-ops are fine); call them as `ref.current?.focusThread(id)`.
 
@@ -178,7 +173,7 @@ interface DocumentEditorHandle {
 | `Variable`, `VariableType`, `VARIABLE_TYPES`, `RequiredSection`, `SampleSet`, `VariableValue(s)`, `JSONContent`, `VariableNodeJSON`, `NODE`                                                  | The model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `ContractChange`, `ContractChangeKind`, `ContractState`, `diffVariables`, `identityOf`, `flaggedKeys`, `isBreaking`                                                                          | The consumer contract (Submit and review dialogs). `ContractChange` is a union with one member per kind, each with exactly its fields. `diffVariables(baseline, current)` pairs variables by id first (`identityOf`: the id, else the key), then by key, so a renamed variable is one `key_renamed`.                                                                                                                                                                                                                                                                               |
 | `formatValue`, `validateValue`, `ValidationResult`, `MAX_VALUE_LENGTH`, `longerThan`, `toKey`, `labelFromKey`, `isValidKey`, `TYPE_META`, `VariableTypeMeta`, `VariableIconKey`, `US_STATES` | Typed values and keys (render, sample sets, server validation). `labelFromKey` keeps whole-word acronyms in capitals ("purchase_apr" → "Purchase APR").                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets(variables, today)`, `sampleSetValues(set, variables, today)`                                                                 | Sample sets (Phase 3): the three default sets for a variable list, and the values to render a set with (its own values, gaps filled from its kind's defaults). `today` is `YYYY-MM-DD`; deterministic for a given day.                                                                                                                                                                                                                                                                                                                                                             |
+| `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets(variables, today)`, `sampleSetValues(set, variables, today)`                                                                 | Sample sets: the three default sets for a variable list, and the values to render a set with (its own values, gaps filled from its kind's defaults). `today` is `YYYY-MM-DD`; deterministic for a given day.                                                                                                                                                                                                                                                                                                                                                                       |
 | `baseExtensions(opts)`, `BaseExtensionOptions`                                                                                                                                               | The schema for server work: `@tiptap/html`, `@tiptap/static-renderer`, import, render.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `ensureBlockIds(doc)`                                                                                                                                                                        | Adds stable block ids server-side. Call it in seeds, import and server writes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `normalizePastedHtml(html, { parse? })`, `NormalizeHtmlOptions`                                                                                                                              | Word / Google Docs / web HTML → clean schema HTML. Pure DOM; pass `parse` (e.g. happy-dom's DOMParser) on the server.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -186,8 +181,8 @@ interface DocumentEditorHandle {
 | `normalizeDocument(doc)`, `normalizeField(doc, lines?, characters?)`, `normalizeFragment(nodes, edges)`                                                                                      | Save normalization (docs/render-spec.md §3), pure JSON: tabs, control, invisible and line-break characters, heading levels 4–6, cell `align`/`colwidth`, TipTap's list `type`, links (`links.ts`), content in cells, ragged and wide tables. A field (`FieldLines`: `"line"` or `"lines"`) loses its marks and joins its paragraphs; on `"line"` a break is a space, on `"lines"` a hard break. A message's field (`characters: "message"`, a push's or an SMS's) keeps its invisible characters. Paste (as a slice), import and autosave run it. Idempotent; never drops content. |
 | `documentProblem(doc)`, `fieldProblem(doc, check?)`, `DOCUMENT_MESSAGES`                                                                                                                     | The document check's limits beyond the schema (heading levels, list start and style, depth ≤ 9, cell content, table shape, ≤ 12 columns), with the author-facing sentences, and a channel field's check (`FieldCheck`: its lines, and the problem it is refused with: the email's, a push's or an SMS's sentence; the domain picks them by channel). `src/server/render/schema-check.ts` adds the schema parse.                                                                                                                                                                    |
 | `normalizeAndCheckBody(doc)`, `normalizeAndCheckField(doc)`                                                                                                                                  | What every save does first: normalize, then the check (`{ doc, problem }`). The autosave's pre-check and `src/server/documents/prepare.ts` (autosave and import) both call them.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `sectionTitleKey(text)`, `matchesSectionTitle(text, title)`                                                                                                                                  | Phase 7a: how a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it.                                                                                                                                                                                                                                                                                                                                                                                           |
-| `looksLikeMarkdown(text)`, `markdownToHtml(markdown)`                                                                                                                                        | Phase 7a: whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `sectionTitleKey(text)`, `matchesSectionTitle(text, title)`                                                                                                                                  | How a heading's text is compared with a required section's title (case, spacing, leading numbering and a trailing colon ignored). Import and the section-merging paste use it.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `looksLikeMarkdown(text)`, `markdownToHtml(markdown)`                                                                                                                                        | Whether plain text reads as Markdown, and Markdown → schema HTML (pure strings; `{{key}}` left as written, text escaped). The document's paste uses them; so can import.                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Component types                                                                                                                                                                              | `EditorRootProps`, `DocumentEditorProps`, `DocumentEditorHandle`, `FocusTarget`, `DocumentAlign`, `VariablesPanelProps`, `InlineVariableFieldProps`, `StaticDocumentProps`, `VariableChipViewProps`, `ThreadAnchor`, `CommentRequest`, `TextFlag`, `TextFlagger`.                                                                                                                                                                                                                                                                                                                  |
 
 ## Composition
@@ -228,8 +223,10 @@ import { VariablesPanel } from "@/editor/components/variables-panel";
   (same Suspense boundary) and the panel's usage counts are in the server HTML; otherwise they fill
   in after hydration on the same line (rows keep their height).
 - **Hidden routes.** Survives React `<Activity>` hiding: an editor destroyed while hidden comes back
-  with its latest content and re-registers with its root (`lib/use-editor-lifecycle.ts`; its undo
-  history comes with it, `lib/history-carry.ts`).
+  with its latest content and re-registers with its root (`lib/use-editor-lifecycle.ts`). Its undo
+  history comes with it (`lib/history-carry.ts`): ⌘Z still reaches back past a tab switch, in the document and in
+  one-line fields. Each step lands on the same document as before, but a step is one replace of the range that
+  changed, so the caret after an undo can sit at the start of the change.
 - **Hide a field, don't unmount it.** A field that leaves the tree leaves the root: its chips stop
   counting, and a key renamed meanwhile never reaches them (they come back as unknown chips). To put
   an inline field away for a while (the email subject while Email is off), pass `hidden`: it isn't
@@ -266,14 +263,13 @@ markerFormat, markerDelimiter }`: the numbering style the author chose (null = t
   popover: label, key, type, sample value and where it's used (sections and fields, with counts).
   Backspace/Delete remove a chip whole. A key that isn't in the list shows the key, in the warning
   style.
-- **Three ways to insert**, each one undo step: drag a panel row into the text; type `{{` for the
-  picker (filter by label or key, spaces allowed; **Create** pinned at the bottom unless the query
-  already names a variable; Create turns the picker into the compact form, and Enter creates the
-  variable, inserts its chip and gives focus back to the text at once, so the next key lands);
-  click or Enter on a panel row (inserts at the last caret of the last-focused field, or at the
-  start of the first required section if nothing had focus yet).
-  Typing `{{key}}` in full also makes a chip. A chip gets a space only where it would touch a word;
-  the caret lands right after it.
+- **Three ways to insert**, each one undo step: drag a panel row into the text; type `{{` for the picker; click or
+  Enter on a panel row (it inserts at the last caret of the last-focused field, or at the start of the first
+  required section if nothing had focus yet). Typing `{{key}}` in full also makes a chip.
+- **The `{{` picker** filters by label or key (spaces allowed), with **Create** pinned at the bottom unless the query
+  already names a variable. Create turns the picker into the compact form; Enter creates the variable, inserts its
+  chip and gives focus back to the text at once, so the next key lands.
+- **Spacing.** A chip gets a space only where it would touch a word; the caret lands right after it.
 - **Panel rows**: type, label, key, uses, Required switch; unused rows are muted. The pencil
   (revealed on hover and focus) opens the same form as Create, with Delete. Deleting a variable in
   use asks: Cancel, Keep chips (they become unknown chips), Remove chips (undo brings back both the
@@ -282,13 +278,28 @@ markerFormat, markerDelimiter }`: the numbering style the author chose (null = t
 - **The form**: label, key (follows the label as snake_case until edited; unique), type, required
   (on by default), sample (optional; validated for its type, and at most `MAX_VALUE_LENGTH` (1,000) characters: the input stops there). Messages only once a save is blocked.
 - **Ids carry renames** ([decision 0022](../../docs/decisions/0022-a-variable-keeps-its-identity-across-renames.md)).
-  The root's variable store gives each variable it creates a fresh id (a UUID, never a valid key).
-  A variable that arrives without one (a starter's, an import's) is identified by its key until its
-  key is first renamed; it then keeps that key as its id, and renamed back it needs none. Nothing
-  changes an id, and `onVariablesChange` reports the list with them, so a host that saves it keeps
-  the rename: after a reload, at submit and in later versions, `diffVariables` reads it as one
-  `key_renamed` (`a` → `b` → `c` is one rename `a` → `c`), and a new variable on a renamed one's old
-  key is an addition beside it.
+  The root's variable store gives each variable it creates a fresh id (a UUID, never a valid key). A variable that
+  arrives without one (a starter's, an import's) is identified by its key until its key is first renamed; it then
+  keeps that key as its id, and renamed back it needs none. Nothing changes an id.
+- **What a host that saves the list gets.** `onVariablesChange` reports the list with its ids, so the rename survives a
+  reload, submit and later versions: `diffVariables` reads it as one `key_renamed` (`a` → `b` → `c` is one rename
+  `a` → `c`), and a new variable on a renamed one's old key is an addition beside it.
+
+### Sample sets
+
+`defaultSampleSets(variables, today)` gives three sets with a canonical value for every variable
+(`model/sample-sets.ts`, pure TypeScript, deterministic for a given `today`):
+
+- **Typical** ("Typical customer"): each variable's sample when it is valid for its type, else a realistic default.
+- **Long** ("Long name and maximum values"): stresses layout, with long names ("Alexandria-Marguerite",
+  "Featherstonehaugh-Villiers"), a long phrase for other text, seven-digit amounts and numbers, a high percent, the
+  widest month (the next September 30) and the longest state name.
+- **Minimum** ("Minimum values"): short names ("Al", "Li"), zeros, the next May 1 and the shortest state name.
+- **Text defaults** follow the variable's key, then its label: a first, last or full name, a company, an email, a
+  city, a street address; anything else uses its label for the typical set.
+- **`sampleSetValues(set, variables, today)`** gives the set's value for each variable when it has one, otherwise the
+  default for the set's kind (a custom set falls back to typical). Keys that aren't in the list are dropped; values
+  pass through as given (the render route validates them).
 
 ### Required sections
 
@@ -320,14 +331,13 @@ ranges, sentences and replacements). `extensions/text-flags.ts`:
 - **Drawn as decorations**: `<span class="ucomp-flag" data-flag="i">`, a wavy warning underline on a
   soft wash that reaches a little past the text, so a single ’ shows. Text that draws nothing (a
   zero-width space) is also `data-invisible` and gets a sliver of width. Nothing moves.
-- **The popover** (`components/flag-popover.tsx`, store `state/flag-popover.ts`): the host's
-  sentence, and the fix when there is one ("Replace with '", "Replace with a space", or "Remove" for
-  an empty replacement). It opens on a click on the flag, or when the caret is moved onto it without
-  typing; an edit, the caret leaving, Esc and blur close it. It never takes focus on its own: Tab
-  from the field moves into it. There, Esc or Shift+Tab goes back to the field, and Tab closes it
-  and goes on to the control after the field (`lib/tab-order.ts`: the popover is portalled, so the
-  browser's own Tab would land at the end of the page). Its sentence is also said in a polite live
-  region beside the field, so a screen reader hears it as the caret arrives.
+- **The popover** (`components/flag-popover.tsx`, store `state/flag-popover.ts`): the host's sentence, and the fix when
+  there is one ("Replace with '", "Replace with a space", or "Remove" for an empty replacement). It opens on a click on
+  the flag, or when the caret is moved onto it without typing; an edit, the caret leaving, Esc and blur close it.
+  Its sentence is also said in a polite live region beside the field, so a screen reader hears it as the caret arrives.
+- **Keyboard into the popover.** It never takes focus on its own: Tab from the field moves into it. There, Esc or
+  Shift+Tab goes back to the field, and Tab closes it and goes on to the control after the field (`lib/tab-order.ts`:
+  the popover is portalled, so the browser's own Tab would land at the end of the page).
 - **The fix is one transaction** (`applyFlagFix`): the text replaced, or removed for "". ⌘Z puts it
   back. Read-only, the popover explains and offers no fix.
 
@@ -337,16 +347,15 @@ ranges, sentences and replacements). `extensions/text-flags.ts`:
   there (Esc right away takes the line back out). ⋮⋮ drags; clicked (no drag), it opens the block
   menu. Required headings show the + only. The handle is never wider than the gutter: in one narrower
   than its two buttons side by side (the workspace's, at a 320px window) they stack, the grip above the +.
-- **Block menu** (⋮⋮ click, a second click closes it; or Alt+F10 from the caret: a focused button in
-  the gutter, Enter opens it), named "Block options". For a numbered list: **Numbering** lists
-  Default (the style by depth, previewed) and the ten styles, each previewed ("1. 2. 3.",
-  "(a) (b) (c)"…), the list's own checked; **Start at…** swaps its row for a small number field
-  (0–9999; Enter applies, anything else is explained and not applied; Esc goes back to the item,
-  and focus moving to another row cancels it). Each choice is one undo step and an ordinary edit
-  (autosaved). The list is the one the caret is in when the caret is inside the block (so a nested
-  level is reached by clicking into it; the menu names the level), else the block itself, else the
-  first numbered list inside it. Any other block: both items disabled, with the reason. Nothing
-  scrolls; focus goes back to the text.
+- **Block menu** (⋮⋮ click, a second click closes it; or Alt+F10 from the caret: a focused button in the gutter,
+  Enter opens it), named "Block options". For a numbered list: **Numbering** lists Default (the style by depth,
+  previewed) and the ten styles, each previewed ("1. 2. 3.", "(a) (b) (c)"…), the list's own checked; **Start at…**
+  swaps its row for a small number field (0–9999; Enter applies, anything else is explained and not applied; Esc goes
+  back to the item, and focus moving to another row cancels it). Each choice is one undo step and an ordinary edit
+  (autosaved). Nothing scrolls; focus goes back to the text.
+- **Which list the menu edits.** The list the caret is in when the caret is inside the block (so a nested level is
+  reached by clicking into it; the menu names the level), else the block itself, else the first numbered list inside
+  it. Any other block: both items disabled, with the reason.
 - **Lists**: every item's marker is the text `model/list-markers.ts` writes ("1.", "(b)", "iv)",
   "•"), the same string every channel prints: default 1. → a. → i. by numbered-list depth, bullets
   • ◦ ▪ by bulleted-list depth, the author's style and start, out-of-range numbers in digits. Drawn
@@ -374,21 +383,21 @@ ranges, sentences and replacements). `extensions/text-flags.ts`:
   mounted, disabled, with what was typed in it, so nothing moves when the hold starts or lets go and
   the author returns to exactly where they were. `readOnly` wins when both are set.
 
-### Comments (Phase 4)
+### Comments
 
 Mechanics only: the editor highlights, reports and asks; the host stores threads and draws them
 (a list, popovers or margin cards) with the handle's rect methods.
 
-- **Highlights.** Each open thread highlights the first match of its `quote` in its block (the block
-  with `attrs.id === blockId`, top-level first). Matching ignores whitespace differences; chips read
-  as their label. No quote, or a quote that's no longer in the block: the whole block is washed
-  instead. Resolved threads, unknown blocks and the whole-document thread (`blockId: "doc"`) draw
-  nothing. Markup: `<mark class="ucomp-thread" data-thread="id">` per text run (chips stay
-  outside), `class="ucomp-thread-block" data-thread-block="id"` on a block; the active thread's
-  carries `data-active`. Warning tokens (`--warning-soft` wash with a `--warning-border` underline;
-  active: `--warning-border` with a `--warning` underline), apart from the teal of selection and
-  dragged blocks. Backgrounds and inset shadows only: blocks and chips don't move (text after a
-  highlight on its line can move ≤0.1 px: kerning across the highlight's edge).
+- **Highlights.** Each open thread highlights the first match of its `quote` in its block (the block with
+  `attrs.id === blockId`, top-level first). Matching ignores whitespace differences; chips read as their label. No
+  quote, or a quote that's no longer in the block: the whole block is washed instead. Resolved threads, unknown blocks
+  and the whole-document thread (`blockId: "doc"`) draw nothing.
+- **Markup and colour.** `<mark class="ucomp-thread" data-thread="id">` per text run (chips stay outside),
+  `class="ucomp-thread-block" data-thread-block="id"` on a block; the active thread's carries `data-active`. Warning
+  tokens (`--warning-soft` wash with a `--warning-border` underline; active: `--warning-border` with a `--warning`
+  underline), apart from the teal of selection and dragged blocks. Backgrounds and inset shadows only: blocks and
+  chips don't move (text after a highlight on its line can move a fraction of a pixel: kerning across the highlight's
+  edge).
 - **Edits.** Highlights are mapped decorations: they follow typing, moves, paste and undo, and are
   never part of the document or undo history. Typing inside a quote grows its highlight; deleting the
   quoted text falls back to the block; an edit to that block tries the quote again (so undo restores
@@ -457,22 +466,22 @@ through the host (`requestComment(blockId)` from a control of its own).
   **optional** Text variables labelled from the key (`promo_code` → "Promo code"), so a paste
   never silently adds a breaking change; a deleted variable pasted back returns as it was. Invalid
   `{{…}}` stays text. The paste is one undo step; created variables stay.
-- **Markdown** (Phase 7a): in the document, plain text with no HTML on the clipboard that looks like
+- **Markdown**: in the document, plain text with no HTML on the clipboard that looks like
   Markdown (a `#` heading, a list, a pipe table, a rule, a code fence, `**bold**` or a
   `[link](https://…)`) pastes as structure: `#`–`###` headings (deeper ones become H3), `-`/`*`/`+`
   and `1.` lists nested by indent, pipe tables with a header row, `---` rules, blank-line
   paragraphs, bold, italic and http/https/mailto links. Code, quotes, strikethrough and images keep
   their text only. `{{key}}` still becomes a chip. Other text pastes line by line as before, and so
   does a paste as plain text (⇧⌘V).
-- **Required sections** (Phase 7a): a pasted top-level heading that matches one of the document's
-  required headings (`matchesSectionTitle`) merges into it instead of adding a second one. Blocks
-  before the first match paste at the caret (below the heading when the caret is in a required
-  heading); each match's blocks go to the end of its section (a section runs to the next H2), after
-  its last line with something in it, replacing it when it holds only empty lines; headings that
-  match nothing stay headings, and so does a copied required heading (it pastes as a plain heading,
-  as above). Over a selection spanning required headings (select-all) the range
-  rule runs first, so an answer pasted over the whole draft replaces it section by section. One
-  undo step, and still a paste: chips and created variables as above. Works for HTML pastes too.
+- **Required sections**: a pasted top-level heading that matches one of the document's required headings
+  (`matchesSectionTitle`) merges into it instead of adding a second one. Blocks before the first match paste at the
+  caret (below the heading when the caret is in a required heading); each match's blocks go to the end of its section
+  (a section runs to the next H2), after its last line with something in it, replacing it when it holds only empty
+  lines. Headings that match nothing stay headings, and so does a copied required heading (it pastes as a plain
+  heading, as above).
+- **Over a selection spanning required headings** (select-all) the range rule runs first, so an answer pasted over the
+  whole draft replaces it section by section. It is one undo step, and still a paste: chips and created variables as
+  above. It works for HTML pastes too.
 - Links only form on their own from URLs with a protocol (`https://…`).
 - **One-line fields** join pasted lines with spaces (no Markdown, no section merging).
 
@@ -498,48 +507,43 @@ menus near the end of a document can open below the caret.
   rows subscribe to their own key in the root's zustand stores; menus mount only while open.
 - Usage is counted at most once per frame; each top-level block is summarized once and cached by
   node identity, so a recount after a keystroke walks only the edited block.
-- **Typing latency** (`node e2e/perf/typing-latency.mjs [baseURL]`: Event Timing API, ~190
-  keystrokes on the lab's long fixture, next to chips, in a table cell and in a list item): input
-  delay plus handler work per keystroke ≈ 1.5 ms median, under 4 ms max. Budget 16 ms.
-  With three threads highlighted (the lab's Comments toggle): 1.3 ms median (Phase 4).
+- **Typing latency** (`node e2e/perf/typing-latency.mjs [baseURL]`: Event Timing API, keystrokes on the lab's
+  long fixture, next to chips, in a table cell and in a list item): input delay plus handler work per keystroke,
+  budgeted at 16 ms; the script exits 1 when a p95 is over it. Also run it with threads highlighted (the lab's
+  Comments toggle).
 - **No visible swap**: the server and the hydration pass render `<StaticDocument>`; the live editor
-  mounts after hydration with identical markup. Measured: 0 px movement of every block and chip,
-  CLS 0 (lab and workspace).
+  mounts after hydration with identical markup, so no block or chip moves (layout shift is zero in the lab and the
+  workspace).
 
 ## Lifting it into another app
 
 1. **Copy** `src/editor/` as is (tests and fixtures included).
-2. **Install** (all MIT; versions as used here):
-
-   | Package                                                                                                                                                                                                                                                                                                                                    | Version       |
-   | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-   | `@tiptap/core`, `@tiptap/pm`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-table`, `@tiptap/extensions`, `@tiptap/extension-unique-id`, `@tiptap/extension-drag-handle`, `@tiptap/extension-drag-handle-react`, `@tiptap/extension-node-range`, `@tiptap/extension-mention`, `@tiptap/suggestion`, `@tiptap/static-renderer` | ^3.31.4       |
-   | peers of the drag handle: `@tiptap/extension-collaboration`, `@tiptap/y-tiptap`                                                                                                                                                                                                                                                            | 3.31.4, 3.0.9 |
-   | `@floating-ui/dom` (imported directly; here it arrives through TipTap)                                                                                                                                                                                                                                                                     | ^1.8.0        |
-   | `@base-ui/react`                                                                                                                                                                                                                                                                                                                           | ^1.8.0        |
-   | `react`, `react-dom`                                                                                                                                                                                                                                                                                                                       | 19.2          |
-   | `motion`                                                                                                                                                                                                                                                                                                                                   | ^14.0.0       |
-   | `zustand`                                                                                                                                                                                                                                                                                                                                  | ^5.0.15       |
-   | `lucide-react`                                                                                                                                                                                                                                                                                                                             | ^1.51.0       |
-   | for the shadcn components: `cmdk` ^1.1.1, `class-variance-authority` ^0.7.1, `cn` ^0.4.0                                                                                                                                                                                                                                                   |               |
-   | tests only: `vitest`, `happy-dom`                                                                                                                                                                                                                                                                                                          |               |
+2. **Install** (all MIT; versions in this repo's `package.json`):
+   - `@tiptap/core`, `@tiptap/pm`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-table`,
+     `@tiptap/extensions`, `@tiptap/extension-unique-id`, `@tiptap/extension-drag-handle`,
+     `@tiptap/extension-drag-handle-react`, `@tiptap/extension-node-range`, `@tiptap/extension-mention`,
+     `@tiptap/suggestion`, `@tiptap/static-renderer`
+   - the drag handle's peers: `@tiptap/extension-collaboration`, `@tiptap/y-tiptap`
+   - `@floating-ui/dom` (imported directly; here it also arrives through TipTap), `@base-ui/react`, `react`,
+     `react-dom`, `motion`, `zustand`, `lucide-react`
+   - for the shadcn components: `cmdk`, `class-variance-authority`, `cn`
+   - tests only: `vitest`, `happy-dom`
 
 3. **shadcn/ui** (base-nova style, Base UI) at `@/components/ui/*`: `alert-dialog`, `button`,
    `command`, `dropdown-menu`, `input`, `kbd`, `select`, `switch`, `toggle` (and what they import:
    `dialog`, `input-group`). Adjust the `@/` alias if yours differs.
-4. **Tokens.** Tailwind v4 with the UCOMP semantic theme. Utilities used: `bg-surface`,
-   `bg-surface-tinted`, `bg-surface-sunken`, `bg-hover`, `bg-selected`, `border-hairline`,
-   `bg-control-off`, `text-text`, `text-text-muted`, `text-text-subtle`, `text-label`,
-   `bg-chip`, `border-chip-border`, `text-chip-text`, `text-chip-icon`, `bg-warning-soft`,
-   `border-warning-border`, `text-warning-text`, `text-warning`, `text-danger-text`,
-   `bg-danger-soft`, `bg-popover`, `ring-ring`, `bg-scrim` (dialogs), `shadow-pop`,
-   `rounded-md…4xl`, `font-mono`, `.caps-label`, `sr-only`. CSS variables read by `styles.css`:
-   `--text`, `--text-muted`, `--text-subtle`, `--hairline`, `--surface-tinted`, `--brand`,
-   `--brand-1`, `--brand-3`, `--brand-soft`, `--warning`, `--warning-text`, `--warning-soft`,
-   `--warning-border`, `--radius-chip`, `--radius-control`, `--radius-card`, `--doc-width`,
-   `--ui-font-sans`, `--ui-font-display` (section heads), `--dur-fast`, `--ease-out-soft`; and a
-   global `:focus-visible` ring from `--focus-ring`. Theming = changing tokens, never this folder.
-   Make sure Tailwind scans the copied folder.
+4. **Tokens.** Tailwind v4 with the UCOMP semantic theme. Theming means changing tokens, never this folder. Make sure
+   Tailwind scans the copied folder.
+   - Utilities used: `bg-surface`, `bg-surface-tinted`, `bg-surface-sunken`, `bg-hover`, `bg-selected`,
+     `border-hairline`, `bg-control-off`, `text-text`, `text-text-muted`, `text-text-subtle`, `text-label`, `bg-chip`,
+     `border-chip-border`, `text-chip-text`, `text-chip-icon`, `bg-warning-soft`, `border-warning-border`,
+     `text-warning-text`, `text-warning`, `text-danger-text`, `bg-danger-soft`, `bg-popover`, `ring-ring`, `bg-scrim`
+     (dialogs), `shadow-pop`, `rounded-md…4xl`, `font-mono`, `.caps-label`, `sr-only`.
+   - CSS variables read by `styles.css`: `--text`, `--text-muted`, `--text-subtle`, `--hairline`, `--surface-tinted`,
+     `--brand`, `--brand-1`, `--brand-3`, `--brand-soft`, `--warning`, `--warning-text`, `--warning-soft`,
+     `--warning-border`, `--radius-chip`, `--radius-control`, `--radius-card`, `--doc-width`, `--ui-font-sans`,
+     `--ui-font-display` (section heads), `--dur-fast`, `--ease-out-soft`; and a global `:focus-visible` ring from
+     `--focus-ring`.
 5. **CSS**: `styles.css` is imported by the components; bundlers that handle CSS imports (Next,
    Vite) need nothing else. Otherwise import it once globally.
 6. **Wire it**: wrap the document and panel in an `<EditorRoot>` per version (`key`), persist from
@@ -554,129 +558,6 @@ menus near the end of a document can open below the caret.
 The folder imports only `react`, `react-dom`, `@tiptap/*`, `@base-ui/react`, `@floating-ui/dom`,
 `@/components/ui/*`, `lucide-react`, `motion` and `zustand` (`portability.test.ts`; in this repo
 ESLint enforces it too: no `next/*`, no app code).
-
-## Changes since Phase 1
-
-For anyone who wired the Phase 1 editor:
-
-- **New composition**: `<EditorRoot>` owns the variable list; `<VariablesPanel>` and
-  `<InlineVariableField>` render inside it. `DocumentEditor`'s `variables`,
-  `readOnly` and `onVariablesChange` are now for standalone use only (inside a root they're
-  ignored). Standalone, `variables` is read once (Phase 1 re-synced it on every change).
-- **New props**: `align` on `DocumentEditor` and `StaticDocument`; `ref` (`DocumentEditorHandle`
-  with `focus()`); `requiredNote` and `baseline` on the root. `onVariablesChange` now fires.
-- **New exports**: `EditorRoot`, `VariablesPanel`, `InlineVariableField`, `useContractState`,
-  `diffVariables`, `flaggedKeys`, `isBreaking`, `labelFromKey`, `normalizePastedHtml`,
-  `chipsInJSON`, `variableKeys`, and the contract types.
-- **Removed exports** (internal now): `editorExtensions`, `EditorExtensionOptions`,
-  `BLOCK_ID_TYPES`, `EMPTY_LINE_PLACEHOLDER`. `schema.ts` still exports the first three (with
-  `inlineFieldExtensions`) for the editor's own modules, and ESLint refuses them outside `src/editor`;
-  `EMPTY_LINE_PLACEHOLDER` is not exported at all.
-- **Behavior**: required headings are locked (Phase 1 only kept their key unique); chips are
-  interactive (popover, insert, delete); unknown chips use the warning tokens; section heads (H2)
-  use the display serif and H3 is medium weight; Home/End move along the visual line; pasted Word
-  and Google Docs content is normalized; bare-domain text no longer turns into links on its own.
-
-## Changes since Phase 2
-
-Phase 3 additions (additive only; nothing above changed or went away):
-
-- **New exports**: `DEFAULT_SAMPLE_SETS`, `DefaultSampleSetId`, `defaultSampleSets`,
-  `sampleSetValues` (`model/sample-sets.ts`, pure TS).
-  - `DEFAULT_SAMPLE_SETS`: `typical` "Typical customer", `long` "Long name and maximum values",
-    `minimum` "Minimum values" (the same ids and names the seed uses).
-  - `defaultSampleSets(variables, today)`: those three sets with a canonical value for every
-    variable. Typical uses each variable's sample when it's valid for its type. Long stresses layout:
-    long names ("Alexandria-Marguerite", "Featherstonehaugh-Villiers"), a ~60-character phrase for
-    other text, 1,000,000 for amounts and numbers, 99.99%, the next September 30, the longest state
-    name. Minimum: short names ("Al", "Li"), zeros, the next May 1, the shortest state name. Text
-    defaults follow the key, then the label (first, last or full name, company, email, city, street
-    address; anything else uses its label for typical).
-  - `sampleSetValues(set, variables, today)`: the set's value for each variable when it has one,
-    otherwise the default for the set's kind (custom sets fall back to typical). Keys that aren't in
-    the list are dropped; values pass through as given (the render route validates them).
-
-## Changes since Phase 3
-
-Phase 4 additions: review-comment mechanics (additive only; nothing above changed or went away).
-
-- **New `DocumentEditor` props**: `activeThreadId`, `onThreadClick`, `onCaretThreadChange`; `threads`
-  and `onRequestComment` (accepted since Phase 1) now work; `threads` takes a readonly array.
-- **New handle methods**: `focusThread`, `getBlockRect`, `getThreadRect`, `subscribeBlockRects`,
-  `requestComment`.
-- **New `StaticDocument` props**: `threads`, `activeThreadId`.
-- **Behavior**: the toolbar's Comment action (icon and label "Comment") and ⌘⌥M; read-only documents
-  show a Comment-only toolbar on selected text when `onRequestComment` is given. See Behavior → Comments.
-- No new exports or dependencies (`ThreadAnchor` and `CommentRequest` were exported already; the
-  tooltip uses `@base-ui/react/tooltip` directly so it renders inside the editor).
-
-## Changes since Phase 4
-
-Phase 7a additions: Markdown paste and section-merging paste for Copilot's answers (additive only;
-nothing above changed or went away).
-
-- **New exports**: `sectionTitleKey`, `matchesSectionTitle` (`model/section-title.ts`, pure TS),
-  `looksLikeMarkdown`, `markdownToHtml` (`paste/markdown.ts`, pure strings).
-- **Behavior** (document editor only; one-line fields unchanged): plain-text Markdown pastes as
-  structure, and pasted headings that match required sections merge into them (see Paste).
-- **New internals**: `extensions/section-paste.ts` (`SectionPaste`, in the client extension list at
-  priority 1001, just ahead of the required-section guard); the field binding's
-  `clipboardTextParser` for the document. No new props, handle methods or dependencies.
-
-## Changes since Phase 7a
-
-Undo and redo a host can show as buttons, undo history that survives a hidden route, and inline
-fields a host can hide without taking them out of the root, all additive; and variable ids that carry
-a rename into the contract diff, which change the contract types (the last item).
-
-- **New exports**: `useEditorHistory()` (`components/editor-root.tsx`) and its `EditorHistory` type
-  (`types.ts`). The root runtime gains `history` (a store of `{ canUndo, canRedo }`), `undo()`,
-  `redo()` and `noteHistory(fieldId)`, which the field binding calls on every update.
-- **Behavior**: `undo()` / `redo()` take one step in the last-focused field, as ⌘Z / ⇧⌘Z do, but
-  leave the scroll position alone (⌘Z scrolls to the change): a button pressed while reading one
-  part of the document doesn't carry the page off to another.
-- **Undo history across a hidden route**: Next destroys a hidden route's editors and builds new ones
-  when it shows again. `lib/history-carry.ts` captures the documents each undo and redo leads to as
-  the old editor goes, and replays them into the new editor's history, so ⌘Z still reaches back past a
-  tab switch (document and one-line fields). Each step lands on the same document as before; a step
-  is one replace of the range that changed, so the caret after an undo can sit at the start of a
-  change rather than exactly where it was.
-- **New prop**: `hidden` on `InlineVariableField`, backed by the root runtime's
-  `setFieldHidden(fieldId, hidden)`. A hidden field still counts and follows renames and deletes;
-  insert, undo and redo pass it by (see Composition).
-- **New prop**: `lines` on `InlineVariableField` (`"line"`, the default, or `"lines"`), and the same
-  as the second argument of `inlineFieldExtensions`. A `"lines"` field's schema has the hard break;
-  `extensions/field-lines.ts` makes Enter add one (after the `{{` picker) and turns a paste into one
-  paragraph with a hard break for each line, blank lines kept (`flattenToLines`, `linesOfText` in
-  `paste/chips.ts`). `normalizeField`, `fieldProblem` and `ContentLimits` take the same setting.
-- No new handle methods or dependencies.
-- **Renames reach the contract**: `Variable` gains an optional `id` (see Behavior, Variables), and
-  `onVariablesChange` reports it. `ContractChange` is a union with one member per kind, each with
-  exactly its fields: `type_changed` no longer repeats its new type as `type`, and `made_required` and
-  `made_optional` no longer carry `required`. `diffVariables(baseline, current)` takes no options:
-  `DiffOptions` and its `renames` map are gone, and so are the variable store's `renames` and a
-  tombstone's `renamedFrom`. `identityOf` is new in `model/contract`.
-
-## Changes for the message composer
-
-Three additive props on `InlineVariableField`, for the message composer's fields (a push's title and
-body, an SMS's message) in a page's main column:
-
-- **New prop**: `flags` (`TextFlagger`, with the `TextFlag` type in `types.ts`): problems underlined in
-  the text, each with the host's sentence and an optional one-click fix (see Behavior, Flags). It is
-  `textFlags` in `EditorExtensionOptions` for `inlineFieldExtensions`. New files:
-  `extensions/text-flags.ts`, `state/flag-popover.ts`, `components/flag-popover.tsx`.
-- **New prop**: `footer`, fixed content inside the field's box after its text, never editable (an
-  SMS's locked footer). It shows in the server paint too.
-- **New prop**: `size` (`"sm"`, the default, or `"md"`): 15px text and roomier padding beside a
-  document-sized column.
-- **New prop**: `characters` (`CharacterRules` in `model/characters.ts`: `"document"`, the default, or
-  `"message"`), the third argument of `inlineFieldExtensions` and a `ContentLimits` option. A message's
-  field keeps the invisible characters a phone draws with (an emoji's joiner and selector, a flag's tags,
-  the non-joiner in a Persian name) in what is pasted into it; only control characters go. The same
-  setting is on `normalizeField`, `normalizeFragment`, `FieldCheck` and `cleanCharacters`
-  (docs/render-spec.md §4).
-- No new handle methods or dependencies.
 
 ## How it's built
 
