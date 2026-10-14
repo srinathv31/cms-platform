@@ -5,7 +5,7 @@ import type { VariableKit } from "@/server/documents/variables";
 // Card offer terms: a rewards offer written the way the Coral Offers templates are.
 //
 // `first_name` and `purchase_apr` are declared but not used in the body, on purpose: the author
-// drags the first name in from the panel and types {{ to add the purchase APR (build plan, scenario 2).
+// drags the first name in from the panel and types {{ to add the purchase APR.
 // `offer_end_date` is left out for the same reason: the author creates it.
 
 export function cardOfferTermsVariables(kit: VariableKit): Variable[] {

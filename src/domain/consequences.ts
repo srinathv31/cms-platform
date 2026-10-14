@@ -1,5 +1,5 @@
 // Consequences before commitment: the approve, sunset and revoke dialogs say who is affected, in plain
-// words, from the render log (build plan, "Template lifecycle"). Pure TypeScript; the dialog recomputes
+// words, from the render log. Pure TypeScript; the dialog recomputes
 // the lines client-side as the sunset date changes, so `now` is the demo clock passed in.
 //
 //   approve  "v2 becomes Active. v1 becomes Superseded; Coral keeps rendering v1 until it relinks."

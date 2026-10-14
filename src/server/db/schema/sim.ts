@@ -28,7 +28,7 @@ export const simOffers = sqliteTable("sim_offers", {
   kind: text("kind").$type<SimOfferKind>().notNull().default("offer"),
   name: text("name").notNull(), // "Spring Travel Rewards", "Card used abroad"
   headline: text("headline").notNull(), // "Spend $1,000 in 3 months, get $200 back"; an alert's: when it's sent
-  // annualFee in dollars ("95" when mapped); endsOn is a YYYY-MM-DD day (Phase 5: offer.* mapping fields).
+  // annualFee in dollars ("95" when mapped); endsOn is a YYYY-MM-DD day (the offer.* mapping fields).
   // Null for an alert.
   terms: json<{
     spend: number;
@@ -90,7 +90,7 @@ export const simDeliveries = sqliteTable(
     batchId: text("batch_id").notNull(),
     offerId: text("offer_id").notNull(),
     customerId: text("customer_id").notNull(),
-    // Phase 5: what was asked for. Nullable only so the column can be added; always written.
+    // What was asked for. Nullable only so the column could be added; always written.
     templateId: text("template_id"),
     versionNumber: integer("version_number"),
     channel: text("channel").$type<SimChannel>().notNull(),

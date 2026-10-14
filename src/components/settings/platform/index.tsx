@@ -13,7 +13,7 @@ import { ContentTypesSectionView } from "./content-types";
 import { TeamsSectionView } from "./teams";
 import { TimeZoneSectionView } from "./time-zone";
 
-// Platform group section bodies (Phase 6, slice U2). Each is an async server component that reads its
+// Platform group section bodies. Each is an async server component that reads its
 // query (a 404 for anyone but a Platform Admin) inside the settings panel's Suspense, then hands the
 // read model to a client view.
 

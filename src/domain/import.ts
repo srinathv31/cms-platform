@@ -1,4 +1,4 @@
-// The import's pure rules (Phase 7a): what a converted .docx, .pdf or .txt becomes as a new draft.
+// The import's pure rules: what a converted .docx, .pdf or .txt becomes as a new draft.
 // Placeholders → Text chips, the content type's required sections found or added, the template's
 // name, plain text and PDF lines → blocks, and the report as short lines. Pure TypeScript: the
 // converters (src/server/import/*) hand over schema JSON; block ids come after (ensureBlockIds).

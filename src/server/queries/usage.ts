@@ -7,7 +7,7 @@ import { requireRequestContext } from "@/server/context/request";
 import { services } from "@/server/services";
 import { requireSpace } from "./spaces";
 
-// The Usage read models (slice S2): the dashboard of a space and one template's Usage tab. The backend counts
+// The Usage read models: the dashboard of a space and one template's Usage tab. The backend counts
 // the render log (`services().usage`: the windows, what counts as usage, UTC days, each sunset decided in the
 // business time zone) and answers facts; the domain's pure `usageDashboard` and `templateUsage`
 // (src/domain/golive/usage.ts) add them up, order them and word them. Nothing here decides or reads a clock:

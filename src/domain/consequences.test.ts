@@ -28,7 +28,7 @@ const DEPOSITS_V1 = row("Deposits Online", 1, daysAgo(3), 12);
 const CORAL_V2 = row("Coral", 2, hoursAgo(1), 80);
 
 describe("consequences: approve", () => {
-  it("names the consumers that keep rendering the previous version until they relink (the build plan's example)", () => {
+  it("names the consumers that keep rendering the previous version until they relink", () => {
     expect(
       consequences(
         { kind: "approve", newNumber: 2, previousNumber: 1, sunsetAt: null },
@@ -394,7 +394,7 @@ describe("breakingKeysOf", () => {
 });
 
 describe("consequences: sunset", () => {
-  it("says who still renders it and until when (the build plan's example)", () => {
+  it("says who still renders it and until when", () => {
     expect(
       consequences(
         { kind: "sunset", number: 1, sunsetAt: MARCH_1, activeNumber: 2 },
@@ -465,7 +465,7 @@ describe("consequences: sunset", () => {
 });
 
 describe("consequences: revoke", () => {
-  it("says how much each consumer renders it, and that those renders fail now (the build plan's example)", () => {
+  it("says how much each consumer renders it, and that those renders fail now", () => {
     expect(
       consequences(
         { kind: "revoke", number: 1, activeNumber: 2 },

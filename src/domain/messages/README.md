@@ -50,12 +50,15 @@ They need no browser either: the composer hands them text, or the phone kit's me
   `units ÷ perPart` suggests: 152 letters, a €, and 152 more letters are 306 septets but 3 parts.
 - **The empty text** is GSM-7 with 0 parts.
 - **Characters outside GSM-7** come back from `nonGsmCharacters` one grapheme cluster at a time, with the UTF-16
-  offset and length the editor needs to underline it. Punctuation and spacing with an obvious GSM-7 equivalent get a
-  `replacement`: ‘ ’ ‚ ′ ´ to ', “ ” „ ″ « » to ", the hyphens, dashes and minus to -, … to ..., bullets to -, no-break
-  and other Unicode spaces to a space, and invisible characters (zero-width space, soft hyphen, a stray joiner) to
-  nothing. That last one is the empty string, so test `replacement !== undefined`. Letters (á í ó ú ç), emoji,
-  symbols (™ ©) and fractions (1½ would read 11/2) get none: changing them changes the author's words. A letter typed
-  in decomposed form (e plus a combining acute) is offered its composed form (é), which is the same text.
+  offset and length the editor needs to underline it.
+  - Punctuation and spacing with an obvious GSM-7 equivalent get a `replacement`: ‘ ’ ‚ ′ ´ to ', “ ” „ ″ « » to ",
+    the hyphens, dashes and minus to -, … to ..., bullets to -, no-break and other Unicode spaces to a space, and
+    invisible characters (zero-width space, soft hyphen, a stray joiner) to nothing. That last one is the empty
+    string, so test `replacement !== undefined`.
+  - Letters (á í ó ú ç), emoji, symbols (™ ©) and fractions (1½ would read 11/2) get none: changing them changes the
+    author's words.
+  - A letter typed in decomposed form (e plus a combining acute) is offered its composed form (é), which is the same
+    text.
 
 ### 0x09: Ç, not ç
 
@@ -157,7 +160,7 @@ the last whole word (`roundToWord`) and quoted by its last two words (`quotedTai
 “…payment of”." When both platforms cut a title at the same word, one sentence names both.
 
 The composer doesn't warn about Android showing the title with previews hidden: whether that matters depends on
-whether a value is sensitive, which nothing records yet (sensitive variables are a later phase). The preview's
+whether a value is sensitive, which nothing records yet (the product has no sensitive variables yet). The preview's
 Previews: Hidden shows it.
 
 ## Sources

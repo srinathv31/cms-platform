@@ -1,12 +1,12 @@
-// Phase 5 contract (going live), UCOMP side: the consumer API's server shapes, the Usage read models,
-// the integration panel, and the signatures every slice codes against. Pure types (plus two small
-// consts), written by the lead. Dates in read models are ISO strings (they cross into client components).
+// The going-live contract, Stencil's side: the consumer API's server shapes, the Usage read models and the
+// integration panel's data. Pure types (plus a few small consts). Dates in read models are ISO strings (they cross
+// into client components).
 //
-// Three files make up the Phase 5 contract, because the simulator may not import @/domain:
-//   src/contracts/api-v1.ts   the /api/v1 wire shapes (both sides)          ← the consumer API
-//   src/domain/golive-types.ts this file: UCOMP's read models and signatures
-//   src/simulator/types.ts    the simulator's own read models and actions   ← Coral's side
-// Who implements what is in docs/archive/phase-5-brief.md.
+// The wire shapes themselves are src/contracts/api-v1.ts, shared with the simulator, which may not import
+// @/domain; this file re-exports them and checks the domain's render types against them (_DriftChecks). The
+// simulator's own read models are src/simulator/types.ts. The functions over these shapes are in domain/golive/,
+// the consumer API's queries in src/server/services/local/consumer-api.ts, and the Usage queries in
+// src/server/services/local/usage.ts.
 
 import type {
   ApiBase64Response,
@@ -104,43 +104,15 @@ export const USAGE_WINDOW_DAYS = 30;
 export const NEARING_SUNSET_DAYS = 30;
 /** Heatmap columns (weeks, Sunday-first), ending with the demo clock's current week. */
 export const HEATMAP_WEEKS = 18;
-/** Added by S2: "Renders over time" / "Renders by version" columns (Sunday-first weeks, ending this week). */
+/** "Renders over time" / "Renders by version" columns (Sunday-first weeks, ending this week). */
 export const TREND_WEEKS = 13;
-/** Added by S2: the daily series (failure-rate line, the template's `daily`) cover this many UTC days, today last. */
+/** The daily series (failure-rate line, the template's `daily`) cover this many UTC days, today last. */
 export const HISTORY_DAYS = 90;
 
-// ── Pure domain functions (slice D1, src/domain/golive/*.ts, each with a test) ───────────────────
-//
-// json-schema.ts
-//   contractJsonSchema(input: { templateId: string; templateName: string; versionNumber: number;
-//                               variables: readonly Variable[] }): ApiJsonSchema
-//     Patterns must accept exactly the canonical forms validate.ts accepts (test: every seeded sample
-//     validates against its schema; JUNK values don't). us_state → enum of the editor's US_STATES codes.
-//   apiVariables(variables: readonly Variable[]): ApiVariable[]           // example = variable.sample
-// contract-diff.ts
-//   apiChanges(changes: readonly ContractChange[], versionNumber: number): ApiContractChange[]   // text via describeChange
-//   contractDiff(from: { number: number; variables: readonly Variable[] },
-//                to: { number: number; variables: readonly Variable[] }): ApiContractDiff         // via diffVariables
-// notices.ts
-//   noticeView(row: NoticeRow): ApiNotice        // normalizes BOTH payload shapes (see NoticeRow) and writes `message`
-// samples.ts
-//   integrationSamples(input: { origin: string; templateId: string; versionNumber: number; channel: Channel;
-//                               variables: readonly Variable[]; consumerId: string }): { curl: string; fetch: string }
-//     Values = each variable's sample. curl uses --data-raw with pretty JSON and `--output` for pdf.
-//   RESPONSE_FORMATS: readonly ResponseFormat[]  // per channel + base64; copy lives here, not in the UI
-// usage.ts
-//   trendPct(current: number, previous: number): number | null          // null when previous is 0; rounded to 1 decimal
-//   heatmap(counts: ReadonlyMap<string /*YYYY-MM-DD*/, number>, today: string, weeks?: number): UsageHeatmap
-//     Levels: 0 = no renders (taupe); 1–4 by quartiles of the non-zero days in range.
-//   usageTags(row: { versionNumber: number; state: VersionState; sunsetAt: Date | null; revokedAt: Date | null;
-//                    errors30d: number }, now: Date, zone: string): UsageTag[]   // days to a sunset in the business zone
-//     "On superseded v1 · sunset in 6 days" (warning) · "… sunset tomorrow" / "… sunset today" ·
-//     "On superseded v1" (neutral, no sunset set) · "v1 sunset Mar 1 · renders fail" (danger, passed) ·
-//     "v1 revoked · renders fail" (danger) · "3 failed renders" (danger, errors30d > 0). Active rows get none.
-//   errorText(code: RenderErrorCode): string    // render_log keeps codes only: "Missing required variables." etc.
+// ── Notices ────────────────────────────────────────────────────────────────
 
 /**
- * A consumer_notices row as stored. The rows server/effects.ts writes and the seed's carry the same
+ * A consumer_notices row as stored. The rows services/local/effects.ts writes and the seed's carry the same
  * payloads, one shape per kind (decision 0064):
  *   new_version       { templateName, versionNumber, activeVersion, contractChanges, contractLines }
  *   sunset_scheduled  { templateName, versionNumber, activeVersion, sunsetAt, sunsetDay, zone, contractChanges?, contractLines? }
@@ -167,23 +139,7 @@ export interface ResponseFormat {
   example: string | null;
 }
 
-// ── Consumer API queries (slice S1, src/server/services/local/consumer-api.ts; no viewer, consumer-scoped) ──
-//
-//   requireConsumer(header: string | null): Promise<{ ok: true; consumer: { id: string; name: string } } | { ok: false; error: ApiError }>
-//   searchActiveTemplates(q: string, limit: number, after: SearchKey | null): Promise<SearchPage>
-//   getTemplateDetail(templateId: string, opts: { version?: number; since?: number }, now: Date):
-//     Promise<{ ok: true; detail: ApiTemplateDetail } | { ok: false; error: ApiError }>
-//   listNotices(consumerId: string, opts: { after?: number; templateId?: string; limit: number }): Promise<NoticePage>
-//     Both lists page with the opaque cursors in golive/cursor.ts (ApiPage in the contract).
-//
-// Routes (slice S1), GET handlers. Read `request.headers` FIRST (it makes the handler dynamic under
-// Cache Components; a DB read before it would try to prerender). Same header helpers as the render route
-// (correlation id, no-store, nosniff) — move them to src/server/api/http.ts and import from both.
-//   src/app/api/v1/templates/route.ts
-//   src/app/api/v1/templates/[templateId]/route.ts
-//   src/app/api/v1/consumers/[consumerId]/notices/route.ts
-
-// ── Usage read models (slice S2, src/server/queries/usage.ts) ──────────────────────────────────
+// ── Usage read models (src/server/services/local/usage.ts counts them; domain/golive/usage.ts lays them out) ──
 
 export type UsageTone = "neutral" | "warning" | "danger" | "positive";
 
@@ -208,7 +164,7 @@ export interface UsageHeatmap {
   /** Upper bound per level (level 1 ≤ thresholds[0] …), for the legend's tooltips. */
   thresholds: [number, number, number, number];
   total: number;
-  /** Added by S2: the in-range day with the most renders ("Busiest day | 1,234"); null when there were none. */
+  /** the in-range day with the most renders ("Busiest day | 1,234"); null when there were none. */
   busiest: { date: string; count: number } | null;
 }
 
@@ -232,7 +188,7 @@ export interface UsageRow {
   sunsetDay: string | null;
   /** The sunset has passed (`sunsetPassed`), for `<StatusBadge sunsetPassed>`. False when none is set. */
   sunsetPassed: boolean;
-  /** Added by S2: successful renders per UTC day for the sparkline, USAGE_WINDOW_DAYS values, oldest first, today last. */
+  /** successful renders per UTC day for the sparkline, USAGE_WINDOW_DAYS values, oldest first, today last. */
   spark: number[];
 }
 
@@ -271,7 +227,7 @@ export interface UsageDashboard {
    * rows first (danger, warning), then renders desc. */
   rows: UsageRow[];
 
-  // Added by S2 for the picked composition (variant A):
+  // The first stat card and the channel mix:
   /** Successful renders by channel, last 30 days (the first stat card's channel mix). */
   byChannel: Record<Channel, number>;
   /** The gauge: of the last 30 days' successful renders, how many were on a version that is Active now. */
@@ -315,7 +271,7 @@ export interface TemplateUsageData {
     consumers: UsageStatCard;
     errors: UsageStatCard;
   };
-  /** Successful renders per UTC day, last 90 days, oldest first (zeros included). `errors` added by S2. */
+  /** Successful renders per UTC day, last 90 days, oldest first (zeros included). */
   daily: { date: string; count: number; errors: number }[];
   /** Released versions, newest first, each with who renders it. The same data feeds the consequence text. */
   versions: TemplateUsageVersion[];
@@ -330,7 +286,7 @@ export interface TemplateUsageData {
     text: string;
   }[];
 
-  // Added by S2 for the picked composition:
+  // Success and version spread:
   /** ok / (ok + error), last 30 days ("Succeeded"). */
   success: { ok: number; errors: number; pct: number | null };
   /** "N% still on vX": last 30 days' successful renders on each version that is no longer Active, most first. pct 0–100 (whole). */
@@ -375,13 +331,11 @@ export interface TemplateUsageVersion {
   tags: UsageTag[];
 }
 
-// Signatures (slice S2):
-//   getUsageDashboard(spaceSlug: string): Promise<UsageDashboard>                       // cache(); viewer-scoped (template.view)
-//   getTemplateUsage(spaceSlug: string, templateId: string): Promise<TemplateUsageData> // requireTemplate()
-// The backend aggregates in SQL (render_log is ~27k rows; services/local/usage.ts): group by day/consumer/version with `is_preview = 0 AND
-// consumer_id IS NOT NULL`. Days are UTC days of the backend's clock (`asOf`); `usageDashboard` and `templateUsage` (domain/golive/usage.ts) lay the counts out.
+// The backend aggregates in SQL (services/local/usage.ts): group by day/consumer/version with `is_preview = 0 AND
+// consumer_id IS NOT NULL`. Days are UTC days of the backend's clock (`asOf`); `usageDashboard` and `templateUsage`
+// (domain/golive/usage.ts) lay the counts out.
 
-// ── Integration panel (slice S1 query + U3 UI) ────────────────────────────────────────────────
+// ── Integration panel ────────────────────────────────────────────────────────
 
 export interface ContractRow {
   key: string;

@@ -2,8 +2,8 @@ import type { PlatformRole } from "@/domain/types";
 import type { SeedCtx } from "./context";
 import { HOUR } from "./time";
 
-// The switchable personas use the fixed ids from docs/archive/agent-brief.md: the build plan's eight, plus
-// Dana Park (Phase 6), the Legal reviewer a two-stage approval chain names.
+// The switchable personas have fixed ids (e2e specs and screenshots name them). Dana Park is the Legal reviewer
+// a two-stage approval chain names.
 // Everyone else is a non-switchable user who makes the teams, access and inactivity stories real.
 
 interface Person {
@@ -18,7 +18,7 @@ interface Person {
 }
 
 const PEOPLE: Person[] = [
-  // Personas (build plan: "Seed personas")
+  // Personas
   {
     id: "maya",
     name: "Maya Chen",
@@ -134,7 +134,7 @@ const PEOPLE: Person[] = [
     activeHoursAgo: 70,
   },
 
-  // Legal reviewer (Phase 6): a Coral Offers Viewer whom Riley names in a "Legal reviewer" approval stage
+  // Legal reviewer: a Coral Offers Viewer whom Riley names in a "Legal reviewer" approval stage
   {
     id: "dana",
     name: "Dana Park",

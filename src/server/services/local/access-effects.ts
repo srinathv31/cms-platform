@@ -162,7 +162,8 @@ export async function applyMembershipChange(
       return change.membershipId;
     }
     case "delete": {
-      // SQLite enforces the cascade only with foreign_keys on: delete the roles explicitly.
+      // Delete the roles explicitly rather than lean on the cascade: it fires only while foreign keys are enforced
+      // (libSQL's default), and this write shouldn't depend on the connection's setting.
       await tx
         .delete(membershipRoles)
         .where(eq(membershipRoles.membershipId, change.membershipId));

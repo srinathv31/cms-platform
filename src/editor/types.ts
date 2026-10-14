@@ -95,7 +95,7 @@ export interface DocumentEditorHandle {
   /** Focuses the document at `target`; without one, where the caret last was. Safe before the editor has mounted. */
   focus: (target?: FocusTarget) => void;
 
-  // Phase 4: review comments. Each works in readOnly, and is safe before the editor has mounted
+  // Review comments. Each works in readOnly, and is safe before the editor has mounted
   // and while it's hidden (<Activity>). A test double or adapter of the handle implements all of them
   // (no-ops are fine).
   /**
@@ -147,7 +147,7 @@ export interface DocumentEditorProps {
   /** See EditorRootProps.requiredNote. */
   requiredNote?: string;
 
-  // Review comments (Phase 4). See README, Behavior → Comments.
+  // Review comments. See README, Behavior → Comments.
   /** Open threads are highlighted (their quote, or their whole block); resolved ones aren't. */
   threads?: readonly ThreadAnchor[];
   /** The thread shown as active: a stronger highlight. `focusThread` also sets it, until this changes. */
@@ -275,7 +275,7 @@ export interface StaticDocumentProps {
   /** Match the live editor's `align`. Default "center". */
   align?: DocumentAlign;
   className?: string;
-  /** Phase 4: the same highlights as the live editor's `threads` / `activeThreadId`. */
+  /** The same highlights as the live editor's `threads` / `activeThreadId`. */
   threads?: readonly ThreadAnchor[];
   activeThreadId?: string | null;
 }

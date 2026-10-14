@@ -6,11 +6,11 @@
 // its richer types in src/domain; `src/domain/golive-types.ts` checks at compile time that the domain's
 // render types still fit the shapes declared here, so the two can't drift.
 //
-// Phase 5 (going live). Endpoints:
+// Endpoints:
 //   GET  /api/v1/templates                          search, Active templates only     → ApiTemplateSearch (paged)
 //   GET  /api/v1/templates/{id}                     metadata + contract (+ changes)    → ApiTemplateDetail
 //   GET  /api/v1/consumers/{consumerId}/notices     UCOMP's outbox for one consumer    → ApiNoticeList (paged)
-//   POST /api/v1/templates/{id}/render              (Phase 3; contract in src/domain/render/types.ts)
+//   POST /api/v1/templates/{id}/render              (render contract: src/domain/render/types.ts)
 //
 // Every request carries `X-Consumer-Id` (a registered consumer: "coral", "deposits-online"), the render
 // route's included: /api/v1 serves consumers only, and Stencil's own previews are a separate internal route
@@ -399,7 +399,7 @@ export interface ApiNotice {
   message: string;
 }
 
-// ── POST /api/v1/templates/{id}/render (Phase 3; restated for consumers) ────────
+// ── POST /api/v1/templates/{id}/render (restated for consumers) ────────
 
 /**
  * The body a consumer sends. A `"draft"` version is never served here (400 bad_request), and a field that isn't listed

@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { settled } from "./settled";
 
-// Phase 7 principle checks, on every route, as the persona(s) that can see it:
+// The principle checks, on every route, as the persona(s) that can see it:
 //
 //   1. At most one primary (black, filled) button in the canvas, and at most one in each open dialog,
 //      sheet or confirm strip. "Primary" is what the shadcn Button renders for its default variant:
