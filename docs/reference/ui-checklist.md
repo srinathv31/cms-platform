@@ -1,6 +1,8 @@
-# UI checklist — check every screen against this before reporting
+# UI checklist
 
-Distilled from the Phase 3 visual QA. Build it this way the first time; QA will hold you to it.
+Check every screen you build or change against this list before you call it done. The principles specs
+(`e2e/principles-*.spec.ts`) check the parts a machine can: one primary button per canvas or dialog, status words
+only in `StatusBadge`, no placeholder text, no serious axe violations, and zero layout shift. The rest is yours.
 
 ## Controls and states
 
@@ -27,7 +29,33 @@ Distilled from the Phase 3 visual QA. Build it this way the first time; QA will 
 - **Insets are shared constants.** One inset per surface kind, the same for every variant of that surface. Rails pad 20px horizontally.
 - **Wide panels keep comfortable measures.** Lists and forms cap at about 22rem and align to the panel's left content edge; they don't stretch or center in dead space.
 - **Scroll containers** that sit inside the canvas use `overscroll-contain`, and leave about 40px of bottom room so content can scroll clear of the fixed Demo pill.
-- **Reflow: nothing needs a horizontal scroll down to 320 CSS px wide** (WCAG 2.1 SC 1.4.10). A laptop at 400% browser zoom is a 320px window, so this is the width to check, with a 256px-tall window for anything sticky. The page, and the canvas (`main[data-slot="sidebar-inset"]`'s scroll area), never scroll sideways. What needs a two-dimensional layout scrolls inside its own box instead: data tables (wrap them in `ScrollRegion`, `src/components/primitives/scroll-region.tsx`, which gives a scrolling box its Tab stop), the document canvas's tables, a chart's plot area, a phone preview, and a tab strip wider than the screen. Everything else wraps, stacks or gives up room: a flex row gets `flex-wrap`, a fixed width gets a `min()` or a `max-w-full`, and a toolbar that cannot fit goes to two lines. Keep the page's own states (a skeleton, an overlay, a sheet) inside the same rule. Below 800px the sidebar is a drawer behind a top-bar button (`narrow:`, `wide:` and [decision 0045](../decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)); key a layout's narrow rules to the canvas (`@max-[26rem]/canvas:`), so nothing from 800px up changes. A dialog is portaled out of the canvas, so it keys to the window instead: under 26rem (`max-[26rem]:`) it pads 1.25rem and scrolls as a whole with its footer sticky and wrapping (`NARROW_*` in `src/components/app-shell/scrim-dialog.tsx`), and a dialog's popover (the sunset calendar) must open inside the window. Test 320×720 for every screen and dialog, 320×256 for a dialog's footer, 1280×800 and 1440×900 always, and 1000×700 for anything in the rail or tab bar. [e2e/reflow.spec.ts](../../e2e/reflow.spec.ts) holds the 320px check for the Library, a template's Usage tab and the review screen; [e2e/reflow-dialogs.spec.ts](../../e2e/reflow-dialogs.spec.ts) the one for Submit for review, Approve, Request changes, Compare versions and Change sunset; [e2e/reflow-editor-review.spec.ts](../../e2e/reflow-editor-review.spec.ts) the editor's block handle and block menu, and the review header's wrapping name and byline. A title or byline that ends in an ellipsis at 800px and wider wraps below it (`narrow:`). [e2e/reflow-coral-settings.spec.ts](../../e2e/reflow-coral-settings.spec.ts) holds the 320px check, and axe at 320 and 1280, for Coral's screens and every Settings section.
+- **Reflow: nothing needs a horizontal scroll down to 320 CSS px wide** (WCAG 2.1 SC 1.4.10). A laptop at 400% browser
+  zoom is a 320px window, so this is the width to check, with a 256px-tall window for anything sticky.
+  - The page, and the canvas (`main[data-slot="sidebar-inset"]`'s scroll area), never scroll sideways. What needs a
+    two-dimensional layout scrolls inside its own box instead: data tables (wrap them in `ScrollRegion`,
+    `src/components/primitives/scroll-region.tsx`, which gives a scrolling box its Tab stop), the document canvas's
+    tables, a chart's plot area, a phone preview, and a tab strip wider than the screen.
+  - Everything else wraps, stacks or gives up room: a flex row gets `flex-wrap`, a fixed width gets a `min()` or a
+    `max-w-full`, and a toolbar that cannot fit goes to two lines. Keep the page's own states (a skeleton, an overlay,
+    a sheet) inside the same rule.
+  - Below 800px the sidebar is a drawer behind a top-bar button (`narrow:`, `wide:` and
+    [decision 0045](../decisions/0045-stencil-targets-desktop-chrome-and-reflows-for-zoom.md)). Key a layout's narrow
+    rules to the canvas (`@max-[26rem]/canvas:`), so nothing from 800px up changes. A title or byline that ends in an
+    ellipsis at 800px and wider wraps below it (`narrow:`).
+  - A dialog is portaled out of the canvas, so it keys to the window instead: under 26rem (`max-[26rem]:`) it pads
+    1.25rem and scrolls as a whole with its footer sticky and wrapping (`NARROW_*` in
+    `src/components/app-shell/scrim-dialog.tsx`), and a dialog's popover (the sunset calendar) must open inside the
+    window.
+  - Test 320×720 for every screen and dialog, 320×256 for a dialog's footer, 1280×800 and 1440×900 always, and
+    1000×700 for anything in the rail or tab bar.
+  - The specs that hold the 320px check:
+    - [e2e/reflow.spec.ts](../../e2e/reflow.spec.ts): the Library, a template's Usage tab and the review screen.
+    - [e2e/reflow-dialogs.spec.ts](../../e2e/reflow-dialogs.spec.ts): Submit for review, Approve, Request changes,
+      Compare versions and Change sunset.
+    - [e2e/reflow-editor-review.spec.ts](../../e2e/reflow-editor-review.spec.ts): the editor's block handle and block
+      menu, and the review header's wrapping name and byline.
+    - [e2e/reflow-coral-settings.spec.ts](../../e2e/reflow-coral-settings.spec.ts): Coral's screens and every Settings
+      section, with axe at 320 and 1280.
 
 ## Copy
 

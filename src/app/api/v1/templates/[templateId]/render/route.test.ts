@@ -334,7 +334,7 @@ describe("POST …/render: superseded versions", () => {
   });
 });
 
-// /api/v1 serves consumers only (decision 0047): what used to be a CMS preview is refused like any
+// /api/v1 serves consumers only (decision 0047): a request that looks like a CMS preview is refused like any
 // consumer request that names no consumer, a draft, or a version that isn't released. The route never
 // reads the session, so a signed-in person gets nothing a consumer wouldn't. Stencil's own preview is
 // POST /api/templates/[templateId]/preview.

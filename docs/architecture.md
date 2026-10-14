@@ -8,9 +8,13 @@ fields), never both ([decision 0034](decisions/0034-message-channels-families-an
 
 It is one Next.js 16 app (App Router, Cache Components) on one local SQLite file. Three things share the app: the
 CMS itself, **Coral**, a simulated consumer that calls `/api/v1` the way an outside system would, and two
-dev-only labs (the editor and the PDF viewer). It is a working prototype on its way to production. The production backend isn't decided:
-either the existing Spring Boot "UCOMP API" with this app as its BFF, or this app's own server code. Changes should
-keep both open, which mostly means: rules in `src/domain`, database access only in `src/server`.
+dev-only labs (the editor and the PDF viewer). It is a working prototype on its way to production.
+
+The production backend isn't decided: either the existing Spring Boot "UCOMP API" with this app as its BFF, or this
+app's own server code. Changes keep both open, which mostly means rules in `src/domain` and database access only in
+`src/server`. The seam between the two halves is the service interfaces in
+[src/server/services](../src/server/services/README.md): the BFF half asks a service, and a local implementation
+answers from this app's database.
 
 ## Layers
 
@@ -23,9 +27,9 @@ keep both open, which mostly means: rules in `src/domain`, database access only 
 | `src/server`                         | Everything that touches the database, the persona cookie, the clock, or the file system: server actions, read models, schema, render pipeline, import, autosave, seed. | [src/server](../src/server/README.md)                                              |
 | `src/contracts`                      | The `/api/v1` wire types, with no imports, shared by the API and Coral.                                                                                                | [src/contracts](../src/contracts/README.md)                                        |
 | `src/simulator`                      | Coral, the simulated consumer, with routes in `src/app/(simulator)`.                                                                                                   | [src/simulator](../src/simulator/README.md)                                        |
-| `src/hooks`, `src/lib`, `src/styles` | `useIsMobile`; `cn` and the SQLite write lock; design tokens and fonts.                                                                                                | Covered in [src/components](../src/components/README.md#srchooks-srclib-srcstyles) |
-| `e2e`                                | Playwright specs, helpers, and fixtures.                                                                                                                               | [Testing](#testing)                                                                |
-| `scripts`                            | `db:migrate`, `db:reset`, `docs:check`.                                                                                                                                |                                                                                    |
+| `src/hooks`, `src/lib`, `src/styles` | `useIsMobile`; small shared helpers (`cn`, the SQLite write lock, `file:` URLs, the typed template reads, the fresh test database); design tokens and fonts.           | Covered in [src/components](../src/components/README.md#srchooks-srclib-srcstyles) |
+| `e2e`                                | Playwright specs, helpers, and fixtures.                                                                                                                               | [e2e](../e2e/README.md)                                                            |
+| `scripts`                            | `db:migrate`, `db:reset`, `docs:check`, and the seed export, the golden import and their helpers (`seed-reporter.ts`, `unicode-graphemes.ts`).                         |                                                                                    |
 | `data`                               | The SQLite file and uploaded originals. Gitignored; `npm run db:reset` creates it.                                                                                     |                                                                                    |
 
 ## What may import what
@@ -53,13 +57,13 @@ in `src/domain`, pure helpers (`listSets`) in `@/editor/model/*`.
 
 Conventions that nothing enforces yet, and where the code already breaks them:
 
-- **Only `src/server` reads the database.** True today: about 40 files under `src/server` import the `db` client,
-  and none elsewhere (apart from `scripts/db-migrate.ts` and route tests). Keep it that way; it is the seam a Spring
-  Boot backend would replace.
-- **New business rules go in `src/domain`.** About a dozen live in actions, queries, and components today; the
+- **Only `src/server` reads the database.** The `db` client is imported under `src/server` and nowhere else, apart
+  from Coral's own client for its `sim_*` tables (`src/simulator/db.ts`), the helpers in `src/lib` that open a
+  database (the write lock, the fresh test database), the `scripts`, and tests. Keep it that way; it is the seam a
+  Spring Boot backend would replace.
+- **New business rules go in `src/domain`.** Some still live in actions, queries, and components; the
   [domain README](../src/domain/README.md#rules-that-live-outside-srcdomain) lists them.
-- **Components get permissions decided.** Read models carry `can` results; a few components still call `can()`
-  themselves.
+- **Components get permissions decided.** Read models carry `can` results, and no component calls `can()` itself.
 
 ## How requests flow
 
@@ -95,14 +99,13 @@ load." in the tab's place, under the header and the tab bar ([Errors](../src/app
    viewer), zod parse, then the service, `services().review.setSunset`. On success, `revalidatePath()` and
    `refresh()`. The BFF supplies no time.
 3. Behind the service, the local implementation ([services/local/review.ts](../src/server/services/local/review.ts))
-   checks the permission, reads its own clock once, then runs one transaction: re-read the version, call the
-   domain transition, write the
-   changes with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects (audit row,
-   notifications, consumer notices) with `writeEffects`. A notification is stored as its kind's facts and a link by
-   team id; the BFF words it and builds its href when the bell reads it
-   ([0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md)). A refusal anywhere rolls the transaction back and is the
-   answer. After the port, the Java API does this step.
-4. The transition (`setSunset` in [lifecycle/sunset.ts](../src/domain/lifecycle/sunset.ts)) decides; the command only writes. A
+   checks the permission, reads its own clock once, then runs one transaction: re-read the version, call the domain
+   transition, write the changes with a compare-and-set on `state`, `rev`, and `currentStage`, and write the effects
+   (audit row, notifications, consumer notices) with `writeEffects`. A refusal anywhere rolls the transaction back and
+   is the answer. After the port, the Java API does this step.
+4. A notification is stored as its kind's facts and a link by team id; the BFF words it and builds its href when the
+   bell reads it ([0055](decisions/0055-notifications-store-facts-and-are-worded-on-read.md)).
+5. The transition (`setSunset` in [lifecycle/sunset.ts](../src/domain/lifecycle/sunset.ts)) decides; the command only writes. A
    refusal is a value with a stable `code`, which code branches on, and a `reason`, the sentence the person reads
    ([refusals.ts](../src/domain/refusals.ts)).
 
@@ -112,23 +115,25 @@ variations to avoid.
 ### An autosave
 
 1. The workspace's autosave ([use-draft-autosave.ts](../src/components/workspace/autosave/use-draft-autosave.ts))
-   debounces edits (800 ms, at most 5 s), sends one request at a time, and flushes on page hide. While anything
-   typed isn't saved, closing or reloading the page asks first. It runs the server's document check first, so a
-   patch the server would refuse is never sent. The workspace header binds it to the draft on every tab. A
-   refusal retrying can't fix (a conflict) stops it for good: the page turns read-only and offers Reload
+   debounces edits ([autosave-scheduler.ts](../src/components/workspace/autosave/autosave-scheduler.ts)), sends one
+   request at a time, and flushes on page hide. While anything typed isn't saved, closing or reloading the page asks
+   first. It runs the server's document check first, so a patch the server would refuse is never sent.
+2. The workspace header binds autosave to the draft on every tab. A refusal retrying can't fix (a conflict) stops it
+   for good: the page turns read-only and offers Reload
    ([decision 0020](decisions/0020-autosave-never-drops-edits-silently.md)).
-2. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
+3. `PUT /api/drafts/[versionId]` is a route handler, not a server action, because actions run one at a time per
    client. It asks the backend whether the viewer may edit the draft (`drafts.saveAccess`) before reading a byte of
-   the body, reads the body with a byte counter that stops at 2 MB (413 past it), and parses the patch.
-3. The route prepares the body and the channel fields (each by its id, such as `"email.subject"`) with
+   the body, reads the body with a byte counter that stops at `MAX_BODY_SIZE` (413 past it), and parses the patch.
+4. The route prepares the body and the channel fields (each by its id, such as `"email.subject"`) with
    [prepare-patch.ts](../src/server/drafts/prepare-patch.ts), over [prepare.ts](../src/server/documents/prepare.ts):
    normalized, checked against the document limits and the editor schema, block ids added. Import stores documents
-   through the same function. Then it calls `drafts.save` ([local/drafts.ts](../src/server/services/local/drafts.ts)
-   on this app's database, deciding with [autosave.ts](../src/domain/lifecycle/autosave.ts)): in one transaction it
-   checks permission, the `draft` state, and `rev` (tolerating a lost response from the same session, but not a request it gave up on arriving after its retry), writes with a
-   compare-and-set (the channel fields laid over the stored ones), adds the saver to the version's `writers` (nobody
-   decides a version they wrote), and keeps one `draft.edited` audit row per editing session. Nothing is refreshed;
-   the client already has the content.
+   through the same function.
+5. Then it calls `drafts.save` ([local/drafts.ts](../src/server/services/local/drafts.ts) on this app's database,
+   deciding with [autosave.ts](../src/domain/lifecycle/autosave.ts)). In one transaction it checks permission, the
+   `draft` state, and `rev`: it tolerates a lost response from the same session, but not a request the client gave up
+   on arriving after its retry. It writes with a compare-and-set, adds
+   the saver to the version's `writers` (nobody decides a version they wrote), and keeps one `draft.edited` audit row
+   per editing session. Nothing is refreshed; the client already has the content.
 
 ### A consumer render, and the preview that shares it
 
@@ -175,13 +180,15 @@ layer. Two schema files:
     `memberships`, `membership_roles`.
   - **Platform configuration:** `content_types` (required sections, allowed channels of one family, and for a
     message type the SMS footer and part budget), `approval_stages`.
-  - **Templates:** `templates` (id, team, content type; no name); `versions` (the name, body as TipTap JSON,
-    `channel_fields` (each channel's own fields, such as the email subject, by channel and then field key, from
-    the registry in [channel-fields.ts](../src/domain/channel-fields.ts)), variables, channels, state, `number` and
-    `round`, `rev`, `writers`, the approval `stages` and the content type's `sms_footer` recorded at submit, sunset
-    and revoke fields); `approvals` (each decision's stage id). The name is a version field, so a rename goes
-    through review ([decision 0016](decisions/0016-the-name-is-versioned.md)). A row is one round: the number
-    counts releases, and a resubmission after a send-back is the next round of the same number
+  - **Templates:** `templates` (id, team, content type; no name) and `approvals` (each decision's stage id).
+  - **Versions:** `versions` holds the name, the body as TipTap JSON, `channel_fields` (each channel's own fields,
+    such as the email subject, by channel and then field key, from the registry in
+    [channel-fields.ts](../src/domain/channel-fields.ts)), variables, channels, state, `number` and `round`, `rev`,
+    `writers`, the approval `stages` and the content type's `sms_footer` recorded at submit, and the sunset and revoke
+    fields.
+  - **Names and rounds:** the name is a version field, so a rename goes through review
+    ([decision 0016](decisions/0016-the-name-is-versioned.md)). A row is one round: the number counts releases, and
+    a resubmission after a send-back is the next round of the same number
     ([decision 0033](decisions/0033-a-resubmission-is-the-next-round-of-the-same-version.md)).
   - **Review:** `comment_threads`, `comments`.
   - **Import:** `uploads`.
@@ -193,9 +200,12 @@ layer. Two schema files:
 
 Conventions: JSON columns are typed with domain types; timestamps are millisecond integers read as `Date`, and become
 ISO strings at the read-model boundary. Unique indexes, partial where they need to be, allow one row per number
-and round, one released version per number, and one open draft and one Active version per template. Every write in the process takes turns on one lock (`createAppClient` in `src/lib/serialized-writes.ts`),
-the one place a write waits (5 s for its turn); a write that still can't go fails, and nothing retries it. Migrations are in `src/server/db/migrations`; the
-[server README](../src/server/README.md#database) says how to add one.
+and round, one released version per number, and one open draft and one Active version per template.
+
+Every write in the process takes turns on one lock (`createAppClient` in `src/lib/serialized-writes.ts`), the one
+place a write waits (`WRITE_TURN_WAIT_MS` for its turn); a write that still can't go fails, and nothing retries it.
+Migrations are in `src/server/db/migrations`; the [server README](../src/server/README.md#database) says how to add
+one.
 
 What the Java API's MSSQL schema does instead: team and user ids
 ([0053](decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md),
@@ -235,25 +245,25 @@ notice kind's payload and every notification kind's facts.
   ([decision 0053](decisions/0053-team-ids-are-opaque-and-slugs-resolve-at-the-url.md)).
 - **Seed** ([src/server/seed](../src/server/seed/index.ts)), deterministic, rebuilt by `npm run db:reset`:
 
-  |                     |                                                                                                                                                                                                                             |
-  | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | Teams               | Slugs `coral-offers`, `deposits`, `card-statements` (ids `t_coral`, `t_deposits`, `t_cards`: never the slug); `all` is the cross-team space                                                                                 |
-  | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer)                                                                                         |
-  | Content types       | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a 3-part budget                         |
-  | Templates           | Coral Offers: five disclosures, one in each lifecycle state, and three alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: three disclosures each |
-  | Template ids        | `UC-` plus 6 Crockford base32 characters, e.g. `UC-4F7K2Q`                                                                                                                                                                  |
-  | Consumer            | `coral`, with offers, customers, and links in the `sim_*` tables                                                                                                                                                            |
+  |                     |                                                                                                                                                                                                        |
+  | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | Teams               | Slugs `coral-offers`, `deposits`, `card-statements` (ids `t_coral`, `t_deposits`, `t_cards`: never the slug); `all` is the cross-team space                                                            |
+  | Switchable personas | `maya` (default), `jordan`, `alex`, `priya`, `sam`, `riley` (Platform Admin), `taylor` (Auditor), `morgan`, `dana` (Legal reviewer)                                                                    |
+  | Content types       | `disclosure`: required sections `offer_details`, `rates_and_fees`, `legal_notices`; channels `pdf`, `web`, `email`. `alert`: no sections; channels `push`, `sms`; an SMS footer and a part budget      |
+  | Templates           | Coral Offers: disclosures in every lifecycle state, and alerts (Payment Due Reminder Active, Card Used Abroad in review, Rate Change Heads-up a draft). Deposits and Card Statements: disclosures only |
+  | Template ids        | `UC-` plus six Crockford base32 characters, e.g. `UC-4F7K2Q`                                                                                                                                           |
+  | Consumer            | `coral`, with offers, customers, and links in the `sim_*` tables                                                                                                                                       |
 
 ## Configuration
 
 - [next.config.ts](../next.config.ts): `cacheComponents: true`, `typedRoutes: true`, dev indicators off, and libSQL
   kept out of the bundle (`serverExternalPackages`). Partial prefetching stays off: on 16.3.8 it re-requests every
   link's route tree in a loop in this app. The "router prefetch" tests in `e2e/phase-1.spec.ts` guard against it.
-  `headers()` sends static security headers on every response: `nosniff`, `Referrer-Policy: same-origin`, framing
-  by the same origin only (`X-Frame-Options: SAMEORIGIN`; Coral's customer view frames its stored deliveries) and a
-  `Permissions-Policy` that turns off camera, microphone, location, payment and USB. No `Content-Security-Policy`
-  there: a header set in `headers()` replaces a route's own, and the rendered HTML keeps its scriptless one.
-  `e2e/security-headers.spec.ts` checks them.
+- `headers()` in the same file sends static security headers on every response: `nosniff`,
+  `Referrer-Policy: same-origin`, framing by the same origin only (`X-Frame-Options: SAMEORIGIN`; Coral's customer view
+  frames its stored deliveries) and a `Permissions-Policy` that turns off camera, microphone, location, payment and
+  USB. There is no `Content-Security-Policy` there: a header set in `headers()` replaces a route's own, and the
+  rendered HTML keeps its scriptless one. `e2e/security-headers.spec.ts` checks them.
 - Environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`; `DEMO_MODE` (the demo tools: reset, clock advance,
   persona switcher and the Demo pill; off unless set, read when the server starts, and a value that isn't valid stops the server at boot,
   [decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md), parsed in [config.ts](../src/server/config.ts)); `UCOMP_API_ORIGIN` (where Coral sends requests;
@@ -264,7 +274,7 @@ notice kind's payload and every notification kind's facts.
 
 Facts about the code today. Each line goes away in the PR that fixes it.
 
-- No real authentication: the persona cookie, failing open to Maya, identifies every request.
+- No real authentication: the persona cookie identifies every request, and with the demo tools on a missing cookie acts as Maya.
 - The demo controls (reset, advance clock, persona switch) run only with `DEMO_MODE` set, which a deployment never
   sets ([decision 0051](decisions/0051-the-demo-tools-run-only-in-demo-mode.md)). They still go when real sign-in lands. Until then the persona cookie still decides who
   acts, whether or not the switcher is there.
@@ -281,22 +291,22 @@ Facts about the code today. Each line goes away in the PR that fixes it.
 
 ## Testing
 
-- **Unit:** Vitest, `npm test`, about 10 seconds for the whole suite. Tests sit beside their code. The environment
+- **Unit:** Vitest, `npm test`. Tests sit beside their code, and run in a random order. The environment
   is `node`; a test that needs a DOM starts with `// @vitest-environment happy-dom`. Database tests use temporary
   files and never touch `data/ucomp.db`. Each layer README covers its own helpers.
-- **End to end:** Playwright, `npm run e2e`, against the production build, so run `npm run build` first. Spec files
-  run in parallel, `E2E_WORKERS` at a time (4 by default), each worker with its own `next start` (port 3100 and
-  up), database (`data/e2e-<n>.db`) and uploads folder, so no run touches `data/ucomp.db`
+- **End to end:** Playwright, `npm run e2e`, against the production build, so run `npm run build` first ([e2e/README.md](../e2e/README.md) is the guide). Spec files
+  run in parallel, `E2E_WORKERS` at a time (4 by default), each worker with its own `next start` (port 3100 and up),
+  database (`data/e2e-<n>.db`) and uploads folder, so no run touches `data/ucomp.db`
   ([decision 0050](decisions/0050-each-e2e-worker-gets-its-own-server-and-database.md)). Playwright runs
-  `npm run db:reset` and starts the servers when nothing is listening on their ports. The full suite takes about
-  4.5 minutes at 4 workers, 11 with one.
-  Functional specs click at test speed. The whole-demo script (`e2e/demo-script.spec.ts`) and the recording pacing
-  are opt-in: `npx playwright test --project=demo` plays the script with a cursor, paced clicks and a video
-  ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
-  Specs read and arrange Stencil's data only through `e2e/helpers/state` ([README](../e2e/helpers/state/README.md)):
-  named functions that return records, SQL today and a test endpoint or JDBC when Java owns the data
-  ([decision 0068](decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)). ESLint forbids the
-  database client anywhere else in `e2e/`. Where a screen or `/api/v1` can show a fact, the spec asserts it there.
+  `npm run db:reset` and starts the servers when nothing is listening on their ports.
+  - Functional specs click at test speed. The whole-demo script (`e2e/demo-script.spec.ts`) and the recording pacing
+    are opt-in: `npx playwright test --project=demo` plays the script with a cursor, paced clicks and a video
+    ([decision 0049](decisions/0049-the-demo-script-runs-only-in-the-demo-project.md)).
+  - Specs read and arrange Stencil's data only through `e2e/helpers/state`
+    ([README](../e2e/helpers/state/README.md)): named functions that return records, SQL today and a test endpoint or
+    JDBC when Java owns the data
+    ([decision 0068](decisions/0068-the-bff-is-tested-against-a-fake-and-one-contract-suite.md)). ESLint forbids the
+    database client anywhere else in `e2e/`. Where a screen or `/api/v1` can show a fact, the spec asserts it there.
 - **Golden files:** [src/server/render/golden](../src/server/render/golden/README.md) freezes every channel's
   output for a set of documents and checks that web, email, and PDF show the same content. Any change to render
   output fails `npm test` until it is regenerated with `npm run golden:update` and the diff is read. They are also

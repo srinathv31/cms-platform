@@ -13,23 +13,23 @@ is [docs/README.md](docs/README.md). Ignore `docs/archive/`: it records how the 
 
 ## Commands
 
-| Command                                     | What it does                                                                                                                                                                                                                                                                                           |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run dev`                               | Dev server on port 3000, with the demo tools on (`.env.development`).                                                                                                                                                                                                                                  |
-| `npm run db:reset`                          | Drops and reseeds `data/ucomp.db` and empties `data/uploads` (the folder `UPLOADS_DIR` names, if set). Needed once after cloning.                                                                                                                                                                      |
-| `npm run typecheck`                         | `next typegen && tsc --noEmit`. Run it after adding or renaming a route.                                                                                                                                                                                                                               |
-| `npm run lint`                              | ESLint, including the import boundaries below.                                                                                                                                                                                                                                                         |
-| `npm test`                                  | Vitest, about 10 seconds. Never touches `data/ucomp.db`. Tests run in a random order; a failure prints the seed to replay it with.                                                                                                                                                                     |
-| `npm run docs:check`                        | Fails on broken doc links and paths, and on a `src/` folder without a README.                                                                                                                                                                                                                          |
-| `npm run format`                            | Prettier with its default configuration (`.prettierrc` is `{}`): rewrites every file it covers. `.prettierignore` lists what it skips and why. A second run can still change a few files, so run it again until `format:check` passes.                                                                 |
-| `npm run format:check`                      | Fails on a file Prettier would change. Run `npm run format` to fix it.                                                                                                                                                                                                                                 |
-| `npm run golden:update`                     | Regenerates the render golden files after an intended change to render output. Read the diff.                                                                                                                                                                                                          |
-| `npm run document-schema:update`            | Regenerates `docs/reference/document.schema.json` after an editor change that adds or moves a node, mark or attribute. Read the diff.                                                                                                                                                                  |
-| `npm run seed:export`                       | Writes the demo seed as a JSON fixture, `data/seed-fixture.json`, for the Java loader: the same ids, and times relative to the reset ([seed README](src/server/seed/README.md#the-fixture)).                                                                                                           |
-| `npm run build`                             | The production build. It is the only check that enforces the Cache Components rules.                                                                                                                                                                                                                   |
-| `npm run e2e`                               | Playwright against the production build, in parallel: `E2E_WORKERS` workers (default 4), each with its own server (port 3100 and up), `data/e2e-<n>.db` and `data/e2e-uploads-<n>`, never the demo's. About 4.5 minutes (11 with one worker); `E2E_WORKERS=1` for one server (also for a single spec). |
-| `npx playwright test --project=demo`        | Opt-in: plays the whole demo script (`e2e/demo-script.spec.ts`) and the scenario specs paced for a recording. `npm run e2e` never runs the script.                                                                                                                                                     |
-| `npm run db:generate`, `npm run db:migrate` | Generate a migration from the schema; apply migrations.                                                                                                                                                                                                                                                |
+| Command                                     | What it does                                                                                                                                                                                                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                               | Dev server on port 3000, with the demo tools on (`.env.development`).                                                                                                                                                                                          |
+| `npm run db:reset`                          | Drops and reseeds `data/ucomp.db` and empties `data/uploads` (the folder `UPLOADS_DIR` names, if set). Needed once after cloning.                                                                                                                              |
+| `npm run typecheck`                         | `next typegen && tsc --noEmit`. Run it after adding or renaming a route.                                                                                                                                                                                       |
+| `npm run lint`                              | ESLint, including the import boundaries below.                                                                                                                                                                                                                 |
+| `npm test`                                  | Vitest. Never touches `data/ucomp.db`. Tests run in a random order; a failure prints the seed to replay it with.                                                                                                                                               |
+| `npm run docs:check`                        | Fails on broken doc links and paths, and on a `src/` folder without a README.                                                                                                                                                                                  |
+| `npm run format`                            | Prettier with its default configuration (`.prettierrc` is `{}`): rewrites every file it covers. `.prettierignore` lists what it skips and why. A second run can still change a few files, so run it again until `format:check` passes.                         |
+| `npm run format:check`                      | Fails on a file Prettier would change. Run `npm run format` to fix it.                                                                                                                                                                                         |
+| `npm run golden:update`                     | Regenerates the render golden files after an intended change to render output. Read the diff.                                                                                                                                                                  |
+| `npm run document-schema:update`            | Regenerates `docs/reference/document.schema.json` after an editor change that adds or moves a node, mark or attribute. Read the diff.                                                                                                                          |
+| `npm run seed:export`                       | Writes the demo seed as a JSON fixture, `data/seed-fixture.json`, for the Java loader: the same ids, and times relative to the reset ([seed README](src/server/seed/README.md#the-fixture)).                                                                   |
+| `npm run build`                             | The production build. It is the only check that enforces the Cache Components rules.                                                                                                                                                                           |
+| `npm run e2e`                               | Playwright against the production build, in parallel: `E2E_WORKERS` workers (default 4), each with its own server (port 3100 and up), `data/e2e-<n>.db` and `data/e2e-uploads-<n>`, never the demo's. `E2E_WORKERS=1` for one server (also for a single spec). |
+| `npx playwright test --project=demo`        | Opt-in: plays the whole demo script (`e2e/demo-script.spec.ts`) and the scenario specs paced for a recording. `npm run e2e` never runs the script.                                                                                                             |
+| `npm run db:generate`, `npm run db:migrate` | Generate a migration from the schema; apply migrations.                                                                                                                                                                                                        |
 
 Before you finish: `npm run typecheck`, `npm run lint`, `npm test`, `npm run docs:check`, and `npm run format:check`.
 Add `npm run build` when you changed a page, a layout, a route handler, or anything a server component reads. Don't run
@@ -68,12 +68,14 @@ Lint-enforced ([eslint.config.mjs](eslint.config.mjs)):
 - `"use server"` appears only in `src/server/actions/` (and the simulator's `src/simulator/actions.ts`): server
   actions are for mutations. A read a screen loads on demand is a GET route under
   `src/app/api/templates/[templateId]/`.
-- The backend seam ([src/server/services](src/server/services/README.md), "The rules"): only the local implementation
-  (`src/server/services/local`), `src/server/db` and the seed talk to the database; only `services/index.ts`,
-  `/api/v1`, the seed, the reset and tests import an implementation (`services/local`, `services/fake`); only the
-  backend reads the clock (`services/local/clock.ts`); only `src/domain` and the implementations call `can()` and
-  the space rules; and only the backend, the fake, the contract suite and tests import the reset, the seed or
-  `src/server/testing`. The service interfaces import no view model.
+- The backend seam ([src/server/services](src/server/services/README.md), "The rules"):
+  - Only the local implementation (`src/server/services/local`), `src/server/db` and the seed talk to the database.
+  - Only `services/index.ts`, `/api/v1`, the seed, the reset and tests import an implementation (`services/local`,
+    `services/fake`).
+  - Only the backend reads the clock (`services/local/clock.ts`).
+  - Only `src/domain` and the implementations call `can()` and the space rules.
+  - Only the backend, the fake, the contract suite and tests import the reset, the seed or `src/server/testing`.
+  - The service interfaces import no view model.
 
 Not enforced yet; follow them anyway:
 
@@ -105,23 +107,26 @@ Next.js API; Next's own note about it is at the end of this file.
 ## Server code
 
 - The BFF reaches its backend only through the service interfaces, `services().<area>.<method>(ctx, input)`
-  ([src/server/services](src/server/services/README.md), [decision 0072](docs/decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)).
-  A server action runs on `serverAction` ([src/server/actions/kit.ts](src/server/actions/kit.ts)): the request context
+  ([src/server/services](src/server/services/README.md),
+  [decision 0072](docs/decisions/0072-the-bff-reaches-its-backend-through-service-interfaces.md)).
+- A server action runs on `serverAction` ([src/server/actions/kit.ts](src/server/actions/kit.ts)): the request context
   (the viewer; no time), parse with zod, `call` the service, and `after` (refresh, revalidate, redirect last) only
   when it answered `ok`. It answers the service's `ActionResult` (`{ ok: true } | { ok: false, code, reason }`);
-  throw only for bugs. A read model asks a service for facts and words them with a pure shaping function; a GET
-  route answers a service's `ReadResult`. Nobody signed in: a page goes to `signInRequired()`, an action answers
-  `signed_out`, a route 401. A template, version or team the viewer may not see reads as not there (404).
-- Behind the seam, each command runs on `runCommand` ([services/local/command.ts](src/server/services/local/command.ts)):
-  read what the input names and check the permission, read the backend's clock once, then one `inTransaction`:
-  re-read, ask the domain, write with a compare-and-set (a lost one is `version_changed` or the guard's own code),
-  and write the effects (audit rows, notifications, consumer notices) in the same transaction, through `tx`, never
-  `db`. The in-memory fake (`services/fake`) runs the same domain rules for every command; the contract suite
+  throw only for bugs.
+- A read model asks a service for facts and words them with a pure shaping function; a GET route answers a service's
+  `ReadResult`. Nobody signed in: a page goes to `signInRequired()`, an action answers `signed_out`, a route 401. A
+  template, version or team the viewer may not see reads as not there (404).
+- Behind the seam, each command runs on `runCommand`
+  ([services/local/command.ts](src/server/services/local/command.ts)): read what the input names and check the
+  permission, read the backend's clock once, then one `inTransaction`: re-read, ask the domain, write with a
+  compare-and-set (a lost one is `version_changed` or the guard's own code), and write the effects (audit rows,
+  notifications, consumer notices) in the same transaction, through `tx`, never `db`.
+- The in-memory fake (`services/fake`) runs the same domain rules for every command; the contract suite
   (`services/contract`) holds both to one set of cases. Service results are facts (no English, no app URLs), and a
   rule both implementations need goes in `src/domain` first.
-- Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts (`src/instrumentation.ts`): `DEMO_MODE` and `STENCIL_BACKEND`. The demo tools (reset, clock
-  advance, persona switcher, Demo pill) run only when it is on and are off when it is unset: a new demo path checks it
-  too ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).
+- Settings come from `src/server/config.ts`, read once and validated, and checked when the server starts
+  (`src/instrumentation.ts`): `DEMO_MODE` and `STENCIL_BACKEND`. The demo tools (reset, clock advance, persona
+  switcher, Demo pill) run only when `DEMO_MODE` is on and are off when it is unset: a new demo path checks it too ([decision 0051](docs/decisions/0051-the-demo-tools-run-only-in-demo-mode.md)).
 - A domain rule takes facts and `now`, writes nothing, and returns a refusal (a stable `code` and the sentence people
   read), or what to write plus `effects`.
 - Every refusal comes from a table in `src/domain` built with `refusal(code, sentence)`

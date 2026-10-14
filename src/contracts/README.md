@@ -7,6 +7,12 @@ machine-readable API description yet (`ApiJsonSchema` covers one version's rende
 Java team writes the OpenAPI document from [docs/reference/openapi-brief.md](../../docs/reference/openapi-brief.md),
 which also says where the decided contract differs from this file.
 
+## How to read a file here
+
+The comment at the top of a file is its contract: what it holds and what it may not import. A `/** */` comment
+documents the export under it, and a `//` comment records a decision at the line it sits on. For example, the header
+of [api-v1.ts](api-v1.ts) says why the file imports nothing, and each `Api*` type carries the sentence a consumer needs.
+
 ## Rules
 
 - **No imports.** Lint (`eslint.config.mjs`) bans every import in `src/contracts/**/*.ts`. The simulator may not
@@ -16,19 +22,7 @@ which also says where the decided contract differs from this file.
   `"draft"` version, `preview` flag or `round`. Those are Stencil's own preview route's
   (`POST /api/templates/{id}/preview`, not part of this contract); `/api/v1` refuses a draft and ignores `preview` and
   `round` ([decision 0047](../../docs/decisions/0047-stencils-preview-is-its-own-route-and-api-v1-serves-consumers-only.md)). Dates are ISO 8601 strings on the demo clock.
-- A sunset is an instant. `sunsetAt` (on `ApiVersionSummary` and on a `sunset_scheduled` or `sunset_passed`
-  notice) is when renders of that version start failing with 410 `version_sunset`: 00:00 on the sunset date in
-  Stencil's business time zone, `America/New_York` unless a Platform Admin chose another, so "March 1, 2027" is
-  `2027-03-01T05:00:00.000Z`. Compare it with the time; don't take its UTC date as the day, which is the day
-  before for a zone ahead of UTC. Everywhere the API sends a sunset it sends the day and the zone beside the
-  instant, as `sunsetDay` (`YYYY-MM-DD`) and `zone` (an IANA id): on each `ApiVersionSummary` (null with no
-  sunset), on a `sunset_scheduled` or `sunset_passed` notice, and in the `details` of a `version_sunset` 410.
-  Show `sunsetDay`; the `message` of the notice and of the 410 name that day. On a notice they are the day and
-  zone as recorded when it was written; on a version and in the 410 they are the day in the zone in force now, so
-  after the platform changes its zone a sunset already set reads as the day it ends in the new one. Changing the
-  zone doesn't move a sunset already announced
-  ([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md),
-  [0038](../../docs/decisions/0038-a-sunset-is-sent-with-its-day-and-zone.md)).
+- A sunset is an instant, and the day and zone travel with it ([Sunsets](#sunsets)).
 
 ## Endpoints
 
@@ -41,6 +35,24 @@ which also says where the decided contract differs from this file.
 
 Every request carries `X-Consumer-Id` (a registered consumer), the render route's included. `/api/v1` serves consumers
 only: it never serves a draft or a version in review, and it reads no session or cookie.
+
+## Sunsets
+
+`sunsetAt` (on `ApiVersionSummary` and on a `sunset_scheduled` or `sunset_passed` notice) is when renders of that
+version start failing with 410 `version_sunset`: 00:00 on the sunset date in Stencil's business time zone,
+`America/New_York` unless a Platform Admin chose another, so "March 1, 2027" is `2027-03-01T05:00:00.000Z`. Compare it
+with the time; don't take its UTC date as the day, which is the day before for a zone ahead of UTC.
+
+Everywhere the API sends a sunset it sends the day and the zone beside the instant, as `sunsetDay` (`YYYY-MM-DD`) and
+`zone` (an IANA id): on each `ApiVersionSummary` (null with no sunset), on a `sunset_scheduled` or `sunset_passed`
+notice, and in the `details` of a `version_sunset` 410. Show `sunsetDay`; the `message` of the notice and of the 410
+name that day.
+
+On a notice, `sunsetDay` and `zone` are the day and zone as recorded when it was written. On a version and in the 410
+they are the day in the zone in force now, so after the platform changes its zone a sunset already set reads as the
+day it ends in the new one. Changing the zone doesn't move a sunset already announced
+([decision 0017](../../docs/decisions/0017-a-sunset-date-ends-at-midnight-in-the-business-time-zone.md),
+[0038](../../docs/decisions/0038-a-sunset-is-sent-with-its-day-and-zone.md)).
 
 ## Channels: documents and messages
 
@@ -91,30 +103,42 @@ whose key was renamed is one `key_renamed`, so a consumer can move its value fro
 a removal and a new required variable
 ([decision 0022](../../docs/decisions/0022-a-variable-keeps-its-identity-across-renames.md)).
 
+## Render requests
+
 A render body is at most 1,000,000 bytes (`MAX_BODY_BYTES`), else 413 `body_too_large`; the route counts the bytes as
 it reads, so a chunked body is held to the limit too. Each value is at most 1,000 characters, counted in Unicode code
 points (`MAX_VALUE_LENGTH`), else 422 `invalid_values` with `maxLength` on that key's `details.invalid` entry. A value
-is never cut, because it prints exactly as sent. Every value is a JSON string, so `ApiRenderRequest.values` is
-`Record<string, string>`: a JSON number is 422 `invalid_values` too, with `sent: "number"` on that key's entry and a
-sentence that says to send `"21.90"`
-([decision 0058](../../docs/decisions/0058-render-values-are-strings.md)). The published JSON Schema refuses a number
-too, but it stays stricter than the route in four ways, so a body that validates against it is always accepted and
-the reverse does not hold. Each example is read by the route and refused by the schema: a friendly form (a currency of
-`"$1,000"`, a state of `"new jersey"`); whitespace around a value (a percent of `" 21.99 "`); `null` (absent to the
-route); a blank string for an optional value that is not text (`{"promo_rate": ""}` on an optional percent, absent to
-the route). The route's acceptance is in [render spec](../../docs/render-spec.md) §5; the schema's patterns are in
-`src/domain/golive/json-schema.ts`. The published JSON Schema gives every property the same
-`maxLength`. Both limits are in `src/domain/render/types.ts`, and why the value limit is 1,000 is
-[decision 0011](../../docs/decisions/0011-cap-each-render-value.md).
+is never cut, because it prints exactly as sent. Both limits are in `src/domain/render/types.ts`; why the value limit
+is 1,000 is [decision 0011](../../docs/decisions/0011-cap-each-render-value.md).
 
-The two lists page the same way (`ApiPage`): a call returns `nextCursor` and `hasMore`, and the next call passes
+Every value is a JSON string, so `ApiRenderRequest.values` is `Record<string, string>`: a JSON number is 422
+`invalid_values` too, with `sent: "number"` on that key's entry and a sentence that says to send `"21.90"`
+([decision 0058](../../docs/decisions/0058-render-values-are-strings.md)).
+
+The published JSON Schema (`ApiJsonSchema`) refuses a number too, but it is stricter than the route, so a body that
+validates against it is always accepted and the reverse does not hold. The route reads, and the schema refuses:
+
+- a friendly form: a currency of `"$1,000"`, a state of `"new jersey"`;
+- whitespace around a value: a percent of `" 21.99 "`;
+- `null`, which is absent to the route;
+- a blank string for an optional value that is not text (`{"promo_rate": ""}` on an optional percent), which is
+  absent to the route.
+
+The route's acceptance is in [render spec](../../docs/render-spec.md) §5; the schema's patterns are in
+`src/domain/golive/json-schema.ts`, and it gives every property the same `maxLength`.
+
+## Paging
+
+The search and notices lists page the same way (`ApiPage`): a call returns `nextCursor` and `hasMore`, and the next call passes
 the cursor back as `after`. Notices come oldest first in the order Stencil wrote them, so a consumer that keeps the
 last `nextCursor` gets every notice once, however many arrive between polls. A cursor is opaque to consumers and
 belongs to its list; anything else, or a notices cursor from before a demo reset, is 400 `bad_request`. Search
 compares names and ids by code point, not by locale. The cursor format, and why notices page on
 `consumer_notices.seq` rather than on time, are in
 [decision 0006](../../docs/decisions/0006-page-notices-by-commit-order.md); the code is
-`src/domain/golive/cursor.ts`. The shared response headers (`Cache-Control: no-store`, `X-Correlation-Id`, `nosniff`), the error response
+`src/domain/golive/cursor.ts`.
+
+The shared response headers (`Cache-Control: no-store`, `X-Correlation-Id`, `nosniff`), the error response
 and the demo-clock `Date` header come from [server/api/http.ts](../server/api/http.ts). The GET handlers read through
 `src/server/services/local/consumer-api.ts` and the pure builders in `src/domain/golive/`.
 
@@ -134,15 +158,17 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 | 410    | `version_sunset`, `version_revoked`                                                 |
 | 413    | `body_too_large`                                                                    |
 | 422    | `channel_not_allowed`, `channel_not_enabled`, `missing_variables`, `invalid_values` |
+| 422    | `push_payload_too_large`, `sms_too_long` (a push or an SMS over its limit)          |
 | 500    | `render_failed`                                                                     |
 
 `signed_out` is Stencil's own preview route's, and no route returns `preview_forbidden` (the preview answers a version
 the viewer may not see 404 `template_not_found`): `/api/v1` never returns either (they stay in `ApiErrorCode` so the
 two code lists match).
 
-`consumer_mismatch` belongs to the notices route, which answers it for a path naming any consumer but the caller, registered or not, so no answer says which consumer ids exist. The other 15 are the render codes
-(`RenderErrorCode` in `src/domain/render/types.ts`), which the GET routes reuse. That file's `RENDER_ERROR_STATUS`
-repeats their statuses and is read only by `src/domain/render/errors.test.ts`; take statuses from `API_ERROR_STATUS`.
+`consumer_mismatch` belongs to the notices route. It answers it for a path naming any consumer but the caller,
+registered or not, so no answer says which consumer ids exist. Every other code is a render code (`RenderErrorCode` in
+`src/domain/render/types.ts`), which the GET routes reuse. That file's `RENDER_ERROR_STATUS` repeats their statuses
+and is read only by `src/domain/render/errors.test.ts`; take statuses from `API_ERROR_STATUS`.
 
 ## The three type files and the drift checks
 
@@ -152,11 +178,10 @@ repeats their statuses and is read only by `src/domain/render/errors.test.ts`; t
 - [src/simulator/types.ts](../simulator/types.ts): Coral's read models, built on the `Api*` types it imports directly.
 
 `_DriftChecks` in `golive-types.ts` is a tuple of `Assert<Fits<A, B>>` types (`Fits`: A is assignable to B), so `tsc`
-fails when the domain's types stop fitting the wire shapes: `Channel` and `ApiChannel` both ways, `RenderErrorCode`
-into `ApiErrorCode`, `RenderErrorBody` into `ApiErrorBody`, `EmailResponseBody` into `ApiEmailResponse`,
-`Base64ResponseBody` into `ApiBase64Response`, `VariableType` and `ApiVariableType` both ways, `ConsumerNoticeKind`
-into `ApiNotice["kind"]`, and the contract change kinds (`ContractChange["kind"]` and `ApiContractChange["kind"]`)
-both ways. `ApiVersionState` and `ApiRenderRequest` have no explicit check. Only `npm run typecheck` and
+fails when the domain's types stop fitting the wire shapes. It pairs the domain's and the API's channels, push
+platforms, SMS encodings, variable types and contract-change kinds (both ways), and checks one way the render error
+codes and error body, the email and base64 responses, the push and SMS responses and their error details, and the
+notice kinds. `ApiVersionState` and `ApiRenderRequest` have no explicit check. Only `npm run typecheck` and
 `next build` run them. A channel added to the domain therefore has to be added to `ApiChannel`, and from there
 Coral's client (`src/simulator/ucomp-api.ts`) fails to compile until it handles it.
 

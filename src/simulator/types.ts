@@ -1,10 +1,10 @@
-// Phase 5 contract, Coral's side: the consumer simulator's read models and actions ("Coral — simulated").
+// Coral's contract: the consumer simulator's read models and actions ("Coral — simulated").
 //
 // The simulator is an outside system. It reaches UCOMP ONLY over /api/v1 (src/contracts/api-v1.ts) and
 // keeps its data in its own sim_* tables (src/server/db/schema/sim.ts) through its own DB handle
 // (src/simulator/db.ts). It may not import @/server (except the sim schema), @/domain or @/editor
 // (ESLint). Nothing here is UCOMP's: customer data never reaches UCOMP's tables or its render log.
-// Dates are ISO strings. Who implements what is in docs/archive/phase-5-brief.md.
+// Dates are ISO strings.
 
 import type {
   ApiChannel,
@@ -56,9 +56,10 @@ export interface SimField {
 
 // SIM_FIELDS: readonly SimField[]                                         (fields.ts)
 // suggestMapping(variables: readonly ApiVariable[], current?: Record<string, SimFieldPath>, changes?: ApiContractChange[]): Record<string, SimFieldPath>
-//   Keeps current mappings that still fit, under the same key or the earlier key of a key_renamed change; then auto-maps by key (first_name → customer.firstName, last_name,
-//   purchase_apr, home_state, offer_end_date → offer.endsOn). Never auto-maps a key it isn't sure of
-//   (annual_fee stays unmapped: the person picks customer or offer).
+//   Keeps current mappings that still fit, under the same key or the earlier key of a key_renamed change; then auto-maps
+//   the keys in `AUTO` (mapping.ts: first_name → customer.firstName, offer_end_date → offer.endsOn, an alert's card
+//   keys, and so on). Never auto-maps a key it isn't sure of (annual_fee stays unmapped: the person picks customer
+//   or offer).
 // missingRequired(variables: readonly ApiVariable[], mapping: Record<string, SimFieldPath | null>): ApiVariable[]
 // valuesFor(mapping: Record<string, SimFieldPath>, customer: SimCustomerRecord, offer: SimOfferRecord): Record<string, string>
 //   Canonical strings only (customer.purchaseApr "21.99", offer.annualFee "95", offer.endsOn "2027-06-30").
@@ -313,7 +314,7 @@ export interface SimLinkFlow {
     diff: ApiContractDiff | null;
   } | null;
   fields: readonly SimField[];
-  /** S3 addition: the chosen template couldn't be read (bad id, no Active version) or /api/v1 was down. */
+  /** Set when the chosen template couldn't be read (bad id, no Active version) or /api/v1 was down. */
   apiError: SimApiError | null;
 }
 
@@ -338,11 +339,11 @@ export type SimRead<T = Record<never, never>> =
 // sendToCustomers(input: { offerId: string; customerIds: string[] }): Promise<SimResult<{ batch: SimBatch }>>
 //   Refuses with blockedSentence() when required keys are unmapped. Otherwise POSTs
 //   /api/v1/templates/{id}/render once per customer × linked channel, `X-Consumer-Id: coral`, a fresh
-//   X-Correlation-Id each, `version: pinnedVersion`, pdf with `encoding: "base64"`; at most 3 in flight.
+//   X-Correlation-Id each, `version: pinnedVersion`, pdf with `encoding: "base64"`; at most RENDER_CONCURRENCY in flight.
 //   Writes one sim_deliveries row per render (output kept on Coral's side; failures keep the error body).
 //   Failures are results, not action errors: the action is ok unless nothing could be sent.
 // saveMapping(input: { offerId: string; mapping: Record<string, SimFieldPath | null> }): Promise<SimResult>
-//   S3 addition (the offer page's mapping rows): merges into the link's mapping; null clears a key.
+//   Used by the offer page's mapping rows: merges into the link's mapping; null clears a key.
 //   Keys must be variables of the pinned version (re-read over /api/v1).
 // markNoticesRead(input: { noticeIds: string[] }): Promise<SimResult>   // inserts sim_notice_reads
 // The two reads are GET routes, not actions (queries.ts, reads.ts):
