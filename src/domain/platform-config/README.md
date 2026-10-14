@@ -2,7 +2,7 @@
 
 Platform configuration as pure rules: teams, a content type's required sections, its channel rules, its approval
 chain, and the business time zone. Every function takes `now` (the demo clock) and returns what to write and what to
-record (`effects`); [server/actions/platform.ts](../../server/actions/platform.ts) applies both in one
+record (`effects`); the backend ([server/services/local/platform.ts](../../server/services/local/platform.ts)) applies both in one
 transaction. Each Platform screen's live check is the function its transition refuses with, so the screen and the
 server give the same answer. The contract each of the five save functions satisfies, `PlatformConfigDomain`, is in
 [access-types.ts](../access-types.ts).

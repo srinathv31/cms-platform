@@ -32,7 +32,7 @@ import {
 
 // ── The kinds ───────────────────────────────────────────────────────────────
 
-/** Every kind the bell knows, lifecycle (Phase 4) then access (Phase 6). */
+/** Every kind the bell knows: the lifecycle's, then access's. */
 export const NOTIFICATION_KINDS = [
   "review_requested",
   "changes_requested",

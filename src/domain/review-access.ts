@@ -4,7 +4,7 @@
 // facts; the BFF only lays them out.
 //
 // A screen is opened from a space: a team (by its id) or All teams (null). The template's own team sees its
-// rounds in its space, and All teams sees every team's. A stage that names a person (Phase 6, "Legal reviewer")
+// rounds in its space, and All teams sees every team's. A stage that names a person ("Legal reviewer")
 // lets them in from outside the team, in any space: while the round waits on that stage, and once they have
 // decided it.
 

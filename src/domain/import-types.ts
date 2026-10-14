@@ -1,11 +1,9 @@
-// Phase 7a contract (Track C): import a .docx, .pdf or .txt into a new draft, "Compare with original"
-// (the rail's Original tab), the Copilot prompt, and the ⌘K palette's command model. Types and a few
-// constants only, written by the lead; every 7a agent codes against this file. Dates in read models
-// are ISO strings (they cross into client components).
+// The import and palette contract: importing a .docx, .pdf or .txt into a new draft, "Compare with original" (the
+// rail's Original tab), the Copilot prompt, and the ⌘K palette's command model. Types and a few constants. Dates in
+// read models are ISO strings (they cross into client components).
 //
-// Who implements what is in docs/archive/phase-7a-brief.md. No schema change and no migration: the
-// `uploads` table and `versions.import_upload_id` already exist (0000_init). If something here is
-// wrong, make the smallest additive change and say so first in your report.
+// The pure rules are domain/import.ts, domain/copilot.ts and domain/palette.ts; the converters are in
+// src/server/import/. Importing stores into the `uploads` table and `versions.import_upload_id`.
 
 import type { ImportDrop, ImportKind, ImportReport } from "./import-report";
 import { refusal, type Refused } from "./refusals";
@@ -264,10 +262,9 @@ export interface ImportOriginalView {
 // ── Copilot prompt ───────────────────────────────────────────────────────────
 //
 // No AI in the app: the author copies a prompt into Copilot and pastes the answer back into the
-// document. The paste goes through the editor's existing paste path (`{{key}}` → chips; unknown keys
-// become optional Text variables). Phase 7a adds to the editor, additively: Markdown plain-text
-// paste, and pasted headings that match the document's required sections merge into them instead of
-// duplicating them (see the brief).
+// document. The paste goes through the editor's paste path (src/editor/paste): `{{key}}` becomes a chip (an
+// unknown key becomes an optional Text variable), Markdown plain text becomes structure, and a pasted heading that
+// matches one of the document's required sections merges into it instead of duplicating it.
 
 export interface CopilotPromptInput {
   templateName: string;

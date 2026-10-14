@@ -75,8 +75,8 @@ interface Member {
   flaggedDaysAgo?: number;
 }
 
-// Matches the persona table in the build plan. Morgan has no membership on purpose. Dana Park (Legal)
-// views Coral Offers so a "Legal reviewer" stage that names her can be demoed (Phase 6).
+// Morgan has no membership on purpose. Dana Park (Legal) views Coral Offers so a "Legal reviewer" stage that
+// names her can be demoed.
 export const MEMBERS: Member[] = [
   {
     user: "alex",

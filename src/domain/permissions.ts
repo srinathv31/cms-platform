@@ -1,4 +1,4 @@
-// Who may do what: the one central permission check (build plan, "Personas and permissions").
+// Who may do what: the one central permission check.
 // Server actions check it through the kit (`check()`), pages through `requireCan`; the UI reads the
 // decided `can` in a read model to show or disable an action.
 // Pure TypeScript with no framework imports, so it ports directly to the Spring Boot API.
@@ -87,15 +87,15 @@ const EVERYONE: readonly Action[] = ["access.request"];
 
 /**
  * Everything an Auditor may do, whatever else they hold: see and read the audit log. "Sees
- * everything, changes nothing" (build plan) is enforced here, centrally: a team membership an
+ * everything, changes nothing" is enforced here, centrally: a team membership an
  * Auditor somehow holds adds nothing, being named on a stage adds nothing, and they can't ask for a
  * team role (access.request is not theirs).
  */
 const AUDITOR_ONLY: readonly Action[] = PLATFORM_GRANTS.auditor;
 
 /**
- * What a user named by a version's current approval stage may do on that version (Phase 6: Dana
- * Park's "Legal reviewer" stage): open it, decide it and comment on it, on ANY team, with no
+ * What a user named by a version's current approval stage may do on that version (the seed's
+ * Dana Park, named by a "Legal reviewer" stage): open it, decide it and comment on it, on ANY team, with no
  * membership there (a Legal stage covers every team's disclosures; otherwise a Deposits submission
  * would wait forever on someone who can't see it). The person needs some active access (a team or a
  * platform role): a suspended or lapsed person with nowhere to sign in to acts on nothing. An Auditor
@@ -150,7 +150,7 @@ export function can(
   const teamId = teamIdOf(resource);
   const blocked = GUARDS[action]?.(viewer, resource);
   // A self-block explains itself to anyone who can see the item, role or not:
-  // the submitting author sees Approve disabled with "You submitted this version." (build plan, maker-checker),
+  // the submitting author sees Approve disabled with "You submitted this version." (maker-checker),
   // and a co-author sees why they can't decide what they wrote.
   if (blocked && granted(viewer, "template.view", teamId))
     return refuse(blocked);
@@ -197,7 +197,7 @@ function namedApprover(
 
 /**
  * An active membership with a role on some team. A platform role alone doesn't count for a named
- * stage: Platform Admin has no approve power (build plan), so naming one gives them nothing until
+ * stage: Platform Admin has no approve power, so naming one gives them nothing until
  * they hold a team role somewhere.
  */
 export function hasActiveTeamAccess(

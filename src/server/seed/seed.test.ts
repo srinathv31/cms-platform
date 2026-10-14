@@ -269,7 +269,7 @@ describe("ids", () => {
 });
 
 describe("people, teams and access", () => {
-  it("has the nine personas with the fixed ids (the build plan's eight, plus Dana Park in Phase 6)", () => {
+  it("has the nine personas with the fixed ids", () => {
     const personas = users
       .filter((u) => u.isPersona)
       .map((u) => u.id)
@@ -308,7 +308,7 @@ describe("people, teams and access", () => {
     for (const t of teams) expect(RESERVED_SLUGS.has(t.slug)).toBe(false);
   });
 
-  it("matches the persona table in the build plan", async () => {
+  it("matches the persona table", async () => {
     const members = await db.select().from(ucomp.memberships);
     const roles = await db.select().from(ucomp.membershipRoles);
     const byUser = new Map<string, string[]>();
@@ -334,7 +334,7 @@ describe("people, teams and access", () => {
     for (const none of ["riley", "taylor", "morgan"])
       expect(byUser.has(none)).toBe(false);
 
-    // Card Statements has no switchable persona; Coral Offers has 7 members (Dana Park joined in Phase 6).
+    // Card Statements has no switchable persona; Coral Offers has 7 members (Dana Park among them).
     const personaIds = new Set(
       users.filter((u) => u.isPersona).map((u) => u.id),
     );
@@ -485,7 +485,7 @@ describe("lifecycle states", () => {
       expect([v.number, v.round]).toEqual([null, null]);
   });
 
-  it("matches the five Coral templates in the build plan", () => {
+  it("matches the five Coral templates", () => {
     const states = (key: string) =>
       versionsOf(key)
         .map((v) => `${v.number ?? "draft"}:${v.state}`)
@@ -1635,7 +1635,7 @@ describe("simulator data", () => {
     ).toBe(true);
   });
 
-  it("gives every customer an annual fee and Spring Travel an offer fee and end date (Phase 5 mapping)", async () => {
+  it("gives every customer an annual fee and Spring Travel an offer fee and end date (the offer.* mapping)", async () => {
     const customers = await db.select().from(sim.simCustomers);
     for (const c of customers) expect(c.annualFee).toMatch(/^\d+$/);
     const spring = (await db.select().from(sim.simOffers)).find(

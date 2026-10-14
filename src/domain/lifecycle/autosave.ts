@@ -237,8 +237,8 @@ export function recordedSave(details: unknown): LastSave {
  * - No row yet: a new one with `saves: 1`, the changed fields and `since: now`.
  * - A row exists: `saves + 1`, the union of the fields, and `since` kept. The row's `at` moves to now.
  *
- * Rows written before this existed have no `fields`, `since` or `rev`: their fields start empty and `since` falls
- * back to the row's old `at`.
+ * A row without `fields`, `since` or `rev` (an older shape) starts with empty fields, and its `since` falls back to
+ * the row's `at`.
  */
 export function mergeDraftEdit(
   previous: { at: Date; details: unknown } | null,

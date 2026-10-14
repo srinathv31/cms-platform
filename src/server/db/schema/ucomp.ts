@@ -88,7 +88,7 @@ export const memberships = sqliteTable(
     addedAt: ts("added_at").notNull(),
     addedBy: text("added_by").references(() => users.id),
     statusChangedAt: ts("status_changed_at"),
-    /** Why the membership is suspended or lapsed; null while active (Phase 6). */
+    /** Why the membership is suspended or lapsed; null while active. */
     statusReason: text("status_reason").$type<MembershipStatusReason>(),
     /** When the 90-day inactivity flag was raised (and its notification sent); null when not flagged. */
     inactivityFlaggedAt: ts("inactivity_flagged_at"),

@@ -7,7 +7,7 @@ import { refusal, type ReadResult } from "@/server/api/reads";
 import type { RequestContext } from "@/server/context/request";
 import { services } from "@/server/services";
 
-// The Copilot prompt for a template's draft (Phase 7a), served by
+// The Copilot prompt for a template's draft, served by
 // GET /api/templates/[templateId]/copilot-prompt. A read, not a change: the dialog sends the pending
 // autosave first (`session.flush()`), so the saved draft is what is on screen. The backend answers the draft
 // with its team and content type (`services().templates.copilotPrompt`, for someone who may edit it); the

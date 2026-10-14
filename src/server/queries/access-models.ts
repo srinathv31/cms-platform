@@ -315,7 +315,7 @@ export interface BusinessZoneSection {
   consequences: string[];
 }
 
-/** A filter option with how many events it would match given every OTHER filter (S3 addition). */
+/** A filter option with how many events it would match given every OTHER filter. */
 export interface AuditOption {
   value: string;
   label: string;
@@ -330,7 +330,7 @@ export interface AuditPageData {
   applied: AuditFilters;
   /**
    * The five menus. Every option lists what the space holds (selected values always included),
-   * with counts under the other filters (S3 addition: counts, categories, templates, datePresets).
+   * with counts under the other filters (counts, categories, templates, datePresets).
    */
   options: {
     teams: { slug: string; name: string; count: number }[]; // empty in a team space
