@@ -235,8 +235,8 @@ without a persona cookie is signed out unless the demo tools are on, where it ac
 ([S2](../../docs/handoff-review.md#s2--high-identity-fails-open-to-the-default-persona)).
 
 **The preview** (`POST /api/templates/[templateId]/preview`) is the one POST among them, because it carries the sample
-values. It reads the person from the request context (nobody signed in is refused `preview_forbidden` without asking
-the backend), checks the body, and asks the backend to render (`services().render.preview`, under the request's
+values. It reads the person from the request context (nobody signed in is refused 401 `signed_out` before the body is
+read, without asking the backend), checks the body, and asks the backend to render (`services().render.preview`, under the request's
 correlation id), and answers with the same bodies, headers (plus `X-Stencil-Preview: true`) and `{ error: { code, message, details? } }`
 errors as the consumer render route, through [server/api/render-http.ts](../server/api/render-http.ts) and
 `errorResponse`. It takes `version` as `"draft"` or a number, an optional `round`, and any state previews

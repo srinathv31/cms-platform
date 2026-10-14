@@ -147,20 +147,50 @@ describe("POST /api/templates/[templateId]/preview: the request the backend gets
     expect(events).toEqual(["person", "body"]);
   });
 
-  it("answers nobody signed in 401 signed_out, once the body has been checked, without asking the backend", async () => {
+  it("answers nobody signed in 401 signed_out, whatever the body, without asking the backend", async () => {
     vi.mocked(findRequestContext).mockResolvedValue(null);
-    await expectError(
-      await post({ version: 2, channel: "web", values: CUSTOMER }),
-      401,
-      "signed_out",
-      signedOut().message,
-    );
-    await expectError(
-      await post({ version: 2, channel: "fax", values: CUSTOMER }),
-      400,
-      "bad_request",
-    );
+    for (const body of [
+      { version: 2, channel: "web", values: CUSTOMER },
+      // A body the route would refuse 400 is never checked: signed out comes first, as on every route.
+      { version: 2, channel: "fax", values: CUSTOMER },
+      { version: 2, channel: "push", values: CUSTOMER },
+    ])
+      await expectError(
+        await post(body),
+        401,
+        "signed_out",
+        signedOut().message,
+      );
     expect(preview).not.toHaveBeenCalled();
+  });
+
+  it("reads no byte of the body when nobody is signed in", async () => {
+    vi.mocked(findRequestContext).mockResolvedValue(null);
+    let pulled = false;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          pulled = true;
+          controller.enqueue(new TextEncoder().encode("{}"));
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const request = new Request(
+      `http://localhost/api/templates/${TEMPLATE}/preview`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        duplex: "half",
+      } as RequestInit,
+    ) as NextRequest;
+    const res = await POST(request, {
+      params: Promise.resolve({ templateId: TEMPLATE }),
+    } as Parameters<typeof POST>[1]);
+    expect(res.status).toBe(401);
+    expect(pulled).toBe(false);
   });
 });
 

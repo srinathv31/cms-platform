@@ -28,8 +28,8 @@ import { services } from "@/server/services";
 //
 // A POST handler always runs at request time, Cache Components or not. The person is resolved first, then the body
 // is read within MAX_BODY_BYTES (render-http.ts). Nobody signed in previews nothing: 401 `signed_out`, as every
-// other route answers it (in the render API's error shape), once the body has been checked, and nothing is rendered
-// or logged.
+// other route answers it (in the render API's error shape), before a byte of the body is read, and nothing is
+// rendered or logged.
 
 /** A preview's round: a whole number from 1. */
 const Round = z.int().min(1);
@@ -42,6 +42,7 @@ export async function POST(
   const correlationId = correlationIdOf(request);
   // The person first, before a byte of the body is read (as drafts and imports do).
   const context = await findRequestContext();
+  if (!context) return errorResponse(signedOut(), correlationId);
 
   const read = await readRenderRequest(request);
   if (!read.ok) return errorResponse(read.error, correlationId);
@@ -64,7 +65,6 @@ export async function POST(
   // A push asks for its platform; nothing else takes one, and push and SMS take no encoding.
   const target = renderTarget(channel, platform, encoding);
   if (!target.ok) return errorResponse(target.error, correlationId);
-  if (!context) return errorResponse(signedOut(), correlationId);
 
   try {
     const result = await services().render.preview(
