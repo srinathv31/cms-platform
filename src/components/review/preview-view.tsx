@@ -30,7 +30,7 @@ import { isDocumentChannel, type Channel, type Variable } from "@/domain/types";
 import { RV } from "./review-grid";
 
 /**
- * The rendered output of the version under review: the Phase 3 preview's own pieces (the channel
+ * The rendered output of the version under review: the workspace preview's own pieces (the channel
  * control, Download PDF, Desktop / Mobile or the phone's controls, the output on its tinted well).
  * A document channel renders THIS round by number and round through Stencil's own preview route
  * (`POST /api/templates/{id}/preview`, which names a round and reads the session; decision 0047) and
