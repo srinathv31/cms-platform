@@ -65,7 +65,7 @@ export function describeActivity(
 
   switch (e.action) {
     case "template.created": {
-      // Phase 7a: an import names the file it came from ("Maya Chen imported Spring offer.docx.").
+      // An import names the file it came from ("Maya Chen imported Spring offer.docx.").
       const file = text(d.filename);
       return typeof d.source === "string" &&
         d.source.startsWith("import:") &&

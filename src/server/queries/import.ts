@@ -12,7 +12,7 @@ import { services } from "@/server/services";
 import { refusal, type ReadResult } from "@/server/services/results";
 import type { ImportedOriginal } from "@/server/services/templates";
 
-// An imported template's original (Phase 7a): the cheap ref the workspace carries, and what the rail's Original
+// An imported template's original: the cheap ref the workspace carries, and what the rail's Original
 // tab and the file route read. The original belongs to the template (`uploads.template_id`), so every version
 // shows it; the backend decides who may see it (the template's space) and answers facts, which these words and
 // lay out (the report's lines, the file's URL, the text a text file shows).

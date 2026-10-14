@@ -1,4 +1,4 @@
-// The Copilot prompt (Phase 7a). There is no AI in the app: the author copies this prompt into
+// The Copilot prompt. There is no AI in the app: the author copies this prompt into
 // Copilot and pastes the answer back into the document, where the editor turns its Markdown into
 // structure, its `{{key}}` placeholders into chips, and its required headings into the existing
 // sections (src/editor/paste). So the prompt asks for exactly what that paste understands.

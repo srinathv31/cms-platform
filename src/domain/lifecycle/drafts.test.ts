@@ -421,7 +421,7 @@ describe("planDraftStart", () => {
     ).toEqual({ kind: "blocked", ...REFUSALS.newerInReview });
   });
 
-  // Handoff review D1: revoking the Active version used to leave nothing anyone could edit.
+  // Handoff review D1: after the Active version is revoked, Edit starts a draft from it.
   it("copies the revoked version when the Active one was revoked and nothing newer exists", () => {
     expect(
       planDraftStart([v("v1", "superseded", 1), v("v2", "revoked", 2)]),

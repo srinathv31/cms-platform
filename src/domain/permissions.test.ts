@@ -85,7 +85,7 @@ function person(
   };
 }
 
-// Seed personas (build plan, "Seed personas").
+// Seed personas.
 const maya = person("maya", {
   memberships: [member("coral-offers", ["author"])],
 });
@@ -120,7 +120,7 @@ const deny = (refusal: { code: string; reason: string }) => ({
 });
 
 // ── The permission matrix ─────────────────────────────────────
-// A literal copy of the build plan's matrix. The last row ("Anyone") spans every column.
+// A literal copy of the permission matrix. The last row ("Anyone") spans every column.
 
 type Column =
   | "viewer"
@@ -372,7 +372,7 @@ const CASES = MATRIX.flatMap(({ row, actions, cells }) =>
   ),
 );
 
-describe("permission matrix (build plan)", () => {
+describe("permission matrix", () => {
   it.each(CASES)(
     "$row · $column ($cell) · $action",
     ({ action, column, cell }) => {
@@ -610,7 +610,7 @@ describe("access requests", () => {
   });
 });
 
-describe("own access (Phase 6)", () => {
+describe("own access", () => {
   const OWN_ACCESS = {
     code: "own_access",
     reason: "You can't change your own access.",

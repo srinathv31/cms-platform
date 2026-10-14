@@ -7,7 +7,7 @@ export interface StatusMeta {
   label: string;
   tone: "draft" | "review" | "changes" | "active" | "superseded" | "revoked";
   icon: "dot" | "clock" | "corner-up-left" | "check" | "archive" | "ban";
-  /** Renders for consumers? (build plan, lifecycle table) */
+  /** Renders for consumers? */
   renders: "no" | "preview" | "yes" | "until-sunset";
 }
 

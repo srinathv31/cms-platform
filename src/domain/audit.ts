@@ -1,4 +1,4 @@
-// The Audit page and the bell, as pure TypeScript (Phase 6, slice S3):
+// The Audit page and the bell, as pure TypeScript:
 //
 //   - the action catalog: each audit action's category ("templates" | "access" | "platform") and
 //     its label for the Action column ("Submitted", "Access granted", "Configuration changed");

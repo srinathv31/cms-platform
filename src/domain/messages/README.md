@@ -157,7 +157,7 @@ the last whole word (`roundToWord`) and quoted by its last two words (`quotedTai
 “…payment of”." When both platforms cut a title at the same word, one sentence names both.
 
 The composer doesn't warn about Android showing the title with previews hidden: whether that matters depends on
-whether a value is sensitive, which nothing records yet (sensitive variables are a later phase). The preview's
+whether a value is sensitive, which nothing records yet (the product has no sensitive variables yet). The preview's
 Previews: Hidden shows it.
 
 ## Sources

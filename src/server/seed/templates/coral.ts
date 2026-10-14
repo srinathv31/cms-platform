@@ -14,7 +14,7 @@ import type { VarKey } from "@/server/documents/variables";
 import { buildTemplate } from "./build";
 import type { SeedTemplate } from "./types";
 
-// Coral Offers: five disclosures that put every lifecycle state on screen (build plan, "Seed data"). Its
+// Coral Offers: five disclosures that put every lifecycle state on screen. Its
 // alerts are in coral-alerts.ts.
 // Times are days before the reset.
 

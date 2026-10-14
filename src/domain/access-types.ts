@@ -1,11 +1,15 @@
-// Phase 6 contract: access and admin, as the domain rules take and give it. Pure types: the rules' inputs (facts,
-// with Date), the changes and effects they return, the sweep, and what the recertification and audit rules compute.
-// The screens' view models built from them are in src/server/queries/access-models.ts.
+// The access, platform and audit contract: what the domain rules in access/, platform-config/ and audit.ts take
+// and give. Pure types: the rules' inputs (facts, with Date), the changes and effects they return, the sweep, and
+// what the recertification and audit rules compute. The screens' view models built from them are in
+// src/server/queries/access-models.ts.
 //
 //   domain/access/             team access rules: request/decide, members, recertification,
 //                              inactivity, and the clock-driven sweep (lapse, flag, auto-suspend)
-//   domain/platform-config/    teams, content types, channel rules, approval chains
+//   domain/platform-config/    teams, content types, channel rules, approval chains, the business time zone
 //   domain/audit.ts            audit sentences, action groups, filters, CSV
+//
+// `PlatformConfigDomain` and `AuditDomain` near the end state the signatures those two areas export; each area
+// checks itself against its interface (platform-config/contract.ts, `auditDomain` in audit.ts).
 
 import type { Refused } from "./refusals";
 import type {
@@ -28,7 +32,7 @@ import type {
 
 export type { ActionResult };
 
-// ── Rules (Q5 in the plan's §12 is final) ────────────────────────────────────
+// ── Limits ───────────────────────────────────────────────────────────────────
 
 /** A member with no sign-in for this many days is flagged on the Inactivity page. */
 export const INACTIVITY_FLAG_DAYS = 90;
@@ -48,14 +52,14 @@ export const DECIDED_REQUESTS_WINDOW_DAYS = 30;
 export const ACCESS_REASON_MAX = 500;
 export const DECISION_NOTE_MAX = 500;
 
-// ── Domain facts (what the server reads and hands to domain/access.ts) ──────
+// ── Domain facts (what the backend reads and hands to the access rules) ──────
 
 export interface Named {
   id: string;
   name: string;
 }
 
-/** What `validateChain` (platform-config.ts) needs to know about a person a stage may name. */
+/** What `validateChain` (platform-config/approval-chains.ts) needs to know about a person a stage may name. */
 export interface ApproverFacts extends Named {
   platformRole: PlatformRole | null;
   /** Holds a role through an active membership on some team (`hasActiveTeamAccess` in permissions.ts). */
@@ -193,7 +197,7 @@ export type AccessNotificationKind =
   | "recert_due" // to the team's Team Admins when a review starts
   | "team_admin_appointed"; // to a new team's first Team Admin
 
-/** Every notification kind the bell shows: lifecycle (Phase 4) and access (Phase 6). */
+/** Every notification kind the bell shows: lifecycle and access. */
 export type AnyNotificationKind = NotificationKind | AccessNotificationKind;
 
 /**
@@ -323,7 +327,7 @@ export interface AccessEffectsWritten {
 export type Ok<T> = { ok: true } & T;
 export type { Refused };
 
-// ── The sweep (clock-driven; domain/access.ts `sweepAccess`) ─────────────────
+// ── The sweep (clock-driven; access/sweep.ts `sweepAccess`) ──────────────────
 
 export interface SweepInput {
   now: Date;
@@ -342,7 +346,7 @@ export interface SweepResult {
   effects: AccessEffect[];
 }
 
-// ── Recertification progress (domain/access/recertification.ts) ─────────────
+// ── Recertification progress (access/recertification.ts) ─────────────────────
 
 export interface RecertProgress {
   total: number;
@@ -362,7 +366,6 @@ export type AuditCategory = "templates" | "access" | "platform";
  * `?team=&person=&action=&template=&from=&to=` — all optional. Each list field holds one value or
  * several joined by commas (the menus are multi-select: `?person=alex,sam`); values within a field
  * are ORed, fields are ANDed. `action` values are categories or (canonical) actions.
- * S3 additions: `template`, and the comma lists.
  */
 export interface AuditFilters {
   /** Team slugs. Only meaningful in the All teams space; a team space is pinned to itself. */
@@ -393,17 +396,17 @@ export interface AuditRow {
   category: AuditCategory;
   /** "Approved", "Access granted" (the action column). */
   actionLabel: string;
-  /** One plain sentence (domain/audit.ts `describeAuditEvent`). */
+  /** One plain sentence (audit.ts `describeAuditEvent`). */
   summary: string;
-  /** S3 addition: whom an access event is about (details.userId); null for template and platform events. */
+  /** Whom an access event is about (details.userId); null for template and platform events. */
   subject: Person | null;
-  /** S3 addition: the demo-clock time in UTC, "Oct 5, 3:42 PM UTC" (the year only outside the demo clock's; `formatDateTime`). */
+  /** The demo-clock time in UTC, "Oct 5, 3:42 PM UTC" (the year only outside the demo clock's; `formatDateTime`). */
   when: string;
-  /** S3 addition: relative to the demo clock's now, "3 days ago". */
+  /** Relative to the demo clock's now, "3 days ago". */
   ago: string;
 }
 
-// ── domain/platform-config.ts signatures (implemented by slice P1) ──────────
+// ── platform-config/ signatures (checked in platform-config/contract.ts) ─────
 
 export interface PlatformConfigDomain {
   /** "Coral Offers" → "coral-offers". Refuses empty, taken (case-insensitive) and reserved slugs. */
@@ -510,7 +513,7 @@ export interface PlatformConfigDomain {
   }): Ok<{ zone: string; effects: AccessEffect[] }> | Refused;
 }
 
-// ── domain/audit.ts signatures (implemented by slice S3) ────────────────────
+// ── audit.ts signatures (checked by `auditDomain` in audit.ts) ───────────────
 
 export interface AuditDomain {
   categoryOf(action: string): AuditCategory;

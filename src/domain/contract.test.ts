@@ -12,7 +12,7 @@ import type { ContractChange, Variable } from "./types";
 describe("describeChange: one plain sentence per kind", () => {
   it.each<[string, ContractChange, string]>([
     [
-      "a required variable added (the build plan's example)",
+      "a required variable added",
       {
         kind: "added",
         key: "annual_fee",

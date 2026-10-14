@@ -25,7 +25,7 @@ import {
 import { convertFile } from "./convert";
 import { sniffKind } from "./sniff";
 
-// Import a file (Phase 7a): a .docx, .pdf or .txt becomes a new template whose first draft holds
+// Import a file: a .docx, .pdf or .txt becomes a new template whose first draft holds
 // its text, with `{{placeholders}}` as Text chips and the content type's required sections in place.
 // The order is the contract's (src/domain/import-types.ts): permission first, then size, kind,
 // conversion, then the document check (the body is stored as src/server/documents/prepare.ts makes
