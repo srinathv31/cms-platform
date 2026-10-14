@@ -211,7 +211,7 @@ test.describe("the preview route", () => {
     });
   });
 
-  test("a person who can't see the template's team gets a 403 preview_forbidden, and it is logged as a preview", async ({
+  test("a person who can't see the template's team gets a 404 template_not_found, as for a template that isn't there, and nothing is logged", async ({
     playwright,
     baseURL,
   }) => {
@@ -244,20 +244,13 @@ test.describe("the preview route", () => {
         });
         await expectError(
           res,
-          403,
-          "preview_forbidden",
-          "You can't preview this template.",
+          404,
+          "template_not_found",
+          `Template ${draft.templateId} doesn't exist.`,
         );
         expect(res.headers()["x-stencil-preview"]).toBeUndefined();
       });
-      const rows = await renderLogFor(cid);
-      expect(rows, persona).toHaveLength(1);
-      expect(rows[0], persona).toMatchObject({
-        isPreview: true,
-        consumerId: null,
-        outcome: "error",
-        errorCode: "preview_forbidden",
-      });
+      expect(await renderLogFor(cid), persona).toEqual([]);
     }
   });
 

@@ -10,7 +10,6 @@ import {
   channelNotEnabled,
   checkVersion,
   consumerRequired,
-  previewForbidden,
   renderTarget,
   templateNotFound,
   unknownConsumer,
@@ -49,8 +48,9 @@ import { writeRenderLog } from "./log";
 //     A number is its head (`findRound`): the released row, else its latest round, which a consumer is
 //     refused at 4. A preview may name a round (`round`, `?round=` on the review screen); the consumer
 //     route has no round to pass.
-//   3 preview: viewer sees the team → 403 preview_forbidden; consumer: registered → 403 unknown_consumer
-//     (not logged: a caller that isn't a consumer writes nothing)
+//   3 preview: the viewer may see the version (`previewAllowed`) → else 404 template_not_found, checked
+//     with 2 so that a template, version or draft they may not see reads as not there (decision 0052);
+//     consumer: registered → 403 unknown_consumer (neither logged: a caller who may not render writes nothing)
 //   4 version rules (consumers only) → 409 / 410
 //   5 channel: content type allows it → 422 channel_not_allowed; version has it → 422 channel_not_enabled
 //   6–9 the engine (engine.ts): values → 422 missing_variables / invalid_values; the document check,
@@ -58,8 +58,8 @@ import { writeRenderLog } from "./log";
 //     can act on (a stored document the check or the resolver refuses, or characters the PDF's
 //     fonts can't draw; see `renderFailure`); a push or SMS over its limit → 422
 //     push_payload_too_large / sms_too_long
-//  10 one render_log row, ok or error, for every request that reached 3, but a caller that isn't a
-//     consumer. Never values: the channel, a push's platform and the error code only.
+//  10 one render_log row, ok or error, for every request that passed 3. Never values: the channel, a push's
+//     platform and the error code only.
 
 export interface RenderInput {
   templateId: string;
@@ -175,6 +175,17 @@ export async function runRender(
           input.version,
           input.preview ? input.round : undefined,
         );
+  // 3, for a preview: someone who may see the version. A template, a version or a draft the viewer may not see
+  // reads as a template that isn't there, whatever exists (decision 0052), and isn't logged: a request from
+  // outside learns nothing and writes nothing.
+  if (input.preview) {
+    const sees =
+      input.viewer !== null &&
+      (version
+        ? await previewAllowed(db, input.viewer, template, version)
+        : can(input.viewer, "template.view", { teamId: template.teamId }).ok);
+    if (!sees) return fail(templateNotFound(template.id));
+  }
   if (!version) return fail(versionNotFound(template.id, input.version));
 
   // 3, for a consumer: a registered one. A caller that isn't is refused here, unlogged, so anonymous
@@ -289,13 +300,7 @@ async function renderVersion(
   let newerVersion: number | null = null;
 
   if (input.preview) {
-    // 3. The CMS's own preview: the persona must be able to see the template's team.
-    if (
-      !input.viewer ||
-      !(await previewAllowed(db, input.viewer, template, version))
-    ) {
-      return fail(previewForbidden());
-    }
+    // 3 (someone who may see the version) was checked by `runRender`, before anything is logged.
     // 4 is skipped (any state previews), but a Superseded version still names its successor.
     if (version.state === "superseded")
       newerVersion = await activeNumber(db, template.id);

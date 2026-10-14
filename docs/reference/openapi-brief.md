@@ -201,7 +201,7 @@ a code has none (`errorResponse` in `src/server/api/http.ts`):
 | 403    | `unknown_consumer`       | all four              | The caller isn't a registered consumer.                                                                                                                               |
 | 403    | new, name open           | all four (Java)       | _Proposed (0057 doesn't say):_ a registered consumer without the operation's app role. _Suggestion:_ `role_required`.                                                 |
 | 403    | `consumer_mismatch`      | notices               | The path names a consumer other than the caller.                                                                                                                      |
-| 403    | `preview_forbidden`      | never `/api/v1`       | The CMS preview route's: the viewer may not see that version. In `ApiErrorCode` only so the code lists match.                                                         |
+| 403    | `preview_forbidden`      | never `/api/v1`       | Returned by no route: the CMS preview answers a version the viewer may not see 404 `template_not_found`. In `ApiErrorCode` only so the code lists match.              |
 | 401    | `signed_out`             | never `/api/v1`       | The CMS preview route's: nobody is signed in. In `ApiErrorCode` only so the code lists match.                                                                         |
 | 404    | `template_not_found`     | template, render      | No template with that id; for the template read, also a template with no released version.                                                                            |
 | 404    | `version_not_found`      | template, render      | The template has no version with that number.                                                                                                                         |
@@ -274,8 +274,8 @@ the same bodies and the same error body as the render route today, and the appro
 ([0067](../decisions/0067-java-renders-every-channel.md)), and its error body changes to the UCOMP format in the same
 change as `/api/v1`'s, together with its readers (`src/components/preview/render-preview.ts`) and Coral's client
 (`src/simulator/ucomp-api.ts`). Java's preview endpoint is internal and outside this spec: it takes `version` as
-`"draft"` or a number, an optional `round`, and the viewer, renders any state, and refuses with 403
-`preview_forbidden`. The app's other routes keep their `{ ok: false, code, reason }` shape
+`"draft"` or a number, an optional `round`, and the viewer, renders any state, and answers a template, version or
+draft the viewer may not see 404 `template_not_found`, as one that isn't there, unlogged. The app's other routes keep their `{ ok: false, code, reason }` shape
 ([0041](../decisions/0041-routes-refuse-in-the-actions-shape.md)).
 
 ## 5. Endpoints

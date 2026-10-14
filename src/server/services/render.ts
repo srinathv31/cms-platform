@@ -57,10 +57,12 @@ export interface RenderService {
    * viewer, in any state: the version rules a consumer meets are skipped, but a Superseded version still names its
    * successor (`newerVersion`). The viewer may preview what they may see: the template's team, the stage a version
    * in review waits on, or a version they decided while they still have active access somewhere. Refuses, in the
-   * render API's order and statuses: `bad_request` (the target), `template_not_found`, `version_not_found`,
-   * `preview_forbidden`, the channel (`channel_not_allowed`, `channel_not_enabled`), then the engine's (values,
-   * the document, a message's limits). Every request that reaches a known version is logged as a preview (the
-   * context's correlation id, no consumer, never a value) and never counts in Usage.
+   * render API's order and statuses: `bad_request` (the target), `template_not_found`, `version_not_found`, the
+   * channel (`channel_not_allowed`, `channel_not_enabled`), then the engine's (values, the document, a message's
+   * limits). A template, version or draft the viewer may not preview reads as `template_not_found`, whatever
+   * exists (decision 0052), so `version_not_found` reaches only someone who sees the template's team. Every
+   * request that reaches a version the viewer may preview is logged as a preview (the context's correlation id,
+   * no consumer, never a value) and never counts in Usage.
    */
   preview(ctx: RequestContext, input: PreviewRequest): Promise<RenderResult>;
 }

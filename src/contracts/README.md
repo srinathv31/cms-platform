@@ -136,8 +136,9 @@ people as is. Each code's status is `API_ERROR_STATUS` in [golive-types.ts](../d
 | 422    | `channel_not_allowed`, `channel_not_enabled`, `missing_variables`, `invalid_values` |
 | 500    | `render_failed`                                                                     |
 
-`preview_forbidden` and `signed_out` are Stencil's own preview route's: `/api/v1` never returns them (they stay in
-`ApiErrorCode` so the two code lists match).
+`signed_out` is Stencil's own preview route's, and no route returns `preview_forbidden` (the preview answers a version
+the viewer may not see 404 `template_not_found`): `/api/v1` never returns either (they stay in `ApiErrorCode` so the
+two code lists match).
 
 `consumer_mismatch` belongs to the notices route, which answers it for a path naming any consumer but the caller, registered or not, so no answer says which consumer ids exist. The other 15 are the render codes
 (`RenderErrorCode` in `src/domain/render/types.ts`), which the GET routes reuse. That file's `RENDER_ERROR_STATUS`

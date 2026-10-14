@@ -469,7 +469,7 @@ describe("runRender: previews", () => {
             })
           ).result,
         ).code,
-      ).toBe("preview_forbidden");
+      ).toBe("template_not_found");
     } finally {
       await db
         .update(approvalStages)
@@ -522,7 +522,7 @@ describe("runRender: previews", () => {
             })
           ).result,
         ).code,
-      ).toBe("preview_forbidden");
+      ).toBe("template_not_found");
       const lapsed: Viewer = {
         ...naomi,
         memberships: naomi.memberships.map((m) => ({ ...m, status: "lapsed" })),
@@ -539,7 +539,7 @@ describe("runRender: previews", () => {
             })
           ).result,
         ).code,
-      ).toBe("preview_forbidden");
+      ).toBe("template_not_found");
     } finally {
       await db
         .delete(schema.approvals)
@@ -547,7 +547,7 @@ describe("runRender: previews", () => {
     }
   });
 
-  it("forbids a preview to a persona who can't see the team (403), logged as a preview", async () => {
+  it("answers a preview to a persona who can't see the team as a template that isn't there (404), unlogged", async () => {
     const { result, rows } = await render({
       template: "high-yield-savings",
       version: 2,
@@ -555,15 +555,10 @@ describe("runRender: previews", () => {
       viewer: maya,
     });
     expect(failed(result)).toEqual({
-      code: "preview_forbidden",
-      message: "You can't preview this template.",
+      code: "template_not_found",
+      message: `Template ${ids["high-yield-savings"]} doesn't exist.`,
     });
-    expect(rows[0]).toMatchObject({
-      isPreview: true,
-      consumerId: null,
-      outcome: "error",
-      errorCode: "preview_forbidden",
-    });
+    expect(rows).toEqual([]);
 
     expect(
       failed(
@@ -576,7 +571,7 @@ describe("runRender: previews", () => {
           })
         ).result,
       ).code,
-    ).toBe("preview_forbidden");
+    ).toBe("template_not_found");
     expect(
       failed(
         (
@@ -588,7 +583,7 @@ describe("runRender: previews", () => {
           })
         ).result,
       ).code,
-    ).toBe("preview_forbidden");
+    ).toBe("template_not_found");
   });
 });
 

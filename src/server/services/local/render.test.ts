@@ -147,28 +147,29 @@ describe("render.preview on the database", () => {
     expect(out.filename).toBe(`${ids["cash-back"]}-v3-round-1.pdf`);
   }, 30_000);
 
-  it("refuses preview_forbidden to a person outside the template's team, logged as a preview", async () => {
-    for (const userId of ["morgan", "eli"]) {
-      const { result, rows } = await preview(userId, {
-        template: "balance-transfer",
-        version: 2,
-      });
-      expect(result).toEqual({
-        ok: false,
-        error: {
-          code: "preview_forbidden",
-          message: "You can't preview this template.",
-        },
-      });
-      expect(rows).toEqual([
-        expect.objectContaining({
-          isPreview: true,
-          consumerId: null,
-          outcome: "error",
-          errorCode: "preview_forbidden",
-        }),
-      ]);
-    }
+  it("answers a person outside the template's team as if nothing were there, whatever exists, unlogged", async () => {
+    // A version, a version that isn't there, an open draft, no draft, and no template: one answer for all five,
+    // so nobody learns from a preview which templates, versions or drafts exist on a team they can't see.
+    const asks: (Partial<PreviewRequest> & { template: string })[] = [
+      { template: "balance-transfer", version: 2 },
+      { template: "balance-transfer", version: 99 },
+      { template: "annual-fee-waiver", version: "draft" },
+      { template: "balance-transfer", version: "draft" },
+      { template: "UC-ZZZZZZ", version: 2 },
+    ];
+    for (const userId of ["morgan", "eli"])
+      for (const ask of asks) {
+        const { result, rows } = await preview(userId, ask);
+        const templateId = ids[ask.template] ?? ask.template;
+        expect(result).toEqual({
+          ok: false,
+          error: {
+            code: "template_not_found",
+            message: `Template ${templateId} doesn't exist.`,
+          },
+        });
+        expect(rows).toEqual([]);
+      }
   });
 
   it("answers a version or template that isn't there 404, unlogged", async () => {

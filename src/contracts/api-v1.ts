@@ -40,7 +40,7 @@ export type ApiErrorCode =
   | "consumer_required"
   | "body_too_large" // 413: the body is over 1,000,000 bytes
   | "unknown_consumer"
-  | "preview_forbidden" // 403: never returned by /api/v1; Stencil's own preview route uses it (kept so the codes match RenderErrorCode)
+  | "preview_forbidden" // 403: returned by no route (the preview answers 404 template_not_found); kept so the codes match RenderErrorCode
   | "signed_out" // 401: never returned by /api/v1; Stencil's own preview route, with nobody signed in (the same)
   | "template_not_found"
   | "version_not_found"
