@@ -353,16 +353,17 @@ export function reviewContract(h: ContractHarness, base: Date) {
   }
 
   /** Saves the template's open draft as `userId`, from the rev the workspace shows; the save must land. */
+  let sent = 0;
   async function saveDraft(
     userId: string,
     templateId: string,
-    patch: Omit<DraftPatch, "rev" | "sessionKey">,
+    patch: Omit<DraftPatch, "rev" | "sessionKey" | "seq">,
   ) {
     const { version } = await documentOf(templateId);
     if (version.state !== "draft") throw new Error("There is no open draft.");
     const saved = await h.services().drafts.save(await h.as(userId), {
       versionId: version.id,
-      patch: { rev: version.rev, sessionKey: SESSION, ...patch },
+      patch: { rev: version.rev, sessionKey: SESSION, seq: ++sent, ...patch },
     });
     if (!saved.ok) throw new Error(`the save was refused: ${saved.code}`);
   }

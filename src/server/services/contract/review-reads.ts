@@ -127,10 +127,11 @@ export function reviewReadsContract(h: ContractHarness, base: Date) {
     ok(h.services().templates.startDraft(await h.as(userId), { templateId }));
 
   /** Saves the template's open draft as `userId`, from the rev the workspace shows. */
+  let sent = 0;
   async function save(
     userId: string,
     templateId: string,
-    patch: Omit<DraftPatch, "rev" | "sessionKey">,
+    patch: Omit<DraftPatch, "rev" | "sessionKey" | "seq">,
   ) {
     const { version } = await documentOf(templateId);
     await ok(
@@ -139,6 +140,7 @@ export function reviewReadsContract(h: ContractHarness, base: Date) {
         patch: {
           rev: version.rev,
           sessionKey: "session-review-reads-01",
+          seq: ++sent,
           ...patch,
         },
       }),

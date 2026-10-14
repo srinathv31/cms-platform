@@ -174,6 +174,7 @@ const patchSchema = z.strictObject({
   sessionKey: z
     .string()
     .regex(/^[A-Za-z0-9_-]{8,64}$/, { message: "is not a valid session key" }),
+  seq: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
   body: doc.optional(),
   variables: variables.optional(),
   name: name.optional(),

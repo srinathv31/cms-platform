@@ -155,6 +155,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
     return history.template.name;
   }
 
+  let sent = 0;
   async function save(
     userId: string,
     versionId: string,
@@ -162,7 +163,8 @@ export function draftsContract(h: ContractHarness, base: Date) {
   ): Promise<DraftSaveResponse> {
     return h.services().drafts.save(await h.as(userId), {
       versionId,
-      patch: { sessionKey: ONE, ...patch },
+      // Each save is sent after the one before it, as the client's counter makes them, unless a case says otherwise.
+      patch: { sessionKey: ONE, seq: ++sent, ...patch },
     });
   }
 
@@ -558,7 +560,7 @@ export function draftsContract(h: ContractHarness, base: Date) {
       expect((await current()).rev).toBe(before.rev + 1);
     });
 
-    it("takes both of two resends at once from the session that owns the rev, one after the other", async () => {
+    it("takes two resends at once from the session that owns the rev in the order they were sent, and refuses one sent before the save that landed", async () => {
       const {
         versionId,
         stored: before,
@@ -570,8 +572,50 @@ export function draftsContract(h: ContractHarness, base: Date) {
         save("maya", versionId, { rev: before.rev, body: doc("x") }),
         save("maya", versionId, { rev: before.rev, body: doc("y") }),
       ]);
-      expect(answers.every((a) => a.ok)).toBe(true);
-      expect((await current()).rev).toBe(before.rev + 3);
+      // "y" was sent after "x": it lands whichever arrives first, and "x" lands only if it arrives before "y".
+      expect(answers[1]).toMatchObject({ ok: true });
+      expect((await current()).body).toEqual(doc("y"));
+    });
+
+    it("refuses draft_changed, and writes nothing, for a save the client gave up on that arrives after the retry that replaced it", async () => {
+      const {
+        versionId,
+        stored: before,
+        current,
+      } = await draftOf("annual-fee-waiver");
+      h.setClock(minute(1));
+      // The client sent "a" (seq 1), gave up waiting, and retried with what it had by then (seq 2): the retry lands.
+      expect(
+        await save("maya", versionId, {
+          rev: before.rev,
+          seq: 2,
+          body: doc("ab"),
+        }),
+      ).toMatchObject({ ok: true, rev: before.rev + 1 });
+      // Then the request it gave up on arrives. Its rev is behind and the session wrote the current one, but it was
+      // sent before the save that landed: putting back "a" would undo the author's edit without a word.
+      const late = await save("maya", versionId, {
+        rev: before.rev,
+        seq: 1,
+        body: doc("a"),
+      });
+      expect(late).toEqual({
+        ok: false,
+        ...REQUEST_REFUSALS.draftChanged,
+        rev: before.rev + 1,
+      });
+      expect(await current()).toMatchObject({
+        rev: before.rev + 1,
+        body: doc("ab"),
+      });
+      // The session carries on from the rev it was answered.
+      expect(
+        await save("maya", versionId, {
+          rev: before.rev + 1,
+          seq: 3,
+          body: doc("abc"),
+        }),
+      ).toMatchObject({ ok: true, rev: before.rev + 2 });
     });
   });
 

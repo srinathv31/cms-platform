@@ -254,6 +254,7 @@ one row per round and loses its three relational JSON columns
 | `rev`                 | `INT`            | no   | JPA `@Version`. Autosave's compare-and-set counter. Default 0.                                                                                                                                                                                           |
 | `last_save_session`   | `VARCHAR(64)`    | yes  | New. The editing session whose save produced the current `rev`.                                                                                                                                                                                          |
 | `last_save_by`        | `VARCHAR(64)`    | yes  | New. FK → `users`. Who made that save.                                                                                                                                                                                                                   |
+| `last_save_seq`       | `BIGINT`         | yes  | New. That save's `seq`: a save behind `rev` from the same session lands only with a higher one.                                                                                                                                                          |
 | `created_by`          | `VARCHAR(64)`    | no   | FK → `users`.                                                                                                                                                                                                                                            |
 | `created_at`          | `DATETIME2(3)`   | no   |                                                                                                                                                                                                                                                          |
 | `updated_at`          | `DATETIME2(3)`   | no   |                                                                                                                                                                                                                                                          |
@@ -609,8 +610,8 @@ The audit log and the render log are kept differently
     the sunset ([0026](../decisions/0026-a-passed-sunset-is-recorded-by-a-sweep.md)).
   - Autosave's recovery from a lost response (`sessionOwnsRev` in `src/domain/lifecycle/autosave.ts`, given what `lastSaveOf` in
     `src/server/services/local/drafts.ts` reads) reads the
-    session's `draft.edited` row for the `rev` it produced; it becomes `versions.last_save_session` and
-    `last_save_by` beside `rev` ([B5](../handoff-review.md#b5--medium-autosave-conflict-recovery-reads-the-audit-log)).
+    session's `draft.edited` row for the `rev` and `seq` it recorded; it becomes `versions.last_save_session`,
+    `last_save_by` and `last_save_seq` beside `rev` ([B5](../handoff-review.md#b5--medium-autosave-conflict-recovery-reads-the-audit-log)).
 
   Lane F (to-do item 3) puts both reads behind named service methods, so the Java implementation answers them from
   columns.

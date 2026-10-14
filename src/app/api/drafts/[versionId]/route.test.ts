@@ -27,7 +27,12 @@ const backend = fakeBackendPerTest({ base: BASE });
 const DRAFT = "v_dw4w6br3dk";
 const ALERT_DRAFT = "v_c5f0bnjvbf";
 const SESSION = "6f1c2b7e-4a0d-4f43-9a58-3a6a1f0f7b21";
-const good = { rev: 4, sessionKey: SESSION, name: "Annual fee waiver" };
+const good = {
+  rev: 4,
+  sessionKey: SESSION,
+  seq: 1,
+  name: "Annual fee waiver",
+};
 const TOO_LARGE = {
   ok: false,
   code: "draft_too_large",
@@ -194,7 +199,9 @@ describe("PUT /api/drafts/[versionId]", () => {
 
   it("400 invalid for a patch with nothing in it, or an empty name", async () => {
     const save = watchSave();
-    expect((await put({ rev: 4, sessionKey: SESSION })).status).toBe(400);
+    expect((await put({ rev: 4, sessionKey: SESSION, seq: 1 })).status).toBe(
+      400,
+    );
     expect((await put({ ...good, name: "   " })).status).toBe(400);
     expect(save).not.toHaveBeenCalled();
   });

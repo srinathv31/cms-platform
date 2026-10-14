@@ -125,7 +125,7 @@ variations to avoid.
    normalized, checked against the document limits and the editor schema, block ids added. Import stores documents
    through the same function. Then it calls `drafts.save` ([local/drafts.ts](../src/server/services/local/drafts.ts)
    on this app's database, deciding with [autosave.ts](../src/domain/lifecycle/autosave.ts)): in one transaction it
-   checks permission, the `draft` state, and `rev` (tolerating a lost response from the same session), writes with a
+   checks permission, the `draft` state, and `rev` (tolerating a lost response from the same session, but not a request it gave up on arriving after its retry), writes with a
    compare-and-set (the channel fields laid over the stored ones), adds the saver to the version's `writers` (nobody
    decides a version they wrote), and keeps one `draft.edited` audit row per editing session. Nothing is refreshed;
    the client already has the content.

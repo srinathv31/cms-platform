@@ -82,6 +82,7 @@ const sessionRows = async () =>
       )
   ).filter((r) => r.sessionKey === SESSION || r.sessionKey === OTHER);
 
+let sent = 0;
 async function save(
   patch: Partial<DraftPatch> & Pick<DraftPatch, "rev">,
   opts: { by?: string; at?: Date } = {},
@@ -89,14 +90,15 @@ async function save(
   clock = opts.at ?? T1;
   return services.drafts.save(await as(opts.by ?? "maya"), {
     versionId: (await draft()).id,
-    patch: { sessionKey: SESSION, ...patch },
+    // Each save is sent after the one before it, as the client's counter makes them.
+    patch: { sessionKey: SESSION, seq: ++sent, ...patch },
   });
 }
 
 describe("drafts.save on the database: the editing session's audit row", () => {
   it("writes one draft.edited row for a session's first save, with the rev it produced", async () => {
     const { id, rev, templateId } = await draft();
-    await save({ rev, body: doc("a"), name: "Renamed" });
+    await save({ rev, seq: 1, body: doc("a"), name: "Renamed" });
     expect(await sessionRows()).toEqual([
       expect.objectContaining({
         action: "draft.edited",
@@ -111,6 +113,7 @@ describe("drafts.save on the database: the editing session's audit row", () => {
           fields: ["body", "name"],
           since: T1.toISOString(),
           rev: rev + 1,
+          seq: 1,
         },
       }),
     ]);
@@ -118,9 +121,9 @@ describe("drafts.save on the database: the editing session's audit row", () => {
 
   it("merges the session's later saves into that row: the count, the fields, the latest rev and time", async () => {
     const { rev } = await draft();
-    await save({ rev, body: doc("a") }, { at: T1 });
-    await save({ rev: rev + 1, variables: [] }, { at: T2 });
-    await save({ rev: rev + 2, "email.subject": null }, { at: T3 });
+    await save({ rev, seq: 1, body: doc("a") }, { at: T1 });
+    await save({ rev: rev + 1, seq: 2, variables: [] }, { at: T2 });
+    await save({ rev: rev + 2, seq: 3, "email.subject": null }, { at: T3 });
     expect(await sessionRows()).toEqual([
       expect.objectContaining({
         at: T3,
@@ -129,6 +132,7 @@ describe("drafts.save on the database: the editing session's audit row", () => {
           fields: ["body", "variables", "email.subject"],
           since: T1.toISOString(),
           rev: rev + 3,
+          seq: 3,
         },
       }),
     ]);
@@ -190,7 +194,7 @@ describe("drafts.save on the database: the editing session's audit row", () => {
       details: { saves: 15 },
       sessionKey: SESSION,
     });
-    await save({ rev, body: doc("a") });
+    await save({ rev, seq: 1, body: doc("a") });
     expect(await sessionRows()).toEqual([
       expect.objectContaining({
         id: "ae_legacy",
@@ -200,6 +204,7 @@ describe("drafts.save on the database: the editing session's audit row", () => {
           fields: ["body"],
           since: BASE.toISOString(),
           rev: rev + 1,
+          seq: 1,
         },
       }),
     ]);

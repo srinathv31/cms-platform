@@ -9,7 +9,7 @@ import {
   draftSaveChanges,
   draftSaveRefusal,
   mergeDraftEdit,
-  recordedRev,
+  recordedSave,
   type DraftSaveRefused,
 } from "@/domain/lifecycle/autosave";
 import { REQUEST_REFUSALS } from "@/domain/refusals";
@@ -62,12 +62,12 @@ async function authorizeEdit(viewer: Viewer, versionId: string) {
 }
 
 /**
- * The last save an editing session (its key, by one person) made to a draft: the rev it produced (null when its
- * row never recorded one) and the session's `draft.edited` audit row, which this save merges into. Null when the
- * session hasn't saved to the draft.
+ * The last save an editing session (its key, by one person) made to a draft: the rev it produced and its `seq` (each
+ * null when its row never recorded one) and the session's `draft.edited` audit row, which this save merges into.
+ * Null when the session hasn't saved to the draft.
  *
  * The only read of `draft.edited` rows, and the one place autosave reads the audit log (B5). The Java API answers it
- * from the version row instead: `last_save_session` and `last_save_by` beside `rev`, written in the same transaction
+ * from the version row instead: `last_save_session`, `last_save_by` and `last_save_seq` beside `rev`, written in the same transaction
  * as every save, so when they name this session its last save produced the current rev (docs/reference/data-model.md).
  * Never from its audit log, which stays append-only (decision 0066).
  */
@@ -94,7 +94,7 @@ export async function lastSaveOf(
     .orderBy(desc(auditEvents.at))
     .limit(1)
     .then((rows) => rows[0]);
-  return row ? { rev: recordedRev(row.details), row } : null;
+  return row ? { ...recordedSave(row.details), row } : null;
 }
 
 export function localDrafts(deps: LocalDeps): DraftService {
@@ -144,7 +144,7 @@ export function localDrafts(deps: LocalDeps): DraftService {
               sessionKey: patch.sessionKey,
               actorId,
             });
-            const refused = draftSaveRefusal(draft, patch, last?.rev ?? null);
+            const refused = draftSaveRefusal(draft, patch, last);
             if (refused) throw new SaveRefused(refused);
 
             const set: SQLiteUpdateSetSource<typeof versions> = {
@@ -189,6 +189,7 @@ export function localDrafts(deps: LocalDeps): DraftService {
               changedFields(patch),
               now,
               saved.rev,
+              patch.seq,
             );
             if (last)
               await tx

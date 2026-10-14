@@ -207,6 +207,7 @@ describe("submitting an alert", () => {
         patch: {
           rev: draft.rev,
           sessionKey: "session-local-review-01",
+          seq: 1,
           "sms.text": field(
             t("Hi "),
             chip("first_name"),

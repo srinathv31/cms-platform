@@ -27,8 +27,9 @@ export interface DraftService {
    * (`no_channels`, `channel_unavailable`).
    *
    * A `rev` that isn't the current one is `draft_changed`, unless the editing session that sent it (its
-   * `sessionKey`, by the same person) made the save that produced the current rev: its response was lost, and the
-   * save carries on from the current rev. The backend answers that from its own record of the session's last
+   * `sessionKey`, by the same person) made the save that produced the current rev and this save was sent after it
+   * (a higher `seq`): its response was lost, and the save carries on from the current rev. A save sent before it (a
+   * request the client gave up on, arriving after its retry) is `draft_changed`. The backend answers that from its own record of the session's last
    * save (decision 0066: the version row's session columns once ported, never its audit log). A save that loses
    * its compare-and-set to another write is `draft_changed` too.
    */

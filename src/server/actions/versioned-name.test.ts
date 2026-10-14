@@ -150,6 +150,7 @@ async function rename(name: string) {
   const prepared = prepareDraftPatch({
     rev: open.rev,
     sessionKey: "sess_rename",
+    seq: 1,
     name,
   });
   if (!prepared.ok) throw new Error(prepared.reason);

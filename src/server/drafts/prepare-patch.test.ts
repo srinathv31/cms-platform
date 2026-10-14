@@ -29,7 +29,12 @@ const doc = (...content: JSONContent[]): JSONContent => ({
 });
 
 function prepared(patch: Partial<DraftPatch>): DraftPatch {
-  const result = prepareDraftPatch({ rev: 5, sessionKey: SESSION, ...patch });
+  const result = prepareDraftPatch({
+    rev: 5,
+    sessionKey: SESSION,
+    seq: 1,
+    ...patch,
+  });
   if (!result.ok) throw new Error(`refused: ${result.reason}`);
   return result.patch;
 }
@@ -39,6 +44,7 @@ describe("prepareDraftPatch: the documents in stored form", () => {
     const patch: DraftPatch = {
       rev: 5,
       sessionKey: SESSION,
+      seq: 1,
       name: "Annual fee waiver",
       channels: ["pdf"],
       variables: [],
@@ -253,7 +259,9 @@ describe("prepareDraftPatch: a document the check refuses is invalid_input, with
       "This document has content Stencil doesn't support.",
     ],
   ])("refuses %s", (_, body, message) => {
-    expect(prepareDraftPatch({ rev: 5, sessionKey: SESSION, body })).toEqual({
+    expect(
+      prepareDraftPatch({ rev: 5, sessionKey: SESSION, seq: 1, body }),
+    ).toEqual({
       ok: false,
       code: "invalid_input",
       reason: message,
@@ -265,6 +273,7 @@ describe("prepareDraftPatch: a document the check refuses is invalid_input, with
       prepareDraftPatch({
         rev: 5,
         sessionKey: SESSION,
+        seq: 1,
         "email.subject": doc(para("a"), {
           type: "heading",
           attrs: { level: 2 },
@@ -284,6 +293,7 @@ describe("prepareDraftPatch: a document the check refuses is invalid_input, with
       prepareDraftPatch({
         rev: 5,
         sessionKey: SESSION,
+        seq: 1,
         body: doc({ type: "iframe" }),
         "email.subject": doc(para("a"), para("b")),
       }),

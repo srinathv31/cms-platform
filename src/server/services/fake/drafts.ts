@@ -6,7 +6,8 @@ import {
   draftSaveChanges,
   draftSaveRefusal,
   mergeDraftEdit,
-  recordedRev,
+  recordedSave,
+  type LastSave,
   type DraftSaveRefused,
 } from "@/domain/lifecycle/autosave";
 import type { Viewer } from "@/domain/types";
@@ -42,7 +43,7 @@ function lastSaveOf(
   state: FakeState,
   versionId: string,
   session: { sessionKey: string; actorId: string },
-): { rev: number | null; row: AuditEventRow } | null {
+): (LastSave & { row: AuditEventRow }) | null {
   const row = state.auditEvents
     .filter(
       (e) =>
@@ -55,7 +56,7 @@ function lastSaveOf(
       (latest, e) => (latest && latest.at >= e.at ? latest : e),
       undefined,
     );
-  return row ? { rev: recordedRev(row.details), row } : null;
+  return row ? { ...recordedSave(row.details), row } : null;
 }
 
 export function fakeDrafts(deps: FakeDeps): DraftService {
@@ -98,7 +99,7 @@ export function fakeDrafts(deps: FakeDeps): DraftService {
               allowedChannels: contentType.allowedChannels,
             },
             patch,
-            last?.rev ?? null,
+            last,
           );
           if (refused) throw new SaveRefused(refused);
 
@@ -126,6 +127,7 @@ export function fakeDrafts(deps: FakeDeps): DraftService {
             changedFields(patch),
             now,
             rev,
+            patch.seq,
           );
           if (last) tx.update("auditEvents", last.row, merged);
           else

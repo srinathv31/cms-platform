@@ -49,22 +49,34 @@ export function draftSaveAccess(
 
 // ── Whether it lands ───────────────────────────────────────
 
+/** What a session's last save recorded: the rev it produced and its `seq` (each null when its record never said). */
+export interface LastSave {
+  rev: number | null;
+  seq: number | null;
+}
+
 /**
- * True when the draft's current rev was produced by this very session, so a save that is behind
- * (`patchRev` < `currentRev`) can only be missing its own earlier saves, never someone else's. That happens when
- * a save lands but its response is lost.
+ * True when the draft's current rev was produced by this very session and the save was sent after that one, so a
+ * save that is behind (`patch.rev` < `currentRev`) can only be missing its own earlier saves, never someone else's.
+ * That happens when a save lands but its response is lost.
  *
- * `lastSaveRev` is the rev the session's last save produced (null when it has saved nothing, or its record never
- * said). Every write to a version, by anyone, bumps its rev, so if that save produced the current rev then nobody
- * has written since.
+ * `last` is what the session's last save recorded (null when it has saved nothing). Every write to a version, by
+ * anyone, bumps its rev, so if that save produced the current rev then nobody has written since. A save sent before
+ * it (a lower `seq`: a request the client gave up on, arriving after the retry that replaced it) carries older
+ * fields, so it is a conflict like any other.
  */
 export function sessionOwnsRev(
-  lastSaveRev: number | null,
+  last: LastSave | null,
   currentRev: number,
-  patchRev: number,
+  patch: Pick<DraftPatch, "rev" | "seq">,
 ): boolean {
   return (
-    lastSaveRev !== null && patchRev < currentRev && lastSaveRev === currentRev
+    last !== null &&
+    last.rev !== null &&
+    last.seq !== null &&
+    patch.rev < currentRev &&
+    last.rev === currentRev &&
+    patch.seq > last.seq
   );
 }
 
@@ -72,7 +84,8 @@ export function sessionOwnsRev(
  * Whether a save may land on the draft as it stands, in the order autosave answers (after `version_gone` and the
  * permission, which come first): `version_not_draft` once the version has left draft; `draft_changed`, carrying the
  * current rev, for a rev that isn't the current one (behind or ahead), unless the session's own last save produced
- * the current rev (`sessionOwnsRev`: the save carries on from there); then the channels (`draftChannelsRefusal`).
+ * the current rev and this save was sent after it (`sessionOwnsRev`: the save carries on from there); then the
+ * channels (`draftChannelsRefusal`).
  * Null: it lands, on `draft.rev`.
  */
 export function draftSaveRefusal(
@@ -82,14 +95,11 @@ export function draftSaveRefusal(
     /** The channels the template's content type allows. */
     allowedChannels: readonly Channel[];
   },
-  patch: Pick<DraftPatch, "rev" | "channels">,
-  lastSaveRev: number | null,
+  patch: Pick<DraftPatch, "rev" | "seq" | "channels">,
+  last: LastSave | null,
 ): DraftSaveRefused | null {
   if (draft.state !== "draft") return refuse(REQUEST_REFUSALS.versionNotDraft);
-  if (
-    patch.rev !== draft.rev &&
-    !sessionOwnsRev(lastSaveRev, draft.rev, patch.rev)
-  )
+  if (patch.rev !== draft.rev && !sessionOwnsRev(last, draft.rev, patch))
     return draftChanged(draft.rev);
   const channels = patch.channels
     ? draftChannelsRefusal(patch.channels, draft.allowedChannels)
@@ -177,6 +187,8 @@ export interface DraftEditedDetails {
    * it says who wrote the current rev (`recordedRev`, `sessionOwnsRev`).
    */
   rev: number;
+  /** The `seq` of this session's latest save: a save behind the rev lands only when it was sent after it (`sessionOwnsRev`). */
+  seq: number;
   /** Anything else already on the row is kept. */
   [key: string]: unknown;
 }
@@ -210,8 +222,17 @@ export function recordedRev(details: unknown): number | null {
     : null;
 }
 
+/** What a session's `draft.edited` row recorded of its latest save (`recordedRev`, and its `seq` or null). */
+export function recordedSave(details: unknown): LastSave {
+  return {
+    rev: recordedRev(details),
+    seq:
+      isRecord(details) && typeof details.seq === "number" ? details.seq : null,
+  };
+}
+
 /**
- * Folds one save into the session's audit row. `rev` is the version rev the save produced.
+ * Folds one save into the session's audit row. `rev` is the version rev the save produced, `seq` the save's own.
  *
  * - No row yet: a new one with `saves: 1`, the changed fields and `since: now`.
  * - A row exists: `saves + 1`, the union of the fields, and `since` kept. The row's `at` moves to now.
@@ -224,6 +245,7 @@ export function mergeDraftEdit(
   changed: readonly DraftField[],
   now: Date,
   rev: number,
+  seq: number,
 ): { at: Date; details: DraftEditedDetails } {
   const old = previous && isRecord(previous.details) ? previous.details : {};
   const oldSaves =
@@ -247,6 +269,7 @@ export function mergeDraftEdit(
         : previous.at.toISOString()
       : now.toISOString(),
     rev,
+    seq,
   };
   return { at: now, details };
 }

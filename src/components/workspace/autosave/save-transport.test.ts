@@ -6,6 +6,7 @@ import { KEEPALIVE_LIMIT_BYTES, createFetchSend } from "./save-transport";
 const patch: DraftPatch = {
   rev: 3,
   sessionKey: "6f1c2b7e-4a0d-4f43-9a58-3a6a1f0f7b21",
+  seq: 1,
   name: "Annual fee",
 };
 

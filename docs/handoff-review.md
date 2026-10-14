@@ -858,7 +858,7 @@ After the swap, `npm run golden:update` refreshes the Node-only PDF golden files
 
 #### B5 · Medium: Autosave conflict recovery reads the audit log
 
-- **Status:** Partly fixed. Autosave runs behind the seam (`DraftService.save`, lane F's step 2b-1), and the recovery's one read of the audit log is `lastSaveOf` in the local implementation, beside the save; the rule itself is the domain's `sessionOwnsRev`, given only the rev the session's last save produced, so the Java API answers it from the version row's session columns instead ([decision 0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and the contract suite pins the behaviour, not the audit row. The prototype still reads the session's `draft.edited` row.
+- **Status:** Partly fixed. Autosave runs behind the seam (`DraftService.save`, lane F's step 2b-1), and the recovery's one read of the audit log is `lastSaveOf` in the local implementation, beside the save; the rule itself is the domain's `sessionOwnsRev`, given only the rev and the `seq` the session's last save recorded, so the Java API answers it from the version row's session columns instead ([decision 0066](decisions/0066-the-audit-log-is-the-record-and-render-events-roll-up.md)) and the contract suite pins the behaviour, not the audit row. The prototype still reads the session's `draft.edited` row.
 - **Where:** `src/server/services/local/drafts.ts` (`lastSaveOf`)
 - **What happens:** Recovering from a lost save response reads `rev` from the `draft.edited` audit row's JSON. If audit moves to Spring or an event stream, autosave conflict handling breaks.
 - **Fix:** Store `lastSaveSession` and `rev` on the version row.

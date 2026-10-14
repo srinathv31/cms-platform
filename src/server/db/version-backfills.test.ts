@@ -74,6 +74,7 @@ async function edit(userId: string, templateId: string, text: string) {
   const prepared = prepareDraftPatch({
     rev: draft.rev,
     sessionKey: `session-${userId}-${minute}`,
+    seq: 1,
     body: {
       ...draft.body,
       content: [
