@@ -16,6 +16,7 @@ The product was called UCOMP while these were written; it's Stencil now.
 | [phase-4-brief.md](phase-4-brief.md), [phase-5-brief.md](phase-5-brief.md), [phase-6-brief.md](phase-6-brief.md), [phase-7a-brief.md](phase-7a-brief.md) | Task briefs for each build phase: contracts and who implemented what. | The layer READMEs |
 | [handoff-phases-5-7.md](handoff-phases-5-7.md) | Handoff between build sessions. | None |
 | [final-review.md](final-review.md) | What Phases 5–7 built, written for the owner's review. | [architecture.md](../architecture.md) |
+| [render-spec-changes.md](render-spec-changes.md) | Section 14 of the render spec: the Before / Now table of what the specification changed in the first engine. | [render-spec.md](../render-spec.md) |
 | [tracks/](tracks/README.md) | How the three parallel build tracks ran, with each track's report. | None |
 
 Decisions made during the build are not archived: they're in [decisions/prototype-log.md](../decisions/prototype-log.md).
