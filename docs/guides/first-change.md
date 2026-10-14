@@ -32,7 +32,7 @@ A business rule goes in the domain, never in an action or a component. Whether a
 - [limits.ts](../../src/domain/platform-config/limits.ts) holds the limits: add `TEAM_CONTACT_EMAIL_MAX = 120`
   beside `TEAM_DESCRIPTION_MAX`.
 - [refusals.ts](../../src/domain/platform-config/refusals.ts) holds the sentences, each with a stable code that no
-  other refusal has (`refusals.test.ts` checks it). The code is the contract the backend keeps; the sentence is copy:
+  other refusal has ([src/domain/refusals.test.ts](../../src/domain/refusals.test.ts) checks it). The code is the contract the backend keeps; the sentence is copy:
 
   ```ts
   contactEmail: refusal(

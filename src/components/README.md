@@ -461,7 +461,7 @@ submit, and a footer that changed between the two versions struck and inserted (
   hand: `preview/pdf/pdf-controller.test.ts` replaces `load-pdfjs.ts` with a fake pdf.js and `IntersectionObserver` with
   one that reports when told. A settings screen is tested with its server action mocked and the domain's own sentences
   as the expectation (`settings/platform/approval-chains.test.tsx`).
-- End-to-end: `e2e/scenario-02.spec.ts` through `e2e/scenario-10.spec.ts` follow the demo scenarios (create,
+- End-to-end ([e2e/README.md](../../e2e/README.md) is the guide): `e2e/scenario-02.spec.ts` through `e2e/scenario-10.spec.ts` follow the demo scenarios (create,
   review, go live, sunset, revoke, roles, access, import, Copilot); `e2e/alerts.spec.ts` follows an alert from the
   composer and its live phone through submit, a field-redlined review, a comment on a field and Compare;
   `e2e/phase-1.spec.ts`, `e2e/navigation.spec.ts`, and `e2e/principles-*.spec.ts` cover the shell, Back and Forward,

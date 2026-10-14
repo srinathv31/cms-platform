@@ -52,15 +52,17 @@ answers from this app's database.
 Every rule above is lint-enforced in [eslint.config.mjs](../eslint.config.mjs). Flat config replaces the rule per
 file, so its blocks cover disjoint globs; when you add a rule, list everything that applies to those files.
 
+The database is behind the same lint. Only the local implementation (`src/server/services/local`), `src/server/db`, the seed and
+the reset import the database client or Drizzle (types excepted); the exceptions are Coral's own client for its `sim_*`
+tables (`src/simulator/db.ts`), the helpers in `src/lib` that open a database (the write lock, the fresh test
+database), the `scripts`, and tests. It is the seam a Spring Boot backend would replace
+([services README](../src/server/services/README.md#the-rules)).
+
 What a screen and the server both need lives below them both: types and constants (the `ucomp_created` cookie, `SubmitSummary`)
 in `src/domain`, pure helpers (`listSets`) in `@/editor/model/*`.
 
 Conventions that nothing enforces yet, and where the code already breaks them:
 
-- **Only `src/server` reads the database.** The `db` client is imported under `src/server` and nowhere else, apart
-  from Coral's own client for its `sim_*` tables (`src/simulator/db.ts`), the helpers in `src/lib` that open a
-  database (the write lock, the fresh test database), the `scripts`, and tests. Keep it that way; it is the seam a
-  Spring Boot backend would replace.
 - **New business rules go in `src/domain`.** Some still live in actions, queries, and components; the
   [domain README](../src/domain/README.md#rules-that-live-outside-srcdomain) lists them.
 - **Components get permissions decided.** Read models carry `can` results, and no component calls `can()` itself.
@@ -77,8 +79,8 @@ Conventions that nothing enforces yet, and where the code already breaks them:
    renders the header and tab bar.
 3. [versions-content.tsx](../src/components/versions/versions-content.tsx), a server component, awaits `params` and
    calls `getVersions()` from [queries/versions.ts](../src/server/queries/versions.ts).
-4. The read model reads the request context ([context/request.ts](../src/server/context/request.ts): the viewer and
-   the demo time, once per request), checks the space, and asks the backend through the service interfaces
+4. The read model reads the request context ([context/request.ts](../src/server/context/request.ts): the viewer,
+   once per request; it carries no time), checks the space, and asks the backend through the service interfaces
    (`services().versions.history`, [services/](../src/server/services/README.md)). The backend checks access, queries
    the tables and decides `can` per version; the read model words and lays out the facts and returns `VersionsData`:
    plain, serializable, dates as ISO strings, one entry per version number with its review rounds folded into it.

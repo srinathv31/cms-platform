@@ -248,7 +248,7 @@ The backend-agnostic Next.js app and the BFF seam are the same piece of work.
 
 ### Item 2. The docs sweep (lanes L1 to L7, one per README)
 
-- [ ] Make every doc describe the business logic and the code as they are now: fix the eight stale claims and the
+- [x] Make every doc describe the business logic and the code as they are now: fix the eight stale claims and the
       contradiction (review §4 M-28), delete the editor README's status header and its eight "Changes since Phase N"
       sections (H-4), remove the 31 "Phase N" mentions outside `docs/archive/`, rewrite the three type-file headers
       that still address build agents (M-22), label the render spec's pagination rules Node-only and archive its §14
@@ -262,10 +262,12 @@ The backend-agnostic Next.js app and the BFF seam are the same piece of work.
   and the seam once, not twice.
 - Start at: `src/components/README.md:396` (the e2e contradiction), `src/editor/README.md:8-12` and `:521-643`,
   `src/domain/access-types.ts:1-8`, `src/server/README.md:198`.
+  (wave 3.) Left on purpose: ten long bullets in `docs/render-spec.md` (normative text, in sections 4, 12, 13 and the PDF
+  channel) and one numbered step in the golden README stay over 600 characters until someone who owns the spec splits them.
 
 ### Item 9. Lower the barrier to entry for Node.js developers (lane M, plus one paragraph per lane L)
 
-- [ ] A readability pass guided by the review's section 5, with one rule: the TypeScript stays idiomatic TypeScript,
+- [x] A readability pass guided by the review's section 5, with one rule: the TypeScript stays idiomatic TypeScript,
       optimized for Node.js developers, not reshaped to look like Java. Mixing two languages' conventions is how a
       codebase gets messy. Lane M writes the new files: a two-page Next.js primer for developers new to the App Router
       (server components, why `"use server"` is a public endpoint, streaming and hydration, why `cookies()` outside
@@ -279,6 +281,7 @@ The backend-agnostic Next.js app and the BFF seam are the same piece of work.
   explains well but scans slowly.
 - Start at: `src/components/README.md`, `src/server/README.md`, `src/app/README.md:19-40`, `docs/README.md`
   ("Where a new doc goes" says where the guides belong).
+  (wave 3.) The guides are in `docs/guides/`; nothing was left.
 
 ## Wave 4
 

@@ -54,6 +54,8 @@ only in `StatusBadge`, no placeholder text, no serious axe violations, and zero 
       Compare versions and Change sunset.
     - [e2e/reflow-editor-review.spec.ts](../../e2e/reflow-editor-review.spec.ts): the editor's block handle and block
       menu, and the review header's wrapping name and byline.
+    - [e2e/reflow-review-bar.spec.ts](../../e2e/reflow-review-bar.spec.ts): the review screen's decision bar, which
+      sticks to the bottom and leaves the document's last block above it.
     - [e2e/reflow-coral-settings.spec.ts](../../e2e/reflow-coral-settings.spec.ts): Coral's screens and every Settings
       section, with axe at 320 and 1280.
 

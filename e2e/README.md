@@ -121,7 +121,7 @@ template puts it back. `Changes` records each change and undoes them newest firs
 - `stills-1280`: the same specs at 1280 by 800, taking the stills at full speed.
 
 `npm run gate:media` runs both and collects the video and stills ([media/collect.mjs](media/collect.mjs)); it calls
-Homebrew's `ffmpeg` and `sips`, so it is macOS only. Both projects use one worker, because the scenario specs build on
+`ffmpeg`, by default Homebrew's at `/opt/homebrew/bin/ffmpeg` (`FFMPEG` names another). Both projects use one worker, because the scenario specs build on
 each other's data in order.
 
 ## Rules

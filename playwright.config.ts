@@ -49,9 +49,9 @@ if (!Number.isInteger(wanted) || wanted < 1)
   );
 const WORKERS = E2E_SHARED_STORAGE || requested !== "" ? 1 : wanted;
 
-// Only the scenario specs and the whole demo script (Phase 7b): `scenario-02a` (the Phase 2 gate in short
-// form) is not a gate recording. The demo script is for those two projects alone: `chromium` ignores it, so
-// `npm run e2e` never plays it (decision 0049). Run it with `npx playwright test --project=demo`.
+// The two opt-in projects run the scenario specs and the whole demo script, nothing else: `scenario-02a` (the
+// first three steps of scenario 2, mouse and then keyboard) is not a recording. The demo script is for those two projects alone: `chromium`
+// ignores it, so `npm run e2e` never plays it (decision 0049). Run it with `npx playwright test --project=demo`.
 const DEMO_SCRIPT = /demo-script\.spec\.ts/;
 const SCENARIOS = /(scenario-\d+|demo-script)\.spec\.ts/;
 

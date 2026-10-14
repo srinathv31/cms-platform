@@ -79,7 +79,7 @@ is the whole pattern, and the next section is why.
 everything that doesn't depend on a request, plus the fallbacks of the Suspense boundaries. Anything that does depend
 on a request must wait for one, so it has to sit inside a boundary. Reading `cookies()`, `headers()`, `params` or
 `searchParams`, or doing an uncached fetch or database read, outside `<Suspense>` makes the build fail with "Next.js
-encountered runtime data during prerendering" (or "uncached data") and names the route
+encountered uncached or runtime data during prerendering" and names the route
 (building, `node_modules/next/dist/docs/01-app/02-guides/building.md`,
 caching, `node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md`). In `next dev` the same mistake
 shows as a "blocking-route" overlay, easy to miss, and no test sees it.
