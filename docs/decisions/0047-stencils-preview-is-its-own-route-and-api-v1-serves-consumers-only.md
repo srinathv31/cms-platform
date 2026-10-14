@@ -5,7 +5,7 @@ Amended 2026-10-12: the render engine moves to Java ([0067](0067-java-renders-ev
 Amended 2026-10-13: the preview route asks the backend to render through the service interfaces (`services().render.preview`, with the request's context and its correlation id), which on this app's database runs the consumer route's pipeline (`runRender` in `src/server/services/local/render/render-template.ts`, where `previewAllowed` is). Nobody signed in is refused 401 `signed_out` by the route, before it reads the body and without asking the backend.
 Amended 2026-10-13 (PR #79 review): a template, version or draft the viewer may not preview reads as 404
 `template_not_found`, as one that isn't there, and is not logged
-([0052](0052-what-a-viewer-cant-see-reads-as-not-found.md)): a 403 after the template and the version were found told
+([0052](0052-a-page-you-may-not-read-is-not-found.md)): a 403 after the template and the version were found told
 anyone signed in which templates, versions and drafts another team has. No route returns `preview_forbidden` now.
 Date: 2026-10-11
 
