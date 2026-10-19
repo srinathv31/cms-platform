@@ -98,6 +98,16 @@
   --brand-3: var(--teal-500);
   --brand-4: var(--teal-700);
   --brand-soft: var(--teal-50);
+  /* The logo's decorations (src/components/brand): the pen line and its nib, the sketch lines, the paper of the
+     page outlines, and the wash in a folded corner. The accent follows the brand placeholder, so it turns TD
+     green with the rest of the app. */
+  --logo-accent: var(--teal-600);
+  --logo-ink: var(--stone-800);
+  --logo-paper: var(--stone-0);
+  --logo-paper-used: var(
+    --stone-50
+  ); /* the v2 sheets: paper that has been handled, not fresh white */
+  --logo-wash: var(--teal-100);
   --heat-empty: var(--stone-300);
   /* Series in one chart (which channel, which version), always in this order. Amounts stay on brand-1…4. */
   --series-1: var(--viz-teal);
@@ -391,4 +401,16 @@
     system-ui,
     sans-serif
   );
+}
+
+/* Windows high contrast: the logo's decorations draw in the system's text colour on its background, and the
+   wash (a tint with no meaning) goes. */
+@media (forced-colors: active) {
+  :root {
+    --logo-accent: CanvasText;
+    --logo-ink: CanvasText;
+    --logo-paper: Canvas;
+    --logo-paper-used: Canvas;
+    --logo-wash: transparent;
+  }
 }

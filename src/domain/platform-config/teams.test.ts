@@ -257,6 +257,7 @@ describe("RESERVED_SLUGS holds every top-level URL segment, read from the folder
         "request-access",
         "editor-lab",
         "pdf-lab",
+        "logo-lab",
       ]),
     );
   });

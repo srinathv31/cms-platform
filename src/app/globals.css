@@ -21,6 +21,209 @@
 @custom-variant narrow (@media (max-width: 799px));
 @custom-variant wide (@media (min-width: 800px));
 
+/* The logo's sheets fan out on hover (src/components/brand): a number the lockup animates from 0 to 1 and each sheet
+   reads. Registered, so it interpolates; an unregistered custom property would jump. */
+@property --logo-fan {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/*
+ * The pen draws its line while the logo is hovered, or its link is hovered or focused from the keyboard
+ * (src/components/brand/pen-line.tsx), and an underline that follows it draws itself as the pen lands.
+ *
+ * Timing, from the hover: 60ms of intent first, so a pointer passing over doesn't blank the line. Then the pen
+ * runs its 500ms: one timeline of 15 stops, nine along the rise and six along the fall, spaced on an ease-out so
+ * the stroke leaves at once and slows to land (the rise is done by about 200ms). It leans back a little while it
+ * travels and settles past upright and back as it lands. Each stop moves the pen to a point on the curve (set on
+ * the pen inline, as --pen-x-N and --pen-y-N, since the rise stretches with the wordmark) and wipes the line in to
+ * exactly that point. The underline overlaps the landing: it sweeps in from 400ms to 620ms, its second pass from
+ * 450ms to 660ms, both easing out like --ease-out-soft. At rest nothing animates and every line is whole. Under
+ * reduced motion there is no draw.
+ */
+@keyframes logo-pen {
+  0% {
+    left: var(--pen-x-0);
+    top: var(--pen-y-0);
+    opacity: 0;
+    rotate: -5deg;
+  }
+  4.27% {
+    left: var(--pen-x-1);
+    top: var(--pen-y-1);
+    opacity: 1;
+  }
+  8.67% {
+    left: var(--pen-x-2);
+    top: var(--pen-y-2);
+  }
+  13.23% {
+    left: var(--pen-x-3);
+    top: var(--pen-y-3);
+  }
+  17.96% {
+    left: var(--pen-x-4);
+    top: var(--pen-y-4);
+  }
+  22.89% {
+    left: var(--pen-x-5);
+    top: var(--pen-y-5);
+  }
+  28.05% {
+    left: var(--pen-x-6);
+    top: var(--pen-y-6);
+  }
+  33.48% {
+    left: var(--pen-x-7);
+    top: var(--pen-y-7);
+  }
+  39.25% {
+    left: var(--pen-x-8);
+    top: var(--pen-y-8);
+    rotate: -4deg;
+  }
+  45.43% {
+    left: var(--pen-x-9);
+    top: var(--pen-y-9);
+  }
+  52.14% {
+    left: var(--pen-x-10);
+    top: var(--pen-y-10);
+  }
+  59.59% {
+    left: var(--pen-x-11);
+    top: var(--pen-y-11);
+  }
+  68.17% {
+    left: var(--pen-x-12);
+    top: var(--pen-y-12);
+  }
+  78.83% {
+    left: var(--pen-x-13);
+    top: var(--pen-y-13);
+    rotate: 2.5deg;
+  }
+  100% {
+    left: var(--pen-x-14);
+    top: var(--pen-y-14);
+    rotate: 0deg;
+  }
+}
+
+@keyframes logo-draw-rise {
+  0% {
+    clip-path: inset(-1em 100% -1em 0);
+  }
+  4.27% {
+    clip-path: inset(-1em 87.5% -1em 0);
+  }
+  8.67% {
+    clip-path: inset(-1em 75% -1em 0);
+  }
+  13.23% {
+    clip-path: inset(-1em 62.5% -1em 0);
+  }
+  17.96% {
+    clip-path: inset(-1em 50% -1em 0);
+  }
+  22.89% {
+    clip-path: inset(-1em 37.5% -1em 0);
+  }
+  28.05% {
+    clip-path: inset(-1em 25% -1em 0);
+  }
+  33.48% {
+    clip-path: inset(-1em 12.5% -1em 0);
+  }
+  39.25%,
+  100% {
+    clip-path: inset(-1em 0 -1em 0);
+  }
+}
+
+@keyframes logo-draw-fall {
+  0%,
+  39.25% {
+    clip-path: inset(-1em 100% -1em 0);
+  }
+  45.43% {
+    clip-path: inset(
+      -1em calc(100% * 0.8333 + var(--fall-shown) * 0.1667) -1em 0
+    );
+  }
+  52.14% {
+    clip-path: inset(
+      -1em calc(100% * 0.6667 + var(--fall-shown) * 0.3333) -1em 0
+    );
+  }
+  59.59% {
+    clip-path: inset(-1em calc(100% * 0.5 + var(--fall-shown) * 0.5) -1em 0);
+  }
+  68.17% {
+    clip-path: inset(
+      -1em calc(100% * 0.3333 + var(--fall-shown) * 0.6667) -1em 0
+    );
+  }
+  78.83% {
+    clip-path: inset(
+      -1em calc(100% * 0.1667 + var(--fall-shown) * 0.8333) -1em 0
+    );
+  }
+  100% {
+    clip-path: inset(-1em var(--fall-shown) -1em 0);
+  }
+}
+
+/* 660ms, so 400ms is 60.61% and 620ms is 93.94%. */
+@keyframes logo-underline {
+  0%,
+  60.61% {
+    clip-path: inset(-1em 100% -1em 0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  93.94%,
+  100% {
+    clip-path: inset(-1em -1em -1em 0);
+  }
+}
+
+/* 450ms is 68.18%. */
+@keyframes logo-underline-2 {
+  0%,
+  68.18% {
+    clip-path: inset(-1em 100% -1em 0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  100% {
+    clip-path: inset(-1em -1em -1em 0);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :is(
+    [data-slot="stencil-logo"]:hover,
+    a:hover [data-slot="stencil-logo"],
+    a:focus-visible [data-slot="stencil-logo"]
+  ) {
+    & [data-draw="rise"] {
+      animation: logo-draw-rise 500ms linear 60ms;
+    }
+    & [data-draw="fall"] {
+      animation: logo-draw-fall 500ms linear 60ms;
+    }
+    & [data-draw="pen"] {
+      animation: logo-pen 500ms linear 60ms;
+    }
+    & [data-draw="underline"] {
+      animation: logo-underline 660ms linear 60ms;
+    }
+    & [data-draw="underline-2"] {
+      animation: logo-underline-2 660ms linear 60ms;
+    }
+  }
+}
+
 @theme inline {
   /* Fonts */
   --font-sans: var(--ui-font-sans);
@@ -78,6 +281,11 @@
   --color-label: var(--text-label);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-text);
+  --color-logo-accent: var(--logo-accent);
+  --color-logo-ink: var(--logo-ink);
+  --color-logo-paper: var(--logo-paper);
+  --color-logo-paper-used: var(--logo-paper-used);
+  --color-logo-wash: var(--logo-wash);
   --color-brand-1: var(--brand-1);
   --color-brand-2: var(--brand-2);
   --color-brand-3: var(--brand-3);

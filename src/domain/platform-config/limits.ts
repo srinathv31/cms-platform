@@ -60,6 +60,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "sign-in",
   "editor-lab",
   "pdf-lab",
+  "logo-lab",
   "sim",
   "settings",
   "audit",

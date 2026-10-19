@@ -90,15 +90,16 @@ cookie with the demo tools off). Real sign-in (Better Auth, decision 0054) repla
 
 ### `(dev)`: labs
 
-Two labs for working on the editor and the PDF viewer. Each page calls `notFound()` when
+Three labs, for the editor, the PDF viewer and the logo. Each page calls `notFound()` when
 `process.env.NODE_ENV === "production"`, so they answer in `next dev` and 404 in a production build. There is no
 `(dev)` layout or proxy, nothing in the app links to them, and they use fixtures only, never the database or the
 persona.
 
-| URL           | What it is                                                              |
-| ------------- | ----------------------------------------------------------------------- |
-| `/editor-lab` | The live editor on fixtures, beside a server-rendered `StaticDocument`. |
-| `/pdf-lab`    | The PDF viewer, fed from a file input or `?src=`.                       |
+| URL           | What it is                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| `/editor-lab` | The live editor on fixtures, beside a server-rendered `StaticDocument`.                                 |
+| `/pdf-lab`    | The PDF viewer, fed from a file input or `?src=`.                                                       |
+| `/logo-lab`   | The logo's variants in the sidebar's header and at both sizes ([brand](../components/brand/README.md)). |
 
 ### Route handlers
 
